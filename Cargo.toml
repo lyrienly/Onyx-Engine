@@ -1,0 +1,11 @@
+[workspace]
+members = [
+    "crates/core",
+    "crates/gui",
+    "crates/dlls/allochook",
+    "crates/dlls/d3dhook",
+    "crates/dlls/luaclient",
+    "crates/dlls/speedhack",
+    "crates/dlls/vehdebug",
+]
+resolver = "2"

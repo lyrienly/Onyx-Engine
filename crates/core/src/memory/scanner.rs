@@ -1,0 +1,548 @@
+// language: Rust, file: scanner.rs, target: Windows 11, MSVC
+// High-performance multi-threaded Cheat Engine memory scanner
+
+use std::sync::{Arc, Mutex};
+use std::thread;
+use crate::process::{MemoryRegion, Process};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ValType {
+    I8,
+    U8,
+    I16,
+    U16,
+    I32,
+    U32,
+    I64,
+    U64,
+    Float,
+    Double,
+    Str,
+    Aob,
+}
+
+impl ValType {
+    pub fn size(&self) -> usize {
+        match self {
+            ValType::I8 | ValType::U8 => 1,
+            ValType::I16 | ValType::U16 => 2,
+            ValType::I32 | ValType::U32 | ValType::Float => 4,
+            ValType::I64 | ValType::U64 | ValType::Double => 8,
+            ValType::Str | ValType::Aob => 1,
+        }
+    }
+
+    pub fn default_alignment(&self) -> usize {
+        match self {
+            ValType::I8 | ValType::U8 | ValType::Str | ValType::Aob => 1,
+            ValType::I16 | ValType::U16 => 2,
+            ValType::I32 | ValType::U32 | ValType::Float => 4,
+            ValType::I64 | ValType::U64 | ValType::Double => 4, // CE default for 8-byte is often 4
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ScanValue {
+    I8(i8),
+    U8(u8),
+    I16(i16),
+    U16(u16),
+    I32(i32),
+    U32(u32),
+    I64(i64),
+    U64(u64),
+    Float(f32),
+    Double(f64),
+    Str(String),
+    Aob(Vec<Option<u8>>),
+}
+
+impl ScanValue {
+    pub fn val_type(&self) -> ValType {
+        match self {
+            ScanValue::I8(_) => ValType::I8,
+            ScanValue::U8(_) => ValType::U8,
+            ScanValue::I16(_) => ValType::I16,
+            ScanValue::U16(_) => ValType::U16,
+            ScanValue::I32(_) => ValType::I32,
+            ScanValue::U32(_) => ValType::U32,
+            ScanValue::I64(_) => ValType::I64,
+            ScanValue::U64(_) => ValType::U64,
+            ScanValue::Float(_) => ValType::Float,
+            ScanValue::Double(_) => ValType::Double,
+            ScanValue::Str(_) => ValType::Str,
+            ScanValue::Aob(_) => ValType::Aob,
+        }
+    }
+
+    pub fn byte_len(&self) -> usize {
+        match self {
+            ScanValue::I8(_) | ScanValue::U8(_) => 1,
+            ScanValue::I16(_) | ScanValue::U16(_) => 2,
+            ScanValue::I32(_) | ScanValue::U32(_) | ScanValue::Float(_) => 4,
+            ScanValue::I64(_) | ScanValue::U64(_) | ScanValue::Double(_) => 8,
+            ScanValue::Str(s) => s.len(),
+            ScanValue::Aob(v) => v.len(),
+        }
+    }
+
+    pub fn parse(val_type: ValType, text: &str) -> Result<Self, String> {
+        let trimmed = text.trim();
+        match val_type {
+            ValType::I8 => trimmed.parse::<i8>().map(ScanValue::I8).map_err(|e| e.to_string()),
+            ValType::U8 => {
+                if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
+                    u8::from_str_radix(&trimmed[2..], 16).map(ScanValue::U8).map_err(|e| e.to_string())
+                } else {
+                    trimmed.parse::<u8>().map(ScanValue::U8).map_err(|e| e.to_string())
+                }
+            }
+            ValType::I16 => trimmed.parse::<i16>().map(ScanValue::I16).map_err(|e| e.to_string()),
+            ValType::U16 => {
+                if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
+                    u16::from_str_radix(&trimmed[2..], 16).map(ScanValue::U16).map_err(|e| e.to_string())
+                } else {
+                    trimmed.parse::<u16>().map(ScanValue::U16).map_err(|e| e.to_string())
+                }
+            }
+            ValType::I32 => {
+                if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
+                    i32::from_str_radix(&trimmed[2..], 16).map(ScanValue::I32).map_err(|e| e.to_string())
+                } else {
+                    trimmed.parse::<i32>().map(ScanValue::I32).map_err(|e| e.to_string())
+                }
+            }
+            ValType::U32 => {
+                if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
+                    u32::from_str_radix(&trimmed[2..], 16).map(ScanValue::U32).map_err(|e| e.to_string())
+                } else {
+                    trimmed.parse::<u32>().map(ScanValue::U32).map_err(|e| e.to_string())
+                }
+            }
+            ValType::I64 => {
+                if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
+                    i64::from_str_radix(&trimmed[2..], 16).map(ScanValue::I64).map_err(|e| e.to_string())
+                } else {
+                    trimmed.parse::<i64>().map(ScanValue::I64).map_err(|e| e.to_string())
+                }
+            }
+            ValType::U64 => {
+                if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
+                    u64::from_str_radix(&trimmed[2..], 16).map(ScanValue::U64).map_err(|e| e.to_string())
+                } else {
+                    trimmed.parse::<u64>().map(ScanValue::U64).map_err(|e| e.to_string())
+                }
+            }
+            ValType::Float => trimmed.parse::<f32>().map(ScanValue::Float).map_err(|e| e.to_string()),
+            ValType::Double => trimmed.parse::<f64>().map(ScanValue::Double).map_err(|e| e.to_string()),
+            ValType::Str => Ok(ScanValue::Str(trimmed.to_string())),
+            ValType::Aob => {
+                let parts: Vec<&str> = trimmed.split_whitespace().collect();
+                let mut pattern = Vec::new();
+                for p in parts {
+                    if p == "?" || p == "??" {
+                        pattern.push(None);
+                    } else {
+                        let b = u8::from_str_radix(p, 16)
+                            .map_err(|_| format!("Invalid hex byte: {}", p))?;
+                        pattern.push(Some(b));
+                    }
+                }
+                if pattern.is_empty() {
+                    return Err("Empty AOB pattern".to_string());
+                }
+                Ok(ScanValue::Aob(pattern))
+            }
+        }
+    }
+
+    pub fn read_from_bytes(val_type: ValType, buf: &[u8]) -> Option<Self> {
+        if buf.len() < val_type.size() {
+            return None;
+        }
+        match val_type {
+            ValType::I8 => Some(ScanValue::I8(buf[0] as i8)),
+            ValType::U8 => Some(ScanValue::U8(buf[0])),
+            ValType::I16 => Some(ScanValue::I16(i16::from_ne_bytes([buf[0], buf[1]]))),
+            ValType::U16 => Some(ScanValue::U16(u16::from_ne_bytes([buf[0], buf[1]]))),
+            ValType::I32 => Some(ScanValue::I32(i32::from_ne_bytes([buf[0], buf[1], buf[2], buf[3]]))),
+            ValType::U32 => Some(ScanValue::U32(u32::from_ne_bytes([buf[0], buf[1], buf[2], buf[3]]))),
+            ValType::I64 => Some(ScanValue::I64(i64::from_ne_bytes([buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]]))),
+            ValType::U64 => Some(ScanValue::U64(u64::from_ne_bytes([buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]]))),
+            ValType::Float => Some(ScanValue::Float(f32::from_ne_bytes([buf[0], buf[1], buf[2], buf[3]]))),
+            ValType::Double => Some(ScanValue::Double(f64::from_ne_bytes([buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]]))),
+            ValType::Str => Some(ScanValue::Str(String::from_utf8_lossy(buf).to_string())),
+            ValType::Aob => Some(ScanValue::Aob(buf.iter().map(|&b| Some(b)).collect())),
+        }
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        match self {
+            ScanValue::I8(v) => vec![*v as u8],
+            ScanValue::U8(v) => vec![*v],
+            ScanValue::I16(v) => v.to_ne_bytes().to_vec(),
+            ScanValue::U16(v) => v.to_ne_bytes().to_vec(),
+            ScanValue::I32(v) => v.to_ne_bytes().to_vec(),
+            ScanValue::U32(v) => v.to_ne_bytes().to_vec(),
+            ScanValue::I64(v) => v.to_ne_bytes().to_vec(),
+            ScanValue::U64(v) => v.to_ne_bytes().to_vec(),
+            ScanValue::Float(v) => v.to_ne_bytes().to_vec(),
+            ScanValue::Double(v) => v.to_ne_bytes().to_vec(),
+            ScanValue::Str(s) => s.as_bytes().to_vec(),
+            ScanValue::Aob(v) => v.iter().map(|b| b.unwrap_or(0)).collect(),
+        }
+    }
+
+    pub fn to_display_string(&self) -> String {
+        match self {
+            ScanValue::I8(v) => format!("{}", v),
+            ScanValue::U8(v) => format!("{} (0x{:02X})", v, v),
+            ScanValue::I16(v) => format!("{}", v),
+            ScanValue::U16(v) => format!("{} (0x{:04X})", v, v),
+            ScanValue::I32(v) => format!("{} (0x{:08X})", v, v),
+            ScanValue::U32(v) => format!("{} (0x{:08X})", v, v),
+            ScanValue::I64(v) => format!("{} (0x{:016X})", v, v),
+            ScanValue::U64(v) => format!("{} (0x{:016X})", v, v),
+            ScanValue::Float(v) => format!("{:.4}", v),
+            ScanValue::Double(v) => format!("{:.6}", v),
+            ScanValue::Str(s) => format!("\"{}\"", s),
+            ScanValue::Aob(p) => {
+                let bytes: Vec<String> = p.iter().map(|b| match b {
+                    Some(v) => format!("{:02X}", v),
+                    None => "??".to_string(),
+                }).collect();
+                bytes.join(" ")
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ScanCondition {
+    Exact(ScanValue),
+    Increased,
+    Decreased,
+    Changed,
+    Unchanged,
+    IncreasedBy(ScanValue),
+    DecreasedBy(ScanValue),
+    BiggerThan(ScanValue),
+    SmallerThan(ScanValue),
+    Between(ScanValue, ScanValue),
+    UnknownInitial,
+}
+
+#[derive(Debug, Clone)]
+pub struct ScanCandidate {
+    pub address: usize,
+    pub current_value: ScanValue,
+    pub previous_value: ScanValue,
+}
+
+pub struct Scanner {
+    pub val_type: ValType,
+    pub alignment: usize,
+    pub candidates: Vec<ScanCandidate>,
+    pub history: Vec<Vec<ScanCandidate>>,
+    pub scan_count: usize,
+    pub start_addr: usize,
+    pub stop_addr: usize,
+    pub writable_only: bool,
+    pub executable: bool,
+    pub copy_on_write: bool,
+    pub fast_scan: bool,
+}
+
+impl Scanner {
+    pub fn new(val_type: ValType) -> Self {
+        let align = val_type.default_alignment();
+        Scanner {
+            val_type,
+            alignment: align,
+            candidates: Vec::new(),
+            history: Vec::new(),
+            scan_count: 0,
+            start_addr: 0x0000000000000000,
+            stop_addr: 0x7FFFFFFFFFFF,
+            writable_only: true,
+            executable: false,
+            copy_on_write: false,
+            fast_scan: true,
+        }
+    }
+
+    pub fn set_alignment(&mut self, align: usize) {
+        self.alignment = align.max(1);
+    }
+
+    pub fn undo_scan(&mut self) -> bool {
+        if let Some(prev) = self.history.pop() {
+            self.candidates = prev;
+            self.scan_count = self.scan_count.saturating_sub(1);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn first_scan(&mut self, proc: &Process, condition: ScanCondition) -> Result<usize, String> {
+        let all_regions = proc.regions(self.writable_only)?;
+        let start = self.start_addr;
+        let stop = if self.stop_addr == 0 { usize::MAX } else { self.stop_addr };
+
+        let regions: Vec<MemoryRegion> = all_regions
+            .into_iter()
+            .filter(|r| {
+                let r_end = r.base.saturating_add(r.size);
+                if r_end <= start || r.base >= stop {
+                    return false;
+                }
+                if !self.executable && r.is_executable() && !r.is_writable() {
+                    return false;
+                }
+                true
+            })
+            .collect();
+
+        let val_type = self.val_type;
+        let alignment = if self.fast_scan { self.alignment } else { 1 };
+        let cond = condition.clone();
+
+        let results = Arc::new(Mutex::new(Vec::new()));
+        let mut handles = Vec::new();
+
+        let num_cpus = thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+        let chunks: Vec<Vec<MemoryRegion>> = regions
+            .chunks((regions.len() / num_cpus).max(1))
+            .map(|c| c.to_vec())
+            .collect();
+
+        let proc_handle = proc.handle as usize;
+
+        for chunk in chunks {
+            let res_clone = Arc::clone(&results);
+            let cond_clone = cond.clone();
+
+            let handle = thread::spawn(move || {
+                let dummy_proc = Process {
+                    pid: 0,
+                    handle: proc_handle as crate::win32::HANDLE,
+                    name: String::new(),
+                };
+
+                let mut local_candidates = Vec::new();
+                for region in chunk {
+                    // Read in 512KB chunks
+                    let chunk_size = 512 * 1024;
+                    let mut offset = 0;
+
+                    while offset < region.size {
+                        let cur_size = (region.size - offset).min(chunk_size);
+                        let cur_addr = region.base + offset;
+
+                        let mut buf = vec![0u8; cur_size];
+                        if let Ok(bytes_read) = dummy_proc.read_raw(cur_addr, &mut buf) {
+                            if bytes_read >= val_type.size() {
+                                scan_buffer(
+                                    cur_addr,
+                                    &buf[..bytes_read],
+                                    val_type,
+                                    alignment,
+                                    &cond_clone,
+                                    &mut local_candidates,
+                                );
+                            }
+                        }
+                        offset += cur_size;
+                    }
+                }
+
+                // Prevent drop closing handle
+                std::mem::forget(dummy_proc);
+
+                let mut lock = res_clone.lock().unwrap();
+                lock.extend(local_candidates);
+            });
+            handles.push(handle);
+        }
+
+        for h in handles {
+            let _ = h.join();
+        }
+
+        let mut collected = Arc::try_unwrap(results).unwrap().into_inner().unwrap();
+        collected.sort_by_key(|c| c.address);
+
+        self.history.push(std::mem::take(&mut self.candidates));
+        self.candidates = collected;
+        self.scan_count = 1;
+        Ok(self.candidates.len())
+    }
+
+    pub fn next_scan(&mut self, proc: &Process, condition: ScanCondition) -> Result<usize, String> {
+        if self.candidates.is_empty() {
+            return Err("No candidates available for Next Scan. Run First Scan first.".to_string());
+        }
+
+        let val_size = self.val_type.size();
+        let val_type = self.val_type;
+        let mut filtered = Vec::with_capacity(self.candidates.len());
+        let mut buf = vec![0u8; val_size.max(32)];
+
+        for cand in &self.candidates {
+            if proc.read_raw(cand.address, &mut buf[..val_size]).is_ok() {
+                if let Some(new_val) = ScanValue::read_from_bytes(val_type, &buf[..val_size]) {
+                    if matches_next_condition(&cand.current_value, &new_val, &condition) {
+                        filtered.push(ScanCandidate {
+                            address: cand.address,
+                            current_value: new_val,
+                            previous_value: cand.current_value.clone(),
+                        });
+                    }
+                }
+            }
+        }
+
+        self.history.push(self.candidates.clone());
+        self.candidates = filtered;
+        self.scan_count += 1;
+        Ok(self.candidates.len())
+    }
+
+    pub fn results(&self, limit: usize) -> &[ScanCandidate] {
+        let count = self.candidates.len().min(limit);
+        &self.candidates[..count]
+    }
+
+    pub fn count(&self) -> usize {
+        self.candidates.len()
+    }
+}
+
+fn scan_buffer(
+    base_addr: usize,
+    buf: &[u8],
+    val_type: ValType,
+    alignment: usize,
+    cond: &ScanCondition,
+    out: &mut Vec<ScanCandidate>,
+) {
+    let size = val_type.size();
+    if buf.len() < size {
+        return;
+    }
+
+    let max_idx = buf.len() - size;
+    let mut i = 0;
+
+    while i <= max_idx {
+        if let Some(val) = ScanValue::read_from_bytes(val_type, &buf[i..i + size]) {
+            if matches_first_condition(&val, cond) {
+                out.push(ScanCandidate {
+                    address: base_addr + i,
+                    current_value: val.clone(),
+                    previous_value: val,
+                });
+            }
+        }
+        i += alignment;
+    }
+}
+
+fn matches_first_condition(val: &ScanValue, cond: &ScanCondition) -> bool {
+    match cond {
+        ScanCondition::Exact(target) => values_equal(val, target),
+        ScanCondition::BiggerThan(target) => value_cmp(val, target) > 0,
+        ScanCondition::SmallerThan(target) => value_cmp(val, target) < 0,
+        ScanCondition::Between(low, high) => value_cmp(val, low) >= 0 && value_cmp(val, high) <= 0,
+        ScanCondition::UnknownInitial => true,
+        _ => false,
+    }
+}
+
+fn matches_next_condition(old: &ScanValue, cur: &ScanValue, cond: &ScanCondition) -> bool {
+    match cond {
+        ScanCondition::Exact(target) => values_equal(cur, target),
+        ScanCondition::Increased => value_cmp(cur, old) > 0,
+        ScanCondition::Decreased => value_cmp(cur, old) < 0,
+        ScanCondition::Changed => !values_equal(cur, old),
+        ScanCondition::Unchanged => values_equal(cur, old),
+        ScanCondition::BiggerThan(target) => value_cmp(cur, target) > 0,
+        ScanCondition::SmallerThan(target) => value_cmp(cur, target) < 0,
+        ScanCondition::Between(low, high) => value_cmp(cur, low) >= 0 && value_cmp(cur, high) <= 0,
+        ScanCondition::IncreasedBy(diff) => matches_diff(old, cur, diff, true),
+        ScanCondition::DecreasedBy(diff) => matches_diff(old, cur, diff, false),
+        ScanCondition::UnknownInitial => true,
+    }
+}
+
+fn values_equal(a: &ScanValue, b: &ScanValue) -> bool {
+    match (a, b) {
+        (ScanValue::I8(x), ScanValue::I8(y)) => x == y,
+        (ScanValue::U8(x), ScanValue::U8(y)) => x == y,
+        (ScanValue::I16(x), ScanValue::I16(y)) => x == y,
+        (ScanValue::U16(x), ScanValue::U16(y)) => x == y,
+        (ScanValue::I32(x), ScanValue::I32(y)) => x == y,
+        (ScanValue::U32(x), ScanValue::U32(y)) => x == y,
+        (ScanValue::I64(x), ScanValue::I64(y)) => x == y,
+        (ScanValue::U64(x), ScanValue::U64(y)) => x == y,
+        (ScanValue::Float(x), ScanValue::Float(y)) => (x - y).abs() < 0.0001,
+        (ScanValue::Double(x), ScanValue::Double(y)) => (x - y).abs() < 0.000001,
+        (ScanValue::Str(x), ScanValue::Str(y)) => x == y,
+        (ScanValue::Aob(x), ScanValue::Aob(y)) => {
+            if x.len() != y.len() {
+                return false;
+            }
+            for (bx, by) in x.iter().zip(y.iter()) {
+                if let (Some(b1), Some(b2)) = (bx, by) {
+                    if b1 != b2 {
+                        return false;
+                    }
+                }
+            }
+            true
+        }
+        _ => false,
+    }
+}
+
+fn value_cmp(a: &ScanValue, b: &ScanValue) -> i32 {
+    match (a, b) {
+        (ScanValue::I8(x), ScanValue::I8(y)) => x.cmp(y) as i32,
+        (ScanValue::U8(x), ScanValue::U8(y)) => x.cmp(y) as i32,
+        (ScanValue::I16(x), ScanValue::I16(y)) => x.cmp(y) as i32,
+        (ScanValue::U16(x), ScanValue::U16(y)) => x.cmp(y) as i32,
+        (ScanValue::I32(x), ScanValue::I32(y)) => x.cmp(y) as i32,
+        (ScanValue::U32(x), ScanValue::U32(y)) => x.cmp(y) as i32,
+        (ScanValue::I64(x), ScanValue::I64(y)) => x.cmp(y) as i32,
+        (ScanValue::U64(x), ScanValue::U64(y)) => x.cmp(y) as i32,
+        (ScanValue::Float(x), ScanValue::Float(y)) => {
+            if (x - y).abs() < 0.0001 { 0 } else if x > y { 1 } else { -1 }
+        }
+        (ScanValue::Double(x), ScanValue::Double(y)) => {
+            if (x - y).abs() < 0.000001 { 0 } else if x > y { 1 } else { -1 }
+        }
+        _ => 0,
+    }
+}
+
+fn matches_diff(old: &ScanValue, cur: &ScanValue, diff: &ScanValue, is_increase: bool) -> bool {
+    match (old, cur, diff) {
+        (ScanValue::I32(o), ScanValue::I32(c), ScanValue::I32(d)) => {
+            if is_increase { c - o == *d } else { o - c == *d }
+        }
+        (ScanValue::U32(o), ScanValue::U32(c), ScanValue::U32(d)) => {
+            if is_increase { c.wrapping_sub(*o) == *d } else { o.wrapping_sub(*c) == *d }
+        }
+        (ScanValue::Float(o), ScanValue::Float(c), ScanValue::Float(d)) => {
+            let actual = if is_increase { c - o } else { o - c };
+            (actual - d).abs() < 0.001
+        }
+        (ScanValue::Double(o), ScanValue::Double(c), ScanValue::Double(d)) => {
+            let actual = if is_increase { c - o } else { o - c };
+            (actual - d).abs() < 0.0001
+        }
+        _ => false,
+    }
+}

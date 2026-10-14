@@ -1,0 +1,10 @@
+[package]
+name = "onyx_core"
+version = "0.2.0"
+edition = "2024"
+
+[lib]
+name = "onyx_core"
+path = "src/lib.rs"
+
+[dependencies]
