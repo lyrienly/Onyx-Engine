@@ -1,40 +1,78 @@
 @echo off
-echo ===================================================
-echo   OnyxEngine - Native Memory Suite Builder
-echo ===================================================
+setlocal
+title OnyxEngine - Unified Build System (Rust Backend + Pascal Frontend)
+echo ===================================================================
+echo   OnyxEngine: Rust Backend (DLL) + Pascal/Lazarus Frontend
+echo ===================================================================
 echo.
 
+:: 1. Check Rust / Cargo
 where cargo >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [ERROR] Rust / Cargo not found in PATH!
-    echo Please install Rust from https://rustup.rs/
+    echo [ERROR] Rust and Cargo were not found in PATH!
+    echo Please install Rust from: https://rustup.rs/
     pause
     exit /b 1
 )
 
-echo [1/3] Compiling Release Binaries (Workspace)...
-cargo build --release
+:: 2. Compile Rust Backend DLL (onyx_backend.dll)
+echo [*] Step 1/3: Compiling Rust Backend DLL (onyx_backend.dll)...
+cargo build --release -p onyx_backend
 if %errorlevel% neq 0 (
-    echo [ERROR] Build failed!
+    echo.
+    echo [ERROR] Rust Backend compilation failed!
     pause
     exit /b 1
 )
 
-echo.
-echo [2/3] Preparing Output in bin\ ...
 if not exist "bin" mkdir "bin"
-
-if exist "target\release\OnyxEngine.exe" copy /y "target\release\OnyxEngine.exe" "bin\OnyxEngine.exe" >nul
-if exist "target\release\allochook_dll.dll" copy /y "target\release\allochook_dll.dll" "bin\allochook_dll.dll" >nul
-if exist "target\release\d3dhook_dll.dll" copy /y "target\release\d3dhook_dll.dll" "bin\d3dhook_dll.dll" >nul
-if exist "target\release\luaclient_dll.dll" copy /y "target\release\luaclient_dll.dll" "bin\luaclient_dll.dll" >nul
-if exist "target\release\speedhack_dll.dll" copy /y "target\release\speedhack_dll.dll" "bin\speedhack_dll.dll" >nul
-if exist "target\release\vehdebug_dll.dll" copy /y "target\release\vehdebug_dll.dll" "bin\vehdebug_dll.dll" >nul
-if exist "lua53-64.dll" copy /y "lua53-64.dll" "bin\lua53-64.dll" >nul
-
+copy /y "target\release\onyx_backend.dll" "bin\onyx_backend.dll" >nul
+copy /y "target\release\onyx_backend.dll" "cheat-engine\Cheat Engine\bin\onyx_backend.dll" >nul
+echo [OK] onyx_backend.dll generated and deployed.
 echo.
-echo [3/3] Build Completed Successfully!
-echo Binaries are located in: bin\
-echo Executable: bin\OnyxEngine.exe
+
+:: 3. Check Lazarus / lazbuild
+set LAZBUILD_EXE=lazbuild
+where lazbuild >nul 2>nul
+if %errorlevel% neq 0 (
+    if exist "C:\lazarus\lazbuild.exe" (
+        set LAZBUILD_EXE=C:\lazarus\lazbuild.exe
+    ) else (
+        echo [WARNING] lazbuild was not found in PATH or C:\lazarus.
+        echo Skipping Pascal frontend build.
+        goto finish
+    )
+)
+
+:: 4. Compile Pascal Frontend (Cheat Engine)
+echo [*] Step 2/3: Compiling Pascal/Lazarus Frontend with OnyxBackend bridge...
+"%LAZBUILD_EXE%" -B --build-mode=Release "cheat-engine\Cheat Engine\cheatengine.lpi"
+if %errorlevel% neq 0 (
+    echo.
+    echo [ERROR] Pascal frontend compilation failed!
+    pause
+    exit /b 1
+)
+echo [OK] cheatengine-x86_64.exe compiled successfully.
+echo.
+
+:: 5. Copy release artifacts to bin\
+echo [*] Step 3/3: Synchronizing distribution bin directory...
+copy /y "cheat-engine\Cheat Engine\bin\cheatengine-x86_64.exe" "bin\OnyxEngine-CE.exe" >nul
+if exist "cheat-engine\Cheat Engine\bin\lua53-64.dll" (
+    copy /y "cheat-engine\Cheat Engine\bin\lua53-64.dll" "bin\lua53-64.dll" >nul
+)
+if exist "cheat-engine\Cheat Engine\bin\*.dll" (
+    copy /y "cheat-engine\Cheat Engine\bin\*.dll" "bin\" >nul
+)
+
+:finish
+echo.
+echo ===================================================================
+echo   BUILD COMPLETED SUCCESSFULLY!
+echo.
+echo   [Backend]  bin\onyx_backend.dll (Rust C-ABI high performance)
+echo   [Frontend] bin\OnyxEngine-CE.exe (Pascal / Lazarus UI)
+echo ===================================================================
 echo.
 pause

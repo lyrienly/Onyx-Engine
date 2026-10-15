@@ -46,10 +46,21 @@ pub struct DbkDriver {
     pub device_name: String,
 }
 
+unsafe impl Send for DbkDriver {}
+unsafe impl Sync for DbkDriver {}
+
 impl DbkDriver {
-    /// Attempts to open a handle to \\.\DBK64 or \\.\DBK32 driver
+    /// Attempts to open a handle to \\.\DBK64, \\.\DBK32 or official CE driver versions
     pub fn connect() -> Result<Self, String> {
-        let names = ["\\\\.\\DBK64", "\\\\.\\DBK32", "\\\\.\\CEDRIVER73", "\\\\.\\CEDRIVER75"];
+        let names = [
+            "\\\\.\\DBK64",
+            "\\\\.\\DBK32",
+            "\\\\.\\CEDRIVER77",
+            "\\\\.\\CEDRIVER76",
+            "\\\\.\\CEDRIVER75",
+            "\\\\.\\CEDRIVER74",
+            "\\\\.\\CEDRIVER73",
+        ];
 
         for name in &names {
             let wide_name: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
@@ -73,7 +84,75 @@ impl DbkDriver {
             }
         }
 
-        Err("Failed to connect to Cheat Engine kernel driver (neither DBK64 nor DBK32 found). Is the driver loaded?".to_string())
+        Err("Failed to connect to Cheat Engine kernel driver (DBK64/CEDRIVER77). Is DBK loaded?".to_string())
+    }
+
+    /// Verifies driver communication via IOCTL_CE_TEST
+    pub fn test(&self) -> bool {
+        let mut returned: DWORD = 0;
+        let mut test_val: u32 = 0xAA55AA55;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_TEST,
+                &mut test_val as *mut _ as LPVOID,
+                size_of::<u32>() as DWORD,
+                null_mut(),
+                0,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        ok == TRUE
+    }
+
+    /// Queries DBK driver version
+    pub fn get_version(&self) -> Result<u32, String> {
+        let mut version: u32 = 0;
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_GETVERSION,
+                null_mut(),
+                0,
+                &mut version as *mut _ as LPVOID,
+                size_of::<u32>() as DWORD,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            Ok(version)
+        } else {
+            Err("Failed to query DBK version".to_string())
+        }
+    }
+
+    /// Kernel-level process handle acquisition (strips anti-cheat handle protection)
+    pub fn open_process(&self, pid: u32) -> Result<HANDLE, String> {
+        let mut input_pid: u64 = pid as u64;
+        let mut output: CeOpenProcessOutput = unsafe { std::mem::zeroed() };
+        let mut returned: DWORD = 0;
+
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_OPENPROCESS,
+                &mut input_pid as *mut _ as LPVOID,
+                size_of::<u64>() as DWORD,
+                &mut output as *mut _ as LPVOID,
+                size_of::<CeOpenProcessOutput>() as DWORD,
+                &mut returned,
+                null_mut(),
+            )
+        };
+
+        if ok == TRUE && output.handle != 0 {
+            Ok(output.handle as HANDLE)
+        } else {
+            Err(format!("DBK IOCTL_CE_OPENPROCESS failed for PID {}", pid))
+        }
     }
 
     /// Reads process memory via the DBKKernel driver (bypasses usermode hooks and stripped handles)

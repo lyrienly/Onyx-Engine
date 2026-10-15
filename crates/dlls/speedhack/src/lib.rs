@@ -79,9 +79,14 @@ unsafe extern "system" fn Hooked_QueryPerformanceCounter(lpCount: *mut i64) -> B
     if res != 0 && !lpCount.is_null() {
         let mut lock = SPEED_STATE.lock().unwrap();
         if let Some(state) = lock.as_mut() {
-            let delta = real_qpc - state.initial_real_qpc;
-            let scaled_delta = ((delta as f64) * (state.multiplier as f64)) as i64;
-            *lpCount = state.initial_virtual_qpc + scaled_delta;
+            if state.multiplier <= 0.0 {
+                // Unity / Mono IL2CPP freeze: lock virtual counter to baseline
+                *lpCount = state.initial_virtual_qpc;
+            } else {
+                let delta = real_qpc - state.initial_real_qpc;
+                let scaled_delta = ((delta as f64) * (state.multiplier as f64)) as i64;
+                *lpCount = state.initial_virtual_qpc + scaled_delta;
+            }
         } else {
             *lpCount = real_qpc;
         }
@@ -96,9 +101,13 @@ unsafe extern "system" fn Hooked_GetTickCount() -> DWORD {
 
     let mut lock = SPEED_STATE.lock().unwrap();
     if let Some(state) = lock.as_mut() {
-        let delta = real_tick.wrapping_sub(state.initial_real_tick);
-        let scaled_delta = ((delta as f64) * (state.multiplier as f64)) as u32;
-        state.initial_virtual_tick.wrapping_add(scaled_delta)
+        if state.multiplier <= 0.0 {
+            state.initial_virtual_tick
+        } else {
+            let delta = real_tick.wrapping_sub(state.initial_real_tick);
+            let scaled_delta = ((delta as f64) * (state.multiplier as f64)) as u32;
+            state.initial_virtual_tick.wrapping_add(scaled_delta)
+        }
     } else {
         real_tick
     }
@@ -110,9 +119,13 @@ unsafe extern "system" fn Hooked_GetTickCount64() -> u64 {
 
     let mut lock = SPEED_STATE.lock().unwrap();
     if let Some(state) = lock.as_mut() {
-        let delta = real_tick64.wrapping_sub(state.initial_real_tick64);
-        let scaled_delta = ((delta as f64) * (state.multiplier as f64)) as u64;
-        state.initial_virtual_tick64.wrapping_add(scaled_delta)
+        if state.multiplier <= 0.0 {
+            state.initial_virtual_tick64
+        } else {
+            let delta = real_tick64.wrapping_sub(state.initial_real_tick64);
+            let scaled_delta = ((delta as f64) * (state.multiplier as f64)) as u64;
+            state.initial_virtual_tick64.wrapping_add(scaled_delta)
+        }
     } else {
         real_tick64
     }
@@ -141,7 +154,7 @@ pub extern "system" fn SetSpeed(speed: f32) {
             state.initial_virtual_tick64 = state.initial_virtual_tick64.wrapping_add(tick64_delta);
             state.initial_real_tick64 = cur_tick64;
 
-            state.multiplier = speed;
+            state.multiplier = speed.max(0.0);
         }
     }
 }

@@ -1,14 +1,14 @@
-// OnyxEngine Main Application (OnyxEngineApp)
-// Clean, high-performance native memory, scanner, and inspection GUI
-
 use std::time::Instant;
+use std::sync::Arc;
+use std::collections::HashMap;
 use eframe::egui::{self, Color32, RichText, Rounding, Stroke, Vec2};
 use onyx_core::disasm::Disassembler;
 use onyx_core::freeze::Freezer;
 use onyx_core::lua_api::CeLuaEngine;
 use onyx_core::mono::{MonoDissector, RuntimeType};
 use onyx_core::pointer_scanner::{PointerPath, PointerScanner};
-use onyx_core::process::{Process, ProcessEntry};
+use onyx_core::process::{Process, ProcessEntry, ProcessAccessMode};
+use onyx_core::kernel::DbkDriver;
 use onyx_core::scanner::{ScanCondition, ScanValue, Scanner, ValType};
 use onyx_core::speedhack::SpeedhackInjector;
 
@@ -23,6 +23,10 @@ pub struct OnyxEngineApp {
     pub proc_list: Vec<ProcessEntry>,
     pub proc_filter: String,
     pub show_proc_modal: bool,
+    pub proc_modal_tab: usize,
+    pub selected_proc_item: Option<(u32, String)>,
+    pub icon_cache: HashMap<String, egui::TextureHandle>,
+    pub icons: Option<crate::ui::CeIcons>,
 
     // Performance & Responsiveness
     pub last_table_update: Instant,
@@ -59,6 +63,17 @@ pub struct OnyxEngineApp {
     pub show_aa_modal: bool,
     pub show_plugins_modal: bool,
     pub show_add_addr_modal: bool,
+    pub show_settings_modal: bool,
+    pub settings_tab: usize,
+
+    // Process Access Mode & Official CE DBK Driver Link
+    pub access_mode: ProcessAccessMode,
+    pub dbk_driver: Option<Arc<DbkDriver>>,
+    pub dbk_status_msg: String,
+    pub freeze_interval_ms: u64,
+
+    // CE 7.7: Ghost property (Overlay click-through)
+    pub ghost_mode: bool,
 
     // Pointer Scanner State
     pub pointer_scanner: PointerScanner,
@@ -136,6 +151,10 @@ impl OnyxEngineApp {
             proc_list: Vec::new(),
             proc_filter: String::new(),
             show_proc_modal: false,
+            proc_modal_tab: 0,
+            selected_proc_item: None,
+            icon_cache: HashMap::new(),
+            icons: None,
 
             last_table_update: Instant::now(),
 
@@ -167,6 +186,14 @@ impl OnyxEngineApp {
             show_aa_modal: false,
             show_plugins_modal: false,
             show_add_addr_modal: false,
+            show_settings_modal: false,
+            settings_tab: 0,
+
+            access_mode: ProcessAccessMode::NtApi,
+            dbk_driver: DbkDriver::connect().ok().map(Arc::new),
+            dbk_status_msg: String::new(),
+            freeze_interval_ms: 50,
+            ghost_mode: false,
 
             pointer_scanner: PointerScanner::new(),
             ptr_target_addr_text: "0x7FF700000000".to_string(),
@@ -245,6 +272,33 @@ dealloc(newmem)
         }
     }
 
+    pub fn try_connect_dbk(&mut self) {
+        match DbkDriver::connect() {
+            Ok(driver) => {
+                let arc = Arc::new(driver);
+                self.dbk_status_msg = format!("Connected to driver: {}", arc.device_name);
+                self.dbk_driver = Some(arc.clone());
+                if let Some(ref mut proc) = self.attached_proc {
+                    proc.set_dbk(Some(arc));
+                }
+                self.status_msg = "Official Cheat Engine DBK driver connected.".to_string();
+            }
+            Err(e) => {
+                self.dbk_status_msg = format!("DBK connection failed: {}", e);
+                self.dbk_driver = None;
+            }
+        }
+    }
+
+    pub fn set_access_mode(&mut self, mode: ProcessAccessMode) {
+        self.access_mode = mode;
+        if let Some(ref mut proc) = self.attached_proc {
+            proc.set_access_mode(mode);
+            proc.set_dbk(self.dbk_driver.clone());
+        }
+        self.status_msg = format!("Process access mode switched to {}", mode.badge());
+    }
+
     pub fn refresh_proc_list(&mut self) {
         if let Ok(mut list) = Process::list_all() {
             list.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
@@ -252,15 +306,42 @@ dealloc(newmem)
         }
     }
 
+    pub fn ensure_proc_icon(&mut self, ctx: &egui::Context, pid: u32, name: &str) {
+        let key = name.to_lowercase();
+        if self.icon_cache.contains_key(&key) {
+            return;
+        }
+
+        let icon_data = onyx_core::process::ProcessIconExtractor::get_process_icon(pid, name)
+            .or_else(onyx_core::process::ProcessIconExtractor::extract_default_exe_icon);
+
+        if let Some((w, h, pixels)) = icon_data {
+            let color_image = egui::ColorImage::from_rgba_unmultiplied(
+                [w as usize, h as usize],
+                &pixels,
+            );
+            let texture = ctx.load_texture(
+                format!("proc_icon_{}", key),
+                color_image,
+                egui::TextureOptions::LINEAR,
+            );
+            self.icon_cache.insert(key, texture);
+        }
+    }
+
+    pub fn get_icon(&self, name: &str) -> Option<&egui::TextureHandle> {
+        self.icon_cache.get(&name.to_lowercase())
+    }
+
     pub fn attach_to_proc(&mut self, pid: u32, _name: String) {
-        match Process::attach(pid) {
+        match Process::attach_with_mode(pid, self.access_mode, self.dbk_driver.clone()) {
             Ok(p) => {
                 self.proc_name = format!("{:08X} - {}", p.pid, p.name);
                 self.proc_pid = p.pid;
-                self.status_msg = format!("Attached to {} (PID: 0x{:X})", p.name, p.pid);
+                self.status_msg = format!("Attached to {} (PID: 0x{:X}) | Mode: {}", p.name, p.pid, p.access_mode.badge());
 
                 self.freezer.stop();
-                self.freezer.start(&p, 50);
+                self.freezer.start(&p, self.freeze_interval_ms);
 
                 if let Some(lua) = &self.lua_engine {
                     lua.set_active_process(&p);
@@ -278,7 +359,7 @@ dealloc(newmem)
                 if rt != RuntimeType::None {
                     let _ = self.mono_dissector.attach(&p);
                     let _ = self.mono_dissector.dissect(&p);
-                    self.status_msg = format!("Attached to {} (PID: 0x{:X}) • {} active", p.name, p.pid, rt.as_str());
+                    self.status_msg = format!("Attached to {} (PID: 0x{:X}) | {} active", p.name, p.pid, rt.as_str());
                 }
 
                 self.attached_proc = Some(p);
@@ -619,6 +700,19 @@ dealloc(newmem)
                     ValType::U64 => proc.read::<u64>(entry.address).map(|v| v.to_string()).unwrap_or("???".to_string()),
                     ValType::Float => proc.read::<f32>(entry.address).map(|v| format!("{:.2}", v)).unwrap_or("???".to_string()),
                     ValType::Double => proc.read::<f64>(entry.address).map(|v| format!("{:.4}", v)).unwrap_or("???".to_string()),
+                    ValType::Str => {
+                        // CE 7.7: don't render strings longer than 1000 characters in the addresslist
+                        match proc.read_string(entry.address, 1001, false) {
+                            Ok(s) => {
+                                if s.chars().count() > 1000 {
+                                    s.chars().take(1000).collect()
+                                } else {
+                                    s
+                                }
+                            }
+                            Err(_) => "???".to_string(),
+                        }
+                    }
                     _ => proc.read::<i32>(entry.address).map(|v| v.to_string()).unwrap_or("???".to_string()),
                 };
 
@@ -705,6 +799,12 @@ dealloc(newmem)
                         entry.target_val = v.to_string();
                     }
                 }
+                ValType::Str => {
+                    let mut raw = new_val_str.as_bytes().to_vec();
+                    raw.push(0);
+                    let _ = proc.write_raw(entry.address, &raw);
+                    entry.target_val = new_val_str.to_string();
+                }
                 _ => {}
             }
         }
@@ -780,11 +880,67 @@ dealloc(newmem)
 
 impl eframe::App for OnyxEngineApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if self.icons.is_none() {
+            self.icons = Some(crate::ui::CeIcons::load(ctx));
+        }
+
         if self.last_table_update.elapsed() >= std::time::Duration::from_millis(150) {
             self.update_table_values();
             self.last_table_update = Instant::now();
         }
-        ctx.request_repaint_after(std::time::Duration::from_millis(100));
+
+        // Keep 60 FPS pacing when pulsing/animated, zero stutter
+        if self.attached_proc.is_none() {
+            ctx.request_repaint_after(std::time::Duration::from_millis(16));
+        } else {
+            ctx.request_repaint_after(std::time::Duration::from_millis(33));
+        }
+
+        // Global Shortcuts
+        if ctx.input(|i| (i.modifiers.ctrl && i.key_pressed(egui::Key::Comma)) || i.key_pressed(egui::Key::F2)) {
+            self.show_settings_modal = !self.show_settings_modal;
+        }
+        if ctx.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::O)) {
+            self.refresh_proc_list();
+            self.show_proc_modal = true;
+        }
+        if ctx.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::M)) {
+            self.update_memory_view();
+            self.show_memory_view = true;
+        }
+        if ctx.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::P)) {
+            self.show_pointer_scanner = true;
+        }
+        if ctx.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::L)) {
+            self.show_lua_console = true;
+        }
+        if ctx.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::A)) {
+            self.show_aa_modal = true;
+        }
+        if ctx.input(|i| i.key_pressed(egui::Key::F11)) {
+            self.speedhack_enabled = !self.speedhack_enabled;
+            if let Some(proc) = &self.attached_proc {
+                let mult = if self.speedhack_enabled { self.speedhack_val } else { 1.0 };
+                let _ = self.speedhack_injector.enable_speedhack(proc, mult);
+                self.status_msg = format!("Speedhack toggled: {:.1}x", mult);
+            }
+        }
+
+        // CE 7.7: Ghost Mode toggle via hotkey (F10 or Ctrl+Shift+G)
+        if ctx.input(|i| i.key_pressed(egui::Key::F10) || (i.modifiers.ctrl && i.modifiers.shift && i.key_pressed(egui::Key::G))) {
+            self.ghost_mode = !self.ghost_mode;
+            self.status_msg = if self.ghost_mode {
+                "Ghost Mode [ON]: Window is click-through (overlay). Press F10 to disable.".to_string()
+            } else {
+                "Ghost Mode [OFF]: Window interaction restored.".to_string()
+            };
+            ctx.send_viewport_cmd(egui::ViewportCommand::MousePassthrough(self.ghost_mode));
+            ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(if self.ghost_mode {
+                egui::WindowLevel::AlwaysOnTop
+            } else {
+                egui::WindowLevel::Normal
+            }));
+        }
 
         // 1. Top Menubar
         ui::render_top_menu(self, ctx);
@@ -821,42 +977,72 @@ impl eframe::App for OnyxEngineApp {
                 .inner_margin(egui::Margin::symmetric(10.0, 4.0))
                 .show(ui, |ui| {
                     ui.set_height(28.0);
+                    let total_w = ui.available_width();
                     ui.horizontal(|ui| {
                         // Left: Memory View button
-                        let mem_btn = egui::Button::new(RichText::new("Memory View").size(12.5).color(Color32::WHITE).strong())
-                            .fill(Color32::from_rgb(35, 45, 65))
-                            .stroke(Stroke::new(1.0_f32, Color32::from_rgb(55, 80, 120)))
-                            .min_size(Vec2::new(110.0, 26.0))
-                            .rounding(Rounding::same(4.0));
+                        let mem_btn_resp = if let Some(ref icons) = self.icons {
+                            let img = egui::Image::new(&icons.memory_view).fit_to_exact_size(Vec2::splat(18.0));
+                            ui.add(
+                                egui::Button::image_and_text(
+                                    img,
+                                    RichText::new("Memory View").size(12.0).color(Color32::WHITE).strong(),
+                                )
+                                .fill(Color32::from_rgb(32, 42, 58))
+                                .stroke(Stroke::new(1.0_f32, Color32::from_rgb(52, 72, 105)))
+                                .min_size(Vec2::new(120.0, 26.0))
+                                .rounding(Rounding::same(3.0)),
+                            )
+                        } else {
+                            ui.add(
+                                egui::Button::new(RichText::new("Memory View").size(12.0).color(Color32::WHITE).strong())
+                                    .fill(Color32::from_rgb(32, 42, 58))
+                                    .stroke(Stroke::new(1.0_f32, Color32::from_rgb(52, 72, 105)))
+                                    .min_size(Vec2::new(105.0, 26.0))
+                                    .rounding(Rounding::same(3.0)),
+                            )
+                        };
 
-                        if ui.add(mem_btn).clicked() {
+                        if mem_btn_resp.clicked() {
                             self.update_memory_view();
                             self.show_memory_view = true;
                         }
 
-                        ui.add_space(8.0);
+                        // Center: Cheat Engine Iconic Red Downward Arrow
+                        let arrow_w = 40.0;
+                        let mem_w = 120.0;
+                        let space_to_center = ((total_w / 2.0) - mem_w - (arrow_w / 2.0) - 8.0).max(8.0);
+                        ui.add_space(space_to_center);
 
-                        // Center: Cheat Engine Red Downward Arrow [ \/ ]
-                        let center_space = (ui.available_width() - 210.0).max(40.0) / 2.0;
-                        ui.add_space(center_space);
+                        let arrow_btn_resp = if let Some(ref icons) = self.icons {
+                            let img = egui::Image::new(&icons.arrow_down).fit_to_exact_size(Vec2::splat(22.0));
+                            ui.add(
+                                egui::Button::image(img)
+                                    .fill(Color32::from_rgb(180, 35, 35))
+                                    .stroke(Stroke::new(1.0_f32, Color32::from_rgb(230, 60, 60)))
+                                    .min_size(Vec2::new(arrow_w, 26.0))
+                                    .rounding(Rounding::same(3.0)),
+                            )
+                        } else {
+                            ui.add(
+                                egui::Button::new(RichText::new("  \\/  ").size(13.0).color(Color32::WHITE).strong())
+                                    .fill(Color32::from_rgb(180, 35, 35))
+                                    .stroke(Stroke::new(1.0_f32, Color32::from_rgb(230, 60, 60)))
+                                    .min_size(Vec2::new(arrow_w, 26.0))
+                                    .rounding(Rounding::same(3.0)),
+                            )
+                        };
 
-                        let arrow_btn = egui::Button::new(RichText::new(" \\/ ").size(13.0).color(Color32::WHITE).strong())
-                            .fill(Color32::from_rgb(175, 35, 35))
-                            .stroke(Stroke::new(1.0_f32, Color32::from_rgb(220, 55, 55)))
-                            .min_size(Vec2::new(42.0, 26.0))
-                            .rounding(Rounding::same(4.0));
-
-                        if ui.add(arrow_btn).on_hover_text("Add selected / top candidate to address list").clicked() {
+                        if arrow_btn_resp.on_hover_text("Copy selected / top candidate to Cheat Table").clicked() {
                             add_top_candidate = true;
                         }
 
                         // Right: Add Address Manually
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            let manual_btn = egui::Button::new(RichText::new("Add Address Manually").size(12.5).color(Color32::WHITE).strong())
-                                .fill(Color32::from_rgb(30, 75, 45))
+                            let manual_btn = egui::Button::new(RichText::new("+ Add Address Manually").size(12.0).color(Color32::WHITE).strong())
+                                .fill(Color32::from_rgb(28, 70, 42))
                                 .stroke(Stroke::new(1.0_f32, Color32::from_rgb(45, 120, 70)))
-                                .min_size(Vec2::new(150.0, 26.0))
-                                .rounding(Rounding::same(4.0));
+                                .min_size(Vec2::new(145.0, 26.0))
+                                .rounding(Rounding::same(3.0));
 
                             if ui.add(manual_btn).clicked() {
                                 self.show_add_addr_modal = true;

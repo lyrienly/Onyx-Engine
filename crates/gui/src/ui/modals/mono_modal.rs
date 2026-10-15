@@ -65,7 +65,7 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                 ui.horizontal(|ui| {
                     let a_count = app.mono_dissector.assemblies.len();
                     let c_count: usize = app.mono_dissector.assemblies.iter().map(|a| a.classes.len()).sum();
-                    ui.label(RichText::new(format!("Runtime: {} • Assemblies: {} • Classes: {} • Target: {}", app.mono_dissector.runtime_type.as_str(), a_count, c_count, app.proc_name)).color(Color32::LIGHT_GRAY));
+                    ui.label(RichText::new(format!("Runtime: {} | Assemblies: {} | Classes: {} | Target: {}", app.mono_dissector.runtime_type.as_str(), a_count, c_count, app.proc_name)).color(Color32::LIGHT_GRAY));
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui.button(RichText::new("Close Dissector").strong()).clicked() {

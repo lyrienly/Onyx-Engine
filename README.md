@@ -5,109 +5,79 @@
 [![GUI](https://img.shields.io/badge/GUI-egui_%2F_eframe-green)](https://github.com/emilk/egui)
 [![Status](https://img.shields.io/badge/Status-Active_Development-brightgreen)](#)
 
-**OnyxEngine** é uma estação de trabalho nativa em Rust para engenharia reversa, inspeção de memória em tempo real, depuração e análise de processos Windows x86_64. 
-
-Projetada com foco em alta performance, segurança de tipos, arquitetura estritamente desacoplada e ausência de sobrecarga desnecessária, a suíte unifica em uma interface gráfica moderna e responsiva as capacidades essenciais de inspeção de baixo nível.
+**OnyxEngine** é uma suíte de alta performance para engenharia reversa e manipulação de memória em processos Windows x86_64, combinando o frontend nativo do Cheat Engine em Free Pascal/Lazarus com um backend ultrarrápido modularizado em Rust (`onyx_backend.dll`).
 
 ---
 
-## 🏛 Arquitetura do Workspace
+## 🏛 Arquitetura Híbrida (Rust Backend + Pascal Frontend)
 
-O projeto é estruturado como um workspace modular do Cargo, separando rigorosamente o motor nativo (`core`), a interface gráfica (`gui`) e as bibliotecas dinâmicas injetáveis (`dlls`):
+O projeto adota uma divisão estrita de responsabilidades:
+1. **Frontend (Pascal / Lazarus):** Interface gráfica autêntica, robusta e completa do Cheat Engine (`cheat-engine/Cheat Engine`), compilada nativamente via `lazbuild`.
+2. **Backend (Rust C-ABI DLL):** Motor de alta performance modularizado em pastas e subpastas (`crates/backend` e `crates/core`), compilado como biblioteca dinâmica nativa `onyx_backend.dll`.
+3. **Bridge Unit (`OnyxBackend.pas`):** Camada de integração direta que intercepta chamadas de kernel (`NewKernelHandler.pas`), roteando operações de leitura, escrita, scanning e congelamento de memória para as rotinas em Rust.
 
 ```text
 OnyxEngine/
-├── Cargo.toml                      # Workspace raiz (resolver v2)
-├── BUILD.bat                       # Script automatizado de compilação Release
+├── Cargo.toml                      # Workspace Cargo raiz
+├── BUILD.bat                       # Script unificado de compilação (Rust DLL + Pascal Frontend)
 ├── bin/                            # Diretório de distribuição e binários compilados
-│   ├── OnyxEngine.exe              # Executável principal (GUI nativa)
-│   ├── lua53-64.dll                # Runtime embutido Lua 5.3
-│   ├── allochook_dll.dll           # Interceptor de alocações (Heap / VirtualAlloc)
-│   ├── d3dhook_dll.dll             # Overlay DirectX / Direct3D & HUD
-│   ├── luaclient_dll.dll           # Cliente IPC Lua para automação remota
-│   ├── speedhack_dll.dll           # Scaler de tempo de alta precisão (QPC/GetTickCount)
-│   └── vehdebug_dll.dll            # Motor de depuração VEH (Vectored Exception Handler)
+│   ├── OnyxEngine-CE.exe           # Frontend nativo (Cheat Engine em Lazarus)
+│   ├── onyx_backend.dll            # Motor nativo em Rust (C-ABI)
+│   └── lua53-64.dll                # Runtime Lua 5.3
 │
-└── crates/
-    ├── core/                       # [onyx_core] Biblioteca agnóstica de baixo nível
+├── cheat-engine/                   # [Frontend] Código-fonte original Cheat Engine em Pascal
+│   └── Cheat Engine/
+│       ├── cheatengine.lpi / .lpr  # Projeto principal do Lazarus
+│       ├── OnyxBackend.pas         # Bridge FFI com a DLL do Rust
+│       └── NewKernelHandler.pas    # Interceptador de operações de memória
+│
+└── crates/                         # [Backend em Rust]
+    ├── backend/                    # [onyx_backend] DLL C-ABI para consumo pelo Pascal
     │   └── src/
-    │       ├── lib.rs
-    │       ├── memory/             # Scanner, scanner de ponteiros, congelador, dissector de estruturas
-    │       ├── process/            # Handles, APIs Win32 nativas, módulos, símbolos, driver de kernel
-    │       ├── debugger/           # Disassembler x86_64, hardware breakpoints, VEH, hooks inline
-    │       ├── scripting/          # Parser Auto Assembler, engine Lua 5.3, tabelas .CT
-    │       ├── mono/               # Dissector avançado de runtime .NET / Mono / Unity IL2CPP
-    │       └── injection/          # Injetores de DLLs, speedhack e alloc hooks
+    │       ├── lib.rs              # DllMain, versioning e ping
+    │       ├── types.rs            # Structs compatíveis com C/Pascal
+    │       └── api/                # Submódulos individuais de API
+    │           ├── process.rs      # Attach, Read, Write, Protect, Alloc, Modules, Regions
+    │           ├── scanner.rs      # FirstScan, NextScan, Undo, GetResults
+    │           ├── disasm.rs       # DisassembleInstruction, DisassembleBlock (x86_64)
+    │           ├── freezer.rs      # Background Freezer multi-threaded
+    │           ├── pointer.rs      # PointerScan e PointerResolve
+    │           ├── speedhack.rs    # Injeção e ajuste de frequência temporal
+    │           └── mono.rs         # Dissecção de runtimes Mono / .NET / IL2CPP
     │
-    ├── gui/                        # [onyx_gui] Interface gráfica reativa (eframe / egui)
+    ├── core/                       # [onyx_core] Motor algorítmico nativo de baixo nível
     │   └── src/
-    │       ├── main.rs             # Configuração da janela nativa e tema escuro
-    │       ├── app.rs              # OnyxEngineApp (ciclo de vida e throttling de polling)
-    │       ├── state.rs            # Modelos de dados e estado compartilhado
-    │       └── ui/
-    │           ├── menu_bar.rs      # Menus superiores (File/Process/Tools) e barra de status
-    │           ├── scanner_panel.rs # Parâmetros de scan, filtros, tipos e lista de candidatos
-    │           ├── cheat_table.rs   # Lista de endereços ativos, congelamento e edição
-    │           └── modals/          # Janelas secundárias e modais independentes
-    │               ├── process_modal.rs    # Seletor de processos com busca em tempo real
-    │               ├── memory_view.rs      # Disassembler x86_64, Hex Matrix e Data Inspector
-    │               ├── pointer_scanner.rs  # Scanner de ponteiros multinível
-    │               ├── mono_modal.rs       # Navegador de assemblies, classes, métodos e campos
-    │               ├── auto_assembler.rs   # Editor de scripts AA ([ENABLE]/[DISABLE])
-    │               ├── lua_console.rs      # Console interativo Lua 5.3
-    │               ├── plugins_modal.rs    # Painel de injeção de DLLs auxiliares
-    │               ├── address_modal.rs    # Inserção manual de endereços e cadeias de ponteiros
-    │               └── edit_byte_modal.rs  # Edição pontual de bytes hexadecimais
+    │       ├── memory/             # Scanner, scanner de ponteiros, congelador, structs
+    │       ├── process/            # Handles, APIs Win32 nativas, módulos, símbolos
+    │       ├── debugger/           # Disassembler x86_64, VEH, hooks inline
+    │       ├── scripting/          # Auto Assembler, Lua 5.3, tabelas .CT
+    │       ├── mono/               # Dissector Mono / Unity IL2CPP
+    │       └── injection/          # Speedhack e interceptadores
     │
-    └── dlls/                       # DLLs nativas injetáveis (cdylib)
-        ├── allochook/              # Monitoramento e desvio de chamadas de alocação
-        ├── d3dhook/                # Interceptação de buffers e renderização DirectX
-        ├── luaclient/              # Ponte de comando IPC via Lua
-        ├── speedhack/              # Modificação de frequência de clock e contadores temporais
-        └── vehdebug/               # Tratamento de exceções e captura de registradores
-```
+    └── gui/                        # [onyx_gui] Frontend alternativo em Rust (egui/wgpu)
 
 ---
 
-## 📊 Status do Projeto & Paridade com o Cheat Engine
+## 📊 Status do Projeto & Arquitetura Concluída
 
-### ✅ O Que Já Foi Implementado (Concluído)
+### ✅ O Que Já Foi Implementado e Roteado 100% para o Rust
 
-- [x] **Arquitetura 100% GUI Nativa (Zero CLI / Zero Bloat):**
-  - Todo o código foi unificado no executável único `OnyxEngine.exe` acelerado por hardware via `egui + wgpu + winit`.
-  - Remoção de dependências legadas, remoção de referências a ferramentas externas, IA ou MCP, tornando o projeto um utilitário de engenharia reversa sério e independente.
-- [x] **Interface Gráfica Responsiva & Autêntica ao Cheat Engine:**
-  - **Eliminação de Glifos Quebrados:** Purga total de caracteres não-ASCII que renderizavam caixas vazias (`[]`). O indicador de processo agora utiliza desenho vetorial direto na GPU (`ui.painter().circle_filled()`).
-  - **Layout Adaptativo:** Redimensionamento inteligente de janela sem espaços vazios. A área superior do scanner e a lista de candidatos se adaptam dinamicamente, enquanto a Cheat Table inferior ocupa todo o espaço vertical restante.
-  - **Barra Central Clássica do CE:** Inclui o botão `[ Memory View ]` à esquerda, o botão central com seta vermelha `[ \/ ]` para descer candidatos para a tabela, e o botão `[ Add Address Manually ]` à direita.
-- [x] **Navegador de Memória (Memory Viewer) Fiel ao CE 7.5:**
-  - **Disassembler x86_64:**
-    - Cabeçalho padronizado: `Address | Bytes | Opcode | Comment`.
-    - Seleção contínua em azul Cheat Engine (`rgb(0, 120, 215)`) e destaque de sintaxe para chamadas (`call`), saltos (`jmp`/`jxx`) e retornos (`ret`).
-    - Menu de contexto rápido com suporte a **NOP instruction**, cópia de endereço e transição para o Hex View.
-  - **Divisor Central Mnemônico:** Exibe a interpretação textual da instrução selecionada (ex: `subtract`, `call procedure`, `jump`, `logical compare`).
-  - **Banner de Região de Memória:** Exibe informações detalhadas de proteção e alocação (`Protect: Execute/Read/Write   AllocationBase=...   Base=...   Size=...   Module=...`).
-  - **Hex Dump em 16 Bytes:**
-    - Colunas `00..07` em verde e frame amarelo destacado nas colunas `08..0F`.
-    - Coluna de caracteres ASCII em tempo real.
-    - Suporte a clique duplo ou menu de contexto em cada byte individual para edição pontual de memória.
-- [x] **Scanner de Memória Nativo:**
-  - Tipos suportados: Inteiros (i8, u8, i16, u16, i32, u32, i64, u64), Float (32-bit), Double (64-bit), Strings e Array of Bytes (AOB).
-  - Modos de varredura: Exact Value, Bigger than, Smaller than, Value between, Unknown initial value, Changed/Unchanged value, Increased/Decreased by.
-  - Fast Scan com alinhamento configurável (1, 2, 4, 8 bytes), filtros por tipo de proteção de página e histórico completo com **Undo Scan**.
-- [x] **Multilevel Pointer Scanner:**
-  - Varredura recursiva de nós e caminhos de ponteiros multinível com profundidade configurável e re-scan diferencial.
-- [x] **Cheat Table & Freeze Engine:**
-  - Suporte a entradas estáticas e ponteiros encadeados multinível (`P->[Module+Offset]->Offset`).
-  - Thread independente em segundo plano com congelamento de valores em tempo real.
-  - Suporte a salvar e carregar tabelas `.CT`.
-- [x] **Mono / .NET CLR Runtime Dissector:**
-  - Detecção automática de Mono, .NET Core e Unity IL2CPP com árvore de assemblies, classes, métodos e campos com offsets.
-- [x] **Auto Assembler & Lua 5.3:**
-  - Parser Auto Assembler com blocos `[ENABLE]` e `[DISABLE]`, `alloc`, `dealloc`, `registersymbol` e injeção de saltos.
-  - Console interativo com runtime nativo Lua 5.3 (`lua53-64.dll`).
-- [x] **Speedhack & Gerenciador de DLLs:**
-  - Controle de velocidade em tempo real (0.1x a 20x) e injeção de bibliotecas auxiliares via `CreateRemoteThread`.
+- [x] **Backend Modular Nativo em Rust (`crates/backend` -> `onyx_backend.dll`):**
+  - **Process Engine:** `onyx_process_attach`, `onyx_process_read`, `onyx_process_write`, `onyx_process_protect`, `onyx_process_alloc`, `onyx_process_free`, `onyx_process_modules`, `onyx_process_regions`.
+  - **Memory Scanner Engine:** `onyx_scanner_first_scan`, `onyx_scanner_next_scan`, `onyx_scanner_undo`, `onyx_scanner_save_results_file` (formato binário direto `ADDRESSES.TMP` nativo do Cheat Engine).
+  - **Disassembler Engine:** `onyx_disasm_instruction`, `onyx_disasm_block` decodificando instruções x86_64 completas com mnemônicos e operandos.
+  - **Freezer & Pointer Engine:** `onyx_freezer_*` com thread dedicada em Rust e `onyx_pointer_resolve` para caminhos multinível.
+  - **Mono / IL2CPP Dissector:** `onyx_mono_detect`, `onyx_mono_dissect` com contagem e mapeamento de classes.
+
+- [x] **Frontend em Pascal / Lazarus Conectado ao Backend Rust (`cheat-engine/Cheat Engine`):**
+  - **Hooking de Operações de Memória (`NewKernelHandler.pas`):** `ReadProcessMemoryActual`, `WriteProcessMemoryActual` e `OpenProcess` redirecionados para `onyx_process_*` na DLL do Rust.
+  - **Scanner 100% via Rust (`memscan.pas`):** `TScanController.firstScan`, `TScanController.nextScan` e `TMemscan.undoLastScan` interceptados diretamente por `OnyxDoFirstScan`, `OnyxDoNextScan` e `OnyxDoUndoScan`, gravando os resultados em `ADDRESSES.TMP` e alimentando a interface gráfica sem intermediários.
+  - **Disassembler 100% via Rust (`disassembler.pas`):** Registro de override global (`registerGlobalDisassembleOverride` com `TOnyxDisasmBridge`) de modo que cada instrução aberta no Memory View é decodificada diretamente pelo Rust.
+
+- [x] **Build Unificado & Distribuição Automatizada (`BUILD.bat`):**
+  - Compilação em um clique do backend em Rust com `cargo build --release -p onyx_backend`.
+  - Compilação do frontend completo em Free Pascal via `lazbuild -B --build-mode=Release`.
+  - Distribuição pronta em `bin/` contendo `OnyxEngine-CE.exe` e `onyx_backend.dll`.
 
 ---
 
@@ -137,22 +107,23 @@ Para que o OnyxEngine atinja equivalência absoluta funcional com o Cheat Engine
 
 ### Pré-requisitos
 - **Windows 10 / 11 (64-bit)**
-- **Rust Toolchain:** Rust estável (edição 2024 recomendada) com target `x86_64-pc-windows-msvc`.
-- **Visual Studio Build Tools:** C++ MSVC Build Tools instalados.
+- **Rust Toolchain:** Rust estável com target `x86_64-pc-windows-msvc`.
+- **Lazarus IDE / Free Pascal:** Lazarus 2.2.x+ instalado com `lazbuild.exe` em `C:\lazarus` ou no PATH do sistema.
 
-### Compilação Rápida
-Execute o script em lote na raiz do repositório:
+### Compilação Unificada em Um Clique
+Execute o script na raiz do repositório:
 ```cmd
 BUILD.bat
 ```
 
-Ou execute diretamente via Cargo:
-```cmd
-# Compilação otimizada de todo o workspace
-cargo build --release
+Isso irá:
+1. Compilar o backend Rust (`onyx_backend.dll`) com otimizações máximas de release.
+2. Compilar o frontend Lazarus (`cheatengine-x86_64.exe`) com todos os hooks do OnyxBackend.
+3. Sincronizar e empacotar todos os binários e bibliotecas de suporte na pasta `bin/`.
 
-# O binário final estará em:
-target\release\OnyxEngine.exe
+Os executáveis finais prontos para uso estarão disponíveis em:
+- `bin\OnyxEngine-CE.exe` (Frontend Pascal conectado ao backend Rust)
+- `bin\onyx_backend.dll` (Motor Rust nativo de alta performance)
 ```
 
 ---

@@ -8,39 +8,67 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
         return;
     }
 
-    egui::Window::new("Lua Scripting Engine (Lua 5.3)")
-        .collapsible(true)
-        .resizable(true)
-        .movable(true)
-        .constrain(false)
-        .default_size(Vec2::new(600.0, 480.0))
-        .show(ctx, |ui| {
-            ui.label(RichText::new("Lua Code:").strong());
-            ui.add(egui::TextEdit::multiline(&mut app.lua_script).code_editor().desired_rows(8).desired_width(f32::INFINITY));
+    let mut close_modal = false;
 
-            ui.horizontal(|ui| {
-                if ui.button(RichText::new("[Run Lua]").strong().color(Color32::GREEN)).clicked() {
-                    if let Some(lua) = &app.lua_engine {
-                        match lua.execute(&app.lua_script) {
-                            Ok(res) => app.lua_output.push(format!("[Out]: {}", res)),
-                            Err(e) => app.lua_output.push(format!("[Err]: {}", e)),
+    ctx.show_viewport_immediate(
+        egui::ViewportId::from_hash_of("ce_lua_engine_viewport"),
+        egui::ViewportBuilder::default()
+            .with_title("Lua Engine (Lua 5.3)")
+            .with_inner_size([720.0, 520.0])
+            .with_min_inner_size([480.0, 360.0])
+            .with_resizable(true),
+        |ctx, _class| {
+            if ctx.input(|i| i.viewport().close_requested() || i.key_pressed(egui::Key::Escape)) {
+                close_modal = true;
+            }
+
+            egui::CentralPanel::default()
+                .frame(egui::Frame::none().fill(Color32::from_rgb(26, 29, 36)).inner_margin(egui::Margin::same(8.0)))
+                .show(ctx, |ui| {
+                    let avail_h = ui.available_height();
+                    let edit_h = (avail_h * 0.42).clamp(100.0, 240.0);
+                    let output_h = (avail_h - edit_h - 85.0).max(100.0);
+
+                    ui.label(RichText::new("Lua Code:").strong());
+                    ui.add_sized(
+                        Vec2::new(ui.available_width(), edit_h),
+                        egui::TextEdit::multiline(&mut app.lua_script).code_editor().desired_width(f32::INFINITY)
+                    );
+
+                    ui.add_space(4.0);
+                    ui.horizontal(|ui| {
+                        if ui.button(RichText::new("[Run Lua]").strong().color(Color32::GREEN)).clicked() {
+                            if let Some(lua) = &app.lua_engine {
+                                match lua.execute(&app.lua_script) {
+                                    Ok(res) => app.lua_output.push(format!("[Out]: {}", res)),
+                                    Err(e) => app.lua_output.push(format!("[Err]: {}", e)),
+                                }
+                            }
                         }
-                    }
-                }
-                if ui.button("Clear Log").clicked() {
-                    app.lua_output.clear();
-                }
-                if ui.button("Close").clicked() {
-                    app.show_lua_console = false;
-                }
-            });
+                        if ui.button("Clear Log").clicked() {
+                            app.lua_output.clear();
+                        }
+                        if ui.button("Close").clicked() {
+                            close_modal = true;
+                        }
+                    });
 
-            ui.separator();
-            ui.label(RichText::new("Console Output:").strong());
-            egui::ScrollArea::vertical().max_height(180.0).show(ui, |ui| {
-                for line in &app.lua_output {
-                    ui.label(RichText::new(line).monospace());
-                }
-            });
-        });
+                    ui.separator();
+                    ui.label(RichText::new("Console Output:").strong());
+                    egui::ScrollArea::vertical()
+                        .id_salt("lua_console_scroll")
+                        .max_height(output_h)
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            for line in &app.lua_output {
+                                ui.label(RichText::new(line).monospace());
+                            }
+                        });
+                });
+        },
+    );
+
+    if close_modal {
+        app.show_lua_console = false;
+    }
 }

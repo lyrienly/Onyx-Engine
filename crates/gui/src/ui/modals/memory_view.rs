@@ -117,7 +117,28 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                         });
 
                         ui.menu_button("Kernel tools", |ui| {
-                            ui.label("Kernel Mode DBK Driver required");
+                            let dbk_connected = app.dbk_driver.is_some();
+                            if dbk_connected {
+                                ui.label(RichText::new("[DBK64 ACTIVE]").color(Color32::GREEN).strong());
+                                if let Some(ref proc) = app.attached_proc {
+                                    if let Some(ref dbk) = app.dbk_driver {
+                                        if let Ok(cr3) = dbk.get_cr3(proc.pid) {
+                                            ui.label(RichText::new(format!("CR3: 0x{:016X}", cr3)).monospace().color(Color32::LIGHT_GRAY));
+                                        }
+                                    }
+                                }
+                            } else {
+                                ui.label(RichText::new("[DBK OFFLINE]").color(Color32::GRAY));
+                                if ui.button("Connect DBK Driver...").clicked() {
+                                    app.try_connect_dbk();
+                                }
+                            }
+                            ui.separator();
+                            if ui.button("Kernel & Access Settings...").clicked() {
+                                app.settings_tab = 1;
+                                app.show_settings_modal = true;
+                                ui.close_menu();
+                            }
                         });
                     });
                 });

@@ -40,12 +40,17 @@ impl Freezer {
         let entries_clone = Arc::clone(&self.entries);
         let running_clone = Arc::clone(&self.running);
         let proc_handle = proc.handle as usize;
+        let proc_pid = proc.pid;
+        let proc_mode = proc.access_mode;
+        let proc_dbk = proc.dbk.clone();
 
         thread::spawn(move || {
             let dummy_proc = Process {
-                pid: 0,
+                pid: proc_pid,
                 handle: proc_handle as crate::win32::HANDLE,
                 name: String::new(),
+                access_mode: proc_mode,
+                dbk: proc_dbk,
             };
 
             while running_clone.load(Ordering::Relaxed) {

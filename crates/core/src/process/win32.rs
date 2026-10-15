@@ -471,3 +471,228 @@ unsafe extern "system" {
     pub fn GetModuleHandleW(lpModuleName: LPCWSTR) -> HMODULE;
     pub fn GetProcAddress(hModule: HMODULE, lpProcName: *const u8) -> *mut c_void;
 }
+
+// NT Native Subsystem Types & FFI (ntdll.dll)
+pub type NTSTATUS = i32;
+pub const STATUS_SUCCESS: NTSTATUS = 0;
+pub const STATUS_UNSUCCESSFUL: NTSTATUS = 0xC0000001_u32 as i32;
+pub const STATUS_ACCESS_DENIED: NTSTATUS = 0xC0000022_u32 as i32;
+pub const STATUS_BUFFER_TOO_SMALL: NTSTATUS = 0xC0000023_u32 as i32;
+pub const STATUS_INFO_LENGTH_MISMATCH: NTSTATUS = 0xC0000004_u32 as i32;
+
+#[repr(C)]
+pub struct UNICODE_STRING {
+    pub Length: u16,
+    pub MaximumLength: u16,
+    pub Buffer: *mut u16,
+}
+
+#[repr(C)]
+pub struct OBJECT_ATTRIBUTES {
+    pub Length: ULONG,
+    pub RootDirectory: HANDLE,
+    pub ObjectName: *mut UNICODE_STRING,
+    pub Attributes: ULONG,
+    pub SecurityDescriptor: PVOID,
+    pub SecurityQualityOfService: PVOID,
+}
+
+#[repr(C)]
+pub struct CLIENT_ID {
+    pub UniqueProcess: HANDLE,
+    pub UniqueThread: HANDLE,
+}
+
+#[link(name = "ntdll")]
+unsafe extern "system" {
+    pub fn NtOpenProcess(
+        ProcessHandle: *mut HANDLE,
+        DesiredAccess: DWORD,
+        ObjectAttributes: *mut OBJECT_ATTRIBUTES,
+        ClientId: *mut CLIENT_ID,
+    ) -> NTSTATUS;
+
+    pub fn NtReadVirtualMemory(
+        ProcessHandle: HANDLE,
+        BaseAddress: PVOID,
+        Buffer: PVOID,
+        NumberOfBytesToRead: SIZE_T,
+        NumberOfBytesRead: *mut SIZE_T,
+    ) -> NTSTATUS;
+
+    pub fn NtWriteVirtualMemory(
+        ProcessHandle: HANDLE,
+        BaseAddress: PVOID,
+        Buffer: LPCVOID,
+        NumberOfBytesToWrite: SIZE_T,
+        NumberOfBytesWritten: *mut SIZE_T,
+    ) -> NTSTATUS;
+
+    pub fn NtAllocateVirtualMemory(
+        ProcessHandle: HANDLE,
+        BaseAddress: *mut PVOID,
+        ZeroBits: ULONG_PTR,
+        RegionSize: *mut SIZE_T,
+        AllocationType: ULONG,
+        Protect: ULONG,
+    ) -> NTSTATUS;
+
+    pub fn NtFreeVirtualMemory(
+        ProcessHandle: HANDLE,
+        BaseAddress: *mut PVOID,
+        RegionSize: *mut SIZE_T,
+        FreeType: ULONG,
+    ) -> NTSTATUS;
+
+    pub fn NtProtectVirtualMemory(
+        ProcessHandle: HANDLE,
+        BaseAddress: *mut PVOID,
+        RegionSize: *mut SIZE_T,
+        NewProtect: ULONG,
+        OldProtect: *mut ULONG,
+    ) -> NTSTATUS;
+
+    pub fn NtQueryVirtualMemory(
+        ProcessHandle: HANDLE,
+        BaseAddress: PVOID,
+        MemoryInformationClass: ULONG,
+        MemoryInformation: PVOID,
+        MemoryInformationLength: SIZE_T,
+        ReturnLength: *mut SIZE_T,
+    ) -> NTSTATUS;
+}
+
+// Shell & Icon Extraction Subsystem
+pub type HICON = HANDLE;
+pub type HBITMAP = HANDLE;
+pub type HDC = HANDLE;
+
+pub const SHGFI_ICON: DWORD = 0x000000100;
+pub const SHGFI_SMALLICON: DWORD = 0x000000001;
+pub const SHGFI_LARGEICON: DWORD = 0x000000000;
+pub const SHGFI_USEFILEATTRIBUTES: DWORD = 0x000000010;
+
+pub const BI_RGB: DWORD = 0;
+pub const DIB_RGB_COLORS: DWORD = 0;
+
+#[repr(C)]
+pub struct ICONINFO {
+    pub fIcon: BOOL,
+    pub xHotspot: DWORD,
+    pub yHotspot: DWORD,
+    pub hbmMask: HBITMAP,
+    pub hbmColor: HBITMAP,
+}
+
+#[repr(C)]
+pub struct BITMAP {
+    pub bmType: i32,
+    pub bmWidth: i32,
+    pub bmHeight: i32,
+    pub bmWidthBytes: i32,
+    pub bmPlanes: u16,
+    pub bmBitsPixel: u16,
+    pub bmBits: LPVOID,
+}
+
+#[repr(C)]
+pub struct BITMAPINFOHEADER {
+    pub biSize: DWORD,
+    pub biWidth: i32,
+    pub biHeight: i32,
+    pub biPlanes: WORD,
+    pub biBitCount: WORD,
+    pub biCompression: DWORD,
+    pub biSizeImage: DWORD,
+    pub biXPelsPerMeter: i32,
+    pub biYPelsPerMeter: i32,
+    pub biClrUsed: DWORD,
+    pub biClrImportant: DWORD,
+}
+
+#[repr(C)]
+pub struct RGBQUAD {
+    pub rgbBlue: BYTE,
+    pub rgbGreen: BYTE,
+    pub rgbRed: BYTE,
+    pub rgbReserved: BYTE,
+}
+
+#[repr(C)]
+pub struct BITMAPINFO {
+    pub bmiHeader: BITMAPINFOHEADER,
+    pub bmiColors: [RGBQUAD; 1],
+}
+
+#[repr(C)]
+pub struct SHFILEINFOW {
+    pub hIcon: HICON,
+    pub iIcon: i32,
+    pub dwAttributes: DWORD,
+    pub szDisplayName: [u16; 260],
+    pub szTypeName: [u16; 80],
+}
+
+pub const IDI_APPLICATION: LPCWSTR = 32512 as LPCWSTR;
+pub const COINIT_APARTMENTTHREADED: DWORD = 0x2;
+pub const COINIT_MULTITHREADED: DWORD = 0x0;
+pub const COINIT_DISABLE_OLE1DDE: DWORD = 0x4;
+
+#[link(name = "kernel32")]
+unsafe extern "system" {
+    pub fn QueryFullProcessImageNameW(
+        hProcess: HANDLE,
+        dwFlags: DWORD,
+        lpExeName: LPWSTR,
+        lpdwSize: PDWORD,
+    ) -> BOOL;
+}
+
+#[link(name = "user32")]
+unsafe extern "system" {
+    pub fn GetIconInfo(hIcon: HICON, piconinfo: *mut ICONINFO) -> BOOL;
+    pub fn DestroyIcon(hIcon: HICON) -> BOOL;
+    pub fn LoadIconW(hInstance: HANDLE, lpIconName: LPCWSTR) -> HICON;
+    pub fn GetDC(hWnd: HANDLE) -> HDC;
+    pub fn ReleaseDC(hWnd: HANDLE, hDC: HDC) -> i32;
+}
+
+#[link(name = "gdi32")]
+unsafe extern "system" {
+    pub fn GetObjectW(hgdiobj: HANDLE, cbBuffer: i32, lpvObject: LPVOID) -> i32;
+    pub fn DeleteObject(ho: HANDLE) -> BOOL;
+    pub fn GetDIBits(
+        hdc: HDC,
+        hbm: HBITMAP,
+        start: u32,
+        cLines: u32,
+        lpvBits: LPVOID,
+        lpbmi: *mut BITMAPINFO,
+        usage: u32,
+    ) -> i32;
+}
+
+#[link(name = "shell32")]
+unsafe extern "system" {
+    pub fn SHGetFileInfoW(
+        pszPath: LPCWSTR,
+        dwFileAttributes: DWORD,
+        psfi: *mut SHFILEINFOW,
+        cbFileInfo: u32,
+        uFlags: DWORD,
+    ) -> usize;
+    pub fn ExtractIconExW(
+        lpszFile: LPCWSTR,
+        nIconIndex: i32,
+        phiconLarge: *mut HICON,
+        phiconSmall: *mut HICON,
+        nIcons: u32,
+    ) -> u32;
+}
+
+#[link(name = "ole32")]
+unsafe extern "system" {
+    pub fn CoInitializeEx(pvReserved: LPVOID, dwCoInit: DWORD) -> i32;
+    pub fn CoUninitialize();
+}
+

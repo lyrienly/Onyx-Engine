@@ -238,7 +238,7 @@ impl Disassembler {
                 if idx < code.len() {
                     let rel = code[idx] as i8;
                     idx += 1;
-                    let target = (addr as isize + idx as isize + rel as isize) as usize;
+                    let target = addr.wrapping_add(idx).wrapping_add(rel as isize as usize);
                     DecodedInsn {
                         address: addr,
                         bytes: code[..idx].to_vec(),
@@ -256,7 +256,7 @@ impl Disassembler {
                 if idx + 4 <= code.len() {
                     let rel = i32::from_le_bytes([code[idx], code[idx + 1], code[idx + 2], code[idx + 3]]);
                     idx += 4;
-                    let target = (addr as isize + idx as isize + rel as isize) as usize;
+                    let target = addr.wrapping_add(idx).wrapping_add(rel as isize as usize);
                     DecodedInsn {
                         address: addr,
                         bytes: code[..idx].to_vec(),
@@ -274,7 +274,7 @@ impl Disassembler {
                 if idx + 4 <= code.len() {
                     let rel = i32::from_le_bytes([code[idx], code[idx + 1], code[idx + 2], code[idx + 3]]);
                     idx += 4;
-                    let target = (addr as isize + idx as isize + rel as isize) as usize;
+                    let target = addr.wrapping_add(idx).wrapping_add(rel as isize as usize);
                     DecodedInsn {
                         address: addr,
                         bytes: code[..idx].to_vec(),
@@ -292,7 +292,7 @@ impl Disassembler {
                 if idx < code.len() {
                     let rel = code[idx] as i8;
                     idx += 1;
-                    let target = (addr as isize + idx as isize + rel as isize) as usize;
+                    let target = addr.wrapping_add(idx).wrapping_add(rel as isize as usize);
                     let cond = jcc_name(opcode & 0x0F);
                     DecodedInsn {
                         address: addr,
@@ -609,7 +609,7 @@ fn decode_two_byte_op(
             if idx + 4 <= code.len() {
                 let rel = i32::from_le_bytes([code[idx], code[idx + 1], code[idx + 2], code[idx + 3]]);
                 idx += 4;
-                let target = (addr as isize + idx as isize + rel as isize) as usize;
+                let target = addr.wrapping_add(idx).wrapping_add(rel as isize as usize);
                 let cond = jcc_name(op2 & 0x0F);
                 DecodedInsn {
                     address: addr,

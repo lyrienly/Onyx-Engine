@@ -58,16 +58,47 @@ pub struct ExportSymbol {
 pub struct SymbolResolver {
     // module_name (lowercase) -> (export_name -> absolute_address)
     cache: HashMap<String, HashMap<String, usize>>,
+    // CE 7.7: Priority list for symbol resolution when module is unspecified
+    pub module_preference: Vec<String>,
 }
 
 impl SymbolResolver {
     pub fn new() -> Self {
+        let default_pref = vec![
+            "kernel32.dll".to_string(),
+            "kernelbase.dll".to_string(),
+            "ntdll.dll".to_string(),
+            "user32.dll".to_string(),
+            "advapi32.dll".to_string(),
+            "ucrtbase.dll".to_string(),
+            "msvcrt.dll".to_string(),
+            "mono-2.0-bdwgc.dll".to_string(),
+            "libc.so.6".to_string(),
+            "libc.so".to_string(),
+            "libdl.so.2".to_string(),
+            "libdl.so".to_string(),
+            "libpthread.so.0".to_string(),
+        ];
+
         SymbolResolver {
             cache: HashMap::new(),
+            module_preference: default_pref,
+        }
+    }
+
+    pub fn set_module_preference(&mut self, pref: Vec<String>) {
+        self.module_preference = pref.into_iter().map(|s| s.to_lowercase()).collect();
+    }
+
+    pub fn add_module_preference(&mut self, mod_name: &str) {
+        let key = mod_name.to_lowercase();
+        if !self.module_preference.contains(&key) {
+            self.module_preference.push(key);
         }
     }
 
     /// Resolves expressions like "kernel32.dll!CreateProcessW" or "ntdll.dll!NtQuerySystemInformation"
+    /// When unspecified, uses CE 7.7 modulePreference priority order.
     pub fn resolve(&mut self, proc: &Process, expr: &str) -> Option<usize> {
         let trimmed = expr.trim();
         if let Some(pos) = trimmed.find('!') {
@@ -75,14 +106,35 @@ impl SymbolResolver {
             let sym_part = &trimmed[pos + 1..];
             self.resolve_module_export(proc, mod_part, sym_part)
         } else {
-            // Search all loaded modules
-            if let Ok(mods) = proc.modules() {
-                for m in mods {
+            let mods = proc.modules().ok()?;
+
+            let preferences = self.module_preference.clone();
+
+            // 1. CE 7.7: Check modules in order of modulePreference first
+            for pref in &preferences {
+                if let Some(m) = mods.iter().find(|m| {
+                    let mn = m.name.to_lowercase();
+                    mn == *pref || mn.strip_suffix(".dll").unwrap_or(&mn) == pref.strip_suffix(".dll").unwrap_or(pref)
+                }) {
                     if let Some(addr) = self.resolve_module_export(proc, &m.name, trimmed) {
                         return Some(addr);
                     }
                 }
             }
+
+            // 2. Search remaining loaded modules
+            for m in &mods {
+                let mn = m.name.to_lowercase();
+                let already_checked = preferences.iter().any(|pref| {
+                    mn == *pref || mn.strip_suffix(".dll").unwrap_or(&mn) == pref.strip_suffix(".dll").unwrap_or(pref)
+                });
+                if !already_checked {
+                    if let Some(addr) = self.resolve_module_export(proc, &m.name, trimmed) {
+                        return Some(addr);
+                    }
+                }
+            }
+
             None
         }
     }
@@ -209,3 +261,24 @@ impl SymbolResolver {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_module_preference_order() {
+        let mut resolver = SymbolResolver::new();
+        assert!(resolver.module_preference.contains(&"kernel32.dll".to_string()));
+        assert!(resolver.module_preference.contains(&"ntdll.dll".to_string()));
+
+        resolver.set_module_preference(vec!["custom_mod.dll".to_string(), "kernel32.dll".to_string()]);
+        assert_eq!(resolver.module_preference[0], "custom_mod.dll");
+        assert_eq!(resolver.module_preference[1], "kernel32.dll");
+
+        resolver.add_module_preference("another.dll");
+        assert_eq!(resolver.module_preference.len(), 3);
+        assert_eq!(resolver.module_preference[2], "another.dll");
+    }
+}
+

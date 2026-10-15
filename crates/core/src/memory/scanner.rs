@@ -22,6 +22,23 @@ pub enum ValType {
 }
 
 impl ValType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ValType::I8 => "Byte",
+            ValType::U8 => "Byte (unsigned)",
+            ValType::I16 => "2 Bytes",
+            ValType::U16 => "2 Bytes (unsigned)",
+            ValType::I32 => "4 Bytes",
+            ValType::U32 => "4 Bytes (unsigned)",
+            ValType::I64 => "8 Bytes",
+            ValType::U64 => "8 Bytes (unsigned)",
+            ValType::Float => "Float",
+            ValType::Double => "Double",
+            ValType::Str => "String",
+            ValType::Aob => "Array of byte",
+        }
+    }
+
     pub fn size(&self) -> usize {
         match self {
             ValType::I8 | ValType::U8 => 1,
@@ -42,6 +59,70 @@ impl ValType {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AobByte {
+    pub value: u8,
+    pub mask: u8,
+}
+
+impl AobByte {
+    pub fn exact(b: u8) -> Self {
+        AobByte { value: b, mask: 0xFF }
+    }
+
+    pub fn wildcard() -> Self {
+        AobByte { value: 0, mask: 0x00 }
+    }
+
+    pub fn matches(&self, b: u8) -> bool {
+        (b & self.mask) == (self.value & self.mask)
+    }
+
+    pub fn parse(token: &str) -> Result<Self, String> {
+        let t = token.trim();
+        if t == "?" || t == "??" {
+            return Ok(Self::wildcard());
+        }
+
+        // CE 7.7 binary notation: |010**010|
+        if t.starts_with('|') && t.ends_with('|') && t.len() >= 3 {
+            let bits = &t[1..t.len() - 1];
+            if bits.len() != 8 {
+                return Err(format!("Binary AOB token must be exactly 8 bits, got: {}", t));
+            }
+            let mut value: u8 = 0;
+            let mut mask: u8 = 0;
+            for ch in bits.chars() {
+                value <<= 1;
+                mask <<= 1;
+                match ch {
+                    '1' => {
+                        value |= 1;
+                        mask |= 1;
+                    }
+                    '0' => {
+                        mask |= 1;
+                    }
+                    '*' | '?' | 'x' | 'X' => {
+                        // wildcard bit
+                    }
+                    _ => return Err(format!("Invalid char in binary token '{}' in {}", ch, t)),
+                }
+            }
+            return Ok(AobByte { value, mask });
+        }
+
+        let hex_str = if t.starts_with("0x") || t.starts_with("0X") {
+            &t[2..]
+        } else {
+            t
+        };
+        let b = u8::from_str_radix(hex_str, 16)
+            .map_err(|_| format!("Invalid hex byte: {}", token))?;
+        Ok(Self::exact(b))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum ScanValue {
     I8(i8),
@@ -55,7 +136,7 @@ pub enum ScanValue {
     Float(f32),
     Double(f64),
     Str(String),
-    Aob(Vec<Option<u8>>),
+    Aob(Vec<AobByte>),
 }
 
 impl ScanValue {
@@ -141,13 +222,7 @@ impl ScanValue {
                 let parts: Vec<&str> = trimmed.split_whitespace().collect();
                 let mut pattern = Vec::new();
                 for p in parts {
-                    if p == "?" || p == "??" {
-                        pattern.push(None);
-                    } else {
-                        let b = u8::from_str_radix(p, 16)
-                            .map_err(|_| format!("Invalid hex byte: {}", p))?;
-                        pattern.push(Some(b));
-                    }
+                    pattern.push(AobByte::parse(p)?);
                 }
                 if pattern.is_empty() {
                     return Err("Empty AOB pattern".to_string());
@@ -173,7 +248,7 @@ impl ScanValue {
             ValType::Float => Some(ScanValue::Float(f32::from_ne_bytes([buf[0], buf[1], buf[2], buf[3]]))),
             ValType::Double => Some(ScanValue::Double(f64::from_ne_bytes([buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]]))),
             ValType::Str => Some(ScanValue::Str(String::from_utf8_lossy(buf).to_string())),
-            ValType::Aob => Some(ScanValue::Aob(buf.iter().map(|&b| Some(b)).collect())),
+            ValType::Aob => Some(ScanValue::Aob(buf.iter().map(|&b| AobByte::exact(b)).collect())),
         }
     }
 
@@ -190,7 +265,7 @@ impl ScanValue {
             ScanValue::Float(v) => v.to_ne_bytes().to_vec(),
             ScanValue::Double(v) => v.to_ne_bytes().to_vec(),
             ScanValue::Str(s) => s.as_bytes().to_vec(),
-            ScanValue::Aob(v) => v.iter().map(|b| b.unwrap_or(0)).collect(),
+            ScanValue::Aob(v) => v.iter().map(|b| b.value).collect(),
         }
     }
 
@@ -208,9 +283,26 @@ impl ScanValue {
             ScanValue::Double(v) => format!("{:.6}", v),
             ScanValue::Str(s) => format!("\"{}\"", s),
             ScanValue::Aob(p) => {
-                let bytes: Vec<String> = p.iter().map(|b| match b {
-                    Some(v) => format!("{:02X}", v),
-                    None => "??".to_string(),
+                let bytes: Vec<String> = p.iter().map(|b| {
+                    if b.mask == 0xFF {
+                        format!("{:02X}", b.value)
+                    } else if b.mask == 0x00 {
+                        "??".to_string()
+                    } else {
+                        let mut s = String::with_capacity(10);
+                        s.push('|');
+                        for bit in (0..8).rev() {
+                            if (b.mask & (1 << bit)) == 0 {
+                                s.push('*');
+                            } else if (b.value & (1 << bit)) != 0 {
+                                s.push('1');
+                            } else {
+                                s.push('0');
+                            }
+                        }
+                        s.push('|');
+                        s
+                    }
                 }).collect();
                 bytes.join(" ")
             }
@@ -319,16 +411,22 @@ impl Scanner {
             .collect();
 
         let proc_handle = proc.handle as usize;
+        let proc_pid = proc.pid;
+        let proc_mode = proc.access_mode;
+        let proc_dbk = proc.dbk.clone();
 
         for chunk in chunks {
             let res_clone = Arc::clone(&results);
             let cond_clone = cond.clone();
+            let chunk_dbk = proc_dbk.clone();
 
             let handle = thread::spawn(move || {
                 let dummy_proc = Process {
-                    pid: 0,
+                    pid: proc_pid,
                     handle: proc_handle as crate::win32::HANDLE,
                     name: String::new(),
+                    access_mode: proc_mode,
+                    dbk: chunk_dbk,
                 };
 
                 let mut local_candidates = Vec::new();
@@ -428,6 +526,35 @@ fn scan_buffer(
     cond: &ScanCondition,
     out: &mut Vec<ScanCandidate>,
 ) {
+    if let ScanCondition::Exact(ScanValue::Aob(pattern)) = cond {
+        let pat_len = pattern.len();
+        if buf.len() < pat_len {
+            return;
+        }
+        let max_idx = buf.len() - pat_len;
+        let mut i = 0;
+        while i <= max_idx {
+            let mut matched = true;
+            for (p_idx, pat_byte) in pattern.iter().enumerate() {
+                if !pat_byte.matches(buf[i + p_idx]) {
+                    matched = false;
+                    break;
+                }
+            }
+            if matched {
+                let cand_bytes: Vec<AobByte> = buf[i..i + pat_len].iter().map(|&b| AobByte::exact(b)).collect();
+                let cand_val = ScanValue::Aob(cand_bytes);
+                out.push(ScanCandidate {
+                    address: base_addr + i,
+                    current_value: cand_val.clone(),
+                    previous_value: cand_val,
+                });
+            }
+            i += alignment;
+        }
+        return;
+    }
+
     let size = val_type.size();
     if buf.len() < size {
         return;
@@ -495,10 +622,9 @@ fn values_equal(a: &ScanValue, b: &ScanValue) -> bool {
                 return false;
             }
             for (bx, by) in x.iter().zip(y.iter()) {
-                if let (Some(b1), Some(b2)) = (bx, by) {
-                    if b1 != b2 {
-                        return false;
-                    }
+                let mask = bx.mask & by.mask;
+                if (bx.value & mask) != (by.value & mask) {
+                    return false;
                 }
             }
             true

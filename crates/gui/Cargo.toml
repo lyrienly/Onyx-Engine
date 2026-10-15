@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 eframe = { version = "0.29", default-features = false, features = ["wgpu", "default_fonts"] }
 egui = "0.29"
+image = { version = "0.25", default-features = false, features = ["png"] }
 onyx_core = { path = "../core" }
 
 [[bin]]

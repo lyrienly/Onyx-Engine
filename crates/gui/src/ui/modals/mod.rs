@@ -9,6 +9,7 @@ pub mod lua_console;
 pub mod plugins_modal;
 pub mod address_modal;
 pub mod edit_byte_modal;
+pub mod settings_modal;
 
 use eframe::egui;
 use crate::app::OnyxEngineApp;
@@ -23,4 +24,5 @@ pub fn render_all_modals(app: &mut OnyxEngineApp, ctx: &egui::Context) {
     plugins_modal::render(app, ctx);
     address_modal::render(app, ctx);
     edit_byte_modal::render(app, ctx);
+    settings_modal::render(app, ctx);
 }

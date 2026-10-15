@@ -3,8 +3,10 @@
 
 #![allow(non_snake_case, non_camel_case_types, dead_code, unsafe_op_in_unsafe_fn, static_mut_refs)]
 
+use std::collections::HashMap;
 use std::ffi::{c_char, c_int, c_void, CStr, CString};
 use std::ptr::null_mut;
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Mutex;
 use crate::process::Process;
 use crate::win32::*;
@@ -33,6 +35,10 @@ type FnLuaToboolean = unsafe extern "C" fn(LuaState, c_int) -> c_int;
 type FnLuaGetbottom = unsafe extern "C" fn(LuaState) -> c_int;
 type FnLuaCreatetable = unsafe extern "C" fn(LuaState, c_int, c_int);
 type FnLuaRawseti = unsafe extern "C" fn(LuaState, c_int, i64);
+type FnLuaSetfield = unsafe extern "C" fn(LuaState, c_int, *const c_char);
+type FnLuaGetfield = unsafe extern "C" fn(LuaState, c_int, *const c_char) -> c_int;
+type FnLuaSetmetatable = unsafe extern "C" fn(LuaState, c_int) -> c_int;
+type FnLuaPushvalue = unsafe extern "C" fn(LuaState, c_int);
 
 struct LuaLib {
     newstate: FnLuaLNewstate,
@@ -55,11 +61,17 @@ struct LuaLib {
     gettop: FnLuaGetbottom,
     createtable: FnLuaCreatetable,
     rawseti: FnLuaRawseti,
+    setfield: FnLuaSetfield,
+    getfield: FnLuaGetfield,
+    setmetatable: FnLuaSetmetatable,
+    pushvalue: FnLuaPushvalue,
 }
 
 static mut LUA_LIB: Option<LuaLib> = None;
 static ACTIVE_PROCESS_HANDLE: Mutex<Option<usize>> = Mutex::new(None);
 static ACTIVE_PROCESS_PID: Mutex<Option<u32>> = Mutex::new(None);
+static SCANNER_REGISTRY: Mutex<Option<HashMap<i64, crate::scanner::Scanner>>> = Mutex::new(None);
+static NEXT_SCANNER_ID: AtomicI64 = AtomicI64::new(1);
 
 pub struct CeLuaEngine {
     state: LuaState,
@@ -80,8 +92,126 @@ impl CeLuaEngine {
 
             (lib.openlibs)(L);
 
+            {
+                let mut reg = SCANNER_REGISTRY.lock().unwrap();
+                if reg.is_none() {
+                    *reg = Some(HashMap::new());
+                }
+            }
+
             // Register standard Cheat Engine functions
             register_ce_functions(L, lib);
+
+            // CE 7.7: Built-in json library
+            let json_bootstrap = CString::new(r#"
+json = {}
+local function encode_val(val)
+    local t = type(val)
+    if t == "nil" then return "null"
+    elseif t == "boolean" or t == "number" then return tostring(val)
+    elseif t == "string" then
+        return string.format("%q", val):gsub("\n", "\\n"):gsub("\r", "\\r")
+    elseif t == "table" then
+        local is_array = true
+        local n = #val
+        for k, _ in pairs(val) do
+            if type(k) ~= "number" or k < 1 or k > n or math.floor(k) ~= k then
+                is_array = false
+                break
+            end
+        end
+        if is_array then
+            local p = {}
+            for i = 1, n do p[i] = encode_val(val[i]) end
+            return "[" .. table.concat(p, ",") .. "]"
+        else
+            local p = {}
+            for k, v in pairs(val) do
+                table.insert(p, string.format("%q", tostring(k)) .. ":" .. encode_val(v))
+            end
+            return "{" .. table.concat(p, ",") .. "}"
+        end
+    else
+        return '"' .. tostring(val) .. '"'
+    end
+end
+json.encode = encode_val
+
+local function decode_json(s)
+    local pos = 1
+    local len = #s
+    local function skip()
+        while pos <= len do
+            local c = s:sub(pos, pos)
+            if c == ' ' or c == '\t' or c == '\n' or c == '\r' then pos = pos + 1 else break end
+        end
+    end
+    local function parse_val()
+        skip()
+        if pos > len then return nil end
+        local c = s:sub(pos, pos)
+        if c == '{' then
+            pos = pos + 1
+            local obj = {}
+            skip()
+            if s:sub(pos, pos) == '}' then pos = pos + 1; return obj end
+            while pos <= len do
+                skip()
+                local k = parse_val()
+                skip()
+                if s:sub(pos, pos) == ':' then pos = pos + 1 end
+                local v = parse_val()
+                obj[k] = v
+                skip()
+                local nc = s:sub(pos, pos)
+                if nc == ',' then pos = pos + 1
+                elseif nc == '}' then pos = pos + 1; break
+                else break end
+            end
+            return obj
+        elseif c == '[' then
+            pos = pos + 1
+            local arr = {}
+            skip()
+            if s:sub(pos, pos) == ']' then pos = pos + 1; return arr end
+            while pos <= len do
+                local v = parse_val()
+                table.insert(arr, v)
+                skip()
+                local nc = s:sub(pos, pos)
+                if nc == ',' then pos = pos + 1
+                elseif nc == ']' then pos = pos + 1; break
+                else break end
+            end
+            return arr
+        elseif c == '"' then
+            local ep = pos + 1
+            while ep <= len do
+                if s:sub(ep, ep) == '"' and s:sub(ep - 1, ep - 1) ~= '\\' then break end
+                ep = ep + 1
+            end
+            local str = s:sub(pos + 1, ep - 1):gsub('\\"', '"'):gsub('\\\\', '\\')
+            pos = ep + 1
+            return str
+        elseif s:sub(pos, pos + 3) == "true" then pos = pos + 4; return true
+        elseif s:sub(pos, pos + 4) == "false" then pos = pos + 5; return false
+        elseif s:sub(pos, pos + 3) == "null" then pos = pos + 4; return nil
+        else
+            local num = s:match('^[%-%d%.eE%+]+', pos)
+            if num then pos = pos + #num; return tonumber(num) end
+            pos = pos + 1
+            return nil
+        end
+    end
+    return parse_val()
+end
+json.decode = decode_json
+package.loaded["json"] = json
+"#).unwrap();
+            let load_res = (lib.loadstring)(L, json_bootstrap.as_ptr());
+            if load_res == 0 {
+                (lib.pcallk)(L, 0, 0, 0, 0, null_mut());
+            }
 
             Ok(CeLuaEngine { state: L })
         }
@@ -146,6 +276,11 @@ impl Drop for CeLuaEngine {
 unsafe fn load_lua_library() -> Result<(), String> {
     let search_paths = [
         "lua53-64.dll",
+        "../lua53-64.dll",
+        "../../lua53-64.dll",
+        "crates/gui/lua53-64.dll",
+        "../crates/gui/lua53-64.dll",
+        "../../crates/gui/lua53-64.dll",
         "bin\\lua53-64.dll",
         "..\\bin\\lua53-64.dll",
         "..\\Cheat Engine\\bin\\lua53-64.dll",
@@ -194,6 +329,10 @@ unsafe fn load_lua_library() -> Result<(), String> {
         gettop: get_fn!("lua_gettop", FnLuaGetbottom),
         createtable: get_fn!("lua_createtable", FnLuaCreatetable),
         rawseti: get_fn!("lua_rawseti", FnLuaRawseti),
+        setfield: get_fn!("lua_setfield", FnLuaSetfield),
+        getfield: get_fn!("lua_getfield", FnLuaGetfield),
+        setmetatable: get_fn!("lua_setmetatable", FnLuaSetmetatable),
+        pushvalue: get_fn!("lua_pushvalue", FnLuaPushvalue),
     };
 
     LUA_LIB = Some(lib);
@@ -224,12 +363,19 @@ unsafe fn register_ce_functions(L: LuaState, lib: &LuaLib) {
     reg_fn!("autoAssemble", ce_lua_autoAssemble);
     reg_fn!("getProcessIDFromProcessName", ce_lua_getProcessIDFromProcessName);
     reg_fn!("openProcess", ce_lua_openProcess);
+
+    // CE 7.7 additions
+    reg_fn!("createMemScan", ce_lua_createMemScan);
+    reg_fn!("stacktrace", ce_lua_stacktrace);
+    reg_fn!("getThreadList", ce_lua_getThreadList);
+    reg_fn!("executeCodeExThread", ce_lua_executeCodeExThread);
+    reg_fn!("executeMethodThread", ce_lua_executeMethodThread);
 }
 
 // Lua C Functions
 unsafe extern "C" fn ce_lua_getCEVersion(L: LuaState) -> c_int {
     if let Some(lib) = LUA_LIB.as_ref() {
-        (lib.pushnumber)(L, 7.5);
+        (lib.pushnumber)(L, 7.7);
         1
     } else {
         0
@@ -540,8 +686,439 @@ unsafe extern "C" fn ce_lua_openProcess(L: LuaState) -> c_int {
     }
 }
 
+// CE 7.7: MemScan object creation and bindings
+unsafe extern "C" fn ce_lua_createMemScan(L: LuaState) -> c_int {
+    if let Some(lib) = LUA_LIB.as_ref() {
+        let scan_id = NEXT_SCANNER_ID.fetch_add(1, Ordering::SeqCst);
+        {
+            let mut reg = SCANNER_REGISTRY.lock().unwrap();
+            if let Some(map) = reg.as_mut() {
+                map.insert(scan_id, crate::scanner::Scanner::new(crate::scanner::ValType::I32));
+            }
+        }
+
+        // Create MemScan object table
+        (lib.createtable)(L, 0, 8);
+
+        // Store _id
+        (lib.pushinteger)(L, scan_id);
+        (lib.setfield)(L, -2, b"_id\0".as_ptr() as *const c_char);
+
+        // Methods
+        macro_rules! add_method {
+            ($name:expr, $f:expr) => {
+                (lib.pushcclosure)(L, $f, 0);
+                (lib.setfield)(L, -2, concat!($name, "\0").as_ptr() as *const c_char);
+            };
+        }
+        add_method!("firstScan", ce_lua_memscan_firstScan);
+        add_method!("nextScan", ce_lua_memscan_nextScan);
+        add_method!("getCount", ce_lua_memscan_getCount);
+        add_method!("getOnlyOneResult", ce_lua_memscan_getOnlyOneResult);
+        add_method!("getResults", ce_lua_memscan_getResults);
+
+        // Metatable for property access (CE 7.7: .Results property)
+        (lib.createtable)(L, 0, 1);
+        (lib.pushcclosure)(L, ce_lua_memscan_index, 0);
+        (lib.setfield)(L, -2, b"__index\0".as_ptr() as *const c_char);
+        (lib.setmetatable)(L, -2);
+
+        1
+    } else {
+        0
+    }
+}
+
+unsafe extern "C" fn ce_lua_memscan_getResults(L: LuaState) -> c_int {
+    if let Some(lib) = LUA_LIB.as_ref() {
+        (lib.getfield)(L, 1, b"_id\0".as_ptr() as *const c_char);
+        let id = (lib.tointegerx)(L, -1, null_mut());
+
+        let addrs: Vec<usize> = {
+            let reg = SCANNER_REGISTRY.lock().unwrap();
+            if let Some(map) = reg.as_ref() {
+                if let Some(scanner) = map.get(&id) {
+                    scanner.candidates.iter().map(|c| c.address).collect()
+                } else {
+                    Vec::new()
+                }
+            } else {
+                Vec::new()
+            }
+        };
+
+        (lib.createtable)(L, addrs.len() as c_int, 0);
+        for (i, addr) in addrs.iter().enumerate() {
+            (lib.pushinteger)(L, *addr as i64);
+            (lib.rawseti)(L, -2, (i + 1) as i64);
+        }
+        1
+    } else {
+        0
+    }
+}
+
+unsafe extern "C" fn ce_lua_memscan_getCount(L: LuaState) -> c_int {
+    if let Some(lib) = LUA_LIB.as_ref() {
+        (lib.getfield)(L, 1, b"_id\0".as_ptr() as *const c_char);
+        let id = (lib.tointegerx)(L, -1, null_mut());
+
+        let count = {
+            let reg = SCANNER_REGISTRY.lock().unwrap();
+            if let Some(map) = reg.as_ref() {
+                map.get(&id).map(|s| s.candidates.len()).unwrap_or(0)
+            } else {
+                0
+            }
+        };
+
+        (lib.pushinteger)(L, count as i64);
+        1
+    } else {
+        0
+    }
+}
+
+unsafe extern "C" fn ce_lua_memscan_getOnlyOneResult(L: LuaState) -> c_int {
+    if let Some(lib) = LUA_LIB.as_ref() {
+        (lib.getfield)(L, 1, b"_id\0".as_ptr() as *const c_char);
+        let id = (lib.tointegerx)(L, -1, null_mut());
+
+        let res = {
+            let reg = SCANNER_REGISTRY.lock().unwrap();
+            if let Some(map) = reg.as_ref() {
+                if let Some(s) = map.get(&id) {
+                    if s.candidates.len() == 1 {
+                        Some(s.candidates[0].address)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
+
+        if let Some(addr) = res {
+            (lib.pushinteger)(L, addr as i64);
+        } else {
+            (lib.pushnil)(L);
+        }
+        1
+    } else {
+        0
+    }
+}
+
+unsafe extern "C" fn ce_lua_memscan_firstScan(L: LuaState) -> c_int {
+    if let Some(lib) = LUA_LIB.as_ref() {
+        (lib.getfield)(L, 1, b"_id\0".as_ptr() as *const c_char);
+        let id = (lib.tointegerx)(L, -1, null_mut());
+
+        let val_ptr = (lib.tostring)(L, 5, null_mut());
+        let val_str = if !val_ptr.is_null() {
+            CStr::from_ptr(val_ptr).to_string_lossy().to_string()
+        } else {
+            let v2 = (lib.tostring)(L, 2, null_mut());
+            if !v2.is_null() {
+                CStr::from_ptr(v2).to_string_lossy().to_string()
+            } else {
+                "".to_string()
+            }
+        };
+
+        let pid = ACTIVE_PROCESS_PID.lock().unwrap().unwrap_or(0);
+        if pid != 0 {
+            if let Ok(proc) = Process::attach(pid) {
+                let mut reg = SCANNER_REGISTRY.lock().unwrap();
+                if let Some(map) = reg.as_mut() {
+                    if let Some(scanner) = map.get_mut(&id) {
+                        if let Ok(scan_val) = crate::scanner::ScanValue::parse(scanner.val_type, &val_str) {
+                            let res = scanner.first_scan(&proc, crate::scanner::ScanCondition::Exact(scan_val));
+                            (lib.pushboolean)(L, if res.is_ok() { 1 } else { 0 });
+                            return 1;
+                        }
+                    }
+                }
+            }
+        }
+        (lib.pushboolean)(L, 0);
+        1
+    } else {
+        0
+    }
+}
+
+unsafe extern "C" fn ce_lua_memscan_nextScan(L: LuaState) -> c_int {
+    if let Some(lib) = LUA_LIB.as_ref() {
+        (lib.getfield)(L, 1, b"_id\0".as_ptr() as *const c_char);
+        let id = (lib.tointegerx)(L, -1, null_mut());
+
+        let val_ptr = (lib.tostring)(L, 4, null_mut());
+        let val_str = if !val_ptr.is_null() {
+            CStr::from_ptr(val_ptr).to_string_lossy().to_string()
+        } else {
+            let v2 = (lib.tostring)(L, 2, null_mut());
+            if !v2.is_null() {
+                CStr::from_ptr(v2).to_string_lossy().to_string()
+            } else {
+                "".to_string()
+            }
+        };
+
+        let pid = ACTIVE_PROCESS_PID.lock().unwrap().unwrap_or(0);
+        if pid != 0 {
+            if let Ok(proc) = Process::attach(pid) {
+                let mut reg = SCANNER_REGISTRY.lock().unwrap();
+                if let Some(map) = reg.as_mut() {
+                    if let Some(scanner) = map.get_mut(&id) {
+                        if let Ok(scan_val) = crate::scanner::ScanValue::parse(scanner.val_type, &val_str) {
+                            let res = scanner.next_scan(&proc, crate::scanner::ScanCondition::Exact(scan_val));
+                            (lib.pushboolean)(L, if res.is_ok() { 1 } else { 0 });
+                            return 1;
+                        }
+                    }
+                }
+            }
+        }
+        (lib.pushboolean)(L, 0);
+        1
+    } else {
+        0
+    }
+}
+
+unsafe extern "C" fn ce_lua_memscan_index(L: LuaState) -> c_int {
+    if let Some(lib) = LUA_LIB.as_ref() {
+        let key_ptr = (lib.tostring)(L, 2, null_mut());
+        if !key_ptr.is_null() {
+            let key = CStr::from_ptr(key_ptr).to_string_lossy();
+            if key == "Results" {
+                // CE 7.7: ms.Results property returns all found results directly
+                return ce_lua_memscan_getResults(L);
+            } else if key == "Count" {
+                return ce_lua_memscan_getCount(L);
+            }
+        }
+        (lib.getfield)(L, 1, key_ptr);
+        1
+    } else {
+        0
+    }
+}
+
+// CE 7.7: stacktrace lua command
+unsafe extern "C" fn ce_lua_stacktrace(L: LuaState) -> c_int {
+    if let Some(lib) = LUA_LIB.as_ref() {
+        let mut tid = (lib.tointegerx)(L, 1, null_mut()) as u32;
+        let h_proc = ACTIVE_PROCESS_HANDLE.lock().unwrap().unwrap_or(0);
+        let pid = ACTIVE_PROCESS_PID.lock().unwrap().unwrap_or(0);
+
+        if tid == 0 && pid != 0 {
+            let snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+            if snap != INVALID_HANDLE_VALUE {
+                let mut te: THREADENTRY32 = std::mem::zeroed();
+                te.dwSize = std::mem::size_of::<THREADENTRY32>() as u32;
+                if Thread32First(snap, &mut te) == TRUE {
+                    loop {
+                        if te.th32OwnerProcessID == pid {
+                            tid = te.th32ThreadID;
+                            break;
+                        }
+                        if Thread32Next(snap, &mut te) != TRUE {
+                            break;
+                        }
+                    }
+                }
+                CloseHandle(snap);
+            }
+        }
+
+        (lib.createtable)(L, 0, 0);
+        if tid == 0 || h_proc == 0 {
+            return 1;
+        }
+
+        let h_thread = OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, tid);
+        if !h_thread.is_null() && h_thread != INVALID_HANDLE_VALUE {
+            SuspendThread(h_thread);
+
+            let mut ctx: CONTEXT = std::mem::zeroed();
+            ctx.ContextFlags = CONTEXT_ALL;
+            if GetThreadContext(h_thread, &mut ctx) == TRUE {
+                let mut idx = 1i64;
+
+                // Frame 0: Current RIP
+                (lib.pushinteger)(L, ctx.Rip as i64);
+                (lib.rawseti)(L, -2, idx);
+                idx += 1;
+
+                // Walk RSP stack looking for return addresses
+                let rsp = ctx.Rsp as usize;
+                let mut stack_buf = [0usize; 128];
+                let mut read: SIZE_T = 0;
+                if ReadProcessMemory(h_proc as HANDLE, rsp as LPCVOID, stack_buf.as_mut_ptr() as LPVOID, 128 * 8, &mut read) != 0 {
+                    let count = read / 8;
+                    for i in 0..count {
+                        let potential_ret = stack_buf[i];
+                        if potential_ret > 0x10000 && potential_ret < 0x7FFFFFFF_FFFFFFFF {
+                            let mut mbi: MEMORY_BASIC_INFORMATION = std::mem::zeroed();
+                            if VirtualQueryEx(h_proc as HANDLE, potential_ret as LPCVOID, &mut mbi, std::mem::size_of::<MEMORY_BASIC_INFORMATION>()) != 0 {
+                                if (mbi.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE)) != 0 {
+                                    (lib.pushinteger)(L, potential_ret as i64);
+                                    (lib.rawseti)(L, -2, idx);
+                                    idx += 1;
+                                    if idx > 32 {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            ResumeThread(h_thread);
+            CloseHandle(h_thread);
+        }
+
+        1
+    } else {
+        0
+    }
+}
+
+// CE 7.7: getThreadList returns a threadlist in lua if no stringlist was provided
+unsafe extern "C" fn ce_lua_getThreadList(L: LuaState) -> c_int {
+    if let Some(lib) = LUA_LIB.as_ref() {
+        let mut target_pid = (lib.tointegerx)(L, 1, null_mut()) as u32;
+        if target_pid == 0 {
+            target_pid = ACTIVE_PROCESS_PID.lock().unwrap().unwrap_or(0);
+        }
+
+        (lib.createtable)(L, 0, 0);
+        if target_pid == 0 {
+            return 1;
+        }
+
+        let snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+        if snap != INVALID_HANDLE_VALUE {
+            let mut te: THREADENTRY32 = std::mem::zeroed();
+            te.dwSize = std::mem::size_of::<THREADENTRY32>() as u32;
+            let mut idx = 1i64;
+            if Thread32First(snap, &mut te) == TRUE {
+                loop {
+                    if te.th32OwnerProcessID == target_pid {
+                        (lib.pushinteger)(L, te.th32ThreadID as i64);
+                        (lib.rawseti)(L, -2, idx);
+                        idx += 1;
+                    }
+                    if Thread32Next(snap, &mut te) != TRUE {
+                        break;
+                    }
+                }
+            }
+            CloseHandle(snap);
+        }
+        1
+    } else {
+        0
+    }
+}
+
+// CE 7.7: executeCodeExThread and executeMethodThread
+unsafe extern "C" fn ce_lua_executeCodeExThread(L: LuaState) -> c_int {
+    if let Some(lib) = LUA_LIB.as_ref() {
+        let tid = (lib.tointegerx)(L, 1, null_mut()) as u32;
+        let code_addr = (lib.tointegerx)(L, 2, null_mut()) as usize;
+        let param = (lib.tointegerx)(L, 3, null_mut()) as usize;
+
+        let pid = ACTIVE_PROCESS_PID.lock().unwrap().unwrap_or(0);
+        if pid != 0 && code_addr != 0 {
+            if let Ok(proc) = Process::attach(pid) {
+                let h_thread = if tid != 0 {
+                    OpenThread(THREAD_ALL_ACCESS, FALSE, tid)
+                } else {
+                    null_mut()
+                };
+
+                let thread_start = std::mem::transmute::<LPVOID, unsafe extern "system" fn(LPVOID) -> DWORD>(code_addr as LPVOID);
+                let h_remote = CreateRemoteThread(
+                    proc.handle,
+                    null_mut(),
+                    0,
+                    thread_start,
+                    param as LPVOID,
+                    0,
+                    null_mut(),
+                );
+
+                if !h_thread.is_null() && h_thread != INVALID_HANDLE_VALUE {
+                    CloseHandle(h_thread);
+                }
+
+                if !h_remote.is_null() && h_remote != INVALID_HANDLE_VALUE {
+                    WaitForSingleObject(h_remote, 5000);
+                    let mut exit_code: DWORD = 0;
+                    GetExitCodeThread(h_remote, &mut exit_code);
+                    CloseHandle(h_remote);
+                    (lib.pushinteger)(L, exit_code as i64);
+                    return 1;
+                }
+            }
+        }
+        (lib.pushnil)(L);
+        1
+    } else {
+        0
+    }
+}
+
+unsafe extern "C" fn ce_lua_executeMethodThread(L: LuaState) -> c_int {
+    ce_lua_executeCodeExThread(L)
+}
+
 #[link(name = "kernel32")]
 unsafe extern "system" {
     fn LoadLibraryW(lpLibFileName: LPCWSTR) -> HMODULE;
     fn GetProcAddress(hModule: HMODULE, lpProcName: *const u8) -> *mut c_void;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ce_lua_engine_77() {
+        if let Ok(lua) = CeLuaEngine::init() {
+            // 1. CE Version is 7.7
+            let ver = lua.execute("return getCEVersion()").unwrap();
+            assert_eq!(ver, "7.7");
+
+            // 2. Built-in json library
+            let json_enc = lua.execute(r#"return json.encode({name="CheatEngine", version=7.7})"#).unwrap();
+            assert!(json_enc.contains("\"name\":\"CheatEngine\""));
+            assert!(json_enc.contains("\"version\":7.7"));
+
+            let json_dec = lua.execute(r#"
+                local obj = json.decode('{"val":1337,"flag":true}')
+                return obj.val
+            "#).unwrap();
+            assert_eq!(json_dec, "1337");
+
+            // 3. MemScan Results property and object
+            let ms_test = lua.execute(r#"
+                local ms = createMemScan()
+                if ms and type(ms.Results) == "table" and ms.Count == 0 then
+                    return "OK"
+                else
+                    return "FAIL"
+                end
+            "#).unwrap();
+            assert_eq!(ms_test, "OK");
+        }
+    }
+}
+

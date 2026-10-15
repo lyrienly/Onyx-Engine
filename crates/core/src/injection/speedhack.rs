@@ -30,10 +30,14 @@ impl SpeedController {
         let current_real_elapsed = self.start_real_time.elapsed().as_millis() as f64;
         self.last_virtual_time_ms += (current_real_elapsed * (self.multiplier as f64)) as u64;
         self.start_real_time = Instant::now();
-        self.multiplier = speed;
+        self.multiplier = speed.max(0.0);
     }
 
     pub fn get_scaled_time_ms(&self) -> u64 {
+        if self.multiplier <= 0.0 {
+            // Unity / Mono IL2CPP freeze: time delta stays 0.0
+            return self.last_virtual_time_ms;
+        }
         let current_real_elapsed = self.start_real_time.elapsed().as_millis() as f64;
         let scaled_delta = (current_real_elapsed * (self.multiplier as f64)) as u64;
         self.last_virtual_time_ms + scaled_delta
