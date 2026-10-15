@@ -509,6 +509,7 @@ type
     VarType: TComboBox;
     ProgressBar: TProgressBar;
     UndoScan: TButton;
+    pnlScanTime: TPanel;
     lblScanTime: TLabel;
     scanvalue: TEdit;
     foundlistpopup: TPopupMenu;
@@ -10556,6 +10557,7 @@ begin
       remainingSec := totalSec - (minutes * 60.0);
       lblScanTime.Caption := Format('%d m %.1f s', [minutes, remainingSec]);
     end;
+    lblScanTime.Font.Color := $0000E676;
     lblScanTime.Hint := 'Scan duration: ' + lblScanTime.Caption;
   end;
 

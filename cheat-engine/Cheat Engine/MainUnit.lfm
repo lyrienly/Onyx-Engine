@@ -727,22 +727,38 @@ object MainForm: TMainForm
       OnClick = UndoScanClick
       TabOrder = 3
     end
-    object lblScanTime: TLabel
+    object pnlScanTime: TPanel
       AnchorSideLeft.Control = btnNextScan
       AnchorSideLeft.Side = asrBottom
       AnchorSideTop.Control = btnNextScan
-      AnchorSideTop.Side = asrCenter
       Left = 581
-      Height = 15
-      Top = 51
-      Width = 10
+      Height = 25
+      Top = 46
+      Width = 90
+      BevelOuter = bvNone
+      BorderStyle = bsSingle
       BorderSpacing.Left = 8
-      Caption = ''
-      Hint = 'Last scan duration'
+      BorderSpacing.Right = 8
+      Color = clBtnFace
       ParentColor = False
       ParentFont = False
-      ShowHint = True
-      Font.Style = [fsBold]
+      TabOrder = 14
+      object lblScanTime: TLabel
+        Left = 0
+        Height = 23
+        Top = 0
+        Width = 88
+        Align = alClient
+        Alignment = taCenter
+        Caption = ''
+        Font.Color = 58998
+        Font.Style = [fsBold]
+        Hint = 'Last scan duration'
+        Layout = tlCenter
+        ParentColor = False
+        ParentFont = False
+        ShowHint = True
+      end
     end
     object scanvalue: TEdit
       AnchorSideLeft.Control = VarType
