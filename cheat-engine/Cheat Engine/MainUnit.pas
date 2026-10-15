@@ -509,6 +509,7 @@ type
     VarType: TComboBox;
     ProgressBar: TProgressBar;
     UndoScan: TButton;
+    lblScanTime: TLabel;
     scanvalue: TEdit;
     foundlistpopup: TPopupMenu;
     Browsethismemoryarrea1: TMenuItem;
@@ -5832,6 +5833,8 @@ begin
 
   foundcount := 0;
   foundlist.Clear;
+  if lblScanTime <> nil then
+    lblScanTime.Caption := '';
 
   btnNewScan.Caption := strFirstScan;
 
@@ -10503,6 +10506,11 @@ procedure TMainForm.MemScanStart(sender: TObject);
 begin
   foundlist.Deinitialize; //unlock file handles
   cleanupPreviousResults;
+  if lblScanTime <> nil then
+  begin
+    lblScanTime.Caption := 'Scanning...';
+    lblScanTime.Hint := 'Scan in progress...';
+  end;
 end;
 
 procedure TMainForm.MemScanDone(sender: TObject);
@@ -10516,11 +10524,40 @@ var
   c: qword;
 
   scantime: qword;
+  {$ifdef windows}
+  perfFreq: int64;
+  elapsedMs: Double;
+  totalSec: Double;
+  minutes: Integer;
+  remainingSec: Double;
+  {$endif}
 begin
   {$ifdef windows}
   QueryPerformanceCounter(scantimefinish);
 
   scantime:=scantimefinish-scantimestart;
+
+  if (lblScanTime <> nil) and (scantimestart > 0) then
+  begin
+    QueryPerformanceFrequency(perfFreq);
+    if perfFreq > 0 then
+      elapsedMs := ((scantimefinish - scantimestart) * 1000.0) / perfFreq
+    else
+      elapsedMs := 0;
+
+    if elapsedMs < 1000.0 then
+      lblScanTime.Caption := Format('%.1f ms', [elapsedMs])
+    else if elapsedMs < 60000.0 then
+      lblScanTime.Caption := Format('%.2f s', [elapsedMs / 1000.0])
+    else
+    begin
+      totalSec := elapsedMs / 1000.0;
+      minutes := Trunc(totalSec / 60.0);
+      remainingSec := totalSec - (minutes * 60.0);
+      lblScanTime.Caption := Format('%d m %.1f s', [minutes, remainingSec]);
+    end;
+    lblScanTime.Hint := 'Scan duration: ' + lblScanTime.Caption;
+  end;
 
   {$ifdef SCANPERF}
   if ssCtrl in GetKeyShiftState then
@@ -10682,6 +10719,7 @@ var
 begin
   {$ifdef windows}
   if aprilfools then decreaseCheatECoinCount;
+  QueryPerformanceCounter(scantimestart);
   {$endif}
 
   { estimateddiskspaceneeded:=foundcount*8*3;

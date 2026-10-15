@@ -727,6 +727,23 @@ object MainForm: TMainForm
       OnClick = UndoScanClick
       TabOrder = 3
     end
+    object lblScanTime: TLabel
+      AnchorSideLeft.Control = btnNextScan
+      AnchorSideLeft.Side = asrBottom
+      AnchorSideTop.Control = btnNextScan
+      AnchorSideTop.Side = asrCenter
+      Left = 581
+      Height = 15
+      Top = 51
+      Width = 10
+      BorderSpacing.Left = 8
+      Caption = ''
+      Hint = 'Last scan duration'
+      ParentColor = False
+      ParentFont = False
+      ShowHint = True
+      Font.Style = [fsBold]
+    end
     object scanvalue: TEdit
       AnchorSideLeft.Control = VarType
       AnchorSideTop.Control = ScanText
