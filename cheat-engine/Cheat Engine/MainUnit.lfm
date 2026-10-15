@@ -712,34 +712,18 @@ object MainForm: TMainForm
       Step = 1
       TabOrder = 9
     end
-    object UndoScan: TButton
-      AnchorSideTop.Control = btnNextScan
-      AnchorSideRight.Control = LogoPanel
-      Left = 599
-      Height = 25
-      Top = 46
-      Width = 83
-      Anchors = [akTop, akRight]
-      AutoSize = True
-      BorderSpacing.Right = 5
-      Caption = 'Undo Scan'
-      Enabled = False
-      OnClick = UndoScanClick
-      TabOrder = 3
-    end
     object pnlScanTime: TPanel
       AnchorSideLeft.Control = btnNextScan
       AnchorSideLeft.Side = asrBottom
       AnchorSideTop.Control = btnNextScan
-      Left = 581
+      Left = 577
       Height = 25
       Top = 46
-      Width = 90
+      Width = 72
       BevelOuter = bvNone
       BorderStyle = bsSingle
-      BorderSpacing.Left = 8
-      BorderSpacing.Right = 8
-      Color = clBtnFace
+      BorderSpacing.Left = 6
+      Color = 2829099
       ParentColor = False
       ParentFont = False
       TabOrder = 14
@@ -747,7 +731,7 @@ object MainForm: TMainForm
         Left = 0
         Height = 23
         Top = 0
-        Width = 88
+        Width = 70
         Align = alClient
         Alignment = taCenter
         Caption = ''
@@ -759,6 +743,21 @@ object MainForm: TMainForm
         ParentFont = False
         ShowHint = True
       end
+    end
+    object UndoScan: TButton
+      AnchorSideLeft.Control = pnlScanTime
+      AnchorSideLeft.Side = asrBottom
+      AnchorSideTop.Control = btnNextScan
+      Left = 655
+      Height = 25
+      Top = 46
+      Width = 83
+      AutoSize = True
+      BorderSpacing.Left = 6
+      Caption = 'Undo Scan'
+      Enabled = False
+      OnClick = UndoScanClick
+      TabOrder = 3
     end
     object scanvalue: TEdit
       AnchorSideLeft.Control = VarType
