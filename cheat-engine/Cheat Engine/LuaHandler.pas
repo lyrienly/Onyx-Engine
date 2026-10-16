@@ -134,7 +134,8 @@ uses autoassembler, MainUnit, MainUnit2, LuaClass, frmluaengineunit, plugin, plu
   rttihelper, LuaDotNetPipe, LuaRemoteExecutor, windows7taskbar, debugeventhandler,
   tcclib, dotnethost, CSharpCompiler, LuaCECustomButton, feces, process,
   networkInterface, networkInterfaceApi, LuaVirtualStringTree, userbytedisassembler,
-  parsers, LuaNetworkInterface, symbolsync, GDBServerDebuggerInterface, contexthandler;
+  parsers, LuaNetworkInterface, symbolsync, GDBServerDebuggerInterface, contexthandler,
+  OnyxBackend;
 
   {$warn 5044 off}
 
@@ -17289,6 +17290,7 @@ begin
       {$endif}
 
 
+      RegisterOnyxLua(L);
     finally
       s.free;
     end;

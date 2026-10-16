@@ -72,3 +72,37 @@ pub struct OnyxDisasmInsn {
     pub mnemonic: [u8; 32],
     pub operands: [u8; 96],
 }
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct OnyxVehHit {
+    pub instruction_address: usize,
+    pub count: usize,
+    pub last_rax: u64,
+    pub last_rbx: u64,
+    pub last_rcx: u64,
+    pub last_rdx: u64,
+    pub last_rsi: u64,
+    pub last_rdi: u64,
+    pub last_rsp: u64,
+    pub last_rbp: u64,
+    pub instruction_text: [u8; 64],
+}
+
+impl OnyxVehHit {
+    pub fn empty() -> Self {
+        Self {
+            instruction_address: 0,
+            count: 0,
+            last_rax: 0,
+            last_rbx: 0,
+            last_rcx: 0,
+            last_rdx: 0,
+            last_rsi: 0,
+            last_rdi: 0,
+            last_rsp: 0,
+            last_rbp: 0,
+            instruction_text: [0u8; 64],
+        }
+    }
+}

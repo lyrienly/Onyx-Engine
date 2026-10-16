@@ -14,6 +14,7 @@ pub use api::freezer::*;
 pub use api::pointer::*;
 pub use api::speedhack::*;
 pub use api::mono::*;
+pub use api::veh::*;
 pub use loader::*;
 
 /// Query backend version code (e.g. 100 for v1.0.0)

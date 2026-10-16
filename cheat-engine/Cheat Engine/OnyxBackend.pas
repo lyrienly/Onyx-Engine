@@ -58,6 +58,21 @@ type
   end;
   POnyxPointerPathRecord = ^TOnyxPointerPathRecord;
 
+  TOnyxVehHit = packed record
+    instruction_address: PtrUInt;
+    count: PtrUInt;
+    last_rax: UInt64;
+    last_rbx: UInt64;
+    last_rcx: UInt64;
+    last_rdx: UInt64;
+    last_rsi: UInt64;
+    last_rdi: UInt64;
+    last_rsp: UInt64;
+    last_rbp: UInt64;
+    instruction_text: array[0..63] of AnsiChar;
+  end;
+  POnyxVehHit = ^TOnyxVehHit;
+
 const
   ONYX_PTR_PHASE_IDLE = 0;
   ONYX_PTR_PHASE_MAPPING = 1;
@@ -117,9 +132,22 @@ function onyx_pointer_scanner_load_results(session: Pointer; file_path: PAnsiCha
 
 function onyx_speedhack_init(process: Pointer; initial_speed: Single): integer; stdcall; external OnyxBackendDLL;
 function onyx_speedhack_set(process: Pointer; multiplier: Single): integer; stdcall; external OnyxBackendDLL;
+
 function onyx_mono_detect(process: Pointer): integer; stdcall; external OnyxBackendDLL;
 function onyx_mono_dissect(process: Pointer): integer; stdcall; external OnyxBackendDLL;
 function onyx_mono_class_count: integer; stdcall; external OnyxBackendDLL;
+function onyx_mono_get_class_info(index: integer; out_name: PAnsiChar; max_len: DWORD; out_addr: PPtrUInt; out_fields_count: PDWORD): integer; stdcall; external OnyxBackendDLL;
+function onyx_mono_find_field_offset(class_name: PAnsiChar; field_name: PAnsiChar): integer; stdcall; external OnyxBackendDLL;
+function onyx_mono_find_method_address(class_name: PAnsiChar; method_name: PAnsiChar): PtrUInt; stdcall; external OnyxBackendDLL;
+function onyx_mono_generate_hook(method_name: PAnsiChar; method_addr: PtrUInt; out_script: PAnsiChar; max_len: DWORD): integer; stdcall; external OnyxBackendDLL;
+
+function onyx_veh_inject(process: Pointer; dll_path: PAnsiChar): integer; stdcall; external OnyxBackendDLL;
+function onyx_veh_init(process: Pointer): integer; stdcall; external OnyxBackendDLL;
+function onyx_veh_set_hw_bp(process: Pointer; address: PtrUInt; bp_type: integer; size: integer): integer; stdcall; external OnyxBackendDLL;
+function onyx_veh_clear_hw_bp(process: Pointer; index: PtrUInt): integer; stdcall; external OnyxBackendDLL;
+function onyx_veh_poll_hit(process: Pointer; out_rip: PPtrUInt; out_thread_id: PDWORD): integer; stdcall; external OnyxBackendDLL;
+function onyx_veh_monitor_address(process: Pointer; address: PtrUInt; bp_type: integer; size: integer; duration_secs: UInt64; out_hits: Pointer; max_hits: DWORD; out_count: PDWORD): integer; stdcall; external OnyxBackendDLL;
+procedure onyx_veh_cleanup; stdcall; external OnyxBackendDLL;
 
 var
   CurrentOnyxProcessHandle: Pointer = nil;
@@ -178,10 +206,24 @@ procedure OnyxUnfreezeRecord(entryId: PtrUInt);
 procedure OnyxClearFreezer;
 function OnyxGetProcessList(ProcessList: TStrings; NoPID: boolean = false; noProcessInfo: boolean = false): Boolean;
 
+function OnyxVehInject(dllPath: string = ''): Boolean;
+function OnyxVehSetHardwareBreakpoint(address: PtrUInt; bpType: integer = 1; size: integer = 4): integer;
+function OnyxVehClearHardwareBreakpoint(index: PtrUInt): Boolean;
+function OnyxVehPollHit(var hitRip: PtrUInt; var threadId: DWORD): Boolean;
+
+function OnyxMonoDetect: integer;
+function OnyxMonoDissect: integer;
+function OnyxMonoGetClassCount: integer;
+function OnyxMonoGetClassInfo(index: integer; var className: string; var classAddr: PtrUInt; var fieldsCount: DWORD): Boolean;
+function OnyxMonoFindFieldOffset(className, fieldName: string): integer;
+function OnyxMonoFindMethodAddress(className, methodName: string): PtrUInt;
+function OnyxMonoGenerateHook(methodName: string; methodAddr: PtrUInt): string;
+procedure RegisterOnyxLua(L: Pointer);
+
 implementation
 
 uses
-  ProcessHandlerUnit, disassembler, lastdisassembledata, speedhack2;
+  ProcessHandlerUnit, disassembler, lastdisassembledata, speedhack2, lua;
 
 type
   TOnyxDisasmBridge = class
@@ -719,6 +761,306 @@ begin
   Result := True;
 end;
 
+function OnyxVehInject(dllPath: string = ''): Boolean;
+var
+  pProc: Pointer;
+  pPath: PAnsiChar;
+  ansiStr: AnsiString;
+begin
+  pProc := OnyxEnsureAttachedProcess;
+  if pProc = nil then Exit(False);
+  if dllPath <> '' then
+  begin
+    ansiStr := AnsiString(dllPath);
+    pPath := PAnsiChar(ansiStr);
+  end
+  else
+    pPath := nil;
+  Result := onyx_veh_inject(pProc, pPath) = 1;
+end;
+
+function OnyxVehSetHardwareBreakpoint(address: PtrUInt; bpType: integer = 1; size: integer = 4): integer;
+var
+  pProc: Pointer;
+begin
+  pProc := OnyxEnsureAttachedProcess;
+  if pProc = nil then Exit(-1);
+  Result := onyx_veh_set_hw_bp(pProc, address, bpType, size);
+end;
+
+function OnyxVehClearHardwareBreakpoint(index: PtrUInt): Boolean;
+var
+  pProc: Pointer;
+begin
+  pProc := OnyxEnsureAttachedProcess;
+  if pProc = nil then Exit(False);
+  Result := onyx_veh_clear_hw_bp(pProc, index) = 1;
+end;
+
+function OnyxVehPollHit(var hitRip: PtrUInt; var threadId: DWORD): Boolean;
+var
+  pProc: Pointer;
+  rRip: PtrUInt;
+  rTid: DWORD;
+begin
+  hitRip := 0;
+  threadId := 0;
+  pProc := OnyxEnsureAttachedProcess;
+  if pProc = nil then Exit(False);
+  rRip := 0;
+  rTid := 0;
+  if onyx_veh_poll_hit(pProc, @rRip, @rTid) = 1 then
+  begin
+    hitRip := rRip;
+    threadId := rTid;
+    Result := True;
+  end
+  else
+    Result := False;
+end;
+
+function OnyxMonoDetect: integer;
+var
+  pProc: Pointer;
+begin
+  pProc := OnyxEnsureAttachedProcess;
+  if pProc = nil then Exit(0);
+  Result := onyx_mono_detect(pProc);
+end;
+
+function OnyxMonoDissect: integer;
+var
+  pProc: Pointer;
+begin
+  pProc := OnyxEnsureAttachedProcess;
+  if pProc = nil then Exit(0);
+  Result := onyx_mono_dissect(pProc);
+end;
+
+function OnyxMonoGetClassCount: integer;
+begin
+  Result := onyx_mono_class_count;
+end;
+
+function OnyxMonoGetClassInfo(index: integer; var className: string; var classAddr: PtrUInt; var fieldsCount: DWORD): Boolean;
+var
+  buf: array[0..259] of AnsiChar;
+  addr: PtrUInt;
+  fc: DWORD;
+begin
+  className := '';
+  classAddr := 0;
+  fieldsCount := 0;
+  addr := 0;
+  fc := 0;
+  FillChar(buf, SizeOf(buf), 0);
+  if onyx_mono_get_class_info(index, @buf[0], SizeOf(buf), @addr, @fc) = 1 then
+  begin
+    className := StrPas(PAnsiChar(@buf[0]));
+    classAddr := addr;
+    fieldsCount := fc;
+    Result := True;
+  end
+  else
+    Result := False;
+end;
+
+function OnyxMonoFindFieldOffset(className, fieldName: string): integer;
+var
+  cAnsi, fAnsi: AnsiString;
+begin
+  cAnsi := AnsiString(className);
+  fAnsi := AnsiString(fieldName);
+  Result := onyx_mono_find_field_offset(PAnsiChar(cAnsi), PAnsiChar(fAnsi));
+end;
+
+function OnyxMonoFindMethodAddress(className, methodName: string): PtrUInt;
+var
+  cAnsi, mAnsi: AnsiString;
+begin
+  cAnsi := AnsiString(className);
+  mAnsi := AnsiString(methodName);
+  Result := onyx_mono_find_method_address(PAnsiChar(cAnsi), PAnsiChar(mAnsi));
+end;
+
+function OnyxMonoGenerateHook(methodName: string; methodAddr: PtrUInt): string;
+var
+  buf: array[0..4095] of AnsiChar;
+  mAnsi: AnsiString;
+begin
+  FillChar(buf, SizeOf(buf), 0);
+  mAnsi := AnsiString(methodName);
+  if onyx_mono_generate_hook(PAnsiChar(mAnsi), methodAddr, @buf[0], SizeOf(buf)) = 1 then
+    Result := StrPas(PAnsiChar(@buf[0]))
+  else
+    Result := '';
+end;
+
+function lua_onyx_veh_inject(L: PLua_State): integer; cdecl;
+var
+  dllPath: string;
+  ok: Boolean;
+begin
+  dllPath := '';
+  if lua_gettop(L) >= 1 then
+    dllPath := lua_tostring(L, 1);
+  ok := OnyxVehInject(dllPath);
+  lua_pushboolean(L, ok);
+  Result := 1;
+end;
+
+function lua_onyx_veh_set_hw_bp(L: PLua_State): integer; cdecl;
+var
+  addr: PtrUInt;
+  bpType: integer;
+  size: integer;
+  slot: integer;
+begin
+  if lua_gettop(L) >= 1 then
+  begin
+    addr := lua_tointeger(L, 1);
+    bpType := 1;
+    size := 4;
+    if lua_gettop(L) >= 2 then
+      bpType := lua_tointeger(L, 2);
+    if lua_gettop(L) >= 3 then
+      size := lua_tointeger(L, 3);
+    slot := OnyxVehSetHardwareBreakpoint(addr, bpType, size);
+    lua_pushinteger(L, slot);
+    Result := 1;
+  end
+  else
+  begin
+    lua_pushinteger(L, -1);
+    Result := 1;
+  end;
+end;
+
+function lua_onyx_veh_clear_hw_bp(L: PLua_State): integer; cdecl;
+var
+  idx: PtrUInt;
+  ok: Boolean;
+begin
+  if lua_gettop(L) >= 1 then
+  begin
+    idx := lua_tointeger(L, 1);
+    ok := OnyxVehClearHardwareBreakpoint(idx);
+    lua_pushboolean(L, ok);
+    Result := 1;
+  end
+  else
+  begin
+    lua_pushboolean(L, False);
+    Result := 1;
+  end;
+end;
+
+function lua_onyx_veh_poll_hit(L: PLua_State): integer; cdecl;
+var
+  hitRip: PtrUInt;
+  threadId: DWORD;
+  hit: Boolean;
+begin
+  hit := OnyxVehPollHit(hitRip, threadId);
+  if hit then
+  begin
+    lua_pushinteger(L, hitRip);
+    lua_pushinteger(L, threadId);
+    Result := 2;
+  end
+  else
+  begin
+    lua_pushnil(L);
+    Result := 1;
+  end;
+end;
+
+function lua_onyx_mono_detect(L: PLua_State): integer; cdecl;
+begin
+  lua_pushinteger(L, OnyxMonoDetect);
+  Result := 1;
+end;
+
+function lua_onyx_mono_dissect(L: PLua_State): integer; cdecl;
+begin
+  lua_pushinteger(L, OnyxMonoDissect);
+  Result := 1;
+end;
+
+function lua_onyx_mono_class_count(L: PLua_State): integer; cdecl;
+begin
+  lua_pushinteger(L, OnyxMonoGetClassCount);
+  Result := 1;
+end;
+
+function lua_onyx_mono_find_field_offset(L: PLua_State): integer; cdecl;
+var
+  cls, fld: string;
+begin
+  if lua_gettop(L) >= 2 then
+  begin
+    cls := lua_tostring(L, 1);
+    fld := lua_tostring(L, 2);
+    lua_pushinteger(L, OnyxMonoFindFieldOffset(cls, fld));
+  end
+  else
+    lua_pushinteger(L, -1);
+  Result := 1;
+end;
+
+function lua_onyx_mono_find_method_address(L: PLua_State): integer; cdecl;
+var
+  cls, meth: string;
+begin
+  if lua_gettop(L) >= 2 then
+  begin
+    cls := lua_tostring(L, 1);
+    meth := lua_tostring(L, 2);
+    lua_pushinteger(L, OnyxMonoFindMethodAddress(cls, meth));
+  end
+  else
+    lua_pushinteger(L, 0);
+  Result := 1;
+end;
+
+function lua_onyx_mono_generate_hook(L: PLua_State): integer; cdecl;
+var
+  meth: string;
+  addr: PtrUInt;
+  script: string;
+begin
+  if lua_gettop(L) >= 2 then
+  begin
+    meth := lua_tostring(L, 1);
+    addr := lua_tointeger(L, 2);
+    script := OnyxMonoGenerateHook(meth, addr);
+    lua_pushstring(L, PAnsiChar(AnsiString(script)));
+  end
+  else
+    lua_pushstring(L, '');
+  Result := 1;
+end;
+
+procedure RegisterOnyxLua(L: Pointer);
+var
+  state: PLua_State;
+begin
+  if L = nil then Exit;
+  state := PLua_State(L);
+
+  lua.lua_register(state, 'onyx_veh_inject', @lua_onyx_veh_inject);
+  lua.lua_register(state, 'onyx_veh_set_hw_bp', @lua_onyx_veh_set_hw_bp);
+  lua.lua_register(state, 'onyx_veh_clear_hw_bp', @lua_onyx_veh_clear_hw_bp);
+  lua.lua_register(state, 'onyx_veh_poll_hit', @lua_onyx_veh_poll_hit);
+
+  lua.lua_register(state, 'onyx_mono_detect', @lua_onyx_mono_detect);
+  lua.lua_register(state, 'onyx_mono_dissect', @lua_onyx_mono_dissect);
+  lua.lua_register(state, 'onyx_mono_class_count', @lua_onyx_mono_class_count);
+  lua.lua_register(state, 'onyx_mono_find_field_offset', @lua_onyx_mono_find_field_offset);
+  lua.lua_register(state, 'onyx_mono_find_method_address', @lua_onyx_mono_find_method_address);
+  lua.lua_register(state, 'onyx_mono_generate_hook', @lua_onyx_mono_generate_hook);
+end;
+
 function InitOnyxBackend: Boolean;
 var
   v: DWORD;
@@ -783,5 +1125,7 @@ finalization
     onyx_process_close(CurrentOnyxProcessHandle);
     CurrentOnyxProcessHandle := nil;
   end;
+
+  onyx_veh_cleanup;
 
 end.

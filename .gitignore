@@ -24,4 +24,15 @@ rustc-ice-*.txt
 *.obj
 cheat-engine/Cheat Engine/lib/
 cheat-engine/Cheat Engine/backup/
+cheat-engine/Cheat Engine/VEHDebug/lib/
+cheat-engine/Cheat Engine/VEHDebug/backup/
+
+# MSBuild / C++ build output
+*.exp
+*.lib
+*.ilk
+**/Release/
+**/Debug/
+**/*.tlog/
+**/MonoData.*/
 
