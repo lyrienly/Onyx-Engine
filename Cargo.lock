@@ -1599,12 +1599,40 @@ name = "onyx_core"
 version = "0.2.0"
 
 [[package]]
+name = "onyx_disasm"
+version = "0.1.0"
+dependencies = [
+ "onyx_core",
+]
+
+[[package]]
+name = "onyx_freezer"
+version = "0.1.0"
+dependencies = [
+ "onyx_core",
+]
+
+[[package]]
 name = "onyx_gui"
 version = "0.2.0"
 dependencies = [
  "eframe",
  "egui",
  "image",
+ "onyx_core",
+]
+
+[[package]]
+name = "onyx_pointer"
+version = "0.1.0"
+dependencies = [
+ "onyx_core",
+]
+
+[[package]]
+name = "onyx_scanner"
+version = "0.1.0"
+dependencies = [
  "onyx_core",
 ]
 

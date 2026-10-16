@@ -5,6 +5,7 @@
 
 pub mod types;
 pub mod api;
+pub mod loader;
 
 pub use api::process::*;
 pub use api::scanner::*;
@@ -13,6 +14,7 @@ pub use api::freezer::*;
 pub use api::pointer::*;
 pub use api::speedhack::*;
 pub use api::mono::*;
+pub use loader::*;
 
 /// Query backend version code (e.g. 100 for v1.0.0)
 #[no_mangle]
@@ -38,10 +40,10 @@ pub extern "system" fn DllMain(
 
     match fdw_reason {
         DLL_PROCESS_ATTACH => {
-            // Initialization
+            loader::init_modules();
         }
         DLL_PROCESS_DETACH => {
-            // Cleanup
+            loader::cleanup_modules();
         }
         _ => {}
     }

@@ -1,0 +1,11 @@
+[package]
+name = "onyx_disasm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "onyx_disasm"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+onyx_core = { path = "../../core" }
