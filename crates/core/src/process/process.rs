@@ -732,11 +732,15 @@ impl Process {
         if let Some(filename) = p.file_name() {
             let candidates = [
                 PathBuf::from(filename),
+                PathBuf::from("modules/injections").join(filename),
+                PathBuf::from("bin/modules/injections").join(filename),
+                PathBuf::from("cheat-engine/Cheat Engine/bin/modules/injections").join(filename),
+                PathBuf::from("target/release").join(filename),
+                PathBuf::from("../target/release").join(filename),
+                PathBuf::from("../../target/release").join(filename),
                 PathBuf::from("target/debug").join(filename),
                 PathBuf::from("../target/debug").join(filename),
                 PathBuf::from("../../target/debug").join(filename),
-                PathBuf::from("target/release").join(filename),
-                PathBuf::from("../target/release").join(filename),
                 PathBuf::from("CE_rust_gui/target/release").join(filename),
                 PathBuf::from("CE_rust/target/release").join(filename),
             ];

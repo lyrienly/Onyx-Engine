@@ -1,28 +1,43 @@
 // OnyxEngine Speedhack Backend API
-// Multiplier injection and QPC frequency scaling
+// Multiplier injection and IPC frequency scaling
 
+use std::fs::OpenOptions;
+use std::io::Write;
 use onyx_core::process::Process;
-use onyx_core::speedhack::SpeedhackInjector;
 
-static mut SPEEDHACK_INJECTOR: Option<SpeedhackInjector> = None;
+/// Injects speedhack DLL into target process and initializes IPC pipe
+#[no_mangle]
+pub unsafe extern "C" fn onyx_speedhack_init(process: *mut Process, initial_speed: f32) -> i32 {
+    if process.is_null() {
+        return 0;
+    }
+    let p = &*process;
+    match p.inject_dll("speedhack_dll.dll") {
+        Ok(_) => {
+            // Give DLL a few milliseconds to start pipe listener
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            let _ = onyx_speedhack_set(process, initial_speed);
+            1
+        }
+        Err(e) => {
+            eprintln!("[Onyx Speedhack] Injection failed: {}", e);
+            0
+        }
+    }
+}
 
+/// Sets real-time speedhack multiplier via named pipe
 #[no_mangle]
 pub unsafe extern "C" fn onyx_speedhack_set(process: *mut Process, multiplier: f32) -> i32 {
     if process.is_null() {
         return 0;
     }
-
-    let proc = &*process;
-    if SPEEDHACK_INJECTOR.is_none() {
-        SPEEDHACK_INJECTOR = Some(SpeedhackInjector::new());
-    }
-
-    if let Some(injector) = &mut SPEEDHACK_INJECTOR {
-        match injector.enable_speedhack(proc, multiplier) {
-            Ok(_) => 1,
-            Err(_) => 0,
+    let p = &*process;
+    let pipe_name = format!("\\\\.\\pipe\\ce_speedhack_{}", p.pid);
+    if let Ok(mut pipe) = OpenOptions::new().write(true).open(&pipe_name) {
+        if pipe.write_all(&multiplier.to_le_bytes()).is_ok() {
+            return 1;
         }
-    } else {
-        0
     }
+    0
 }

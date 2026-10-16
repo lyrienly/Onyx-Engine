@@ -113,6 +113,7 @@ function onyx_pointer_scanner_get_path(session: Pointer; index: PtrUInt; out_rec
 function onyx_pointer_scanner_save_results(session: Pointer; file_path: PAnsiChar): integer; stdcall; external OnyxBackendDLL;
 function onyx_pointer_scanner_load_results(session: Pointer; file_path: PAnsiChar): integer; stdcall; external OnyxBackendDLL;
 
+function onyx_speedhack_init(process: Pointer; initial_speed: Single): integer; stdcall; external OnyxBackendDLL;
 function onyx_speedhack_set(process: Pointer; multiplier: Single): integer; stdcall; external OnyxBackendDLL;
 function onyx_mono_detect(process: Pointer): integer; stdcall; external OnyxBackendDLL;
 function onyx_mono_dissect(process: Pointer): integer; stdcall; external OnyxBackendDLL;
@@ -171,7 +172,7 @@ function OnyxDoUndoScan(folder: string; var outFound: UInt64): Boolean;
 implementation
 
 uses
-  ProcessHandlerUnit, disassembler, lastdisassembledata;
+  ProcessHandlerUnit, disassembler, lastdisassembledata, speedhack2;
 
 type
   TOnyxDisasmBridge = class
@@ -179,8 +180,67 @@ type
     function DisasmOverride(sender: TObject; address: ptruint; var ldd: TLastDisassembleData; var output: string; var description: string): boolean;
   end;
 
+  TOnyxSpeedhackBridge = class
+  public
+    function OnActivate(out r: boolean; out error: string): boolean;
+    function OnSetSpeed(speed: single; out r: boolean; out error: string): boolean;
+  end;
+
 var
   OnyxBridgeInstance: TOnyxDisasmBridge = nil;
+  OnyxSpeedhackBridgeInstance: TOnyxSpeedhackBridge = nil;
+
+function TOnyxSpeedhackBridge.OnActivate(out r: boolean; out error: string): boolean;
+var
+  pProc: Pointer;
+begin
+  pProc := OnyxEnsureAttachedProcess;
+  if pProc = nil then
+  begin
+    r := False;
+    error := 'Nenhum processo selecionado para o Speedhack.';
+    Exit(True);
+  end;
+
+  if onyx_speedhack_init(pProc, 1.0) = 1 then
+  begin
+    r := True;
+    error := '';
+  end
+  else
+  begin
+    r := False;
+    error := 'Falha ao injetar speedhack_dll.dll via Rust backend.';
+  end;
+
+  Result := True;
+end;
+
+function TOnyxSpeedhackBridge.OnSetSpeed(speed: single; out r: boolean; out error: string): boolean;
+var
+  pProc: Pointer;
+begin
+  pProc := OnyxEnsureAttachedProcess;
+  if pProc = nil then
+  begin
+    r := False;
+    error := 'Processo desconectado.';
+    Exit(True);
+  end;
+
+  if onyx_speedhack_set(pProc, speed) = 1 then
+  begin
+    r := True;
+    error := '';
+  end
+  else
+  begin
+    r := False;
+    error := 'Falha ao atualizar velocidade via pipe IPC.';
+  end;
+
+  Result := True;
+end;
 
 function TOnyxDisasmBridge.DisasmOverride(sender: TObject; address: ptruint; var ldd: TLastDisassembleData; var output: string; var description: string): boolean;
 var
@@ -558,6 +618,12 @@ begin
         OnyxBridgeInstance := TOnyxDisasmBridge.Create;
         registerGlobalDisassembleOverride(OnyxBridgeInstance.DisasmOverride);
       end;
+
+      if OnyxSpeedhackBridgeInstance = nil then
+      begin
+        OnyxSpeedhackBridgeInstance := TOnyxSpeedhackBridge.Create;
+        registerSpeedhackCallbacks(OnyxSpeedhackBridgeInstance.OnActivate, OnyxSpeedhackBridgeInstance.OnSetSpeed);
+      end;
     end;
   except
     Result := False;
@@ -572,6 +638,11 @@ finalization
   begin
     onyx_pointer_scanner_destroy(GlobalOnyxPointerScanner);
     GlobalOnyxPointerScanner := nil;
+  end;
+
+  if OnyxSpeedhackBridgeInstance <> nil then
+  begin
+    FreeAndNil(OnyxSpeedhackBridgeInstance);
   end;
 
   if CurrentOnyxScanner <> nil then
