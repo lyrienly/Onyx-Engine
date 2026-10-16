@@ -304,6 +304,88 @@ pub unsafe extern "C" fn onyx_pointer_scanner_start_rescan(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn onyx_pointer_scanner_start_value_rescan(
+    session: *mut PointerScannerSession,
+    proc: *mut Process,
+    val_bytes: *const u8,
+    val_len: u32,
+) -> i32 {
+    if session.is_null() || proc.is_null() || val_bytes.is_null() || val_len == 0 {
+        return 0;
+    }
+
+    let s = &mut *session;
+
+    if let Some(h) = s.worker_handle.take() {
+        let _ = h.join();
+    }
+
+    s.cancel_flag.store(false, Ordering::SeqCst);
+    s.phase.store(OnyxPointerScanPhase::Rescanning as u32, Ordering::SeqCst);
+    if let Ok(mut pct) = s.progress_pct.lock() {
+        *pct = 0.0;
+    }
+
+    let results_arc = Arc::clone(&s.results);
+    let phase_arc = Arc::clone(&s.phase);
+    let progress_arc = Arc::clone(&s.progress_pct);
+    let count_arc = Arc::clone(&s.found_count);
+    let cancel_arc = Arc::clone(&s.cancel_flag);
+
+    let pid = (*proc).pid;
+    let expected = std::slice::from_raw_parts(val_bytes, val_len as usize).to_vec();
+
+    s.worker_handle = Some(std::thread::spawn(move || {
+        let process_res = Process::attach(pid);
+        let process = match process_res {
+            Ok(p) => p,
+            Err(_) => {
+                phase_arc.store(OnyxPointerScanPhase::Failed as u32, Ordering::SeqCst);
+                return;
+            }
+        };
+
+        let current_paths = {
+            match results_arc.read() {
+                Ok(guard) => guard.clone(),
+                Err(poisoned) => poisoned.into_inner().clone(),
+            }
+        };
+
+        let valid_paths = PointerScanner::rescan_paths_by_value_with_progress(
+            &process,
+            &current_paths,
+            &expected,
+            &mut |pct, found| {
+                if cancel_arc.load(Ordering::Relaxed) {
+                    return false;
+                }
+                if let Ok(mut guard) = progress_arc.lock() {
+                    *guard = pct;
+                }
+                count_arc.store(found, Ordering::Relaxed);
+                true
+            },
+        );
+
+        if cancel_arc.load(Ordering::Relaxed) {
+            phase_arc.store(OnyxPointerScanPhase::Cancelled as u32, Ordering::SeqCst);
+        } else {
+            count_arc.store(valid_paths.len(), Ordering::SeqCst);
+            if let Ok(mut res) = results_arc.write() {
+                *res = valid_paths;
+            }
+            if let Ok(mut guard) = progress_arc.lock() {
+                *guard = 100.0;
+            }
+            phase_arc.store(OnyxPointerScanPhase::Completed as u32, Ordering::SeqCst);
+        }
+    }));
+
+    1
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn onyx_pointer_scanner_cancel(session: *mut PointerScannerSession) -> i32 {
     if session.is_null() {
         return 0;

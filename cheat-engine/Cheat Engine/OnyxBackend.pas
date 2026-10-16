@@ -123,6 +123,7 @@ function onyx_pointer_scanner_create: Pointer; stdcall; external OnyxBackendDLL;
 procedure onyx_pointer_scanner_destroy(session: Pointer); stdcall; external OnyxBackendDLL;
 function onyx_pointer_scanner_start_scan(session: Pointer; proc: Pointer; target_addr: PtrUInt; max_depth: PtrUInt; max_offset: PtrUInt; alignment: PtrUInt; max_results: PtrUInt): integer; stdcall; external OnyxBackendDLL;
 function onyx_pointer_scanner_start_rescan(session: Pointer; proc: Pointer; new_target_addr: PtrUInt): integer; stdcall; external OnyxBackendDLL;
+function onyx_pointer_scanner_start_value_rescan(session: Pointer; proc: Pointer; val_bytes: Pointer; val_len: DWORD): integer; stdcall; external OnyxBackendDLL;
 function onyx_pointer_scanner_cancel(session: Pointer): integer; stdcall; external OnyxBackendDLL;
 function onyx_pointer_scanner_get_status(session: Pointer; out_phase: PDWORD; out_progress: PSingle; out_found_count: PPtrUInt): integer; stdcall; external OnyxBackendDLL;
 function onyx_pointer_scanner_get_count(session: Pointer): PtrUInt; stdcall; external OnyxBackendDLL;
@@ -164,6 +165,7 @@ function OnyxEnsureAttachedProcess: Pointer;
 
 function OnyxStartPointerScan(targetAddr: PtrUInt; maxDepth: integer = 5; maxOffset: PtrUInt = $1000; alignment: integer = 4; maxResults: integer = 20000): Boolean;
 function OnyxStartPointerRescan(newTargetAddr: PtrUInt): Boolean;
+function OnyxStartPointerValueRescan(valBytes: Pointer; valLen: DWORD): Boolean;
 procedure OnyxCancelPointerScan;
 function OnyxGetPointerScanProgress(var phase: DWORD; var progressPct: Single; var foundCount: PtrUInt): Boolean;
 function OnyxGetPointerScanCount: PtrUInt;
@@ -613,6 +615,18 @@ begin
   if pScan = nil then Exit(False);
 
   Result := onyx_pointer_scanner_start_rescan(pScan, pProc, newTargetAddr) = 1;
+end;
+
+function OnyxStartPointerValueRescan(valBytes: Pointer; valLen: DWORD): Boolean;
+var
+  pProc, pScan: Pointer;
+begin
+  pProc := OnyxEnsureAttachedProcess;
+  if pProc = nil then Exit(False);
+  pScan := EnsureGlobalPointerScanner;
+  if pScan = nil then Exit(False);
+
+  Result := onyx_pointer_scanner_start_value_rescan(pScan, pProc, valBytes, valLen) = 1;
 end;
 
 procedure OnyxCancelPointerScan;

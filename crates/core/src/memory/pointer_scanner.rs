@@ -346,6 +346,47 @@ impl PointerScanner {
         valid_paths
     }
 
+    /// Rescan of known pointer paths to verify if the memory pointed to by final_address matches expected bytes
+    pub fn rescan_paths_by_value_with_progress(
+        proc: &Process,
+        paths: &[PointerPath],
+        expected_bytes: &[u8],
+        progress_cb: &mut dyn FnMut(f32, usize) -> bool,
+    ) -> Vec<PointerPath> {
+        let mut valid_paths = Vec::new();
+        let total = paths.len();
+        let val_len = expected_bytes.len();
+        if val_len == 0 {
+            return valid_paths;
+        }
+
+        let mut read_buf = vec![0u8; val_len];
+
+        for (idx, p) in paths.iter().enumerate() {
+            if let Ok(resolved) = Self::evaluate_path(proc, p) {
+                if resolved != 0 {
+                    if let Ok(n) = proc.read_raw(resolved, &mut read_buf) {
+                        if n == val_len && read_buf == expected_bytes {
+                            let mut updated = p.clone();
+                            updated.final_address = resolved;
+                            valid_paths.push(updated);
+                        }
+                    }
+                }
+            }
+
+            if idx % 100 == 0 && total > 0 {
+                let pct = (idx as f32 / total as f32) * 100.0;
+                if !progress_cb(pct, valid_paths.len()) {
+                    break;
+                }
+            }
+        }
+
+        let _ = progress_cb(100.0, valid_paths.len());
+        valid_paths
+    }
+
     /// Saves pointer scan results to high-speed binary `.onyxptr` format
     pub fn save_to_file(paths: &[PointerPath], path: &str) -> Result<(), String> {
         let file = File::create(path).map_err(|e| format!("Failed to create file: {}", e))?;

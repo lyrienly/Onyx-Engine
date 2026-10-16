@@ -269,6 +269,8 @@ type
     procedure lvResultsDblClick(Sender: TObject);
     procedure cbTypeChange(Sender: TObject);
     procedure miOnyxTurboScanClick(Sender: TObject);
+    procedure btnOnyxRescanClick(Sender: TObject);
+    procedure btnOnyxValueRescanClick(Sender: TObject);
     procedure tmrOnyxProgressTimer(Sender: TObject);
     procedure DoStartOnyxScan(targetAddr: PtrUInt; maxDepth: integer = 5; maxOffset: PtrUInt = $1000; align: integer = 4; maxResults: integer = 20000);
     procedure SetupOnyxResultsView;
@@ -276,6 +278,9 @@ type
     tmrOnyxProgress: TTimer;
     isOnyxScanActive: Boolean;
     onyxScanTargetAddr: PtrUInt;
+    btnOnyxScan: TButton;
+    btnOnyxRescan: TButton;
+    btnOnyxValRescan: TButton;
   private
     { Private declarations }
     loadedFormPosition: boolean;
@@ -3696,6 +3701,43 @@ begin
   miOnyx.OnClick := miOnyxTurboScanClick;
   Pointerscanner1.Insert(0, miOnyx);
 
+  btnOnyxScan := TButton.Create(Self);
+  btnOnyxScan.Parent := Panel1;
+  btnOnyxScan.Caption := '⚡ Onyx Turbo Scan';
+  btnOnyxScan.Height := 24;
+  btnOnyxScan.Width := 150;
+  btnOnyxScan.Left := 2;
+  btnOnyxScan.Top := 1;
+  btnOnyxScan.Hint := 'Escanear ponteiros em Rust sem travar a interface (Ctrl+Shift+P)';
+  btnOnyxScan.ShowHint := True;
+  btnOnyxScan.OnClick := miOnyxTurboScanClick;
+
+  btnOnyxRescan := TButton.Create(Self);
+  btnOnyxRescan.Parent := Panel1;
+  btnOnyxRescan.Caption := '⚡ Rescan Endereço';
+  btnOnyxRescan.Height := 24;
+  btnOnyxRescan.Width := 135;
+  btnOnyxRescan.Left := 156;
+  btnOnyxRescan.Top := 1;
+  btnOnyxRescan.Hint := 'Rescanear caminhos para um novo endereço de memória';
+  btnOnyxRescan.ShowHint := True;
+  btnOnyxRescan.OnClick := btnOnyxRescanClick;
+
+  btnOnyxValRescan := TButton.Create(Self);
+  btnOnyxValRescan.Parent := Panel1;
+  btnOnyxValRescan.Caption := '⚡ Rescan por Valor';
+  btnOnyxValRescan.Height := 24;
+  btnOnyxValRescan.Width := 140;
+  btnOnyxValRescan.Left := 295;
+  btnOnyxValRescan.Top := 1;
+  btnOnyxValRescan.Hint := 'Filtrar caminhos que apontam para um valor específico (Byte, 4-byte, Float, etc)';
+  btnOnyxValRescan.ShowHint := True;
+  btnOnyxValRescan.OnClick := btnOnyxValueRescanClick;
+
+  cbType.Left := 440;
+  cbType.Top := 1;
+  cbType.Height := 24;
+
   cbtype.Onchange:=nil;
   cbtype.Items.clear;
 
@@ -3985,6 +4027,99 @@ begin
   end;
 
   DoStartOnyxScan(target, depth, offset, 4, 20000);
+end;
+
+procedure Tfrmpointerscanner.btnOnyxRescanClick(Sender: TObject);
+var
+  newAddrStr: string;
+  newTargetAddr: PtrUInt;
+begin
+  if (not isOnyxScanActive) or (OnyxGetPointerScanCount = 0) then
+  begin
+    MessageDlg('Nenhum resultado de ponteiros do Onyx para rescanear.', mtInformation, [mbOK], 0);
+    Exit;
+  end;
+
+  newAddrStr := IntToHex(onyxScanTargetAddr, 8);
+  if not InputQuery('⚡ Onyx Turbo Rescan por Endereço', 'Novo endereço alvo de memória (hex):', newAddrStr) then Exit;
+  newTargetAddr := StrToInt64Def('$' + trim(newAddrStr), 0);
+  if newTargetAddr = 0 then
+  begin
+    MessageDlg('Endereço inválido!', mtError, [mbOK], 0);
+    Exit;
+  end;
+
+  onyxScanTargetAddr := newTargetAddr;
+  pnlProgress.Visible := True;
+  ProgressBar1.Position := 0;
+  lblProgressbar1.Caption := 'Onyx Rust: Rescaneando caminhos por endereço...';
+  OnyxStartPointerRescan(newTargetAddr);
+  tmrOnyxProgress.Enabled := True;
+end;
+
+procedure Tfrmpointerscanner.btnOnyxValueRescanClick(Sender: TObject);
+var
+  valStr: string;
+  valInt: Integer;
+  valSingle: Single;
+  valInt64: Int64;
+  valDouble: Double;
+  valByte: Byte;
+  valWord: Word;
+begin
+  if (not isOnyxScanActive) or (OnyxGetPointerScanCount = 0) then
+  begin
+    MessageDlg('Nenhum resultado de ponteiros do Onyx para filtrar por valor.', mtInformation, [mbOK], 0);
+    Exit;
+  end;
+
+  valStr := '';
+  if not InputQuery('⚡ Onyx Turbo Rescan por Valor', 'Digite o valor esperado que o ponteiro deve conter:', valStr) then Exit;
+  if Trim(valStr) = '' then Exit;
+
+  pnlProgress.Visible := True;
+  ProgressBar1.Position := 0;
+  lblProgressbar1.Caption := 'Onyx Rust: Rescaneando caminhos por valor...';
+
+  case cbtype.ItemIndex of
+    0: // Byte
+    begin
+      valByte := StrToIntDef(valStr, 0);
+      OnyxStartPointerValueRescan(@valByte, SizeOf(valByte));
+    end;
+    1: // Word / 2 Byte
+    begin
+      valWord := StrToIntDef(valStr, 0);
+      OnyxStartPointerValueRescan(@valWord, SizeOf(valWord));
+    end;
+    2: // Dword / 4 Byte
+    begin
+      valInt := StrToIntDef(valStr, 0);
+      OnyxStartPointerValueRescan(@valInt, SizeOf(valInt));
+    end;
+    3: // Qword / 8 Byte
+    begin
+      valInt64 := StrToInt64Def(valStr, 0);
+      OnyxStartPointerValueRescan(@valInt64, SizeOf(valInt64));
+    end;
+    4: // Float
+    begin
+      valSingle := StrToFloatDef(valStr, 0.0);
+      OnyxStartPointerValueRescan(@valSingle, SizeOf(valSingle));
+    end;
+    5: // Double
+    begin
+      valDouble := StrToFloatDef(valStr, 0.0);
+      OnyxStartPointerValueRescan(@valDouble, SizeOf(valDouble));
+    end;
+    else
+    begin
+      valInt := StrToIntDef(valStr, 0);
+      OnyxStartPointerValueRescan(@valInt, SizeOf(valInt));
+    end;
+  end;
+
+  tmrOnyxProgress.Enabled := True;
 end;
 
 procedure Tfrmpointerscanner.DoStartOnyxScan(targetAddr: PtrUInt; maxDepth: integer = 5; maxOffset: PtrUInt = $1000; align: integer = 4; maxResults: integer = 20000);
