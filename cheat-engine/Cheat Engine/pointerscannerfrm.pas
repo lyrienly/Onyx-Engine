@@ -27,7 +27,7 @@ uses
   WinSock2, Sockets, registry, PageMap, CELazySocket,
   PointerscanNetworkCommands, resolve, pointeraddresslist, pointerscanworker,
   PointerscanStructures, PointerscanController, sqlite3conn, sqldb,
-  frmSelectionlistunit, commonTypeDefs, betterControls;
+  frmSelectionlistunit, commonTypeDefs, betterControls, OnyxBackend;
 
 {$endif}
 
@@ -268,6 +268,14 @@ type
     procedure Resyncmodulelist1Click(Sender: TObject);
     procedure lvResultsDblClick(Sender: TObject);
     procedure cbTypeChange(Sender: TObject);
+    procedure miOnyxTurboScanClick(Sender: TObject);
+    procedure tmrOnyxProgressTimer(Sender: TObject);
+    procedure DoStartOnyxScan(targetAddr: PtrUInt; maxDepth: integer = 5; maxOffset: PtrUInt = $1000; align: integer = 4; maxResults: integer = 20000);
+    procedure SetupOnyxResultsView;
+  public
+    tmrOnyxProgress: TTimer;
+    isOnyxScanActive: Boolean;
+    onyxScanTargetAddr: PtrUInt;
   private
     { Private declarations }
     loadedFormPosition: boolean;
@@ -2029,6 +2037,9 @@ begin
     reg.writeBool('Display Hexadecimal',miHexadecimal.checked);
   end;
   reg.free;
+
+  if tmrOnyxProgress <> nil then
+    FreeAndNil(tmrOnyxProgress);
 end;
 
 procedure Tfrmpointerscanner.btnStopRescanLoopClick(Sender: TObject);
@@ -3243,9 +3254,29 @@ var address: ptrUint;
     FloatSettings: TFormatSettings;
     floataccuracy: integer;
     i: integer;
+    newAddrStr: string;
+    newTargetAddr: PtrUInt;
 begin
-  floatsettings:=DefaultFormatSettings;
+  if isOnyxScanActive and (OnyxGetPointerScanCount > 0) then
+  begin
+    newAddrStr := IntToHex(onyxScanTargetAddr, 8);
+    if not InputQuery('⚡ Onyx Turbo Rescan', 'Novo endereço de memória (hex):', newAddrStr) then Exit;
+    newTargetAddr := StrToInt64Def('$' + trim(newAddrStr), 0);
+    if newTargetAddr = 0 then
+    begin
+      MessageDlg('Endereço inválido!', mtError, [mbOK], 0);
+      Exit;
+    end;
+    onyxScanTargetAddr := newTargetAddr;
+    pnlProgress.Visible := True;
+    ProgressBar1.Position := 0;
+    lblProgressbar1.Caption := 'Onyx Rust: Rescaneando caminhos...';
+    OnyxStartPointerRescan(newTargetAddr);
+    tmrOnyxProgress.Enabled := True;
+    Exit;
+  end;
 
+  floatsettings:=DefaultFormatSettings;
 
   if rescan<>nil then
     freeandnil(rescan);
@@ -3543,6 +3574,16 @@ end;
 procedure Tfrmpointerscanner.btnStopScanClick(Sender: TObject);
 var c: TModalResult;
 begin
+  if isOnyxScanActive then
+  begin
+    OnyxCancelPointerScan;
+    if tmrOnyxProgress <> nil then
+      tmrOnyxProgress.Enabled := False;
+    pnlProgress.Visible := False;
+    SetupOnyxResultsView;
+    Exit;
+  end;
+
   if staticscanner<>nil then
   begin
     if staticscanner.initializer=false then
@@ -3598,6 +3639,14 @@ begin
   if staticscanner<>nil then
     freeandnil(staticscanner);
 
+  if isOnyxScanActive then
+  begin
+    if tmrOnyxProgress <> nil then
+      tmrOnyxProgress.Enabled := False;
+    OnyxCancelPointerScan;
+    isOnyxScanActive := False;
+  end;
+
  
   pnlData.Visible:=false;
   panel1.Caption:='';
@@ -3632,7 +3681,21 @@ procedure Tfrmpointerscanner.FormCreate(Sender: TObject);
 var
   x: array of integer;
   reg: tregistry;
+  miOnyx: TMenuItem;
 begin
+  tmrOnyxProgress := TTimer.Create(Self);
+  tmrOnyxProgress.Interval := 40;
+  tmrOnyxProgress.Enabled := False;
+  tmrOnyxProgress.OnTimer := tmrOnyxProgressTimer;
+  isOnyxScanActive := False;
+  onyxScanTargetAddr := 0;
+
+  miOnyx := TMenuItem.Create(MainMenu1);
+  miOnyx.Caption := '⚡ Onyx Turbo Scan (Rust - Non-blocking)';
+  miOnyx.ShortCut := ShortCut(VK_P, [ssCtrl, ssShift]);
+  miOnyx.OnClick := miOnyxTurboScanClick;
+  Pointerscanner1.Insert(0, miOnyx);
+
   cbtype.Onchange:=nil;
   cbtype.Items.clear;
 
@@ -3703,8 +3766,32 @@ var
 
   vartype: TVariableType;
   ct: TCustomType=nil;
-
+  onyxRec: TOnyxPointerPathRecord;
 begin
+  if isOnyxScanActive then
+  begin
+    if OnyxGetPointerScanPath(Item.Index, onyxRec) then
+    begin
+      if onyxRec.module_name[0] <> #0 then
+        Item.Caption := '"' + string(onyxRec.module_name) + '"+' + IntToHex(onyxRec.base_offset, 8)
+      else
+        Item.Caption := IntToHex(onyxRec.base_offset, 8);
+
+      for i := 0 to onyxRec.offset_count - 1 do
+        Item.SubItems.Add(IntToHex(onyxRec.offsets[i], 1));
+
+      for i := onyxRec.offset_count to 6 do
+        Item.SubItems.Add('');
+
+      address := onyxRec.final_address;
+      if address = 0 then
+        Item.SubItems.Add('-')
+      else
+        Item.SubItems.Add(IntToHex(address, 8) + ' = ' + readAndParseAddress(address, vtDword, nil, miHexadecimal.Checked, miSigned.Checked, 128));
+    end;
+    Exit;
+  end;
+
   if Pointerscanresults<>nil then
   begin
 
@@ -3861,7 +3948,147 @@ end;
 procedure Tfrmpointerscanner.cbTypeChange(Sender: TObject);
 begin
   lvResults.Refresh;
+end;
 
+procedure Tfrmpointerscanner.miOnyxTurboScanClick(Sender: TObject);
+var
+  target: PtrUInt;
+  addrStr: string;
+  depth: integer;
+  offset: PtrUInt;
+begin
+  addrStr := '';
+  if frmpointerscannersettings <> nil then
+    addrStr := trim(frmpointerscannersettings.cbAddress.Text);
+
+  if addrStr = '' then
+    addrStr := '0';
+
+  if not InputQuery('⚡ Onyx Turbo Pointer Scan', 'Endereço alvo para escanear ponteiros (hex):', addrStr) then
+    Exit;
+
+  target := StrToInt64Def('$' + trim(addrStr), 0);
+  if target = 0 then
+  begin
+    MessageDlg('Endereço inválido!', mtError, [mbOK], 0);
+    Exit;
+  end;
+
+  depth := 5;
+  offset := $1000;
+  if frmpointerscannersettings <> nil then
+  begin
+    if frmpointerscannersettings.maxlevel > 0 then
+      depth := frmpointerscannersettings.maxlevel;
+    if frmpointerscannersettings.structsize > 0 then
+      offset := frmpointerscannersettings.structsize;
+  end;
+
+  DoStartOnyxScan(target, depth, offset, 4, 20000);
+end;
+
+procedure Tfrmpointerscanner.DoStartOnyxScan(targetAddr: PtrUInt; maxDepth: integer = 5; maxOffset: PtrUInt = $1000; align: integer = 4; maxResults: integer = 20000);
+begin
+  new1.Click;
+  onyxScanTargetAddr := targetAddr;
+  isOnyxScanActive := True;
+
+  pnlProgress.Visible := True;
+  ProgressBar1.Position := 0;
+  ProgressBar1.Max := 100;
+  lblProgressbar1.Caption := 'Onyx Rust: Inicializando scanner de ponteiros...';
+  pnlData.Visible := True;
+  btnStopScan.Enabled := True;
+  btnStopScan.Caption := rsStop;
+
+  if not OnyxStartPointerScan(targetAddr, maxDepth, maxOffset, align, maxResults) then
+  begin
+    MessageDlg('Falha ao iniciar Onyx Pointer Scanner em Rust.', mtError, [mbOK], 0);
+    pnlProgress.Visible := False;
+    isOnyxScanActive := False;
+    Exit;
+  end;
+
+  tmrOnyxProgress.Enabled := True;
+end;
+
+procedure Tfrmpointerscanner.tmrOnyxProgressTimer(Sender: TObject);
+var
+  phase: DWORD;
+  pct: Single;
+  found: PtrUInt;
+begin
+  if not OnyxGetPointerScanProgress(phase, pct, found) then Exit;
+
+  ProgressBar1.Position := Round(pct);
+
+  case phase of
+    ONYX_PTR_PHASE_MAPPING:
+      lblProgressbar1.Caption := Format('Onyx Rust: Mapeando memoria... %.1f%% (Ponteiros: %d)', [pct * 2, found]);
+    ONYX_PTR_PHASE_SEARCHING:
+      lblProgressbar1.Caption := Format('Onyx Rust: Buscando caminhos multinivel... %.1f%% (Achados: %d)', [(pct - 50.0) * 2, found]);
+    ONYX_PTR_PHASE_RESCANNING:
+      lblProgressbar1.Caption := Format('Onyx Rust: Rescaneando caminhos... %.1f%% (Validos: %d)', [pct, found]);
+    ONYX_PTR_PHASE_COMPLETED:
+    begin
+      tmrOnyxProgress.Enabled := False;
+      pnlProgress.Visible := False;
+      lblProgressbar1.Caption := Format('Onyx Rust Concluido: %d caminhos encontrados', [found]);
+      SetupOnyxResultsView;
+    end;
+    ONYX_PTR_PHASE_CANCELLED:
+    begin
+      tmrOnyxProgress.Enabled := False;
+      pnlProgress.Visible := False;
+      lblProgressbar1.Caption := 'Onyx Scan cancelado.';
+      SetupOnyxResultsView;
+    end;
+    ONYX_PTR_PHASE_FAILED:
+    begin
+      tmrOnyxProgress.Enabled := False;
+      pnlProgress.Visible := False;
+      lblProgressbar1.Caption := 'Onyx Scan falhou ao ler processo.';
+      MessageDlg('Erro durante a varredura de ponteiros em Rust.', mtError, [mbOK], 0);
+    end;
+  end;
+end;
+
+procedure Tfrmpointerscanner.SetupOnyxResultsView;
+var
+  col_base, col_off, col_pt: TListColumn;
+  i: integer;
+  c: PtrUInt;
+begin
+  c := OnyxGetPointerScanCount;
+  lvResults.Items.BeginUpdate;
+  lvResults.Columns.BeginUpdate;
+  lvResults.Columns.Clear;
+
+  col_base := lvResults.Columns.Add;
+  col_base.Caption := 'Base Address';
+  col_base.Width := 200;
+
+  for i := 0 to 6 do
+  begin
+    col_off := lvResults.Columns.Add;
+    col_off.Caption := 'Offset ' + IntToStr(i);
+    col_off.Width := 75;
+  end;
+
+  col_pt := lvResults.Columns.Add;
+  col_pt.Caption := 'Points to:';
+  col_pt.Width := 180;
+
+  lvResults.Items.Count := c;
+  lvResults.Columns.EndUpdate;
+  lvResults.Items.EndUpdate;
+
+  pnlData.Visible := True;
+  lvResults.Align := alClient;
+  lvResults.Visible := True;
+  cbType.Visible := True;
+  Rescanmemory1.Enabled := (c > 0);
+  new1.Enabled := True;
 end;
 
 initialization
