@@ -7027,7 +7027,9 @@ var
 
   parseregiontimestart: qword;
   parseregiontimestop: qword;
+  firstFoundAddr: PtrUInt;
 begin
+  firstFoundAddr := 0;
   if OnyxDoFirstScan(
     OwningMemScan.ScanresultFolder,
     Integer(variableType),
@@ -7042,9 +7044,12 @@ begin
     scanWritable = scanInclude,
     scanExecutable = scanInclude,
     scanCopyOnWrite = scanInclude,
-    OwningMemScan.found
+    OwningMemScan.found,
+    firstFoundAddr
   ) then
   begin
+    AddressFound := firstFoundAddr;
+    FoundSomething := (OwningMemScan.found > 0);
     savescannerresults := false;
     isdone := true;
     Exit;

@@ -795,6 +795,128 @@ unsafe fn scan_u8_exact_avx2(
     }
 }
 
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn scan_aob_exact_avx2(
+    base_addr: usize,
+    buf: &[u8],
+    pattern: &[AobByte],
+    alignment: usize,
+    out: &mut Vec<ScanCandidate>,
+) {
+    use core::arch::x86_64::*;
+
+    let pat_len = pattern.len();
+    let len = buf.len();
+    if len < pat_len {
+        return;
+    }
+
+    let max_idx = len - pat_len;
+
+    // Find the first non-wildcard byte to use as anchor
+    let anchor_info = pattern.iter().enumerate().find(|(_, b)| b.mask == 0xFF);
+
+    if let (Some((anchor_idx, anchor_byte)), 1) = (anchor_info, alignment) {
+        let anchor_v = _mm256_set1_epi8(anchor_byte.value as i8);
+        let mut i = 0;
+
+        while i + 32 <= len {
+            let chunk_ptr = unsafe { buf.as_ptr().add(i) as *const __m256i };
+            let chunk_v = unsafe { _mm256_loadu_si256(chunk_ptr) };
+            let cmp = _mm256_cmpeq_epi8(chunk_v, anchor_v);
+            let mut mask = _mm256_movemask_epi8(cmp) as u32;
+
+            while mask != 0 {
+                let tz = mask.trailing_zeros() as usize;
+                let cand_idx = i + tz;
+                if cand_idx >= anchor_idx {
+                    let start_idx = cand_idx - anchor_idx;
+                    if start_idx <= max_idx {
+                        let mut matched = true;
+                        for (p_idx, pat_byte) in pattern.iter().enumerate() {
+                            if !pat_byte.matches(buf[start_idx + p_idx]) {
+                                matched = false;
+                                break;
+                            }
+                        }
+                        if matched {
+                            let cand_bytes: Vec<AobByte> = buf[start_idx..start_idx + pat_len]
+                                .iter()
+                                .map(|&b| AobByte::exact(b))
+                                .collect();
+                            let cand_val = ScanValue::Aob(cand_bytes);
+                            out.push(ScanCandidate {
+                                address: base_addr + start_idx,
+                                current_value: cand_val.clone(),
+                                previous_value: cand_val,
+                            });
+                        }
+                    }
+                }
+                mask &= mask - 1;
+            }
+            i += 32;
+        }
+
+        // Tail bytes
+        let mut tail_idx = if len >= 32 { len - 32 } else { 0 };
+        if tail_idx <= max_idx {
+            while tail_idx <= max_idx {
+                let mut matched = true;
+                for (p_idx, pat_byte) in pattern.iter().enumerate() {
+                    if !pat_byte.matches(buf[tail_idx + p_idx]) {
+                        matched = false;
+                        break;
+                    }
+                }
+                if matched {
+                    let addr = base_addr + tail_idx;
+                    if !out.iter().any(|c| c.address == addr) {
+                        let cand_bytes: Vec<AobByte> = buf[tail_idx..tail_idx + pat_len]
+                            .iter()
+                            .map(|&b| AobByte::exact(b))
+                            .collect();
+                        let cand_val = ScanValue::Aob(cand_bytes);
+                        out.push(ScanCandidate {
+                            address: addr,
+                            current_value: cand_val.clone(),
+                            previous_value: cand_val,
+                        });
+                    }
+                }
+                tail_idx += alignment;
+            }
+        }
+        return;
+    }
+
+    // Fallback scalar loop
+    let mut i = 0;
+    while i <= max_idx {
+        let mut matched = true;
+        for (p_idx, pat_byte) in pattern.iter().enumerate() {
+            if !pat_byte.matches(buf[i + p_idx]) {
+                matched = false;
+                break;
+            }
+        }
+        if matched {
+            let cand_bytes: Vec<AobByte> = buf[i..i + pat_len]
+                .iter()
+                .map(|&b| AobByte::exact(b))
+                .collect();
+            let cand_val = ScanValue::Aob(cand_bytes);
+            out.push(ScanCandidate {
+                address: base_addr + i,
+                current_value: cand_val.clone(),
+                previous_value: cand_val,
+            });
+        }
+        i += alignment;
+    }
+}
+
 fn scan_buffer(
     base_addr: usize,
     buf: &[u8],
@@ -804,6 +926,16 @@ fn scan_buffer(
     out: &mut Vec<ScanCandidate>,
 ) {
     if let ScanCondition::Exact(ScanValue::Aob(pattern)) = cond {
+        #[cfg(target_arch = "x86_64")]
+        {
+            if is_x86_feature_detected!("avx2") {
+                unsafe {
+                    scan_aob_exact_avx2(base_addr, buf, pattern, alignment, out);
+                }
+                return;
+            }
+        }
+
         let pat_len = pattern.len();
         if buf.len() < pat_len {
             return;

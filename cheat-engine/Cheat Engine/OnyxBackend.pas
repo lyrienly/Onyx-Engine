@@ -187,7 +187,8 @@ function OnyxDoFirstScan(
   writable: boolean;
   executable: boolean;
   copyOnWrite: boolean;
-  var outFound: UInt64
+  var outFound: UInt64;
+  var outFirstAddr: PtrUInt
 ): Boolean;
 
 function OnyxDoNextScan(
@@ -356,16 +357,19 @@ function OnyxDoFirstScan(
   writable: boolean;
   executable: boolean;
   copyOnWrite: boolean;
-  var outFound: UInt64
+  var outFound: UInt64;
+  var outFirstAddr: PtrUInt
 ): Boolean;
 var
   count: Int64;
   res: Int64;
   filePath: AnsiString;
   curPid: DWORD;
+  cand: TOnyxScanCandidate;
 begin
   Result := False;
   outFound := 0;
+  outFirstAddr := 0;
 
   curPid := processid;
   if curPid = 0 then Exit;
@@ -412,6 +416,12 @@ begin
   if res < 0 then Exit;
 
   outFound := UInt64(count);
+  if count > 0 then
+  begin
+    if onyx_scanner_get_results(CurrentOnyxScanner, @cand, 1) > 0 then
+      outFirstAddr := cand.address;
+  end;
+
   Result := True;
 end;
 
