@@ -155,26 +155,15 @@ var
 begin
   if fcanvas.Handle<>0 then
   begin
-    facecolor:=parent.color;
+    if parent<>nil then
+      facecolor:=parent.color
+    else
+      facecolor:=ColorSet.TextBackground;
 
     fcanvas.brush.style:=bsSolid;
     fcanvas.brush.color:=facecolor;
     fcanvas.Clear;
     fcanvas.font.size:=font.size;
-
-
-    fcanvas.pen.Width:=1;
-    if enabled then
-    begin
-      fcanvas.pen.color:=colorset.CheckboxCheckMarkColor;
-      fcanvas.brush.color:=colorset.CheckboxFillColor;
-    end
-    else
-    begin
-      fcanvas.pen.color:=colorset.InactiveCheckboxCheckMarkColor;
-      fcanvas.brush.color:=colorset.InactiveCheckboxFillColor;
-    end;
-
 
     dpiscale:=Screen.PixelsPerInch/96;
 
@@ -183,28 +172,45 @@ begin
 
     r:=rect(trunc(dpiscale)-1,trunc(3*dpiscale),(trunc(dpiscale)-1)*2+clientheight-trunc((3*dpiscale)*2),(trunc(dpiscale)-1)+clientheight-trunc((3*dpiscale)));
 
-    fcanvas.Rectangle(r);
+    if enabled then
+    begin
+      if state=cbChecked then
+      begin
+        fcanvas.pen.color:=$008E5A;
+        fcanvas.brush.color:=$008E5A;
+      end
+      else
+      begin
+        fcanvas.pen.color:=$4E4E4E;
+        fcanvas.brush.color:=$282828;
+      end;
+    end
+    else
+    begin
+      fcanvas.pen.color:=$333333;
+      fcanvas.brush.color:=$222222;
+    end;
+
+    fcanvas.RoundRect(r.Left, r.Top, r.Right, r.Bottom, 3, 3);
 
     case state of
       cbChecked:
       begin
+        fCanvas.Pen.Color:=$FFFFFF;
         fCanvas.Pen.Width:=2;
-       // fcanvas.pen.EndCap:=pecFlat;
-        fCanvas.PenPos:=point(r.left+trunc(1.5*dpiscale),r.top+(r.Height div 2)-(trunc(dpiscale)-1));
-        fcanvas.LineTo(r.left+(r.Width div 3),r.Bottom-trunc(4*dpiscale));
-        fcanvas.LineTo(r.right-trunc(2*dpiscale),r.top+trunc(2*dpiscale));
-
+        fCanvas.PenPos:=point(r.left+trunc(2*dpiscale),r.top+(r.Height div 2));
+        fcanvas.LineTo(r.left+(r.Width div 3)+1,r.Bottom-trunc(3.5*dpiscale));
+        fcanvas.LineTo(r.right-trunc(2*dpiscale),r.top+trunc(2.5*dpiscale));
       end;
 
       cbUnchecked:
       begin
-
       end;
 
       cbGrayed:
       begin
         fCanvas.Pen.Width:=1;
-        fcanvas.brush.color:=fcanvas.pen.color;
+        fcanvas.brush.color:=$707070;
         fcanvas.FillRect(r.Left+r.Width div 4, r.top+r.Height div 4, r.Right-r.width div 4-(trunc(dpiscale)-1), r.Bottom-r.height div 4-(trunc(dpiscale)-1));
       end;
     end;

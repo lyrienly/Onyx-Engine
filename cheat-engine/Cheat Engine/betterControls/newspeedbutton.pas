@@ -27,15 +27,29 @@ begin
   if ShouldAppsUseDarkMode and darkmode then
   begin
     case FState of
-      bsUp: Canvas.Brush.Color := Color;
-      bsDisabled: Canvas.brush.Color:= Color xor $aaaaaa;
-      bsHot: Canvas.Brush.Color:=incColor(color,15); //or $aaaaaa;
-      bsDown: Canvas.Brush.Color :=incColor(color,32);
+      bsUp:
+      begin
+        Canvas.Brush.Color := Color;
+        Canvas.Pen.Color := Color;
+      end;
+      bsDisabled:
+      begin
+        Canvas.Brush.Color := Color;
+        Canvas.Pen.Color := Color;
+      end;
+      bsHot:
+      begin
+        Canvas.Brush.Color := incColor(Color, 18);
+        Canvas.Pen.Color := $4E4E4E;
+      end;
+      bsDown:
+      begin
+        Canvas.Brush.Color := incColor(Color, 32);
+        Canvas.Pen.Color := $00B478;
+      end;
     end;
 
-    Canvas.FillRect(PaintRect);
-    canvas.pen.color:=color xor $aaaaaa;
-    Canvas.Rectangle(PaintRect);
+    Canvas.RoundRect(PaintRect.Left, PaintRect.Top, PaintRect.Right, PaintRect.Bottom, 4, 4);
   end
   else
     inherited PaintBackground(paintrect);

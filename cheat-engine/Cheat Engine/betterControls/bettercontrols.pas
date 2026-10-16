@@ -327,17 +327,22 @@ initialization
 
         if ShouldAppsUseDarkMode() then
         begin
-          ColorSet.CheckboxFillColor:=$e8e8e8;
-          ColorSet.InactiveCheckboxFillColor:=$999999;
-          clBtnFace:=inccolor(ColorSet.TextBackground,8);
-          clBtnText:=ColorSet.FontColor;
+          ColorSet.FontColor:=$EDEDED;
+          ColorSet.TextBackground:=$202020;
+          ColorSet.InactiveFontColor:=$707070;
+          ColorSet.ButtonBorderColor:=$3E3E3E;
 
-          clBtnBorder:=$9b9b9b;
+          ColorSet.CheckboxFillColor:=$2D2D2D;
+          ColorSet.InactiveCheckboxFillColor:=$222222;
+          ColorSet.CheckboxCheckMarkColor:=$00E676;
+          ColorSet.InactiveCheckboxCheckMarkColor:=$555555;
 
-          clWindow:=colorset.TextBackground;
+          clBtnFace:=$2B2B2B;
+          clBtnText:=$EDEDED;
+          clBtnBorder:=$3E3E3E;
 
-          ColorSet.CheckboxCheckMarkColor:=InvertColor(ColorSet.CheckboxFillColor);
-          ColorSet.InactiveCheckboxCheckMarkColor:=InvertColor(ColorSet.CheckboxCheckMarkColor);
+          clWindow:=$202020;
+          clWindowText:=$EDEDED;
 
           darkmodestring:=' dark';
         end;

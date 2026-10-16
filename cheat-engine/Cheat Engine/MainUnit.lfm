@@ -9,7 +9,7 @@ object MainForm: TMainForm
   VertScrollBar.Visible = False
   AllowDropFiles = True
   AutoSize = True
-  Caption = 'Cheat Engine'
+  Caption = 'OnyxEngine'
   ClientHeight = 572
   ClientWidth = 734
   Menu = MainMenu1
@@ -721,7 +721,7 @@ object MainForm: TMainForm
       Top = 46
       Width = 72
       BevelOuter = bvNone
-      BorderStyle = bsSingle
+      BorderStyle = bsNone
       BorderSpacing.Left = 6
       Color = 2829099
       ParentColor = False

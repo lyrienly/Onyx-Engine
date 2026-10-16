@@ -82,40 +82,36 @@ begin
 
   if ShouldAppsUseDarkMode then
   begin
-    //setting color means default display
-    fFaceColorUp:=c;
-
-    ;
-    fFaceColorDisabled:=clDkGray; //cldark;
-    fBorderColor:=clActiveBorder;
-    fPenColorHover:=clBlue;
-    fInactiveBorderColor:=clInactiveBorder;
-    fInactiveFontColor:=clInactiveCaption;
-
-
-    if (c=clDefault) or (c=0) then
+    if (c=clDefault) or (c=0) or (c=clBtnFace) then
     begin
-      //default color
-      fFaceColorDown:=c;
-      fFaceColorHover:=clBtnHiLight;
-
-
+      fFaceColorUp:=$2C2C2C;
+      fFaceColorHover:=$383838;
+      fFaceColorDown:=$1E1E1E;
+      fFaceColorDisabled:=$222222;
+      fBorderColor:=$3E3E3E;
+      fPenColorHover:=$00B478;
+      fInactiveBorderColor:=$2C2C2C;
+      fInactiveFontColor:=$666666;
     end
     else
     begin
+      fFaceColorUp:=c;
       fFaceColorDown:=DecColor(c,14);
+      fFaceColorDisabled:=$222222;
+      fBorderColor:=DecColor(c,20);
+      fPenColorHover:=$00B478;
+      fInactiveBorderColor:=$2C2C2C;
+      fInactiveFontColor:=$666666;
 
-      //there is no incColor, and -14 is not the same
       newc:=ColorToRGB(c);
       r:=Red(newc);
       g:=Green(newc);
       b:=Blue(newc);
-      if r<255 then inc(r,14) else r:=255;
-      if g<255 then inc(g,14) else g:=255;
-      if b<255 then inc(b,14) else b:=255;
+      if r<240 then inc(r,16) else r:=255;
+      if g<240 then inc(g,16) else g:=255;
+      if b<240 then inc(b,16) else b:=255;
       fFaceColorHover:=RGBToColor(r,g,b);
     end;
-
   end;
 
 end;
@@ -188,43 +184,62 @@ procedure TNewButton.DefaultCustomPaint;
 var
   ts: TTextStyle;
   faceColor: TColor;
-   GKS: TShiftState;
+  curBorderColor: TColor;
+  isPrimary: boolean;
 begin
   if fcanvas.Handle<>0 then
   begin
+    isPrimary:=(caption='First Scan') or (caption='Next Scan');
+
     if enabled then
     begin
       if self.MouseInClient then
       begin
-        fborderColor:=fpenColorHover;
-
+        curBorderColor:=fpenColorHover;
         if MouseIsDown then
           facecolor:=fFaceColorDown
         else
           facecolor:=fFaceColorHover;
       end
       else
-        facecolor:=fFaceColorUp;
-      end
+      begin
+        if isPrimary then
+        begin
+          facecolor:=$25382E;
+          curBorderColor:=$008E5A;
+        end
+        else
+        begin
+          facecolor:=fFaceColorUp;
+          curBorderColor:=fBorderColor;
+        end;
+      end;
+    end
     else
     begin
       facecolor:=fFaceColorDisabled;
+      curBorderColor:=fInactiveBorderColor;
     end;
 
     fcanvas.brush.style:=bsSolid;
-    fcanvas.brush.color:=facecolor;
+    if parent<>nil then
+      fcanvas.brush.color:=parent.color
+    else
+      fcanvas.brush.color:=facecolor;
     fcanvas.Clear;
 
+    fcanvas.brush.color:=facecolor;
     fcanvas.pen.Width:=1;
-    if enabled then
-      fcanvas.pen.color:=fBorderColor
-    else
-      fcanvas.pen.color:=fInactiveBorderColor;
-
-    fcanvas.Rectangle(0,0,clientwidth,clientheight);
+    fcanvas.pen.color:=curBorderColor;
+    fcanvas.RoundRect(0,0,clientwidth,clientheight,6,6);
 
     if enabled then
-      fcanvas.font.color:=font.color
+    begin
+      if isPrimary and (not self.MouseInClient) then
+        fcanvas.font.color:=$00E676
+      else
+        fcanvas.font.color:=font.color;
+    end
     else
       fcanvas.font.color:=fInactiveFontcolor;
 
@@ -232,13 +247,10 @@ begin
     ts.Alignment:=taCenter;
     fcanvas.TextRect(rect(0,0,width,height),0,(height div 2)-(fcanvas.TextHeight(caption) div 2),caption, ts);
 
-
     if self.Focused then
     begin
-     // fcanvas.pen.color:=
-      fcanvas.DrawFocusRect(rect(2,2,width-2,height-2));
+      fcanvas.DrawFocusRect(rect(3,3,width-3,height-3));
     end;
-
   end;
 end;
 

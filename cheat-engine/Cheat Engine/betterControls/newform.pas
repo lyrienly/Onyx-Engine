@@ -33,16 +33,15 @@ begin
   begin
     AllowDarkModeForWindow(handle,1);
 
-
-    color:=$242424;
+    color:=$202020;
     if font.color=clDefault then
       font.color:=colorset.FontColor;
-
 
     if InitDwmLibrary then
     begin
       ldark:=1;
       DwmSetWindowAttribute(handle, 19, @Ldark, sizeof(Ldark));
+      DwmSetWindowAttribute(handle, 20, @Ldark, sizeof(Ldark));
     end;
   end;
 end;
@@ -55,12 +54,12 @@ begin
   begin
     AllowDarkModeForWindow(handle,1);
 
-    color:=$242424;
+    color:=$202020;
     font.color:=colorset.FontColor;
     if InitDwmLibrary then
     begin
       ldark:=1;
-
+      DwmSetWindowAttribute(handle, 19, @Ldark, sizeof(Ldark));
       DwmSetWindowAttribute(handle, 20, @Ldark, sizeof(Ldark));
     end;
   end;

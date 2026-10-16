@@ -32,8 +32,8 @@ begin
   begin
     AllowDarkModeForWindow(handle,1);
     SetWindowTheme(Handle,'','');
-    SendMessage(Handle, PBM_SETBARCOLOR, 0,$383838);
-    SendMessage(Handle, PBM_SETBKCOLOR, 0, $999999);
+    SendMessage(Handle, PBM_SETBKCOLOR, 0, $202020);
+    SendMessage(Handle, PBM_SETBARCOLOR, 0, $00B478);
   end;
 end;
 
