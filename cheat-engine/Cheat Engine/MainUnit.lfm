@@ -713,25 +713,26 @@ object MainForm: TMainForm
       TabOrder = 9
     end
     object pnlScanTime: TPanel
-      AnchorSideLeft.Control = btnNextScan
+      AnchorSideLeft.Control = foundcountlabel
       AnchorSideLeft.Side = asrBottom
-      AnchorSideTop.Control = btnNextScan
-      Left = 577
-      Height = 25
-      Top = 46
+      AnchorSideTop.Control = Label6
+      AnchorSideTop.Side = asrCenter
+      Left = 80
+      Height = 18
+      Top = 30
       Width = 72
       BevelOuter = bvNone
       BorderStyle = bsNone
-      BorderSpacing.Left = 6
+      BorderSpacing.Left = 10
       Color = 2829099
       ParentColor = False
       ParentFont = False
       TabOrder = 14
       object lblScanTime: TLabel
         Left = 0
-        Height = 23
+        Height = 18
         Top = 0
-        Width = 70
+        Width = 72
         Align = alClient
         Alignment = taCenter
         Caption = ''
@@ -745,10 +746,10 @@ object MainForm: TMainForm
       end
     end
     object UndoScan: TButton
-      AnchorSideLeft.Control = pnlScanTime
+      AnchorSideLeft.Control = btnNextScan
       AnchorSideLeft.Side = asrBottom
       AnchorSideTop.Control = btnNextScan
-      Left = 655
+      Left = 577
       Height = 25
       Top = 46
       Width = 83
@@ -2682,6 +2683,7 @@ object MainForm: TMainForm
     end
     object miHelp: TMenuItem
       Caption = '&Help'
+      Visible = False
       OnClick = miHelpClick
       object Helpindex1: TMenuItem
         Caption = 'Cheat Engine Help'

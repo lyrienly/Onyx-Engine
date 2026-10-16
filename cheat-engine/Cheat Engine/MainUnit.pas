@@ -5980,6 +5980,7 @@ begin
   lastAdded.vartype:=vtDword;
 
   miSignTable.visible:={$ifdef windows}canSignTables{$else}false{$endif};
+  miHelp.Visible := False;
 
 
   vartype.Items.Clear;
