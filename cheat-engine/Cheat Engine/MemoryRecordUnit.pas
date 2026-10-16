@@ -9,7 +9,7 @@ uses
   jwawindows, Windows, forms, graphics, Classes, SysUtils, controls, stdctrls, comctrls,
   symbolhandler, SymbolListHandler, cefuncproc,newkernelhandler, hotkeyhandler,
   dom, XMLRead,XMLWrite, customtypehandler, fileutil, LCLProc, commonTypeDefs,
-  pointerparser, LazUTF8, LuaClass, math, betterControls, memrecDataStructures;
+  pointerparser, LazUTF8, LuaClass, math, betterControls, memrecDataStructures, OnyxBackend;
 {$endif}
 
 {$ifdef darwin}
@@ -108,6 +108,7 @@ type
   TMemoryRecord=class
   private
     fID: integer;
+    fOnyxFreezerId: PtrUInt;
     FrozenValue   : string;
     CurrentValue  : string;
     UndoValue     : string;  //keeps the last value before a manual edit
@@ -1134,6 +1135,12 @@ end;
 destructor TMemoryRecord.destroy;
 var i: integer;
 begin
+  if fOnyxFreezerId <> 0 then
+  begin
+    OnyxUnfreezeRecord(fOnyxFreezerId);
+    fOnyxFreezerId := 0;
+  end;
+
   taddresslist(fowner).MemrecDescriptionChange(self, fdescription,'');
 
   if processingThread<>nil then
@@ -2721,6 +2728,15 @@ begin
         //enabled
 
         FrozenValue:=f;
+        fOnyxFreezerId := OnyxFreezeRecord(GetRealAddress, ord(VarType), f, Description);
+      end
+      else
+      begin
+        if fOnyxFreezerId <> 0 then
+        begin
+          OnyxUnfreezeRecord(fOnyxFreezerId);
+          fOnyxFreezerId := 0;
+        end;
       end;
 
       fActive:=state;
@@ -2890,6 +2906,8 @@ var oldvalue, newvalue: string;
 begin
   if (not fisgroupheader) and active and (VarType<>vtAutoAssembler) then
   begin
+    if (fOnyxFreezerId <> 0) and not (allowIncrease or allowDecrease) then exit;
+
     try
 
       if allowIncrease or allowDecrease  then
@@ -3632,6 +3650,9 @@ begin
 
   if (not isfreezer) then
   begin
+    if fOnyxFreezerId <> 0 then
+      OnyxUpdateFrozenRecord(fOnyxFreezerId, ord(VarType), unparsedvalue);
+
     if (GetValue<>newundovalue) then
       undovalue:=newundovalue;
 

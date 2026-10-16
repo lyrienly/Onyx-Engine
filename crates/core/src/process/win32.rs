@@ -696,3 +696,53 @@ unsafe extern "system" {
     pub fn CoUninitialize();
 }
 
+pub const SystemProcessInformation: u32 = 5;
+
+#[repr(C)]
+pub struct SYSTEM_PROCESS_INFORMATION {
+    pub NextEntryOffset: u32,
+    pub NumberOfThreads: u32,
+    pub WorkingSetPrivateSize: i64,
+    pub HardFaultCount: u32,
+    pub NumberOfThreadsHighWatermark: u32,
+    pub CycleTime: u64,
+    pub CreateTime: i64,
+    pub UserTime: i64,
+    pub KernelTime: i64,
+    pub ImageName: UNICODE_STRING,
+    pub BasePriority: i32,
+    pub UniqueProcessId: HANDLE,
+    pub InheritedFromUniqueProcessId: HANDLE,
+    pub HandleCount: u32,
+    pub SessionId: u32,
+    pub UniqueProcessKey: usize,
+    pub PeakVirtualSize: usize,
+    pub VirtualSize: usize,
+    pub PageFaultCount: u32,
+    pub PeakWorkingSetSize: usize,
+    pub WorkingSetSize: usize,
+    pub QuotaPeakPagedPoolUsage: usize,
+    pub QuotaPagedPoolUsage: usize,
+    pub QuotaPeakNonPagedPoolUsage: usize,
+    pub QuotaNonPagedPoolUsage: usize,
+    pub PagefileUsage: usize,
+    pub PeakPagefileUsage: usize,
+    pub PrivatePageCount: usize,
+    pub ReadOperationCount: i64,
+    pub WriteOperationCount: i64,
+    pub OtherOperationCount: i64,
+    pub ReadTransferCount: i64,
+    pub WriteTransferCount: i64,
+    pub OtherTransferCount: i64,
+}
+
+#[link(name = "ntdll")]
+unsafe extern "system" {
+    pub fn NtQuerySystemInformation(
+        SystemInformationClass: u32,
+        SystemInformation: *mut c_void,
+        SystemInformationLength: u32,
+        ReturnLength: *mut u32,
+    ) -> i32;
+}
+

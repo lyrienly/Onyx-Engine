@@ -1,6 +1,7 @@
 // language: Rust, file: process.rs, target: Windows 11, MSVC
 // Target process management, memory R/W, module enumeration, and privilege escalation
 
+use std::ffi::c_void;
 use std::mem::{size_of, zeroed};
 use std::ptr::{null, null_mut};
 use std::path::{Path, PathBuf};
@@ -104,7 +105,80 @@ pub struct Process {
 }
 
 impl Process {
+    pub fn list_all_nt() -> Result<Vec<ProcessEntry>, String> {
+        let mut buffer_size: u32 = 256 * 1024;
+        let mut buffer: Vec<u8> = vec![0u8; buffer_size as usize];
+        let mut return_len: u32 = 0;
+
+        unsafe {
+            loop {
+                let status = NtQuerySystemInformation(
+                    SystemProcessInformation,
+                    buffer.as_mut_ptr() as *mut c_void,
+                    buffer_size,
+                    &mut return_len,
+                );
+
+                if status == STATUS_INFO_LENGTH_MISMATCH {
+                    buffer_size = return_len.max(buffer_size * 2) + 64 * 1024;
+                    buffer.resize(buffer_size as usize, 0);
+                } else if status < 0 {
+                    return Err(format!("NtQuerySystemInformation failed with NTSTATUS: {:#X}", status));
+                } else {
+                    break;
+                }
+            }
+
+            let mut entries = Vec::new();
+            let mut offset = 0;
+
+            loop {
+                let p_info = buffer.as_ptr().add(offset) as *const SYSTEM_PROCESS_INFORMATION;
+                let info = &*p_info;
+
+                let pid = info.UniqueProcessId as usize as u32;
+                let parent_pid = info.InheritedFromUniqueProcessId as usize as u32;
+                let threads = info.NumberOfThreads;
+
+                let name = if info.ImageName.Length > 0 && !info.ImageName.Buffer.is_null() {
+                    let len = (info.ImageName.Length / 2) as usize;
+                    let slice = std::slice::from_raw_parts(info.ImageName.Buffer, len);
+                    String::from_utf16_lossy(slice)
+                } else if pid == 0 {
+                    "System Idle Process".to_string()
+                } else if pid == 4 {
+                    "System".to_string()
+                } else {
+                    format!("PID_{}", pid)
+                };
+
+                entries.push(ProcessEntry {
+                    pid,
+                    name,
+                    parent_pid,
+                    threads,
+                });
+
+                if info.NextEntryOffset == 0 {
+                    break;
+                }
+                offset += info.NextEntryOffset as usize;
+                if offset >= buffer.len() {
+                    break;
+                }
+            }
+
+            Ok(entries)
+        }
+    }
+
     pub fn list_all() -> Result<Vec<ProcessEntry>, String> {
+        if let Ok(entries) = Self::list_all_nt() {
+            if !entries.is_empty() {
+                return Ok(entries);
+            }
+        }
+
         let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
         if snapshot == INVALID_HANDLE_VALUE {
             return Err("Failed to create process snapshot".to_string());

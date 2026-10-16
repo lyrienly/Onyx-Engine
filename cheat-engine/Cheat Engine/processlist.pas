@@ -33,7 +33,7 @@ var
 implementation
 
 uses Globals, commonTypeDefs, DebuggerInterfaceAPIWrapper, networkInterfaceApi,
-  GDBServerDebuggerInterface, maps
+  GDBServerDebuggerInterface, maps, OnyxBackend
   {$ifdef darwin}
   , macportdefines //must be at the end
   {$endif}
@@ -220,6 +220,8 @@ begin
   {$endif}
 
   {$ifdef windows}
+  if OnyxGetProcessList(ProcessList, NoPID, noProcessInfo) then exit;
+
   lwindir:=lowercase(windowsdir);
   ProcessListInfo:=nil;
   HI:=0;

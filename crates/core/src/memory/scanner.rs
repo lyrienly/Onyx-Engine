@@ -170,47 +170,67 @@ impl ScanValue {
 
     pub fn parse(val_type: ValType, text: &str) -> Result<Self, String> {
         let trimmed = text.trim();
+        let hex_stripped = if trimmed.starts_with('$') {
+            Some(&trimmed[1..])
+        } else if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
+            Some(&trimmed[2..])
+        } else {
+            None
+        };
+
         match val_type {
-            ValType::I8 => trimmed.parse::<i8>().map(ScanValue::I8).map_err(|e| e.to_string()),
+            ValType::I8 => {
+                if let Some(h) = hex_stripped {
+                    i8::from_str_radix(h, 16).map(ScanValue::I8).map_err(|e| e.to_string())
+                } else {
+                    trimmed.parse::<i8>().map(ScanValue::I8).map_err(|e| e.to_string())
+                }
+            }
             ValType::U8 => {
-                if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
-                    u8::from_str_radix(&trimmed[2..], 16).map(ScanValue::U8).map_err(|e| e.to_string())
+                if let Some(h) = hex_stripped {
+                    u8::from_str_radix(h, 16).map(ScanValue::U8).map_err(|e| e.to_string())
                 } else {
                     trimmed.parse::<u8>().map(ScanValue::U8).map_err(|e| e.to_string())
                 }
             }
-            ValType::I16 => trimmed.parse::<i16>().map(ScanValue::I16).map_err(|e| e.to_string()),
+            ValType::I16 => {
+                if let Some(h) = hex_stripped {
+                    i16::from_str_radix(h, 16).map(ScanValue::I16).map_err(|e| e.to_string())
+                } else {
+                    trimmed.parse::<i16>().map(ScanValue::I16).map_err(|e| e.to_string())
+                }
+            }
             ValType::U16 => {
-                if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
-                    u16::from_str_radix(&trimmed[2..], 16).map(ScanValue::U16).map_err(|e| e.to_string())
+                if let Some(h) = hex_stripped {
+                    u16::from_str_radix(h, 16).map(ScanValue::U16).map_err(|e| e.to_string())
                 } else {
                     trimmed.parse::<u16>().map(ScanValue::U16).map_err(|e| e.to_string())
                 }
             }
             ValType::I32 => {
-                if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
-                    i32::from_str_radix(&trimmed[2..], 16).map(ScanValue::I32).map_err(|e| e.to_string())
+                if let Some(h) = hex_stripped {
+                    i32::from_str_radix(h, 16).map(ScanValue::I32).map_err(|e| e.to_string())
                 } else {
                     trimmed.parse::<i32>().map(ScanValue::I32).map_err(|e| e.to_string())
                 }
             }
             ValType::U32 => {
-                if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
-                    u32::from_str_radix(&trimmed[2..], 16).map(ScanValue::U32).map_err(|e| e.to_string())
+                if let Some(h) = hex_stripped {
+                    u32::from_str_radix(h, 16).map(ScanValue::U32).map_err(|e| e.to_string())
                 } else {
                     trimmed.parse::<u32>().map(ScanValue::U32).map_err(|e| e.to_string())
                 }
             }
             ValType::I64 => {
-                if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
-                    i64::from_str_radix(&trimmed[2..], 16).map(ScanValue::I64).map_err(|e| e.to_string())
+                if let Some(h) = hex_stripped {
+                    i64::from_str_radix(h, 16).map(ScanValue::I64).map_err(|e| e.to_string())
                 } else {
                     trimmed.parse::<i64>().map(ScanValue::I64).map_err(|e| e.to_string())
                 }
             }
             ValType::U64 => {
-                if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
-                    u64::from_str_radix(&trimmed[2..], 16).map(ScanValue::U64).map_err(|e| e.to_string())
+                if let Some(h) = hex_stripped {
+                    u64::from_str_radix(h, 16).map(ScanValue::U64).map_err(|e| e.to_string())
                 } else {
                     trimmed.parse::<u64>().map(ScanValue::U64).map_err(|e| e.to_string())
                 }
@@ -485,22 +505,95 @@ impl Scanner {
 
         let val_size = self.val_type.size();
         let val_type = self.val_type;
-        let mut filtered = Vec::with_capacity(self.candidates.len());
-        let mut buf = vec![0u8; val_size.max(32)];
+        let num_cpus = thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+        let chunk_size = (self.candidates.len() / num_cpus).max(1);
+        let chunks: Vec<Vec<ScanCandidate>> = self.candidates
+            .chunks(chunk_size)
+            .map(|c| c.to_vec())
+            .collect();
 
-        for cand in &self.candidates {
-            if proc.read_raw(cand.address, &mut buf[..val_size]).is_ok() {
-                if let Some(new_val) = ScanValue::read_from_bytes(val_type, &buf[..val_size]) {
-                    if matches_next_condition(&cand.current_value, &new_val, &condition) {
-                        filtered.push(ScanCandidate {
-                            address: cand.address,
-                            current_value: new_val,
-                            previous_value: cand.current_value.clone(),
-                        });
+        let proc_handle = proc.handle as usize;
+        let proc_pid = proc.pid;
+        let proc_mode = proc.access_mode;
+        let proc_dbk = proc.dbk.clone();
+        let cond = condition.clone();
+
+        let results = Arc::new(Mutex::new(Vec::new()));
+        let mut handles = Vec::new();
+
+        for chunk in chunks {
+            let res_clone = Arc::clone(&results);
+            let cond_clone = cond.clone();
+            let chunk_dbk = proc_dbk.clone();
+
+            let handle = thread::spawn(move || {
+                let dummy_proc = Process {
+                    pid: proc_pid,
+                    handle: proc_handle as crate::win32::HANDLE,
+                    name: String::new(),
+                    access_mode: proc_mode,
+                    dbk: chunk_dbk,
+                };
+
+                let mut local = Vec::new();
+                let mut page_buf = vec![0u8; 64 * 1024];
+                let mut cached_page_base: usize = usize::MAX;
+                let mut cached_page_len: usize = 0;
+
+                for cand in &chunk {
+                    let addr = cand.address;
+                    let in_cache = addr >= cached_page_base
+                        && (addr + val_size) <= (cached_page_base + cached_page_len);
+
+                    if !in_cache {
+                        let page_base = addr & !0xFFF;
+                        if let Ok(bytes_read) = dummy_proc.read_raw(page_base, &mut page_buf) {
+                            cached_page_base = page_base;
+                            cached_page_len = bytes_read;
+                        } else {
+                            let mut single_buf = vec![0u8; val_size];
+                            if dummy_proc.read_raw(addr, &mut single_buf).is_ok() {
+                                if let Some(new_val) = ScanValue::read_from_bytes(val_type, &single_buf) {
+                                    if matches_next_condition(&cand.current_value, &new_val, &cond_clone) {
+                                        local.push(ScanCandidate {
+                                            address: cand.address,
+                                            current_value: new_val,
+                                            previous_value: cand.current_value.clone(),
+                                        });
+                                    }
+                                }
+                            }
+                            continue;
+                        }
+                    }
+
+                    if addr >= cached_page_base && (addr + val_size) <= (cached_page_base + cached_page_len) {
+                        let offset = addr - cached_page_base;
+                        if let Some(new_val) = ScanValue::read_from_bytes(val_type, &page_buf[offset..offset + val_size]) {
+                            if matches_next_condition(&cand.current_value, &new_val, &cond_clone) {
+                                local.push(ScanCandidate {
+                                    address: cand.address,
+                                    current_value: new_val,
+                                    previous_value: cand.current_value.clone(),
+                                });
+                            }
+                        }
                     }
                 }
-            }
+
+                std::mem::forget(dummy_proc);
+                let mut lock = res_clone.lock().unwrap();
+                lock.extend(local);
+            });
+            handles.push(handle);
         }
+
+        for h in handles {
+            let _ = h.join();
+        }
+
+        let mut filtered = Arc::try_unwrap(results).unwrap().into_inner().unwrap();
+        filtered.sort_by_key(|c| c.address);
 
         self.history.push(self.candidates.clone());
         self.candidates = filtered;
@@ -515,6 +608,190 @@ impl Scanner {
 
     pub fn count(&self) -> usize {
         self.candidates.len()
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn scan_i32_exact_avx2(
+    base_addr: usize,
+    buf: &[u8],
+    target: i32,
+    alignment: usize,
+    val_type: ValType,
+    out: &mut Vec<ScanCandidate>,
+) {
+    use core::arch::x86_64::*;
+
+    let target_v = _mm256_set1_epi32(target);
+    let len = buf.len();
+    let mut i = 0;
+
+    if alignment == 4 {
+        while i + 32 <= len {
+            let chunk_v = unsafe {
+                let chunk_ptr = buf.as_ptr().add(i) as *const __m256i;
+                _mm256_loadu_si256(chunk_ptr)
+            };
+            let cmp = _mm256_cmpeq_epi32(chunk_v, target_v);
+            let mask = _mm256_movemask_epi8(cmp) as u32;
+
+            if mask != 0 {
+                for k in 0..8 {
+                    if (mask & (0xF << (k * 4))) == (0xF << (k * 4)) {
+                        let addr = base_addr + i + k * 4;
+                        let cand_val = if val_type == ValType::U32 {
+                            ScanValue::U32(target as u32)
+                        } else {
+                            ScanValue::I32(target)
+                        };
+                        out.push(ScanCandidate {
+                            address: addr,
+                            current_value: cand_val.clone(),
+                            previous_value: cand_val,
+                        });
+                    }
+                }
+            }
+            i += 32;
+        }
+    }
+
+    while i + 4 <= len {
+        let v = i32::from_ne_bytes([buf[i], buf[i + 1], buf[i + 2], buf[i + 3]]);
+        if v == target {
+            let cand_val = if val_type == ValType::U32 {
+                ScanValue::U32(target as u32)
+            } else {
+                ScanValue::I32(target)
+            };
+            out.push(ScanCandidate {
+                address: base_addr + i,
+                current_value: cand_val.clone(),
+                previous_value: cand_val,
+            });
+        }
+        i += alignment;
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn scan_float_exact_avx2(
+    base_addr: usize,
+    buf: &[u8],
+    target: f32,
+    alignment: usize,
+    out: &mut Vec<ScanCandidate>,
+) {
+    use core::arch::x86_64::*;
+
+    let target_v = _mm256_set1_ps(target);
+    let epsilon_v = _mm256_set1_ps(0.0001);
+    let sign_mask = _mm256_set1_ps(-0.0);
+    let len = buf.len();
+    let mut i = 0;
+
+    if alignment == 4 {
+        while i + 32 <= len {
+            let chunk_v = unsafe {
+                let chunk_ptr = buf.as_ptr().add(i) as *const f32;
+                _mm256_loadu_ps(chunk_ptr)
+            };
+            let diff = _mm256_sub_ps(chunk_v, target_v);
+            let abs_diff = _mm256_andnot_ps(sign_mask, diff);
+            let cmp = _mm256_cmp_ps(abs_diff, epsilon_v, _CMP_LT_OQ);
+            let mask = _mm256_movemask_ps(cmp);
+
+            if mask != 0 {
+                for k in 0..8 {
+                    if (mask & (1 << k)) != 0 {
+                        let addr = base_addr + i + k * 4;
+                        let cand_val = ScanValue::Float(target);
+                        out.push(ScanCandidate {
+                            address: addr,
+                            current_value: cand_val.clone(),
+                            previous_value: cand_val,
+                        });
+                    }
+                }
+            }
+            i += 32;
+        }
+    }
+
+    while i + 4 <= len {
+        let v = f32::from_ne_bytes([buf[i], buf[i + 1], buf[i + 2], buf[i + 3]]);
+        if (v - target).abs() < 0.0001 {
+            let cand_val = ScanValue::Float(v);
+            out.push(ScanCandidate {
+                address: base_addr + i,
+                current_value: cand_val.clone(),
+                previous_value: cand_val,
+            });
+        }
+        i += alignment;
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn scan_u8_exact_avx2(
+    base_addr: usize,
+    buf: &[u8],
+    target: u8,
+    alignment: usize,
+    val_type: ValType,
+    out: &mut Vec<ScanCandidate>,
+) {
+    use core::arch::x86_64::*;
+
+    let target_v = _mm256_set1_epi8(target as i8);
+    let len = buf.len();
+    let mut i = 0;
+
+    if alignment == 1 {
+        while i + 32 <= len {
+            let chunk_v = unsafe {
+                let chunk_ptr = buf.as_ptr().add(i) as *const __m256i;
+                _mm256_loadu_si256(chunk_ptr)
+            };
+            let cmp = _mm256_cmpeq_epi8(chunk_v, target_v);
+            let mut mask = _mm256_movemask_epi8(cmp) as u32;
+
+            while mask != 0 {
+                let tz = mask.trailing_zeros() as usize;
+                let addr = base_addr + i + tz;
+                let cand_val = if val_type == ValType::I8 {
+                    ScanValue::I8(target as i8)
+                } else {
+                    ScanValue::U8(target)
+                };
+                out.push(ScanCandidate {
+                    address: addr,
+                    current_value: cand_val.clone(),
+                    previous_value: cand_val,
+                });
+                mask &= mask - 1;
+            }
+            i += 32;
+        }
+    }
+
+    while i < len {
+        if buf[i] == target {
+            let cand_val = if val_type == ValType::I8 {
+                ScanValue::I8(target as i8)
+            } else {
+                ScanValue::U8(target)
+            };
+            out.push(ScanCandidate {
+                address: base_addr + i,
+                current_value: cand_val.clone(),
+                previous_value: cand_val,
+            });
+        }
+        i += alignment;
     }
 }
 
@@ -553,6 +830,36 @@ fn scan_buffer(
             i += alignment;
         }
         return;
+    }
+
+    // SIMD AVX2 acceleration for Exact scans
+    #[cfg(target_arch = "x86_64")]
+    {
+        if is_x86_feature_detected!("avx2") {
+            match cond {
+                ScanCondition::Exact(ScanValue::I32(v)) if val_type == ValType::I32 => {
+                    unsafe { scan_i32_exact_avx2(base_addr, buf, *v, alignment, val_type, out); }
+                    return;
+                }
+                ScanCondition::Exact(ScanValue::U32(v)) if val_type == ValType::U32 => {
+                    unsafe { scan_i32_exact_avx2(base_addr, buf, *v as i32, alignment, val_type, out); }
+                    return;
+                }
+                ScanCondition::Exact(ScanValue::Float(v)) if val_type == ValType::Float => {
+                    unsafe { scan_float_exact_avx2(base_addr, buf, *v, alignment, out); }
+                    return;
+                }
+                ScanCondition::Exact(ScanValue::U8(v)) if val_type == ValType::U8 => {
+                    unsafe { scan_u8_exact_avx2(base_addr, buf, *v, alignment, val_type, out); }
+                    return;
+                }
+                ScanCondition::Exact(ScanValue::I8(v)) if val_type == ValType::I8 => {
+                    unsafe { scan_u8_exact_avx2(base_addr, buf, *v as u8, alignment, val_type, out); }
+                    return;
+                }
+                _ => {}
+            }
+        }
     }
 
     let size = val_type.size();

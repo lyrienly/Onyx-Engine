@@ -5,7 +5,7 @@ unit OnyxBackend;
 interface
 
 uses
-  windows, sysutils, classes, NewKernelHandler;
+  windows, sysutils, classes, NewKernelHandler, commontypedefs;
 
 const
   OnyxBackendDLL = 'onyx_backend.dll';
@@ -95,8 +95,10 @@ function onyx_disasm_instruction(address: PtrUInt; bytes: PByte; length: PtrUInt
 function onyx_disasm_block(address: PtrUInt; bytes: PByte; length: PtrUInt; max_instructions: DWORD; out_insns: Pointer; out_count: PDWORD): integer; stdcall; external OnyxBackendDLL;
 
 function onyx_freezer_create(process: Pointer; interval_ms: UInt64): Pointer; stdcall; external OnyxBackendDLL;
+function onyx_freezer_set_process(freezer: Pointer; process: Pointer): integer; stdcall; external OnyxBackendDLL;
 procedure onyx_freezer_destroy(freezer: Pointer); stdcall; external OnyxBackendDLL;
 function onyx_freezer_add(freezer: Pointer; address: PtrUInt; val_type_idx: integer; val_str: PAnsiChar; description: PAnsiChar): PtrUInt; stdcall; external OnyxBackendDLL;
+function onyx_freezer_update(freezer: Pointer; entry_id: PtrUInt; val_type_idx: integer; val_str: PAnsiChar): integer; stdcall; external OnyxBackendDLL;
 function onyx_freezer_remove(freezer: Pointer; entry_id: PtrUInt): integer; stdcall; external OnyxBackendDLL;
 procedure onyx_freezer_clear(freezer: Pointer); stdcall; external OnyxBackendDLL;
 
@@ -168,6 +170,13 @@ function OnyxDoNextScan(
 ): Boolean;
 
 function OnyxDoUndoScan(folder: string; var outFound: UInt64): Boolean;
+
+function OnyxEnsureFreezer: Pointer;
+function OnyxFreezeRecord(address: PtrUInt; varTypeOrd: integer; valStr: string; desc: string): PtrUInt;
+function OnyxUpdateFrozenRecord(entryId: PtrUInt; varTypeOrd: integer; valStr: string): Boolean;
+procedure OnyxUnfreezeRecord(entryId: PtrUInt);
+procedure OnyxClearFreezer;
+function OnyxGetProcessList(ProcessList: TStrings; NoPID: boolean = false; noProcessInfo: boolean = false): Boolean;
 
 implementation
 
@@ -603,6 +612,113 @@ begin
   Result := onyx_pointer_scanner_load_results(pScan, PAnsiChar(filePath)) = 1;
 end;
 
+var
+  GlobalOnyxFreezer: Pointer = nil;
+  GlobalOnyxFreezerPID: DWORD = 0;
+
+function OnyxEnsureFreezer: Pointer;
+var
+  pProc: Pointer;
+begin
+  pProc := OnyxEnsureAttachedProcess;
+  if pProc = nil then Exit(nil);
+
+  if (GlobalOnyxFreezer <> nil) and (GlobalOnyxFreezerPID <> CurrentOnyxPID) then
+  begin
+    onyx_freezer_destroy(GlobalOnyxFreezer);
+    GlobalOnyxFreezer := nil;
+  end;
+
+  if GlobalOnyxFreezer = nil then
+  begin
+    GlobalOnyxFreezer := onyx_freezer_create(pProc, 50);
+    GlobalOnyxFreezerPID := CurrentOnyxPID;
+  end
+  else
+  begin
+    onyx_freezer_set_process(GlobalOnyxFreezer, pProc);
+  end;
+
+  Result := GlobalOnyxFreezer;
+end;
+
+function OnyxFreezeRecord(address: PtrUInt; varTypeOrd: integer; valStr: string; desc: string): PtrUInt;
+var
+  f: Pointer;
+begin
+  Result := 0;
+  f := OnyxEnsureFreezer;
+  if f = nil then Exit;
+  Result := onyx_freezer_add(f, address, varTypeOrd, PAnsiChar(AnsiString(valStr)), PAnsiChar(AnsiString(desc)));
+end;
+
+function OnyxUpdateFrozenRecord(entryId: PtrUInt; varTypeOrd: integer; valStr: string): Boolean;
+var
+  f: Pointer;
+begin
+  Result := False;
+  f := OnyxEnsureFreezer;
+  if (f = nil) or (entryId = 0) then Exit;
+  Result := onyx_freezer_update(f, entryId, varTypeOrd, PAnsiChar(AnsiString(valStr))) = 1;
+end;
+
+procedure OnyxUnfreezeRecord(entryId: PtrUInt);
+begin
+  if (GlobalOnyxFreezer <> nil) and (entryId <> 0) then
+    onyx_freezer_remove(GlobalOnyxFreezer, entryId);
+end;
+
+procedure OnyxClearFreezer;
+begin
+  if GlobalOnyxFreezer <> nil then
+    onyx_freezer_clear(GlobalOnyxFreezer);
+end;
+
+function OnyxGetProcessList(ProcessList: TStrings; NoPID: boolean = false; noProcessInfo: boolean = false): Boolean;
+var
+  entries: array[0..1023] of TOnyxProcessEntry;
+  total: DWORD;
+  count, i: integer;
+  s: string;
+  nameStr: string;
+  pli: PProcessListInfo;
+begin
+  Result := False;
+  total := 0;
+  count := onyx_process_list(@entries[0], 1024, @total);
+  if count <= 0 then Exit;
+
+  for i := 0 to count - 1 do
+  begin
+    if entries[i].pid <> 0 then
+    begin
+      pli := nil;
+      if not noProcessInfo then
+      begin
+        GetMem(pli, SizeOf(TProcessListInfo));
+        pli^.processID := entries[i].pid;
+        pli^.winhandle := 0;
+        pli^.processIcon := 0;
+      end;
+
+      if NoPID then
+        s := ''
+      else
+        s := IntToHex(entries[i].pid, 8) + '-';
+
+      nameStr := StrPas(PAnsiChar(@entries[i].name[0]));
+      s := s + ExtractFileName(nameStr);
+
+      if noProcessInfo or (pli = nil) then
+        ProcessList.Add(s)
+      else
+        ProcessList.AddObject(s, TObject(pli));
+    end;
+  end;
+
+  Result := True;
+end;
+
 function InitOnyxBackend: Boolean;
 var
   v: DWORD;
@@ -634,6 +750,12 @@ initialization
   InitOnyxBackend;
 
 finalization
+  if GlobalOnyxFreezer <> nil then
+  begin
+    onyx_freezer_destroy(GlobalOnyxFreezer);
+    GlobalOnyxFreezer := nil;
+  end;
+
   if GlobalOnyxPointerScanner <> nil then
   begin
     onyx_pointer_scanner_destroy(GlobalOnyxPointerScanner);
