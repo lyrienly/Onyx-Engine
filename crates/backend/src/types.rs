@@ -170,3 +170,61 @@ pub struct OnyxStructureDifference {
     pub differentiates: i32,
     pub value_size: u32,
 }
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct OnyxDissectBranch {
+    pub from_address: usize,
+    pub to_address: usize,
+    pub kind: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct OnyxXRefEntry {
+    pub target_address: usize,
+    pub caller_address: usize,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct OnyxStringReference {
+    pub instruction_address: usize,
+    pub string_address: usize,
+    pub text: [u8; 128],
+    pub is_unicode: i32,
+    pub mnemonic: [u8; 32],
+    pub operands: [u8; 96],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct OnyxPeSection {
+    pub name: [u8; 16],
+    pub virtual_address: usize,
+    pub virtual_size: usize,
+    pub raw_size: usize,
+    pub characteristics: u32,
+    pub is_executable: i32,
+    pub is_writable: i32,
+    pub is_readable: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct OnyxPeImport {
+    pub module_name: [u8; 128],
+    pub function_name: [u8; 128],
+    pub ordinal: u16,
+    pub iat_address: usize,
+    pub resolved_address: usize,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct OnyxSignatureResult {
+    pub pattern: [u8; 256],
+    pub length: usize,
+    pub match_count: usize,
+    pub is_unique: i32,
+}

@@ -6,8 +6,9 @@ use std::os::raw::c_char;
 use onyx_core::process::Process;
 use onyx_core::scanner::{ScanCondition, ScanValue, Scanner, ValType};
 use onyx_core::memory::codecave::{CodecaveScanner, CaveByteType};
+use onyx_core::memory::signature_maker::SignatureMaker;
 use onyx_core::debugger::rip_scanner::RipRelativeScanner;
-use crate::types::{OnyxScanCandidate, OnyxCodecaveEntry, OnyxRipRelativeMatch};
+use crate::types::{OnyxScanCandidate, OnyxCodecaveEntry, OnyxRipRelativeMatch, OnyxSignatureResult};
 
 fn map_val_type(idx: i32) -> ValType {
     match idx {
@@ -415,6 +416,40 @@ pub unsafe extern "C" fn onyx_scan_rip_relative(
                 *out_matches.add(i) = m_entry;
             }
             write_len as i32
+        }
+        Err(_) => -1,
+    }
+}
+
+/// Automatically generates a unique AOB signature for an instruction or function address
+#[no_mangle]
+pub unsafe extern "C" fn onyx_generate_aob_signature(
+    handle: *mut Process,
+    target_address: usize,
+    scan_start: usize,
+    scan_stop: usize,
+    max_len: usize,
+    out_result: *mut OnyxSignatureResult,
+) -> i32 {
+    if handle.is_null() || out_result.is_null() || max_len == 0 {
+        return -1;
+    }
+
+    match SignatureMaker::generate_signature(&*handle, target_address, scan_start, scan_stop, max_len) {
+        Ok(sig) => {
+            let mut res = OnyxSignatureResult {
+                pattern: [0u8; 256],
+                length: sig.length,
+                match_count: sig.match_count,
+                is_unique: if sig.is_unique { 1 } else { 0 },
+            };
+
+            let p_bytes = sig.pattern.as_bytes();
+            let p_len = p_bytes.len().min(255);
+            res.pattern[..p_len].copy_from_slice(&p_bytes[..p_len]);
+
+            *out_result = res;
+            1
         }
         Err(_) => -1,
     }

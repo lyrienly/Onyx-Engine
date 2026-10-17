@@ -3,8 +3,8 @@
 
 use std::ffi::{c_void, CStr};
 use std::os::raw::c_char;
-use onyx_core::process::{Process, ProcessWatcher, ProcessWatchEvent, DbgHelpSymbolEngine};
-use crate::types::{OnyxModuleEntry, OnyxProcessEntry, OnyxMemoryRegion};
+use onyx_core::process::{Process, ProcessWatcher, ProcessWatchEvent, DbgHelpSymbolEngine, PeInfoParser};
+use crate::types::{OnyxModuleEntry, OnyxProcessEntry, OnyxMemoryRegion, OnyxPeSection, OnyxPeImport};
 
 /// Enumerate all running processes into out_entries buffer
 /// Returns the number of processes written, or -1 on error
@@ -427,5 +427,101 @@ pub unsafe extern "C" fn onyx_symbol_resolve_address(
             1
         }
         None => 0,
+    }
+}
+
+/// Parses all PE sections of a loaded module
+#[no_mangle]
+pub unsafe extern "C" fn onyx_pe_parse_sections(
+    handle: *mut Process,
+    module_base: usize,
+    out_sections: *mut OnyxPeSection,
+    max_sections: u32,
+    out_count: *mut u32,
+) -> i32 {
+    if handle.is_null() || out_sections.is_null() || max_sections == 0 {
+        return -1;
+    }
+
+    match PeInfoParser::parse_process_module(&*handle, module_base) {
+        Ok(info) => {
+            if !out_count.is_null() {
+                *out_count = info.sections.len() as u32;
+            }
+            let write_len = info.sections.len().min(max_sections as usize);
+            for i in 0..write_len {
+                let s = &info.sections[i];
+                let mut entry = OnyxPeSection {
+                    name: [0u8; 16],
+                    virtual_address: s.virtual_address,
+                    virtual_size: s.virtual_size,
+                    raw_size: s.raw_size,
+                    characteristics: s.characteristics,
+                    is_executable: if s.is_executable { 1 } else { 0 },
+                    is_writable: if s.is_writable { 1 } else { 0 },
+                    is_readable: if s.is_readable { 1 } else { 0 },
+                };
+                let n_bytes = s.name.as_bytes();
+                let n_len = n_bytes.len().min(15);
+                entry.name[..n_len].copy_from_slice(&n_bytes[..n_len]);
+
+                *out_sections.add(i) = entry;
+            }
+            write_len as i32
+        }
+        Err(_) => -1,
+    }
+}
+
+/// Parses the Import Address Table (IAT) and imported modules/APIs of a loaded module
+#[no_mangle]
+pub unsafe extern "C" fn onyx_pe_parse_imports(
+    handle: *mut Process,
+    module_base: usize,
+    out_imports: *mut OnyxPeImport,
+    max_imports: u32,
+    out_count: *mut u32,
+) -> i32 {
+    if handle.is_null() || out_imports.is_null() || max_imports == 0 {
+        return -1;
+    }
+
+    match PeInfoParser::parse_process_module(&*handle, module_base) {
+        Ok(info) => {
+            let mut flat_imports = Vec::new();
+            for mod_entry in &info.imports {
+                for fn_entry in &mod_entry.functions {
+                    flat_imports.push((&mod_entry.module_name, fn_entry));
+                }
+            }
+
+            if !out_count.is_null() {
+                *out_count = flat_imports.len() as u32;
+            }
+
+            let write_len = flat_imports.len().min(max_imports as usize);
+            for i in 0..write_len {
+                let (dll_name, f) = flat_imports[i];
+                let mut entry = OnyxPeImport {
+                    module_name: [0u8; 128],
+                    function_name: [0u8; 128],
+                    ordinal: f.ordinal,
+                    iat_address: f.iat_address,
+                    resolved_address: f.resolved_address,
+                };
+
+                let dll_bytes = dll_name.as_bytes();
+                let dll_len = dll_bytes.len().min(127);
+                entry.module_name[..dll_len].copy_from_slice(&dll_bytes[..dll_len]);
+
+                let fn_bytes = f.name.as_bytes();
+                let fn_len = fn_bytes.len().min(127);
+                entry.function_name[..fn_len].copy_from_slice(&fn_bytes[..fn_len]);
+
+                *out_imports.add(i) = entry;
+            }
+            write_len as i32
+        }
+        Err(_) => -1,
     }
 }

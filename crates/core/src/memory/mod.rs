@@ -5,6 +5,7 @@ pub mod freeze;
 pub mod structure;
 pub mod custom_type;
 pub mod codecave;
+pub mod signature_maker;
 
 pub use scanner::*;
 pub use group_scan::*;
@@ -13,4 +14,5 @@ pub use freeze::*;
 pub use structure::*;
 pub use custom_type::*;
 pub use codecave::*;
+pub use signature_maker::*;
 

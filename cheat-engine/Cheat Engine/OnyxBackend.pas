@@ -121,7 +121,6 @@ type
   end;
   POnyxRegisterComparison = ^TOnyxRegisterComparison;
 
-  TOnyxStructureDifference = packed record
     offset: PtrUInt;
     g1_constant: integer;
     g1_value: UInt64;
@@ -131,6 +130,58 @@ type
     value_size: DWORD;
   end;
   POnyxStructureDifference = ^TOnyxStructureDifference;
+
+  TOnyxDissectBranch = packed record
+    from_address: PtrUInt;
+    to_address: PtrUInt;
+    kind: DWORD;
+  end;
+  POnyxDissectBranch = ^TOnyxDissectBranch;
+
+  TOnyxXRefEntry = packed record
+    target_address: PtrUInt;
+    caller_address: PtrUInt;
+  end;
+  POnyxXRefEntry = ^TOnyxXRefEntry;
+
+  TOnyxStringReference = packed record
+    instruction_address: PtrUInt;
+    string_address: PtrUInt;
+    text: array[0..127] of AnsiChar;
+    is_unicode: integer;
+    mnemonic: array[0..31] of AnsiChar;
+    operands: array[0..95] of AnsiChar;
+  end;
+  POnyxStringReference = ^TOnyxStringReference;
+
+  TOnyxPeSection = packed record
+    name: array[0..15] of AnsiChar;
+    virtual_address: PtrUInt;
+    virtual_size: PtrUInt;
+    raw_size: PtrUInt;
+    characteristics: DWORD;
+    is_executable: integer;
+    is_writable: integer;
+    is_readable: integer;
+  end;
+  POnyxPeSection = ^TOnyxPeSection;
+
+  TOnyxPeImport = packed record
+    module_name: array[0..127] of AnsiChar;
+    function_name: array[0..127] of AnsiChar;
+    ordinal: Word;
+    iat_address: PtrUInt;
+    resolved_address: PtrUInt;
+  end;
+  POnyxPeImport = ^TOnyxPeImport;
+
+  TOnyxSignatureResult = packed record
+    pattern: array[0..255] of AnsiChar;
+    length: PtrUInt;
+    match_count: PtrUInt;
+    is_unique: integer;
+  end;
+  POnyxSignatureResult = ^TOnyxSignatureResult;
 
 const
   ONYX_PTR_PHASE_IDLE = 0;
@@ -192,6 +243,19 @@ function onyx_scanner_save_results_file(scanner: Pointer; file_path: PAnsiChar):
 
 function onyx_disasm_instruction(address: PtrUInt; bytes: PByte; length: PtrUInt; out_insn: Pointer): integer; stdcall; external OnyxBackendDLL;
 function onyx_disasm_block(address: PtrUInt; bytes: PByte; length: PtrUInt; max_instructions: DWORD; out_insns: Pointer; out_count: PDWORD): integer; stdcall; external OnyxBackendDLL;
+
+// Code Dissection & XRefs
+function onyx_dissect_code(handle: Pointer; start: PtrUInt; stop: PtrUInt; out_branches: Pointer; max_branches: DWORD; out_branch_count: PDWORD; out_xrefs: Pointer; max_xrefs: DWORD; out_xref_count: PDWORD): integer; stdcall; external OnyxBackendDLL;
+
+// String Referencer
+function onyx_scan_string_references(handle: Pointer; start: PtrUInt; stop: PtrUInt; min_string_len: PtrUInt; out_refs: Pointer; max_refs: DWORD; out_count: PDWORD): integer; stdcall; external OnyxBackendDLL;
+
+// PE Sections & IAT Parser
+function onyx_pe_parse_sections(handle: Pointer; module_base: PtrUInt; out_sections: Pointer; max_sections: DWORD; out_count: PDWORD): integer; stdcall; external OnyxBackendDLL;
+function onyx_pe_parse_imports(handle: Pointer; module_base: PtrUInt; out_imports: Pointer; max_imports: DWORD; out_count: PDWORD): integer; stdcall; external OnyxBackendDLL;
+
+// Unique AOB Signature Generator
+function onyx_generate_aob_signature(handle: Pointer; target_address: PtrUInt; scan_start: PtrUInt; scan_stop: PtrUInt; max_len: PtrUInt; out_result: Pointer): integer; stdcall; external OnyxBackendDLL;
 
 function onyx_freezer_create(process: Pointer; interval_ms: UInt64): Pointer; stdcall; external OnyxBackendDLL;
 function onyx_freezer_set_process(freezer: Pointer; process: Pointer): integer; stdcall; external OnyxBackendDLL;
