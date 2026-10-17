@@ -5,7 +5,9 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 use onyx_core::process::Process;
 use onyx_core::scanner::{ScanCondition, ScanValue, Scanner, ValType};
-use crate::types::OnyxScanCandidate;
+use onyx_core::memory::codecave::{CodecaveScanner, CaveByteType};
+use onyx_core::debugger::rip_scanner::RipRelativeScanner;
+use crate::types::{OnyxScanCandidate, OnyxCodecaveEntry, OnyxRipRelativeMatch};
 
 fn map_val_type(idx: i32) -> ValType {
     match idx {
@@ -319,4 +321,101 @@ pub unsafe extern "C" fn onyx_scanner_save_results_file(
     }
 
     s.candidates.len() as i64
+}
+
+/// Scans process memory for codecaves (blocks of padding bytes)
+/// byte_type: 0 = Int3 (0xCC), 1 = Nop (0x90), 2 = Zero (0x00), 3 = AnyPadding
+/// exec_only: 1 = executable regions only, 0 = all readable regions
+#[no_mangle]
+pub unsafe extern "C" fn onyx_scan_codecaves(
+    handle: *mut Process,
+    start: usize,
+    stop: usize,
+    min_size: usize,
+    byte_type: i32,
+    exec_only: i32,
+    out_entries: *mut OnyxCodecaveEntry,
+    max_entries: u32,
+    out_count: *mut u32,
+) -> i32 {
+    if handle.is_null() || out_entries.is_null() || max_entries == 0 {
+        return -1;
+    }
+
+    let cave_type = match byte_type {
+        0 => CaveByteType::Int3,
+        1 => CaveByteType::Nop,
+        2 => CaveByteType::Zero,
+        _ => CaveByteType::AnyPadding,
+    };
+
+    match CodecaveScanner::scan_process(&*handle, start, stop, min_size, cave_type, exec_only != 0) {
+        Ok(caves) => {
+            if !out_count.is_null() {
+                *out_count = caves.len() as u32;
+            }
+            let write_len = caves.len().min(max_entries as usize);
+            for i in 0..write_len {
+                *out_entries.add(i) = OnyxCodecaveEntry {
+                    address: caves[i].address,
+                    size: caves[i].size,
+                    byte_value: caves[i].byte_value,
+                };
+            }
+            write_len as i32
+        }
+        Err(_) => -1,
+    }
+}
+
+/// Scans executable memory regions of process for RIP-relative instructions referencing a target
+/// target_address: address to filter by (or ignored if has_target_filter is 0)
+#[no_mangle]
+pub unsafe extern "C" fn onyx_scan_rip_relative(
+    handle: *mut Process,
+    start: usize,
+    stop: usize,
+    target_address: usize,
+    has_target_filter: i32,
+    out_matches: *mut OnyxRipRelativeMatch,
+    max_matches: u32,
+    out_count: *mut u32,
+) -> i32 {
+    if handle.is_null() || out_matches.is_null() || max_matches == 0 {
+        return -1;
+    }
+
+    let filter = if has_target_filter != 0 {
+        Some(target_address)
+    } else {
+        None
+    };
+
+    match RipRelativeScanner::scan_range(&*handle, start, stop, filter) {
+        Ok(matches) => {
+            if !out_count.is_null() {
+                *out_count = matches.len() as u32;
+            }
+            let write_len = matches.len().min(max_matches as usize);
+            for i in 0..write_len {
+                let mut m_entry = OnyxRipRelativeMatch {
+                    instruction_address: matches[i].instruction_address,
+                    target_address: matches[i].target_address,
+                    mnemonic: [0u8; 32],
+                    operands: [0u8; 96],
+                };
+                let m_bytes = matches[i].mnemonic.as_bytes();
+                let m_len = m_bytes.len().min(31);
+                m_entry.mnemonic[..m_len].copy_from_slice(&m_bytes[..m_len]);
+
+                let op_bytes = matches[i].operands.as_bytes();
+                let op_len = op_bytes.len().min(95);
+                m_entry.operands[..op_len].copy_from_slice(&op_bytes[..op_len]);
+
+                *out_matches.add(i) = m_entry;
+            }
+            write_len as i32
+        }
+        Err(_) => -1,
+    }
 }

@@ -106,3 +106,67 @@ impl OnyxVehHit {
         }
     }
 }
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct OnyxCodecaveEntry {
+    pub address: usize,
+    pub size: usize,
+    pub byte_value: u8,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct OnyxRipRelativeMatch {
+    pub instruction_address: usize,
+    pub target_address: usize,
+    pub mnemonic: [u8; 32],
+    pub operands: [u8; 96],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct OnyxRegisterSnapshot {
+    pub rax: u64,
+    pub rbx: u64,
+    pub rcx: u64,
+    pub rdx: u64,
+    pub rsi: u64,
+    pub rdi: u64,
+    pub rbp: u64,
+    pub rsp: u64,
+    pub r8: u64,
+    pub r9: u64,
+    pub r10: u64,
+    pub r11: u64,
+    pub r12: u64,
+    pub r13: u64,
+    pub r14: u64,
+    pub r15: u64,
+    pub rip: u64,
+    pub rflags: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct OnyxRegisterComparison {
+    pub reg_name: [u8; 16],
+    pub reg_index: u32,
+    pub g1_constant: i32,
+    pub g1_sample: u64,
+    pub g2_constant: i32,
+    pub g2_sample: u64,
+    pub distinguishes_groups: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct OnyxStructureDifference {
+    pub offset: usize,
+    pub g1_constant: i32,
+    pub g1_value: u64,
+    pub g2_constant: i32,
+    pub g2_value: u64,
+    pub differentiates: i32,
+    pub value_size: u32,
+}

@@ -470,6 +470,8 @@ unsafe extern "system" {
     pub fn WaitForSingleObject(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD;
     pub fn GetExitCodeThread(hThread: HANDLE, lpExitCode: LPDWORD) -> BOOL;
     pub fn GetModuleHandleW(lpModuleName: LPCWSTR) -> HMODULE;
+    pub fn LoadLibraryW(lpLibFileName: LPCWSTR) -> HMODULE;
+    pub fn FreeLibrary(hLibModule: HMODULE) -> BOOL;
     pub fn GetProcAddress(hModule: HMODULE, lpProcName: *const u8) -> *mut c_void;
 }
 
@@ -745,5 +747,7 @@ unsafe extern "system" {
         SystemInformationLength: u32,
         ReturnLength: *mut u32,
     ) -> i32;
+    pub fn NtSuspendProcess(ProcessHandle: HANDLE) -> i32;
+    pub fn NtResumeProcess(ProcessHandle: HANDLE) -> i32;
 }
 

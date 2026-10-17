@@ -73,6 +73,65 @@ type
   end;
   POnyxVehHit = ^TOnyxVehHit;
 
+  TOnyxCodecaveEntry = packed record
+    address: PtrUInt;
+    size: PtrUInt;
+    byte_value: Byte;
+  end;
+  POnyxCodecaveEntry = ^TOnyxCodecaveEntry;
+
+  TOnyxRipRelativeMatch = packed record
+    instruction_address: PtrUInt;
+    target_address: PtrUInt;
+    mnemonic: array[0..31] of AnsiChar;
+    operands: array[0..95] of AnsiChar;
+  end;
+  POnyxRipRelativeMatch = ^TOnyxRipRelativeMatch;
+
+  TOnyxRegisterSnapshot = packed record
+    rax: UInt64;
+    rbx: UInt64;
+    rcx: UInt64;
+    rdx: UInt64;
+    rsi: UInt64;
+    rdi: UInt64;
+    rbp: UInt64;
+    rsp: UInt64;
+    r8: UInt64;
+    r9: UInt64;
+    r10: UInt64;
+    r11: UInt64;
+    r12: UInt64;
+    r13: UInt64;
+    r14: UInt64;
+    r15: UInt64;
+    rip: UInt64;
+    rflags: UInt64;
+  end;
+  POnyxRegisterSnapshot = ^TOnyxRegisterSnapshot;
+
+  TOnyxRegisterComparison = packed record
+    reg_name: array[0..15] of AnsiChar;
+    reg_index: DWORD;
+    g1_constant: integer;
+    g1_sample: UInt64;
+    g2_constant: integer;
+    g2_sample: UInt64;
+    distinguishes_groups: integer;
+  end;
+  POnyxRegisterComparison = ^TOnyxRegisterComparison;
+
+  TOnyxStructureDifference = packed record
+    offset: PtrUInt;
+    g1_constant: integer;
+    g1_value: UInt64;
+    g2_constant: integer;
+    g2_value: UInt64;
+    differentiates: integer;
+    value_size: DWORD;
+  end;
+  POnyxStructureDifference = ^TOnyxStructureDifference;
+
 const
   ONYX_PTR_PHASE_IDLE = 0;
   ONYX_PTR_PHASE_MAPPING = 1;
@@ -89,6 +148,8 @@ function onyx_backend_ping: integer; stdcall; external OnyxBackendDLL;
 function onyx_process_list(out_entries: Pointer; max_count: DWORD; out_total: PDWORD): integer; stdcall; external OnyxBackendDLL;
 function onyx_process_attach(pid: DWORD): Pointer; stdcall; external OnyxBackendDLL;
 procedure onyx_process_close(handle: Pointer); stdcall; external OnyxBackendDLL;
+function onyx_process_suspend(handle: Pointer): integer; stdcall; external OnyxBackendDLL;
+function onyx_process_resume(handle: Pointer): integer; stdcall; external OnyxBackendDLL;
 function onyx_process_read(handle: Pointer; base_address: PtrUInt; buffer: Pointer; size: PtrUInt; out_bytes_read: PPtrUInt): integer; stdcall; external OnyxBackendDLL;
 function onyx_process_write(handle: Pointer; base_address: PtrUInt; buffer: Pointer; size: PtrUInt; out_bytes_written: PPtrUInt): integer; stdcall; external OnyxBackendDLL;
 function onyx_process_protect(handle: Pointer; base_address: PtrUInt; size: PtrUInt; new_protect: DWORD; old_protect: PDWORD): integer; stdcall; external OnyxBackendDLL;
@@ -96,6 +157,29 @@ function onyx_process_alloc(handle: Pointer; preferred_address: PtrUInt; size: P
 function onyx_process_free(handle: Pointer; base_address: PtrUInt; size: PtrUInt; free_type: DWORD): integer; stdcall; external OnyxBackendDLL;
 function onyx_process_modules(handle: Pointer; out_modules: Pointer; max_count: DWORD; out_total: PDWORD): integer; stdcall; external OnyxBackendDLL;
 function onyx_process_regions(handle: Pointer; out_regions: Pointer; max_count: DWORD; out_total: PDWORD): integer; stdcall; external OnyxBackendDLL;
+
+// Process Watcher
+function onyx_process_watcher_create: Pointer; stdcall; external OnyxBackendDLL;
+procedure onyx_process_watcher_destroy(watcher: Pointer); stdcall; external OnyxBackendDLL;
+procedure onyx_process_watcher_add_target(watcher: Pointer; target_name: PAnsiChar); stdcall; external OnyxBackendDLL;
+function onyx_process_watcher_start(watcher: Pointer; poll_ms: DWORD): integer; stdcall; external OnyxBackendDLL;
+procedure onyx_process_watcher_stop(watcher: Pointer); stdcall; external OnyxBackendDLL;
+function onyx_process_watcher_poll(watcher: Pointer; out_entry: Pointer; out_event_type: PInteger): integer; stdcall; external OnyxBackendDLL;
+
+// PDB & Debug Symbols
+function onyx_symbol_init_pdb(process_handle: THandle; search_path: PAnsiChar): Pointer; stdcall; external OnyxBackendDLL;
+procedure onyx_symbol_close_pdb(engine: Pointer); stdcall; external OnyxBackendDLL;
+function onyx_symbol_load_module(engine: Pointer; image_path: PAnsiChar; base: PtrUInt; size: PtrUInt): UInt64; stdcall; external OnyxBackendDLL;
+function onyx_symbol_resolve_name(engine: Pointer; name: PAnsiChar; out_address: PPtrUInt): integer; stdcall; external OnyxBackendDLL;
+function onyx_symbol_resolve_address(engine: Pointer; address: PtrUInt; out_name: PAnsiChar; max_len: DWORD; out_disp: PPtrUInt): integer; stdcall; external OnyxBackendDLL;
+
+// Codecave & RIP-Relative Scanners
+function onyx_scan_codecaves(handle: Pointer; start: PtrUInt; stop: PtrUInt; min_size: PtrUInt; byte_type: integer; exec_only: integer; out_entries: Pointer; max_entries: DWORD; out_count: PDWORD): integer; stdcall; external OnyxBackendDLL;
+function onyx_scan_rip_relative(handle: Pointer; start: PtrUInt; stop: PtrUInt; target_address: PtrUInt; has_target_filter: integer; out_matches: Pointer; max_matches: DWORD; out_count: PDWORD): integer; stdcall; external OnyxBackendDLL;
+
+// Commonality & Structure Difference Analyzer
+function onyx_commonality_analyze_registers(g1: Pointer; g1_count: DWORD; g2: Pointer; g2_count: DWORD; out_comparisons: Pointer; max_out: DWORD; out_count: PDWORD): integer; stdcall; external OnyxBackendDLL;
+function onyx_commonality_analyze_structures(handle: Pointer; g1_ptrs: Pointer; g1_count: DWORD; g2_ptrs: Pointer; g2_count: DWORD; struct_size: PtrUInt; out_diffs: Pointer; max_diffs: DWORD; out_count: PDWORD): integer; stdcall; external OnyxBackendDLL;
 
 function onyx_scanner_create(val_type_idx: integer): Pointer; stdcall; external OnyxBackendDLL;
 procedure onyx_scanner_destroy(scanner: Pointer); stdcall; external OnyxBackendDLL;

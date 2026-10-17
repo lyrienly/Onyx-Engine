@@ -4,6 +4,7 @@ pub mod pointer_scanner;
 pub mod freeze;
 pub mod structure;
 pub mod custom_type;
+pub mod codecave;
 
 pub use scanner::*;
 pub use group_scan::*;
@@ -11,4 +12,5 @@ pub use pointer_scanner::*;
 pub use freeze::*;
 pub use structure::*;
 pub use custom_type::*;
+pub use codecave::*;
 

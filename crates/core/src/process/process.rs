@@ -344,6 +344,26 @@ impl Process {
         Self::attach(found.pid)
     }
 
+    /// Atomically suspends all threads in target process via NtSuspendProcess
+    pub fn suspend(&self) -> Result<(), String> {
+        let status = unsafe { NtSuspendProcess(self.handle) };
+        if status == 0 {
+            Ok(())
+        } else {
+            Err(format!("NtSuspendProcess failed with status {:#X}", status))
+        }
+    }
+
+    /// Atomically resumes all threads in target process via NtResumeProcess
+    pub fn resume(&self) -> Result<(), String> {
+        let status = unsafe { NtResumeProcess(self.handle) };
+        if status == 0 {
+            Ok(())
+        } else {
+            Err(format!("NtResumeProcess failed with status {:#X}", status))
+        }
+    }
+
     pub fn modules(&self) -> Result<Vec<ModuleEntry>, String> {
         let snapshot = unsafe {
             CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, self.pid)
