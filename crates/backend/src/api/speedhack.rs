@@ -41,3 +41,25 @@ pub unsafe extern "C" fn onyx_speedhack_set(process: *mut Process, multiplier: f
     }
     0
 }
+
+/// Checks if speedhack pipe is active and receptive in target process
+#[no_mangle]
+pub unsafe extern "C" fn onyx_speedhack_is_active(process: *mut Process) -> i32 {
+    if process.is_null() {
+        return 0;
+    }
+    let p = &*process;
+    let pipe_name = format!("\\\\.\\pipe\\ce_speedhack_{}", p.pid);
+    if OpenOptions::new().write(true).open(&pipe_name).is_ok() {
+        1
+    } else {
+        0
+    }
+}
+
+/// Resets target process speed back to normal 1.0x
+#[no_mangle]
+pub unsafe extern "C" fn onyx_speedhack_reset(process: *mut Process) -> i32 {
+    onyx_speedhack_set(process, 1.0)
+}
+

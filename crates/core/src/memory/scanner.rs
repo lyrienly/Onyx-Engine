@@ -19,6 +19,8 @@ pub enum ValType {
     Double,
     Str,
     Aob,
+    All,
+    Group,
 }
 
 impl ValType {
@@ -36,12 +38,14 @@ impl ValType {
             ValType::Double => "Double",
             ValType::Str => "String",
             ValType::Aob => "Array of byte",
+            ValType::All => "All",
+            ValType::Group => "Grouped",
         }
     }
 
     pub fn size(&self) -> usize {
         match self {
-            ValType::I8 | ValType::U8 => 1,
+            ValType::I8 | ValType::U8 | ValType::All | ValType::Group => 1,
             ValType::I16 | ValType::U16 => 2,
             ValType::I32 | ValType::U32 | ValType::Float => 4,
             ValType::I64 | ValType::U64 | ValType::Double => 8,
@@ -51,10 +55,25 @@ impl ValType {
 
     pub fn default_alignment(&self) -> usize {
         match self {
-            ValType::I8 | ValType::U8 | ValType::Str | ValType::Aob => 1,
+            ValType::I8 | ValType::U8 | ValType::Str | ValType::Aob | ValType::All => 1,
             ValType::I16 | ValType::U16 => 2,
-            ValType::I32 | ValType::U32 | ValType::Float => 4,
+            ValType::I32 | ValType::U32 | ValType::Float | ValType::Group => 4,
             ValType::I64 | ValType::U64 | ValType::Double => 4, // CE default for 8-byte is often 4
+        }
+    }
+
+    pub fn ce_type_ordinal(&self) -> u32 {
+        match self {
+            ValType::I8 | ValType::U8 => 0,     // vtByte = 0
+            ValType::I16 | ValType::U16 => 1,   // vtWord = 1
+            ValType::I32 | ValType::U32 => 2,   // vtDword = 2
+            ValType::I64 | ValType::U64 => 3,   // vtQword = 3
+            ValType::Float => 4,                // vtSingle = 4
+            ValType::Double => 5,               // vtDouble = 5
+            ValType::Str => 6,                  // vtString = 6
+            ValType::Aob => 8,                  // vtByteArray = 8
+            ValType::All => 10,                 // vtAll = 10
+            ValType::Group => 14,               // vtGrouped = 14
         }
     }
 }
@@ -124,6 +143,20 @@ impl AobByte {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct AllTargets {
+    pub i8_val: Option<i8>,
+    pub u8_val: Option<u8>,
+    pub i16_val: Option<i16>,
+    pub u16_val: Option<u16>,
+    pub i32_val: Option<i32>,
+    pub u32_val: Option<u32>,
+    pub i64_val: Option<i64>,
+    pub u64_val: Option<u64>,
+    pub f32_val: Option<f32>,
+    pub f64_val: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum ScanValue {
     I8(i8),
     U8(u8),
@@ -137,6 +170,8 @@ pub enum ScanValue {
     Double(f64),
     Str(String),
     Aob(Vec<AobByte>),
+    All(AllTargets),
+    Group(crate::memory::group_scan::GroupScanConfig),
 }
 
 impl ScanValue {
@@ -154,6 +189,8 @@ impl ScanValue {
             ScanValue::Double(_) => ValType::Double,
             ScanValue::Str(_) => ValType::Str,
             ScanValue::Aob(_) => ValType::Aob,
+            ScanValue::All(_) => ValType::All,
+            ScanValue::Group(_) => ValType::Group,
         }
     }
 
@@ -165,6 +202,8 @@ impl ScanValue {
             ScanValue::I64(_) | ScanValue::U64(_) | ScanValue::Double(_) => 8,
             ScanValue::Str(s) => s.len(),
             ScanValue::Aob(v) => v.len(),
+            ScanValue::All(_) => 1,
+            ScanValue::Group(g) => g.blocksize,
         }
     }
 
@@ -249,6 +288,67 @@ impl ScanValue {
                 }
                 Ok(ScanValue::Aob(pattern))
             }
+            ValType::All => {
+                let (i8_val, u8_val) = if let Some(h) = hex_stripped {
+                    (i8::from_str_radix(h, 16).ok(), u8::from_str_radix(h, 16).ok())
+                } else {
+                    (trimmed.parse::<i8>().ok(), trimmed.parse::<u8>().ok())
+                };
+
+                let (i16_val, u16_val) = if let Some(h) = hex_stripped {
+                    (i16::from_str_radix(h, 16).ok(), u16::from_str_radix(h, 16).ok())
+                } else {
+                    (trimmed.parse::<i16>().ok(), trimmed.parse::<u16>().ok())
+                };
+
+                let (i32_val, u32_val) = if let Some(h) = hex_stripped {
+                    (i32::from_str_radix(h, 16).ok(), u32::from_str_radix(h, 16).ok())
+                } else {
+                    (trimmed.parse::<i32>().ok(), trimmed.parse::<u32>().ok())
+                };
+
+                let (i64_val, u64_val) = if let Some(h) = hex_stripped {
+                    (i64::from_str_radix(h, 16).ok(), u64::from_str_radix(h, 16).ok())
+                } else {
+                    (trimmed.parse::<i64>().ok(), trimmed.parse::<u64>().ok())
+                };
+
+                let f32_val = if hex_stripped.is_some() {
+                    None
+                } else {
+                    trimmed.parse::<f32>().ok().filter(|f| !f.is_nan() && !f.is_infinite())
+                };
+
+                let f64_val = if hex_stripped.is_some() {
+                    None
+                } else {
+                    trimmed.parse::<f64>().ok().filter(|d| !d.is_nan() && !d.is_infinite())
+                };
+
+                if i8_val.is_none() && u8_val.is_none() && i16_val.is_none() && u16_val.is_none()
+                    && i32_val.is_none() && u32_val.is_none() && i64_val.is_none() && u64_val.is_none()
+                    && f32_val.is_none() && f64_val.is_none()
+                {
+                    return Err(format!("Cannot parse '{}' for All types scan", text));
+                }
+
+                Ok(ScanValue::All(AllTargets {
+                    i8_val,
+                    u8_val,
+                    i16_val,
+                    u16_val,
+                    i32_val,
+                    u32_val,
+                    i64_val,
+                    u64_val,
+                    f32_val,
+                    f64_val,
+                }))
+            }
+            ValType::Group => {
+                crate::memory::group_scan::GroupScanConfig::parse(text)
+                    .map(ScanValue::Group)
+            }
         }
     }
 
@@ -269,6 +369,8 @@ impl ScanValue {
             ValType::Double => Some(ScanValue::Double(f64::from_ne_bytes([buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]]))),
             ValType::Str => Some(ScanValue::Str(String::from_utf8_lossy(buf).to_string())),
             ValType::Aob => Some(ScanValue::Aob(buf.iter().map(|&b| AobByte::exact(b)).collect())),
+            ValType::All => Some(ScanValue::U8(buf[0])),
+            ValType::Group => None,
         }
     }
 
@@ -286,6 +388,7 @@ impl ScanValue {
             ScanValue::Double(v) => v.to_ne_bytes().to_vec(),
             ScanValue::Str(s) => s.as_bytes().to_vec(),
             ScanValue::Aob(v) => v.iter().map(|b| b.value).collect(),
+            ScanValue::All(_) | ScanValue::Group(_) => Vec::new(),
         }
     }
 
@@ -302,6 +405,8 @@ impl ScanValue {
             ScanValue::Float(v) => format!("{:.4}", v),
             ScanValue::Double(v) => format!("{:.6}", v),
             ScanValue::Str(s) => format!("\"{}\"", s),
+            ScanValue::All(_) => "All".to_string(),
+            ScanValue::Group(g) => format!("Grouped ({} elements, blocksize {})", g.elements.len(), g.blocksize),
             ScanValue::Aob(p) => {
                 let bytes: Vec<String> = p.iter().map(|b| {
                     if b.mask == 0xFF {
@@ -350,6 +455,30 @@ pub struct ScanCandidate {
     pub address: usize,
     pub current_value: ScanValue,
     pub previous_value: ScanValue,
+    pub extra_type: u32,
+    pub group_offsets: Vec<u32>,
+}
+
+impl ScanCandidate {
+    pub fn new(address: usize, current_value: ScanValue, extra_type: u32) -> Self {
+        Self {
+            address,
+            previous_value: current_value.clone(),
+            current_value,
+            extra_type,
+            group_offsets: Vec::new(),
+        }
+    }
+
+    pub fn with_offsets(address: usize, current_value: ScanValue, extra_type: u32, group_offsets: Vec<u32>) -> Self {
+        Self {
+            address,
+            previous_value: current_value.clone(),
+            current_value,
+            extra_type,
+            group_offsets,
+        }
+    }
 }
 
 pub struct Scanner {
@@ -450,17 +579,23 @@ impl Scanner {
                 };
 
                 let mut local_candidates = Vec::new();
+                let chunk_size = 512 * 1024;
+                let mut buf = vec![0u8; chunk_size];
+
+                let overlap = if let ScanCondition::Exact(ScanValue::Group(ref g)) = cond_clone {
+                    g.blocksize.saturating_sub(1)
+                } else {
+                    0
+                };
+
                 for region in chunk {
-                    // Read in 512KB chunks
-                    let chunk_size = 512 * 1024;
                     let mut offset = 0;
 
                     while offset < region.size {
                         let cur_size = (region.size - offset).min(chunk_size);
                         let cur_addr = region.base + offset;
 
-                        let mut buf = vec![0u8; cur_size];
-                        if let Ok(bytes_read) = dummy_proc.read_raw(cur_addr, &mut buf) {
+                        if let Ok(bytes_read) = dummy_proc.read_raw(cur_addr, &mut buf[..cur_size]) {
                             if bytes_read >= val_type.size() {
                                 scan_buffer(
                                     cur_addr,
@@ -472,7 +607,11 @@ impl Scanner {
                                 );
                             }
                         }
-                        offset += cur_size;
+                        if offset + cur_size < region.size {
+                            offset += cur_size.saturating_sub(overlap);
+                        } else {
+                            break;
+                        }
                     }
                 }
 
@@ -542,8 +681,22 @@ impl Scanner {
 
                 for cand in &chunk {
                     let addr = cand.address;
+                    let (cand_size, cand_val_type) = if val_type == ValType::All {
+                        match cand.extra_type {
+                            0 => (1, ValType::U8),
+                            1 => (2, ValType::U16),
+                            2 => (4, ValType::U32),
+                            3 => (8, ValType::U64),
+                            4 => (4, ValType::Float),
+                            5 => (8, ValType::Double),
+                            _ => (val_size, val_type),
+                        }
+                    } else {
+                        (val_size, val_type)
+                    };
+
                     let in_cache = addr >= cached_page_base
-                        && (addr + val_size) <= (cached_page_base + cached_page_len);
+                        && (addr + cand_size) <= (cached_page_base + cached_page_len);
 
                     if !in_cache {
                         let page_base = addr & !0xFFF;
@@ -551,14 +704,16 @@ impl Scanner {
                             cached_page_base = page_base;
                             cached_page_len = bytes_read;
                         } else {
-                            let mut single_buf = vec![0u8; val_size];
+                            let mut single_buf = vec![0u8; cand_size];
                             if dummy_proc.read_raw(addr, &mut single_buf).is_ok() {
-                                if let Some(new_val) = ScanValue::read_from_bytes(val_type, &single_buf) {
-                                    if matches_next_condition(&cand.current_value, &new_val, &cond_clone) {
+                                if let Some(new_val) = ScanValue::read_from_bytes(cand_val_type, &single_buf) {
+                                    if check_candidate_condition(cand, &new_val, &cond_clone, val_type) {
                                         local.push(ScanCandidate {
                                             address: cand.address,
                                             current_value: new_val,
                                             previous_value: cand.current_value.clone(),
+                                            extra_type: cand.extra_type,
+                                            group_offsets: cand.group_offsets.clone(),
                                         });
                                     }
                                 }
@@ -567,14 +722,16 @@ impl Scanner {
                         }
                     }
 
-                    if addr >= cached_page_base && (addr + val_size) <= (cached_page_base + cached_page_len) {
+                    if addr >= cached_page_base && (addr + cand_size) <= (cached_page_base + cached_page_len) {
                         let offset = addr - cached_page_base;
-                        if let Some(new_val) = ScanValue::read_from_bytes(val_type, &page_buf[offset..offset + val_size]) {
-                            if matches_next_condition(&cand.current_value, &new_val, &cond_clone) {
+                        if let Some(new_val) = ScanValue::read_from_bytes(cand_val_type, &page_buf[offset..offset + cand_size]) {
+                            if check_candidate_condition(cand, &new_val, &cond_clone, val_type) {
                                 local.push(ScanCandidate {
                                     address: cand.address,
                                     current_value: new_val,
                                     previous_value: cand.current_value.clone(),
+                                    extra_type: cand.extra_type,
+                                    group_offsets: cand.group_offsets.clone(),
                                 });
                             }
                         }
@@ -645,11 +802,7 @@ unsafe fn scan_i32_exact_avx2(
                         } else {
                             ScanValue::I32(target)
                         };
-                        out.push(ScanCandidate {
-                            address: addr,
-                            current_value: cand_val.clone(),
-                            previous_value: cand_val,
-                        });
+                        out.push(ScanCandidate::new(addr, cand_val, val_type.ce_type_ordinal()));
                     }
                 }
             }
@@ -665,11 +818,7 @@ unsafe fn scan_i32_exact_avx2(
             } else {
                 ScanValue::I32(target)
             };
-            out.push(ScanCandidate {
-                address: base_addr + i,
-                current_value: cand_val.clone(),
-                previous_value: cand_val,
-            });
+            out.push(ScanCandidate::new(base_addr + i, cand_val, val_type.ce_type_ordinal()));
         }
         i += alignment;
     }
@@ -708,11 +857,7 @@ unsafe fn scan_float_exact_avx2(
                     if (mask & (1 << k)) != 0 {
                         let addr = base_addr + i + k * 4;
                         let cand_val = ScanValue::Float(target);
-                        out.push(ScanCandidate {
-                            address: addr,
-                            current_value: cand_val.clone(),
-                            previous_value: cand_val,
-                        });
+                        out.push(ScanCandidate::new(addr, cand_val, 4));
                     }
                 }
             }
@@ -724,11 +869,7 @@ unsafe fn scan_float_exact_avx2(
         let v = f32::from_ne_bytes([buf[i], buf[i + 1], buf[i + 2], buf[i + 3]]);
         if (v - target).abs() < 0.0001 {
             let cand_val = ScanValue::Float(v);
-            out.push(ScanCandidate {
-                address: base_addr + i,
-                current_value: cand_val.clone(),
-                previous_value: cand_val,
-            });
+            out.push(ScanCandidate::new(base_addr + i, cand_val, 4));
         }
         i += alignment;
     }
@@ -767,11 +908,7 @@ unsafe fn scan_u8_exact_avx2(
                 } else {
                     ScanValue::U8(target)
                 };
-                out.push(ScanCandidate {
-                    address: addr,
-                    current_value: cand_val.clone(),
-                    previous_value: cand_val,
-                });
+                out.push(ScanCandidate::new(addr, cand_val, val_type.ce_type_ordinal()));
                 mask &= mask - 1;
             }
             i += 32;
@@ -785,11 +922,7 @@ unsafe fn scan_u8_exact_avx2(
             } else {
                 ScanValue::U8(target)
             };
-            out.push(ScanCandidate {
-                address: base_addr + i,
-                current_value: cand_val.clone(),
-                previous_value: cand_val,
-            });
+            out.push(ScanCandidate::new(base_addr + i, cand_val, val_type.ce_type_ordinal()));
         }
         i += alignment;
     }
@@ -846,11 +979,7 @@ unsafe fn scan_aob_exact_avx2(
                                 .map(|&b| AobByte::exact(b))
                                 .collect();
                             let cand_val = ScanValue::Aob(cand_bytes);
-                            out.push(ScanCandidate {
-                                address: base_addr + start_idx,
-                                current_value: cand_val.clone(),
-                                previous_value: cand_val,
-                            });
+                            out.push(ScanCandidate::new(base_addr + start_idx, cand_val, 8));
                         }
                     }
                 }
@@ -878,11 +1007,7 @@ unsafe fn scan_aob_exact_avx2(
                             .map(|&b| AobByte::exact(b))
                             .collect();
                         let cand_val = ScanValue::Aob(cand_bytes);
-                        out.push(ScanCandidate {
-                            address: addr,
-                            current_value: cand_val.clone(),
-                            previous_value: cand_val,
-                        });
+                        out.push(ScanCandidate::new(addr, cand_val, 8));
                     }
                 }
                 tail_idx += alignment;
@@ -907,11 +1032,7 @@ unsafe fn scan_aob_exact_avx2(
                 .map(|&b| AobByte::exact(b))
                 .collect();
             let cand_val = ScanValue::Aob(cand_bytes);
-            out.push(ScanCandidate {
-                address: base_addr + i,
-                current_value: cand_val.clone(),
-                previous_value: cand_val,
-            });
+            out.push(ScanCandidate::new(base_addr + i, cand_val, 8));
         }
         i += alignment;
     }
@@ -925,6 +1046,18 @@ fn scan_buffer(
     cond: &ScanCondition,
     out: &mut Vec<ScanCandidate>,
 ) {
+    if val_type == ValType::All {
+        scan_buffer_all(base_addr, buf, alignment, cond, out);
+        return;
+    }
+
+    if val_type == ValType::Group {
+        if let ScanCondition::Exact(ScanValue::Group(cfg)) = cond {
+            scan_buffer_group(base_addr, buf, cfg, out);
+        }
+        return;
+    }
+
     if let ScanCondition::Exact(ScanValue::Aob(pattern)) = cond {
         #[cfg(target_arch = "x86_64")]
         {
@@ -953,11 +1086,7 @@ fn scan_buffer(
             if matched {
                 let cand_bytes: Vec<AobByte> = buf[i..i + pat_len].iter().map(|&b| AobByte::exact(b)).collect();
                 let cand_val = ScanValue::Aob(cand_bytes);
-                out.push(ScanCandidate {
-                    address: base_addr + i,
-                    current_value: cand_val.clone(),
-                    previous_value: cand_val,
-                });
+                out.push(ScanCandidate::new(base_addr + i, cand_val, 8));
             }
             i += alignment;
         }
@@ -1005,15 +1134,257 @@ fn scan_buffer(
     while i <= max_idx {
         if let Some(val) = ScanValue::read_from_bytes(val_type, &buf[i..i + size]) {
             if matches_first_condition(&val, cond) {
-                out.push(ScanCandidate {
-                    address: base_addr + i,
-                    current_value: val.clone(),
-                    previous_value: val,
-                });
+                out.push(ScanCandidate::new(base_addr + i, val, val_type.ce_type_ordinal()));
             }
         }
         i += alignment;
     }
+}
+
+fn scan_buffer_group(
+    base_addr: usize,
+    buf: &[u8],
+    cfg: &crate::memory::group_scan::GroupScanConfig,
+    out: &mut Vec<ScanCandidate>,
+) {
+    if buf.len() < cfg.blocksize {
+        return;
+    }
+    let max_idx = buf.len() - cfg.blocksize;
+    let step = cfg.blockalignment.max(1);
+    let mut i = 0;
+    let mut offsets = Vec::with_capacity(cfg.elements.len());
+
+    while i <= max_idx {
+        if cfg.matches_block(&buf[i..], &mut offsets) {
+            out.push(ScanCandidate::with_offsets(
+                base_addr + i,
+                ScanValue::Group(cfg.clone()),
+                14,
+                offsets.clone(),
+            ));
+        }
+        i += step;
+    }
+}
+
+fn scan_buffer_all(
+    base_addr: usize,
+    buf: &[u8],
+    alignment: usize,
+    cond: &ScanCondition,
+    out: &mut Vec<ScanCandidate>,
+) {
+    let len = buf.len();
+    let step = alignment.max(1);
+    let mut i = 0;
+
+    match cond {
+        ScanCondition::Exact(ScanValue::All(targets)) => {
+            while i < len {
+                let addr = base_addr + i;
+                let div2 = (addr % 2) == 0;
+                let div4 = (addr % 4) == 0;
+
+                // 1. vtByte = 0 (1 byte)
+                if let Some(target) = targets.u8_val {
+                    if buf[i] == target {
+                        out.push(ScanCandidate::new(addr, ScanValue::U8(target), 0));
+                    }
+                } else if let Some(target) = targets.i8_val {
+                    if buf[i] as i8 == target {
+                        out.push(ScanCandidate::new(addr, ScanValue::I8(target), 0));
+                    }
+                }
+
+                // 2. vtWord = 1 (2 bytes)
+                if div2 && i + 2 <= len {
+                    let w = u16::from_ne_bytes([buf[i], buf[i + 1]]);
+                    if let Some(target) = targets.u16_val {
+                        if w == target {
+                            out.push(ScanCandidate::new(addr, ScanValue::U16(target), 1));
+                        }
+                    } else if let Some(target) = targets.i16_val {
+                        if (w as i16) == target {
+                            out.push(ScanCandidate::new(addr, ScanValue::I16(target), 1));
+                        }
+                    }
+                }
+
+                // 3. vtDword = 2 & vtSingle = 4 (4 bytes)
+                if div4 && i + 4 <= len {
+                    let d = u32::from_ne_bytes([buf[i], buf[i + 1], buf[i + 2], buf[i + 3]]);
+                    if let Some(target) = targets.u32_val {
+                        if d == target {
+                            out.push(ScanCandidate::new(addr, ScanValue::U32(target), 2));
+                        }
+                    } else if let Some(target) = targets.i32_val {
+                        if (d as i32) == target {
+                            out.push(ScanCandidate::new(addr, ScanValue::I32(target), 2));
+                        }
+                    }
+
+                    if let Some(target_f) = targets.f32_val {
+                        let f = f32::from_ne_bytes([buf[i], buf[i + 1], buf[i + 2], buf[i + 3]]);
+                        if !f.is_nan() && !f.is_infinite() && (f - target_f).abs() < 0.001 {
+                            out.push(ScanCandidate::new(addr, ScanValue::Float(f), 4));
+                        }
+                    }
+                }
+
+                // 4. vtQword = 3 & vtDouble = 5 (8 bytes)
+                if div4 && i + 8 <= len {
+                    let q = u64::from_ne_bytes([
+                        buf[i], buf[i + 1], buf[i + 2], buf[i + 3],
+                        buf[i + 4], buf[i + 5], buf[i + 6], buf[i + 7],
+                    ]);
+                    if let Some(target) = targets.u64_val {
+                        if q == target {
+                            out.push(ScanCandidate::new(addr, ScanValue::U64(target), 3));
+                        }
+                    } else if let Some(target) = targets.i64_val {
+                        if (q as i64) == target {
+                            out.push(ScanCandidate::new(addr, ScanValue::I64(target), 3));
+                        }
+                    }
+
+                    if let Some(target_d) = targets.f64_val {
+                        let d = f64::from_ne_bytes([
+                            buf[i], buf[i + 1], buf[i + 2], buf[i + 3],
+                            buf[i + 4], buf[i + 5], buf[i + 6], buf[i + 7],
+                        ]);
+                        if !d.is_nan() && !d.is_infinite() && (d - target_d).abs() < 0.00001 {
+                            out.push(ScanCandidate::new(addr, ScanValue::Double(d), 5));
+                        }
+                    }
+                }
+
+                i += step;
+            }
+        }
+        ScanCondition::UnknownInitial => {
+            while i < len {
+                let addr = base_addr + i;
+                let div2 = (addr % 2) == 0;
+                let div4 = (addr % 4) == 0;
+
+                // vtByte
+                let b = buf[i];
+                out.push(ScanCandidate::new(addr, ScanValue::U8(b), 0));
+
+                // vtWord
+                if div2 && i + 2 <= len {
+                    let w = u16::from_ne_bytes([buf[i], buf[i + 1]]);
+                    out.push(ScanCandidate::new(addr, ScanValue::U16(w), 1));
+                }
+
+                // vtDword & vtSingle
+                if div4 && i + 4 <= len {
+                    let d = u32::from_ne_bytes([buf[i], buf[i + 1], buf[i + 2], buf[i + 3]]);
+                    out.push(ScanCandidate::new(addr, ScanValue::U32(d), 2));
+
+                    let f = f32::from_ne_bytes([buf[i], buf[i + 1], buf[i + 2], buf[i + 3]]);
+                    if !f.is_nan() && !f.is_infinite() {
+                        out.push(ScanCandidate::new(addr, ScanValue::Float(f), 4));
+                    }
+                }
+
+                // vtQword & vtDouble
+                if div4 && i + 8 <= len {
+                    let q = u64::from_ne_bytes([
+                        buf[i], buf[i + 1], buf[i + 2], buf[i + 3],
+                        buf[i + 4], buf[i + 5], buf[i + 6], buf[i + 7],
+                    ]);
+                    out.push(ScanCandidate::new(addr, ScanValue::U64(q), 3));
+
+                    let d = f64::from_ne_bytes([
+                        buf[i], buf[i + 1], buf[i + 2], buf[i + 3],
+                        buf[i + 4], buf[i + 5], buf[i + 6], buf[i + 7],
+                    ]);
+                    if !d.is_nan() && !d.is_infinite() {
+                        out.push(ScanCandidate::new(addr, ScanValue::Double(d), 5));
+                    }
+                }
+
+                i += step;
+            }
+        }
+        _ => {}
+    }
+}
+
+fn check_candidate_condition(
+    cand: &ScanCandidate,
+    new_val: &ScanValue,
+    cond: &ScanCondition,
+    scan_val_type: ValType,
+) -> bool {
+    if scan_val_type == ValType::All {
+        if let ScanCondition::Exact(ScanValue::All(targets)) = cond {
+            return match cand.extra_type {
+                0 => {
+                    if let Some(t) = targets.u8_val {
+                        *new_val == ScanValue::U8(t)
+                    } else if let Some(t) = targets.i8_val {
+                        *new_val == ScanValue::I8(t)
+                    } else {
+                        false
+                    }
+                }
+                1 => {
+                    if let Some(t) = targets.u16_val {
+                        *new_val == ScanValue::U16(t)
+                    } else if let Some(t) = targets.i16_val {
+                        *new_val == ScanValue::I16(t)
+                    } else {
+                        false
+                    }
+                }
+                2 => {
+                    if let Some(t) = targets.u32_val {
+                        *new_val == ScanValue::U32(t)
+                    } else if let Some(t) = targets.i32_val {
+                        *new_val == ScanValue::I32(t)
+                    } else {
+                        false
+                    }
+                }
+                3 => {
+                    if let Some(t) = targets.u64_val {
+                        *new_val == ScanValue::U64(t)
+                    } else if let Some(t) = targets.i64_val {
+                        *new_val == ScanValue::I64(t)
+                    } else {
+                        false
+                    }
+                }
+                4 => {
+                    if let Some(t) = targets.f32_val {
+                        if let ScanValue::Float(f) = new_val {
+                            (f - t).abs() < 0.001
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                }
+                5 => {
+                    if let Some(t) = targets.f64_val {
+                        if let ScanValue::Double(d) = new_val {
+                            (d - t).abs() < 0.00001
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            };
+        }
+    }
+    matches_next_condition(&cand.current_value, new_val, cond)
 }
 
 fn matches_first_condition(val: &ScanValue, cond: &ScanCondition) -> bool {
@@ -1045,6 +1416,7 @@ fn matches_next_condition(old: &ScanValue, cur: &ScanValue, cond: &ScanCondition
 
 fn values_equal(a: &ScanValue, b: &ScanValue) -> bool {
     match (a, b) {
+        (ScanValue::All(_), ScanValue::All(_)) => true,
         (ScanValue::I8(x), ScanValue::I8(y)) => x == y,
         (ScanValue::U8(x), ScanValue::U8(y)) => x == y,
         (ScanValue::I16(x), ScanValue::I16(y)) => x == y,
@@ -1109,5 +1481,70 @@ fn matches_diff(old: &ScanValue, cur: &ScanValue, diff: &ScanValue, is_increase:
             (actual - d).abs() < 0.0001
         }
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_val_type_all_parse() {
+        let v = ScanValue::parse(ValType::All, "100").expect("Should parse 100 as All");
+        if let ScanValue::All(targets) = v {
+            assert_eq!(targets.u8_val, Some(100));
+            assert_eq!(targets.u16_val, Some(100));
+            assert_eq!(targets.u32_val, Some(100));
+            assert_eq!(targets.u64_val, Some(100));
+            assert_eq!(targets.f32_val, Some(100.0));
+            assert_eq!(targets.f64_val, Some(100.0));
+        } else {
+            panic!("Expected ScanValue::All");
+        }
+    }
+
+    #[test]
+    fn test_scan_buffer_all_candidates() {
+        // Build a buffer with:
+        // offset 0: 100 as u32 (and float 100.0) -> div4 match
+        // offset 8: 100 as u8
+        let mut buf = vec![0u8; 32];
+        let val_u32: u32 = 100;
+        buf[0..4].copy_from_slice(&val_u32.to_ne_bytes());
+        buf[8] = 100;
+
+        let cond = ScanCondition::Exact(ScanValue::parse(ValType::All, "100").unwrap());
+        let mut candidates = Vec::new();
+        scan_buffer_all(0x1000, &buf, 1, &cond, &mut candidates);
+
+        // Should find u8, u16, u32 at offset 0 (0x1000)
+        let addr_0_cands: Vec<_> = candidates.iter().filter(|c| c.address == 0x1000).collect();
+        assert!(addr_0_cands.iter().any(|c| c.extra_type == 0)); // vtByte
+        assert!(addr_0_cands.iter().any(|c| c.extra_type == 1)); // vtWord
+        assert!(addr_0_cands.iter().any(|c| c.extra_type == 2)); // vtDword
+
+        // Should find vtByte at offset 8 (0x1008)
+        let addr_8_cands: Vec<_> = candidates.iter().filter(|c| c.address == 0x1008).collect();
+        assert!(addr_8_cands.iter().any(|c| c.extra_type == 0)); // vtByte
+    }
+
+    #[test]
+    fn test_group_scan_buffer_execution() {
+        let cmd = "BA:4 4:100 4:200 4:300";
+        let val = ScanValue::parse(ValType::Group, cmd).expect("Should parse group scan");
+        let cond = ScanCondition::Exact(val);
+
+        let mut buf = vec![0u8; 64];
+        buf[8..12].copy_from_slice(&100u32.to_ne_bytes());
+        buf[12..16].copy_from_slice(&200u32.to_ne_bytes());
+        buf[16..20].copy_from_slice(&300u32.to_ne_bytes());
+
+        let mut candidates = Vec::new();
+        scan_buffer(0x5000, &buf, ValType::Group, 4, &cond, &mut candidates);
+
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].address, 0x5000 + 8);
+        assert_eq!(candidates[0].extra_type, 14);
+        assert_eq!(candidates[0].group_offsets, vec![0, 4, 8]);
     }
 }

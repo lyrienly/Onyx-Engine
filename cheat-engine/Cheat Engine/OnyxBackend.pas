@@ -130,9 +130,15 @@ function onyx_pointer_scanner_get_count(session: Pointer): PtrUInt; stdcall; ext
 function onyx_pointer_scanner_get_path(session: Pointer; index: PtrUInt; out_record: POnyxPointerPathRecord): integer; stdcall; external OnyxBackendDLL;
 function onyx_pointer_scanner_save_results(session: Pointer; file_path: PAnsiChar): integer; stdcall; external OnyxBackendDLL;
 function onyx_pointer_scanner_load_results(session: Pointer; file_path: PAnsiChar): integer; stdcall; external OnyxBackendDLL;
+function onyx_pointer_scanner_save_map(session: Pointer; proc: Pointer; file_path: PAnsiChar): integer; stdcall; external OnyxBackendDLL;
+function onyx_pointer_scanner_load_map(session: Pointer; file_path: PAnsiChar): integer; stdcall; external OnyxBackendDLL;
+function onyx_pointer_scanner_start_offline_scan(session: Pointer; target_addr: PtrUInt; max_depth: PtrUInt; max_offset: PtrUInt; alignment: PtrUInt; max_results: PtrUInt): integer; stdcall; external OnyxBackendDLL;
+function onyx_pointer_scanner_intersect_file(session: Pointer; other_results_file: PAnsiChar): integer; stdcall; external OnyxBackendDLL;
 
 function onyx_speedhack_init(process: Pointer; initial_speed: Single): integer; stdcall; external OnyxBackendDLL;
 function onyx_speedhack_set(process: Pointer; multiplier: Single): integer; stdcall; external OnyxBackendDLL;
+function onyx_speedhack_is_active(process: Pointer): integer; stdcall; external OnyxBackendDLL;
+function onyx_speedhack_reset(process: Pointer): integer; stdcall; external OnyxBackendDLL;
 
 function onyx_mono_detect(process: Pointer): integer; stdcall; external OnyxBackendDLL;
 function onyx_mono_dissect(process: Pointer): integer; stdcall; external OnyxBackendDLL;
@@ -141,6 +147,11 @@ function onyx_mono_get_class_info(index: integer; out_name: PAnsiChar; max_len: 
 function onyx_mono_find_field_offset(class_name: PAnsiChar; field_name: PAnsiChar): integer; stdcall; external OnyxBackendDLL;
 function onyx_mono_find_method_address(class_name: PAnsiChar; method_name: PAnsiChar): PtrUInt; stdcall; external OnyxBackendDLL;
 function onyx_mono_generate_hook(method_name: PAnsiChar; method_addr: PtrUInt; out_script: PAnsiChar; max_len: DWORD): integer; stdcall; external OnyxBackendDLL;
+function onyx_mono_compile_method(process: Pointer; class_name: PAnsiChar; method_name: PAnsiChar): PtrUInt; stdcall; external OnyxBackendDLL;
+function onyx_mono_read_field_value(process: Pointer; instance_address: PtrUInt; class_name: PAnsiChar; field_name: PAnsiChar; out_val: PAnsiChar; max_len: DWORD): integer; stdcall; external OnyxBackendDLL;
+function onyx_mono_get_assembly_count: integer; stdcall; external OnyxBackendDLL;
+function onyx_mono_get_assembly_name(index: integer; out_name: PAnsiChar; max_len: DWORD): integer; stdcall; external OnyxBackendDLL;
+function onyx_mono_dissect_clr_object(process: Pointer; object_address: PtrUInt; out_mt: PPtrUInt; out_eeclass: PPtrUInt; out_size: PDWORD): integer; stdcall; external OnyxBackendDLL;
 
 function onyx_veh_inject(process: Pointer; dll_path: PAnsiChar): integer; stdcall; external OnyxBackendDLL;
 function onyx_veh_init(process: Pointer): integer; stdcall; external OnyxBackendDLL;
@@ -221,6 +232,11 @@ function OnyxMonoGetClassInfo(index: integer; var className: string; var classAd
 function OnyxMonoFindFieldOffset(className, fieldName: string): integer;
 function OnyxMonoFindMethodAddress(className, methodName: string): PtrUInt;
 function OnyxMonoGenerateHook(methodName: string; methodAddr: PtrUInt): string;
+function OnyxMonoCompileMethod(className, methodName: string): PtrUInt;
+function OnyxMonoReadFieldValue(instanceAddress: PtrUInt; className, fieldName: string): string;
+function OnyxMonoGetAssemblyCount: integer;
+function OnyxMonoGetAssemblyName(index: integer): string;
+function OnyxMonoDissectClrObject(objectAddress: PtrUInt; var outMt, outEeClass: PtrUInt; var outSize: DWORD): Boolean;
 procedure RegisterOnyxLua(L: Pointer);
 
 implementation
@@ -919,6 +935,74 @@ begin
   else
     Result := '';
 end;
+
+function OnyxMonoCompileMethod(className, methodName: string): PtrUInt;
+var
+  hProc: Pointer;
+  cAnsi, mAnsi: AnsiString;
+begin
+  hProc := OnyxEnsureAttachedProcess;
+  if hProc = nil then Exit(0);
+  cAnsi := AnsiString(className);
+  mAnsi := AnsiString(methodName);
+  Result := onyx_mono_compile_method(hProc, PAnsiChar(cAnsi), PAnsiChar(mAnsi));
+end;
+
+function OnyxMonoReadFieldValue(instanceAddress: PtrUInt; className, fieldName: string): string;
+var
+  hProc: Pointer;
+  cAnsi, fAnsi: AnsiString;
+  buf: array[0..255] of AnsiChar;
+begin
+  hProc := OnyxEnsureAttachedProcess;
+  if hProc = nil then Exit('???');
+  cAnsi := AnsiString(className);
+  fAnsi := AnsiString(fieldName);
+  FillChar(buf, SizeOf(buf), 0);
+  if onyx_mono_read_field_value(hProc, instanceAddress, PAnsiChar(cAnsi), PAnsiChar(fAnsi), @buf[0], SizeOf(buf)) = 1 then
+    Result := StrPas(PAnsiChar(@buf[0]))
+  else
+    Result := '???';
+end;
+
+function OnyxMonoGetAssemblyCount: integer;
+begin
+  Result := onyx_mono_get_assembly_count;
+end;
+
+function OnyxMonoGetAssemblyName(index: integer): string;
+var
+  buf: array[0..255] of AnsiChar;
+begin
+  FillChar(buf, SizeOf(buf), 0);
+  if onyx_mono_get_assembly_name(index, @buf[0], SizeOf(buf)) = 1 then
+    Result := StrPas(PAnsiChar(@buf[0]))
+  else
+    Result := '';
+end;
+
+function OnyxMonoDissectClrObject(objectAddress: PtrUInt; var outMt, outEeClass: PtrUInt; var outSize: DWORD): Boolean;
+var
+  hProc: Pointer;
+  mt, ee: PtrUInt;
+  sz: DWORD;
+begin
+  hProc := OnyxEnsureAttachedProcess;
+  if hProc = nil then Exit(False);
+  mt := 0;
+  ee := 0;
+  sz := 0;
+  if onyx_mono_dissect_clr_object(hProc, objectAddress, @mt, @ee, @sz) = 1 then
+  begin
+    outMt := mt;
+    outEeClass := ee;
+    outSize := sz;
+    Result := True;
+  end
+  else
+    Result := False;
+end;
+
 
 function lua_onyx_veh_inject(L: PLua_State): integer; cdecl;
 var

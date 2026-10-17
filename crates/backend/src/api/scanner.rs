@@ -18,6 +18,8 @@ fn map_val_type(idx: i32) -> ValType {
         5 => ValType::Double, // vtDouble = 5
         6 | 7 | 16 => ValType::Str, // vtString = 6, vtUnicodeString = 7, vtCodePageString = 16
         8 | 15 => ValType::Aob,     // vtByteArray = 8, vtByteArrays = 15
+        10 => ValType::All,         // vtAll = 10
+        14 => ValType::Group,       // vtGrouped = 14
         _ => ValType::I32,
     }
 }
@@ -262,11 +264,53 @@ pub unsafe extern "C" fn onyx_scanner_save_results_file(
         return -1;
     }
 
+    if s.val_type == ValType::Group {
+        // CE vtGrouped format:
+        // 7-byte header [6, 'N', 'O', 'R', 'M', 'A', 'L']
+        // 4-byte offsetcount (dword)
+        // Array of (address: u64, offsets: [u32; offsetcount])
+        let offset_count = s.candidates.first()
+            .map(|c| c.group_offsets.len() as u32)
+            .unwrap_or(0);
+
+        if writer.write_all(&offset_count.to_le_bytes()).is_err() {
+            return -1;
+        }
+
+        for c in &s.candidates {
+            let addr_u64 = c.address as u64;
+            if writer.write_all(&addr_u64.to_le_bytes()).is_err() {
+                return -1;
+            }
+            for off in &c.group_offsets {
+                if writer.write_all(&off.to_le_bytes()).is_err() {
+                    return -1;
+                }
+            }
+        }
+
+        if writer.flush().is_err() {
+            return -1;
+        }
+
+        return s.candidates.len() as i64;
+    }
+
+    let is_bit_address = s.val_type == ValType::All;
+
     // Write all candidate addresses as raw 64-bit integers
+    // For vtAll (and vtBinary), Cheat Engine expects 16-byte TBitAddress entries:
+    // (address: ptruint, bit/extra: ptruint holding the TVariableType ordinal 0..5)
     for c in &s.candidates {
         let addr_u64 = c.address as u64;
-        if writer.write_all(&addr_u64.to_ne_bytes()).is_err() {
+        if writer.write_all(&addr_u64.to_le_bytes()).is_err() {
             return -1;
+        }
+        if is_bit_address {
+            let extra_u64 = c.extra_type as u64;
+            if writer.write_all(&extra_u64.to_le_bytes()).is_err() {
+                return -1;
+            }
         }
     }
 

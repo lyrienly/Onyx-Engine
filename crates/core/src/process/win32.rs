@@ -455,6 +455,7 @@ unsafe extern "system" {
     pub fn WaitForDebugEvent(lpDebugEvent: *mut DEBUG_EVENT, dwMilliseconds: DWORD) -> BOOL;
     pub fn ContinueDebugEvent(dwProcessId: DWORD, dwThreadId: DWORD, dwContinueStatus: DWORD) -> BOOL;
     pub fn GetLastError() -> DWORD;
+    pub fn GetCurrentProcessId() -> DWORD;
 
     // Remote thread & injection
     pub fn CreateRemoteThread(

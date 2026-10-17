@@ -255,8 +255,213 @@ impl StructureDissector {
         s.push_str("}\n");
         s
     }
+
+    /// Multi-instance structure comparison ("Side by Side Diff")
+    /// Compares multiple instances of a structure (e.g. Player vs Enemy 1 vs Enemy 2)
+    /// Classifies offsets as Identical (constant/vtable), PointerMatch, or Variable (stats/position)
+    pub fn compare_instances(
+        proc: &Process,
+        addresses: &[usize],
+        size: usize,
+    ) -> Result<StructureDiffResult, String> {
+        if addresses.is_empty() {
+            return Err("At least one instance address required for comparison".to_string());
+        }
+
+        let mut instance_fields: Vec<Vec<StructField>> = Vec::new();
+        for &addr in addresses {
+            let fields = Self::dissect(proc, addr, size)?;
+            instance_fields.push(fields);
+        }
+
+        let num_instances = addresses.len();
+        let field_count = instance_fields[0].len();
+        let mut diff_fields = Vec::new();
+        let mut identical_count = 0;
+        let mut different_count = 0;
+
+        for i in 0..field_count {
+            let offset = instance_fields[0][i].offset;
+            let field_type = instance_fields[0][i].guessed.type_name();
+            let mut values = Vec::new();
+            let mut all_bytes_identical = true;
+            let mut all_are_pointers = true;
+
+            let first_bytes = instance_fields[0][i].raw_bytes;
+
+            for inst in &instance_fields {
+                let f = &inst[i];
+                values.push(f.guessed.description());
+                if f.raw_bytes != first_bytes {
+                    all_bytes_identical = false;
+                }
+                match f.guessed {
+                    GuessedType::DataPointer(_) | GuessedType::VTable(_) | GuessedType::FunctionPointer(_) => {}
+                    _ => all_are_pointers = false,
+                }
+            }
+
+            let variance = if all_bytes_identical {
+                identical_count += 1;
+                FieldVariance::Identical
+            } else if all_are_pointers && num_instances > 1 {
+                different_count += 1;
+                FieldVariance::PointerMatch
+            } else {
+                different_count += 1;
+                FieldVariance::Different
+            };
+
+            diff_fields.push(DiffField {
+                offset,
+                field_type,
+                variance,
+                values,
+            });
+        }
+
+        Ok(StructureDiffResult {
+            fields: diff_fields,
+            total_offsets: field_count,
+            identical_count,
+            different_count,
+        })
+    }
+
+    /// Crawls pointers transitively up to max_depth, discovering interconnected structures (Structure Spider)
+    pub fn spider_crawl(
+        proc: &Process,
+        root_address: usize,
+        struct_size: usize,
+        max_depth: usize,
+        max_nodes: usize,
+    ) -> Result<SpiderGraph, String> {
+        let mut graph = SpiderGraph {
+            nodes: Vec::new(),
+            root: root_address,
+        };
+
+        let mut visited = std::collections::HashSet::new();
+        let mut queue = std::collections::VecDeque::new();
+        queue.push_back((root_address, 0usize));
+        visited.insert(root_address);
+
+        while let Some((addr, depth)) = queue.pop_front() {
+            if graph.nodes.len() >= max_nodes {
+                break;
+            }
+
+            if let Ok(fields) = Self::dissect(proc, addr, struct_size) {
+                let mut child_pointers = Vec::new();
+
+                for f in &fields {
+                    let child_addr = match f.guessed {
+                        GuessedType::DataPointer(p) | GuessedType::VTable(p) => Some(p),
+                        GuessedType::UnrealTArray { data_ptr, .. } => Some(data_ptr),
+                        GuessedType::UnrealFString { data_ptr, .. } => Some(data_ptr),
+                        _ => None,
+                    };
+
+                    if let Some(target) = child_addr {
+                        if target > 0x10000 && !visited.contains(&target) {
+                            child_pointers.push((f.offset, target));
+                            if depth + 1 < max_depth {
+                                visited.insert(target);
+                                queue.push_back((target, depth + 1));
+                            }
+                        }
+                    }
+                }
+
+                graph.nodes.push(SpiderNode {
+                    address: addr,
+                    depth,
+                    fields,
+                    child_pointers,
+                });
+            }
+        }
+
+        Ok(graph)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FieldVariance {
+    Identical,
+    Different,
+    PointerMatch,
+}
+
+#[derive(Debug, Clone)]
+pub struct DiffField {
+    pub offset: usize,
+    pub field_type: &'static str,
+    pub variance: FieldVariance,
+    pub values: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StructureDiffResult {
+    pub fields: Vec<DiffField>,
+    pub total_offsets: usize,
+    pub identical_count: usize,
+    pub different_count: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct SpiderNode {
+    pub address: usize,
+    pub depth: usize,
+    pub fields: Vec<StructField>,
+    pub child_pointers: Vec<(usize, usize)>, // (offset, child_address)
+}
+
+#[derive(Debug, Clone)]
+pub struct SpiderGraph {
+    pub root: usize,
+    pub nodes: Vec<SpiderNode>,
 }
 
 fn is_printable_ascii(s: &str) -> bool {
     !s.is_empty() && s.chars().all(|c| c.is_ascii_graphic() || c == ' ')
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_structure_diff_comparison() {
+        let proc = Process::attach_current().expect("attach current process");
+
+        // Allocate two mock objects
+        let obj1 = proc.alloc(64, crate::win32::PAGE_READWRITE).unwrap();
+        let obj2 = proc.alloc(64, crate::win32::PAGE_READWRITE).unwrap();
+
+        // Offset 0: Identical VTable mock (points to ntdll/current process code)
+        let vtable_addr = 0x140001000usize;
+        proc.write_raw(obj1, &vtable_addr.to_le_bytes()).unwrap();
+        proc.write_raw(obj2, &vtable_addr.to_le_bytes()).unwrap();
+
+        // Offset 8: Different integer (e.g. HP 100 vs 200)
+        let hp1: u64 = 100;
+        let hp2: u64 = 200;
+        proc.write_raw(obj1 + 8, &hp1.to_le_bytes()).unwrap();
+        proc.write_raw(obj2 + 8, &hp2.to_le_bytes()).unwrap();
+
+        let diff = StructureDissector::compare_instances(&proc, &[obj1, obj2], 16).unwrap();
+        assert_eq!(diff.fields.len(), 2);
+        assert_eq!(diff.fields[0].offset, 0);
+        assert_eq!(diff.fields[0].variance, FieldVariance::Identical);
+
+        assert_eq!(diff.fields[1].offset, 8);
+        assert_eq!(diff.fields[1].variance, FieldVariance::Different);
+
+        assert_eq!(diff.identical_count, 1);
+        assert_eq!(diff.different_count, 1);
+
+        let _ = proc.free(obj1);
+        let _ = proc.free(obj2);
+    }
 }

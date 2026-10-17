@@ -474,6 +474,178 @@ impl PointerScanner {
 
         Ok(paths)
     }
+
+    /// Saves raw pointer map and module list to high-speed binary `.ptrmap` format for offline analysis
+    pub fn save_map_to_file(&self, path: &str, modules: &[ModuleEntry]) -> Result<(), String> {
+        let file = File::create(path).map_err(|e| format!("Failed to create map file: {}", e))?;
+        let mut writer = BufWriter::with_capacity(1024 * 1024, file);
+
+        // Header: ONYXMAP1
+        writer.write_all(b"ONYXMAP1").map_err(|e| e.to_string())?;
+
+        // Modules count
+        let mod_count = modules.len() as u32;
+        writer.write_all(&mod_count.to_le_bytes()).map_err(|e| e.to_string())?;
+        for m in modules {
+            let name_bytes = m.name.as_bytes();
+            let name_len = name_bytes.len().min(255) as u8;
+            writer.write_all(&[name_len]).map_err(|e| e.to_string())?;
+            writer.write_all(&name_bytes[..name_len as usize]).map_err(|e| e.to_string())?;
+            writer.write_all(&(m.base as u64).to_le_bytes()).map_err(|e| e.to_string())?;
+            writer.write_all(&(m.size as u64).to_le_bytes()).map_err(|e| e.to_string())?;
+        }
+
+        // Total pointers
+        let ptr_count = self.total_pointers as u64;
+        writer.write_all(&ptr_count.to_le_bytes()).map_err(|e| e.to_string())?;
+        for nodes in self.pointer_map.values() {
+            for node in nodes {
+                writer.write_all(&(node.from_address as u64).to_le_bytes()).map_err(|e| e.to_string())?;
+                writer.write_all(&(node.to_address as u64).to_le_bytes()).map_err(|e| e.to_string())?;
+            }
+        }
+
+        writer.flush().map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    /// Loads raw pointer map and module list from `.ptrmap` format
+    pub fn load_map_from_file(path: &str) -> Result<(Self, Vec<ModuleEntry>), String> {
+        let file = File::open(path).map_err(|e| format!("Failed to open map file: {}", e))?;
+        let mut reader = BufReader::with_capacity(1024 * 1024, file);
+
+        let mut magic = [0u8; 8];
+        reader.read_exact(&mut magic).map_err(|e| e.to_string())?;
+        if &magic != b"ONYXMAP1" {
+            return Err("Invalid Onyx pointer map signature".to_string());
+        }
+
+        let mut mod_count_buf = [0u8; 4];
+        reader.read_exact(&mut mod_count_buf).map_err(|e| e.to_string())?;
+        let mod_count = u32::from_le_bytes(mod_count_buf) as usize;
+        let mut modules = Vec::with_capacity(mod_count);
+
+        for _ in 0..mod_count {
+            let mut len_buf = [0u8; 1];
+            reader.read_exact(&mut len_buf).map_err(|e| e.to_string())?;
+            let mut name_buf = vec![0u8; len_buf[0] as usize];
+            reader.read_exact(&mut name_buf).map_err(|e| e.to_string())?;
+            let name = String::from_utf8_lossy(&name_buf).to_string();
+
+            let mut base_buf = [0u8; 8];
+            reader.read_exact(&mut base_buf).map_err(|e| e.to_string())?;
+            let base = u64::from_le_bytes(base_buf) as usize;
+
+            let mut size_buf = [0u8; 8];
+            reader.read_exact(&mut size_buf).map_err(|e| e.to_string())?;
+            let size = u64::from_le_bytes(size_buf) as usize;
+
+            modules.push(ModuleEntry {
+                name,
+                path: String::new(),
+                base,
+                size,
+            });
+        }
+
+        let mut ptr_count_buf = [0u8; 8];
+        reader.read_exact(&mut ptr_count_buf).map_err(|e| e.to_string())?;
+        let ptr_count = u64::from_le_bytes(ptr_count_buf) as usize;
+
+        let mut scanner = PointerScanner::new();
+        const PAGE_SHIFT: usize = 12;
+
+        for _ in 0..ptr_count {
+            let mut from_buf = [0u8; 8];
+            reader.read_exact(&mut from_buf).map_err(|e| e.to_string())?;
+            let from_address = u64::from_le_bytes(from_buf) as usize;
+
+            let mut to_buf = [0u8; 8];
+            reader.read_exact(&mut to_buf).map_err(|e| e.to_string())?;
+            let to_address = u64::from_le_bytes(to_buf) as usize;
+
+            let bucket = to_address >> PAGE_SHIFT;
+            scanner
+                .pointer_map
+                .entry(bucket)
+                .or_default()
+                .push(PointerNode {
+                    from_address,
+                    to_address,
+                });
+            scanner.total_pointers += 1;
+        }
+
+        Ok((scanner, modules))
+    }
+
+    /// Performs offline pointer scan without requiring an active Process
+    pub fn scan_paths_offline(
+        &self,
+        modules: &[ModuleEntry],
+        target_addr: usize,
+        config: &PointerScanConfig,
+        progress_cb: &mut dyn FnMut(f32, usize) -> bool,
+    ) -> Result<Vec<PointerPath>, String> {
+        let mut results = Vec::new();
+        let mut current_offsets = Vec::new();
+        let mut visited = HashSet::new();
+
+        self.find_recursive_safe(
+            target_addr,
+            target_addr,
+            config.max_depth,
+            config.max_offset,
+            config.max_results,
+            modules,
+            &mut current_offsets,
+            &mut visited,
+            &mut results,
+            progress_cb,
+        );
+
+        let _ = progress_cb(100.0, results.len());
+        Ok(results)
+    }
+
+    /// Evaluates a single pointer path against an offline pointer map
+    pub fn evaluate_path_in_map(&self, modules: &[ModuleEntry], path: &PointerPath) -> Option<usize> {
+        let m = modules.iter().find(|m| m.name.eq_ignore_ascii_case(&path.module_name))?;
+        let mut cur_addr = m.base + path.base_offset;
+
+        for &off in &path.offsets {
+            // Find pointer from cur_addr
+            let mut found_dest = None;
+            for nodes in self.pointer_map.values() {
+                if let Some(node) = nodes.iter().find(|n| n.from_address == cur_addr) {
+                    found_dest = Some(node.to_address);
+                    break;
+                }
+            }
+
+            let next_ptr = found_dest?;
+            if next_ptr == 0 {
+                return None;
+            }
+            cur_addr = next_ptr + off;
+        }
+
+        Some(cur_addr)
+    }
+
+    /// Intersects pointer scan results from two or more sessions, isolating stable pointers
+    pub fn intersect_paths(paths_a: &[PointerPath], paths_b: &[PointerPath]) -> Vec<PointerPath> {
+        let mut b_set: HashSet<(String, usize, Vec<usize>)> = HashSet::new();
+        for p in paths_b {
+            b_set.insert((p.module_name.to_lowercase(), p.base_offset, p.offsets.clone()));
+        }
+
+        paths_a
+            .iter()
+            .filter(|p| b_set.contains(&(p.module_name.to_lowercase(), p.base_offset, p.offsets.clone())))
+            .cloned()
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -512,6 +684,70 @@ mod tests {
         assert_eq!(loaded[0].base_offset, 0x240);
         assert_eq!(loaded[0].offsets, vec![0x8, 0x14]);
         assert_eq!(loaded[0].final_address, 0x12345678);
+
+        let _ = std::fs::remove_file(file_path);
+    }
+
+    #[test]
+    fn test_save_load_map_and_offline_scan() {
+        let mut scanner = PointerScanner::new();
+        let modules = vec![ModuleEntry {
+            name: "testapp.exe".to_string(),
+            path: String::new(),
+            base: 0x140000000,
+            size: 0x50000,
+        }];
+
+        // Mock pointer chain:
+        // [testapp.exe + 0x1000] -> points to 0x200000
+        // [0x200000 + 0x20]      -> points to 0x300000 (target struct)
+        // target value at 0x300000 + 0x40 = 0x300040
+        const PAGE_SHIFT: usize = 12;
+
+        scanner.pointer_map.entry(0x200000 >> PAGE_SHIFT).or_default().push(PointerNode {
+            from_address: 0x140001000,
+            to_address: 0x200000,
+        });
+        scanner.total_pointers += 1;
+
+        scanner.pointer_map.entry(0x300000 >> PAGE_SHIFT).or_default().push(PointerNode {
+            from_address: 0x200020,
+            to_address: 0x300000,
+        });
+        scanner.total_pointers += 1;
+
+        let file_path = std::env::temp_dir().join("test_map.ptrmap");
+        let file_str = file_path.to_str().unwrap();
+
+        // 1. Save map
+        assert!(scanner.save_map_to_file(file_str, &modules).is_ok());
+
+        // 2. Load map
+        let (loaded_scanner, loaded_mods) = PointerScanner::load_map_from_file(file_str).expect("load ptrmap");
+        assert_eq!(loaded_mods.len(), 1);
+        assert_eq!(loaded_mods[0].name, "testapp.exe");
+        assert_eq!(loaded_scanner.total_pointers, 2);
+
+        // 3. Scan offline paths to target 0x300040
+        let mut config = PointerScanConfig::default();
+        config.max_depth = 3;
+        config.max_offset = 0x100;
+        let paths = loaded_scanner.scan_paths_offline(&loaded_mods, 0x300040, &config, &mut |_, _| true).unwrap();
+
+        assert_eq!(paths.len(), 1);
+        assert_eq!(paths[0].module_name, "testapp.exe");
+        assert_eq!(paths[0].base_offset, 0x1000);
+        assert_eq!(paths[0].offsets, vec![0x20, 0x40]);
+        assert_eq!(paths[0].final_address, 0x300040);
+
+        // 4. Test evaluate_path_in_map
+        let eval_addr = loaded_scanner.evaluate_path_in_map(&loaded_mods, &paths[0]);
+        assert_eq!(eval_addr, Some(0x300040));
+
+        // 5. Test intersection
+        let other_paths = vec![paths[0].clone()];
+        let intersected = PointerScanner::intersect_paths(&paths, &other_paths);
+        assert_eq!(intersected.len(), 1);
 
         let _ = std::fs::remove_file(file_path);
     }

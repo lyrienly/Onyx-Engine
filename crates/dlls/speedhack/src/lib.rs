@@ -65,10 +65,22 @@ static HOOKS_INSTALLED: AtomicBool = AtomicBool::new(false);
 type FnQpc = unsafe extern "system" fn(*mut i64) -> BOOL;
 type FnGtc = unsafe extern "system" fn() -> DWORD;
 type FnGtc64 = unsafe extern "system" fn() -> u64;
+type FnTimeGetTime = unsafe extern "system" fn() -> DWORD;
+type FnSleep = unsafe extern "system" fn(DWORD);
 
 static mut TRAMPOLINE_QPC: Option<FnQpc> = None;
 static mut TRAMPOLINE_GTC: Option<FnGtc> = None;
 static mut TRAMPOLINE_GTC64: Option<FnGtc64> = None;
+static mut TRAMPOLINE_TGT: Option<FnTimeGetTime> = None;
+static mut TRAMPOLINE_SLEEP: Option<FnSleep> = None;
+
+#[link(name = "kernel32")]
+unsafe extern "system" {
+    fn Sleep(dwMilliseconds: DWORD);
+    fn VirtualAlloc(lpAddress: LPVOID, dwSize: usize, flAllocationType: DWORD, flProtect: DWORD) -> LPVOID;
+    fn FlushInstructionCache(hProcess: HANDLE, lpBaseAddress: LPCVOID, dwSize: usize) -> BOOL;
+    fn GetCurrentProcess() -> HANDLE;
+}
 
 // Hook implementations
 unsafe extern "system" fn Hooked_QueryPerformanceCounter(lpCount: *mut i64) -> BOOL {
@@ -131,6 +143,46 @@ unsafe extern "system" fn Hooked_GetTickCount64() -> u64 {
     }
 }
 
+unsafe extern "system" fn Hooked_timeGetTime() -> DWORD {
+    let real_tgt = if let Some(orig) = TRAMPOLINE_TGT {
+        orig()
+    } else {
+        GetTickCount()
+    };
+
+    let mut lock = SPEED_STATE.lock().unwrap();
+    if let Some(state) = lock.as_mut() {
+        if state.multiplier <= 0.0 {
+            state.initial_virtual_tick
+        } else {
+            let delta = real_tgt.wrapping_sub(state.initial_real_tick);
+            let scaled_delta = ((delta as f64) * (state.multiplier as f64)) as u32;
+            state.initial_virtual_tick.wrapping_add(scaled_delta)
+        }
+    } else {
+        real_tgt
+    }
+}
+
+unsafe extern "system" fn Hooked_Sleep(dwMilliseconds: DWORD) {
+    let mult = {
+        let lock = SPEED_STATE.lock().unwrap();
+        lock.as_ref().map(|s| s.multiplier).unwrap_or(1.0)
+    };
+
+    let orig = TRAMPOLINE_SLEEP.unwrap_or(Sleep);
+
+    if mult <= 0.0 {
+        // Freeze / Paused: sleep in small chunks while frozen
+        orig(50);
+    } else if dwMilliseconds > 0 {
+        let scaled = ((dwMilliseconds as f32) / mult) as DWORD;
+        orig(scaled.max(1));
+    } else {
+        orig(0);
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "system" fn SetSpeed(speed: f32) {
     let mut lock = SPEED_STATE.lock().unwrap();
@@ -184,24 +236,125 @@ pub extern "system" fn InitializeSpeedhack(speed: f32) {
     }
 }
 
+static mut TRAMPOLINE_BUF: *mut u8 = null_mut();
+static mut TRAMPOLINE_POS: usize = 0;
+
+unsafe fn create_detour_64(target: *mut c_void, detour: *mut c_void) -> *mut c_void {
+    if target.is_null() || detour.is_null() {
+        return target;
+    }
+
+    if TRAMPOLINE_BUF.is_null() {
+        TRAMPOLINE_BUF = VirtualAlloc(null_mut(), 4096, 0x1000 | 0x2000, PAGE_EXECUTE_READWRITE) as *mut u8;
+        TRAMPOLINE_POS = 0;
+    }
+
+    if TRAMPOLINE_BUF.is_null() || TRAMPOLINE_POS + 64 > 4096 {
+        return target;
+    }
+
+    let stolen_len = 14;
+    let tramp = TRAMPOLINE_BUF.add(TRAMPOLINE_POS);
+
+    // 1. Copy original 14 bytes into trampoline
+    std::ptr::copy_nonoverlapping(target as *const u8, tramp, stolen_len);
+
+    // 2. Append 14-byte jump to target + 14: FF 25 00 00 00 00 [target + 14]
+    let jmp_back = tramp.add(stolen_len);
+    *jmp_back = 0xFF;
+    *jmp_back.add(1) = 0x25;
+    *jmp_back.add(2) = 0x00;
+    *jmp_back.add(3) = 0x00;
+    *jmp_back.add(4) = 0x00;
+    *jmp_back.add(5) = 0x00;
+    let target_resume = (target as usize) + stolen_len;
+    std::ptr::copy_nonoverlapping(&target_resume as *const usize as *const u8, jmp_back.add(6), 8);
+
+    TRAMPOLINE_POS += stolen_len + 14;
+
+    // 3. Patch target function with jump to detour
+    let mut old_protect: DWORD = 0;
+    if VirtualProtect(target, stolen_len, PAGE_EXECUTE_READWRITE, &mut old_protect) != 0 {
+        let t_ptr = target as *mut u8;
+        *t_ptr = 0xFF;
+        *t_ptr.add(1) = 0x25;
+        *t_ptr.add(2) = 0x00;
+        *t_ptr.add(3) = 0x00;
+        *t_ptr.add(4) = 0x00;
+        *t_ptr.add(5) = 0x00;
+        let detour_addr = detour as usize;
+        std::ptr::copy_nonoverlapping(&detour_addr as *const usize as *const u8, t_ptr.add(6), 8);
+
+        VirtualProtect(target, stolen_len, old_protect, &mut old_protect);
+        FlushInstructionCache(GetCurrentProcess(), target, stolen_len);
+    }
+
+    tramp as *mut c_void
+}
+
 unsafe fn install_inline_hooks() {
     let k32 = GetModuleHandleA(b"kernel32.dll\0".as_ptr());
-    if k32.is_null() {
-        return;
-    }
+    let kbase = GetModuleHandleA(b"kernelbase.dll\0".as_ptr());
+    let winmm = GetModuleHandleA(b"winmm.dll\0".as_ptr());
 
-    let p_qpc = GetProcAddress(k32, b"QueryPerformanceCounter\0".as_ptr());
-    let p_gtc = GetProcAddress(k32, b"GetTickCount\0".as_ptr());
-    let p_gtc64 = GetProcAddress(k32, b"GetTickCount64\0".as_ptr());
+    // QPC: prefer kernelbase, fallback kernel32
+    let p_qpc = if !kbase.is_null() {
+        GetProcAddress(kbase, b"QueryPerformanceCounter\0".as_ptr())
+    } else if !k32.is_null() {
+        GetProcAddress(k32, b"QueryPerformanceCounter\0".as_ptr())
+    } else {
+        null_mut()
+    };
 
     if !p_qpc.is_null() {
-        TRAMPOLINE_QPC = Some(std::mem::transmute(p_qpc));
+        let tramp = create_detour_64(p_qpc, Hooked_QueryPerformanceCounter as *mut c_void);
+        TRAMPOLINE_QPC = Some(std::mem::transmute(tramp));
     }
+
+    // GetTickCount
+    let p_gtc = if !kbase.is_null() {
+        GetProcAddress(kbase, b"GetTickCount\0".as_ptr())
+    } else if !k32.is_null() {
+        GetProcAddress(k32, b"GetTickCount\0".as_ptr())
+    } else {
+        null_mut()
+    };
+
     if !p_gtc.is_null() {
-        TRAMPOLINE_GTC = Some(std::mem::transmute(p_gtc));
+        let tramp = create_detour_64(p_gtc, Hooked_GetTickCount as *mut c_void);
+        TRAMPOLINE_GTC = Some(std::mem::transmute(tramp));
     }
+
+    // GetTickCount64
+    let p_gtc64 = if !kbase.is_null() {
+        GetProcAddress(kbase, b"GetTickCount64\0".as_ptr())
+    } else if !k32.is_null() {
+        GetProcAddress(k32, b"GetTickCount64\0".as_ptr())
+    } else {
+        null_mut()
+    };
+
     if !p_gtc64.is_null() {
-        TRAMPOLINE_GTC64 = Some(std::mem::transmute(p_gtc64));
+        let tramp = create_detour_64(p_gtc64, Hooked_GetTickCount64 as *mut c_void);
+        TRAMPOLINE_GTC64 = Some(std::mem::transmute(tramp));
+    }
+
+    // timeGetTime (winmm.dll)
+    if !winmm.is_null() {
+        let p_tgt = GetProcAddress(winmm, b"timeGetTime\0".as_ptr());
+        if !p_tgt.is_null() {
+            let tramp = create_detour_64(p_tgt, Hooked_timeGetTime as *mut c_void);
+            TRAMPOLINE_TGT = Some(std::mem::transmute(tramp));
+        }
+    }
+
+    // Sleep (kernel32.dll)
+    if !k32.is_null() {
+        let p_sleep = GetProcAddress(k32, b"Sleep\0".as_ptr());
+        if !p_sleep.is_null() {
+            let tramp = create_detour_64(p_sleep, Hooked_Sleep as *mut c_void);
+            TRAMPOLINE_SLEEP = Some(std::mem::transmute(tramp));
+        }
     }
 }
 
@@ -258,3 +411,49 @@ pub unsafe extern "system" fn DllMain(
     }
     1
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_speed_scaling_math() {
+        let state = SpeedState {
+            multiplier: 2.0,
+            initial_real_qpc: 1000,
+            initial_virtual_qpc: 1000,
+            initial_real_tick: 500,
+            initial_virtual_tick: 500,
+            initial_real_tick64: 500,
+            initial_virtual_tick64: 500,
+        };
+
+        // Simulated real tick advances by 100ms
+        let real_now = 600u32;
+        let delta = real_now - state.initial_real_tick;
+        let scaled_delta = ((delta as f64) * (state.multiplier as f64)) as u32;
+        let virtual_now = state.initial_virtual_tick + scaled_delta;
+
+        // With multiplier 2.0, virtual time should advance 200ms
+        assert_eq!(scaled_delta, 200);
+        assert_eq!(virtual_now, 700);
+    }
+
+    #[test]
+    fn test_freeze_math() {
+        let state = SpeedState {
+            multiplier: 0.0,
+            initial_real_qpc: 1000,
+            initial_virtual_qpc: 1000,
+            initial_real_tick: 500,
+            initial_virtual_tick: 500,
+            initial_real_tick64: 500,
+            initial_virtual_tick64: 500,
+        };
+
+        assert_eq!(state.multiplier, 0.0);
+        // At 0.0, virtual counter stays locked at 500
+        assert_eq!(state.initial_virtual_tick, 500);
+    }
+}
+

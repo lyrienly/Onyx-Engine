@@ -165,6 +165,8 @@ fn format_ct_variable_type(t: ValType) -> &'static str {
         ValType::Double => "Double",
         ValType::Str => "String",
         ValType::Aob => "Array of byte",
+        ValType::All => "All",
+        ValType::Group => "Grouped",
     }
 }
 

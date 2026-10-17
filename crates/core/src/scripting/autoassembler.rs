@@ -1,7 +1,9 @@
 // language: Rust, file: autoassembler.rs, target: Windows 11, MSVC
-// Cheat Engine Auto Assembler (AA) script parser and execution engine
+// Cheat Engine 7.7 Auto Assembler (AA) 2-Pass Script Parser and Execution Engine
 
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use crate::debugger::assembler::Assembler;
 use crate::disasm::Disassembler;
 use crate::hook::make_absolute_jmp_64;
 use crate::process::Process;
@@ -21,6 +23,7 @@ pub struct AutoAssembler {
     pub allocations: HashMap<String, (usize, usize)>,
     pub patches: Vec<(usize, Vec<u8>)>,
     pub globalalloc_symbols: HashSet<String>,
+    pub declared_labels: HashSet<String>,
 }
 
 impl AutoAssembler {
@@ -30,21 +33,23 @@ impl AutoAssembler {
             allocations: HashMap::new(),
             patches: Vec::new(),
             globalalloc_symbols: HashSet::new(),
+            declared_labels: HashSet::new(),
         }
     }
 
+    /// Executes an Auto Assembler script using a complete 2-pass compilation pipeline
     pub fn execute(
         &mut self,
         proc: &Process,
         script: &str,
         enable_mode: bool,
     ) -> Result<AaScriptResult, String> {
-        let lines: Vec<&str> = script.lines().collect();
+        let raw_lines: Vec<&str> = script.lines().collect();
         let mut in_target_section = false;
         let mut has_sections = false;
 
-        // Check if script has [ENABLE] or [DISABLE] tags
-        for line in &lines {
+        // Check if script contains [ENABLE] or [DISABLE] tags
+        for line in &raw_lines {
             let t = line.trim();
             if t.eq_ignore_ascii_case("[enable]") || t.eq_ignore_ascii_case("[disable]") {
                 has_sections = true;
@@ -56,19 +61,14 @@ impl AutoAssembler {
             in_target_section = true;
         }
 
-        let mut resolver = SymbolResolver::new();
+        let resolver = RefCell::new(SymbolResolver::new());
         let mut cond_stack: Vec<bool> = Vec::new();
+        let mut active_lines: Vec<String> = Vec::new();
 
-        for line in &lines {
+        // Step 1: Preprocess sections and conditionals
+        for line in &raw_lines {
             let raw_trimmed = line.trim();
-            // Ignore comments
-            let trimmed = if let Some(pos) = raw_trimmed.find("//") {
-                raw_trimmed[..pos].trim()
-            } else if let Some(pos) = raw_trimmed.find('#') {
-                raw_trimmed[..pos].trim()
-            } else {
-                raw_trimmed
-            };
+            let trimmed = strip_comments(raw_trimmed);
 
             if trimmed.is_empty() {
                 continue;
@@ -79,14 +79,14 @@ impl AutoAssembler {
                 let inner = trimmed[7..trimmed.len() - 1].trim();
                 let is_def = self.symbols.contains_key(inner)
                     || self.allocations.contains_key(inner)
-                    || resolver.resolve(proc, inner).is_some();
+                    || resolver.borrow_mut().resolve(proc, inner).is_some();
                 cond_stack.push(is_def);
                 continue;
             } else if lower_t.starts_with("{$ifndef") && lower_t.ends_with('}') {
                 let inner = trimmed[8..trimmed.len() - 1].trim();
                 let is_def = self.symbols.contains_key(inner)
                     || self.allocations.contains_key(inner)
-                    || resolver.resolve(proc, inner).is_some();
+                    || resolver.borrow_mut().resolve(proc, inner).is_some();
                 cond_stack.push(!is_def);
                 continue;
             } else if lower_t == "{$else}" {
@@ -111,11 +111,323 @@ impl AutoAssembler {
                 continue;
             }
 
-            if !in_target_section {
+            if in_target_section {
+                active_lines.push(trimmed.to_string());
+            }
+        }
+
+        // =========================================================================
+        // PASS 1: DIRECTIVES, ALLOCATIONS, SYMBOLS, AND LABEL RESOLUTION
+        // =========================================================================
+        let mut current_ip: Option<usize> = None;
+
+        for line in &active_lines {
+            let lower = line.to_lowercase();
+
+            // 1. label(name)
+            if lower.starts_with("label(") && line.ends_with(')') {
+                let inner = line[6..line.len() - 1].trim();
+                self.declared_labels.insert(inner.to_string());
                 continue;
             }
 
-            self.parse_and_execute_line(proc, trimmed, &mut resolver)?;
+            // 2. alloc(symbol, size [, near_addr])
+            if lower.starts_with("alloc(") && line.ends_with(')') {
+                let inner = &line[6..line.len() - 1];
+                let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
+                if parts.len() < 2 {
+                    return Err("alloc requires at least (name, size)".to_string());
+                }
+                let name = parts[0];
+                let size = parse_number(parts[1])
+                    .ok_or_else(|| format!("Invalid alloc size '{}'", parts[1]))?;
+
+                let addr = if parts.len() >= 3 {
+                    let near_target = self.resolve_address(proc, parts[2], &mut resolver.borrow_mut());
+                    if let Some(preferred) = near_target {
+                        proc.alloc_near(preferred, size, PAGE_EXECUTE_READWRITE)?
+                    } else {
+                        proc.alloc(size, PAGE_EXECUTE_READWRITE)?
+                    }
+                } else {
+                    proc.alloc(size, PAGE_EXECUTE_READWRITE)?
+                };
+
+                self.allocations.insert(name.to_string(), (addr, size));
+                self.symbols.insert(name.to_string(), addr);
+                continue;
+            }
+
+            // 3. globalalloc(symbol, size)
+            if lower.starts_with("globalalloc(") && line.ends_with(')') {
+                let inner = &line[12..line.len() - 1];
+                let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
+                if parts.len() < 2 {
+                    return Err("globalalloc requires (name, size)".to_string());
+                }
+                let name = parts[0];
+                let size = parse_number(parts[1])
+                    .ok_or_else(|| format!("Invalid globalalloc size '{}'", parts[1]))?;
+
+                let addr = proc.alloc(size, PAGE_EXECUTE_READWRITE)?;
+                self.allocations.insert(name.to_string(), (addr, size));
+                self.symbols.insert(name.to_string(), addr);
+                self.globalalloc_symbols.insert(name.to_string());
+                continue;
+            }
+
+            // 4. dealloc(symbol)
+            if lower.starts_with("dealloc(") && line.ends_with(')') {
+                let name = line[8..line.len() - 1].trim();
+                if let Some((addr, _)) = self.allocations.remove(name) {
+                    let _ = proc.free(addr);
+                    self.symbols.remove(name);
+                }
+                continue;
+            }
+
+            // 5. define(name, value)
+            if lower.starts_with("define(") && line.ends_with(')') {
+                let inner = &line[7..line.len() - 1];
+                let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
+                if parts.len() >= 2 {
+                    let name = parts[0];
+                    if let Some(val) = self.resolve_address(proc, parts[1], &mut resolver.borrow_mut()) {
+                        self.symbols.insert(name.to_string(), val);
+                    }
+                }
+                continue;
+            }
+
+            // 6. registersymbol / unregistersymbol
+            if lower.starts_with("registersymbol(") && line.ends_with(')') {
+                continue;
+            }
+            if lower.starts_with("unregistersymbol(") && line.ends_with(')') {
+                let name = line[17..line.len() - 1].trim();
+                self.symbols.remove(name);
+                continue;
+            }
+
+            // 7. aobscan / aobscanmodule / aobscanfunction
+            if lower.starts_with("aobscanmodule(") && line.ends_with(')') {
+                let inner = &line[14..line.len() - 1];
+                let parts: Vec<&str> = inner.splitn(3, ',').map(|s| s.trim()).collect();
+                if parts.len() >= 3 {
+                    let name = parts[0];
+                    let pattern_str = parts[2];
+                    let mut scanner = Scanner::new(ValType::Aob);
+                    let val = ScanValue::parse(ValType::Aob, pattern_str)?;
+                    scanner.first_scan(proc, ScanCondition::Exact(val))?;
+                    if let Some(first_match) = scanner.results(1).first() {
+                        self.symbols.insert(name.to_string(), first_match.address);
+                        continue;
+                    } else {
+                        return Err(format!("aobscanmodule failed to find match for '{}'", name));
+                    }
+                }
+            }
+            if lower.starts_with("aobscan(") && line.ends_with(')') {
+                let inner = &line[8..line.len() - 1];
+                let parts: Vec<&str> = inner.splitn(2, ',').map(|s| s.trim()).collect();
+                if parts.len() >= 2 {
+                    let name = parts[0];
+                    let pattern_str = parts[1];
+                    let mut scanner = Scanner::new(ValType::Aob);
+                    let val = ScanValue::parse(ValType::Aob, pattern_str)?;
+                    scanner.first_scan(proc, ScanCondition::Exact(val))?;
+                    if let Some(first_match) = scanner.results(1).first() {
+                        self.symbols.insert(name.to_string(), first_match.address);
+                        continue;
+                    } else {
+                        return Err(format!("aobscan failed to find match for '{}'", name));
+                    }
+                }
+            }
+            if lower.starts_with("aobscanfunction(") && line.ends_with(')') {
+                let inner = &line[16..line.len() - 1];
+                let parts: Vec<&str> = inner.splitn(3, ',').map(|s| s.trim()).collect();
+                if parts.len() >= 3 {
+                    self.execute_aobscanfunction_command(proc, parts[0], parts[1], parts[2], &mut resolver.borrow_mut())?;
+                    continue;
+                }
+            }
+
+            // 8. assert(addr, bytes)
+            if lower.starts_with("assert(") && line.ends_with(')') {
+                let inner = &line[7..line.len() - 1];
+                let parts: Vec<&str> = inner.splitn(2, ',').map(|s| s.trim()).collect();
+                if parts.len() >= 2 {
+                    let addr = self.resolve_address(proc, parts[0], &mut resolver.borrow_mut())
+                        .ok_or_else(|| format!("Could not resolve assert address '{}'", parts[0]))?;
+                    let expected = parse_hex_bytes(parts[1])?;
+                    let current = proc.read_bytes(addr, expected.len())?;
+                    if current != expected {
+                        return Err(format!("Assert failed at 0x{:X}", addr));
+                    }
+                    continue;
+                }
+            }
+
+            // 9. hook / unhook
+            if lower.starts_with("hook(") && line.ends_with(')') {
+                let inner = &line[5..line.len() - 1];
+                let parts: Vec<&str> = inner.splitn(3, ',').map(|s| s.trim()).collect();
+                if parts.len() >= 3 {
+                    self.execute_hook_command(proc, parts[0], parts[1], parts[2], &mut resolver.borrow_mut())?;
+                    continue;
+                }
+            }
+            if lower.starts_with("unhook(") && line.ends_with(')') {
+                let addr_str = line[7..line.len() - 1].trim();
+                self.execute_unhook_command(proc, addr_str, &mut resolver.borrow_mut())?;
+                continue;
+            }
+
+            // 10. loadlibrary(path)
+            if lower.starts_with("loadlibrary(") && line.ends_with(')') {
+                let path = line[12..line.len() - 1].trim().trim_matches('"');
+                let _ = proc.inject_dll(path)?;
+                continue;
+            }
+
+            // 11. createthread(addr) -> processed in Pass 2
+            if lower.starts_with("createthread(") && line.ends_with(')') {
+                continue;
+            }
+
+            // 12. readmem(addr, size)
+            if lower.starts_with("readmem(") && line.ends_with(')') {
+                let inner = &line[8..line.len() - 1];
+                let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
+                if parts.len() >= 2 {
+                    let size = parse_number(parts[1])
+                        .ok_or_else(|| format!("Invalid readmem size '{}'", parts[1]))?;
+                    if let Some(ip) = current_ip {
+                        current_ip = Some(ip + size);
+                    }
+                }
+                continue;
+            }
+
+            // 13. Label definition or Target Origin switch: "<name>:"
+            if let Some(pos) = line.find(':') {
+                let target_part = line[..pos].trim();
+                let rest = line[pos + 1..].trim();
+
+                // Origin switch or label definition
+                if let Some((addr, _)) = self.allocations.get(target_part) {
+                    current_ip = Some(*addr);
+                } else if self.declared_labels.contains(target_part) {
+                    if let Some(ip) = current_ip {
+                        self.symbols.insert(target_part.to_string(), ip);
+                    }
+                } else if let Some(addr) = self.resolve_address(proc, target_part, &mut resolver.borrow_mut()) {
+                    current_ip = Some(addr);
+                } else if let Some(ip) = current_ip {
+                    // Undeclared local label
+                    self.symbols.insert(target_part.to_string(), ip);
+                }
+
+                // If line contains code after the colon, measure its size in Pass 1
+                if !rest.is_empty() {
+                    if let Some(ip) = current_ip {
+                        let len = self.estimate_code_len(proc, rest, ip, &resolver)?;
+                        current_ip = Some(ip + len);
+                    }
+                }
+                continue;
+            }
+
+            // 14. Plain instruction or data line
+            if let Some(ip) = current_ip {
+                let len = self.estimate_code_len(proc, line, ip, &resolver)?;
+                current_ip = Some(ip + len);
+            }
+        }
+
+        // =========================================================================
+        // PASS 2: CODE ASSEMBLY AND PROCESS MEMORY PATCHING
+        // =========================================================================
+        current_ip = None;
+
+        for line in &active_lines {
+            let lower = line.to_lowercase();
+
+            // Skip directives already handled in Pass 1
+            if lower.starts_with("label(")
+                || lower.starts_with("alloc(")
+                || lower.starts_with("globalalloc(")
+                || lower.starts_with("dealloc(")
+                || lower.starts_with("define(")
+                || lower.starts_with("registersymbol(")
+                || lower.starts_with("unregistersymbol(")
+                || lower.starts_with("aobscan(")
+                || lower.starts_with("aobscanmodule(")
+                || lower.starts_with("aobscanfunction(")
+                || lower.starts_with("assert(")
+                || lower.starts_with("hook(")
+                || lower.starts_with("unhook(")
+                || lower.starts_with("loadlibrary(")
+            {
+                continue;
+            }
+
+            // createthread(addr) in Pass 2
+            if lower.starts_with("createthread(") && line.ends_with(')') {
+                let addr_str = line[12..line.len() - 1].trim();
+                let target_addr = self.resolve_address(proc, addr_str, &mut resolver.borrow_mut())
+                    .ok_or_else(|| format!("createthread: could not resolve address '{}'", addr_str))?;
+                proc.create_thread(target_addr)?;
+                continue;
+            }
+
+            // readmem(addr, size)
+            if lower.starts_with("readmem(") && line.ends_with(')') {
+                let inner = &line[8..line.len() - 1];
+                let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
+                if parts.len() >= 2 {
+                    let src_addr = self.resolve_address(proc, parts[0], &mut resolver.borrow_mut())
+                        .ok_or_else(|| format!("readmem: could not resolve src address '{}'", parts[0]))?;
+                    let size = parse_number(parts[1])
+                        .ok_or_else(|| format!("Invalid readmem size '{}'", parts[1]))?;
+
+                    let bytes = proc.read_bytes(src_addr, size)?;
+                    let ip = current_ip.ok_or("readmem without active target address")?;
+                    self.write_code_bytes(proc, ip, &bytes)?;
+                    current_ip = Some(ip + bytes.len());
+                }
+                continue;
+            }
+
+            // Target Origin or Label line: "<name>:"
+            if let Some(pos) = line.find(':') {
+                let target_part = line[..pos].trim();
+                let rest = line[pos + 1..].trim();
+
+                if let Some((addr, _)) = self.allocations.get(target_part) {
+                    current_ip = Some(*addr);
+                } else if let Some(&sym_addr) = self.symbols.get(target_part) {
+                    current_ip = Some(sym_addr);
+                } else if let Some(addr) = self.resolve_address(proc, target_part, &mut resolver.borrow_mut()) {
+                    current_ip = Some(addr);
+                }
+
+                if !rest.is_empty() {
+                    let ip = current_ip.ok_or_else(|| format!("No active address for instruction '{}'", rest))?;
+                    let bytes = self.assemble_instruction(proc, rest, ip, &resolver)?;
+                    self.write_code_bytes(proc, ip, &bytes)?;
+                    current_ip = Some(ip + bytes.len());
+                }
+                continue;
+            }
+
+            // Assembly instruction or data line
+            if let Some(ip) = current_ip {
+                let bytes = self.assemble_instruction(proc, line, ip, &resolver)?;
+                self.write_code_bytes(proc, ip, &bytes)?;
+                current_ip = Some(ip + bytes.len());
+            }
         }
 
         Ok(AaScriptResult {
@@ -125,206 +437,68 @@ impl AutoAssembler {
         })
     }
 
-    fn parse_and_execute_line(
-        &mut self,
+    fn estimate_code_len(
+        &self,
         proc: &Process,
         line: &str,
-        resolver: &mut SymbolResolver,
-    ) -> Result<(), String> {
-        let lower = line.to_lowercase();
-
-        // 1. alloc(symbol, size)
-        if lower.starts_with("alloc(") && line.ends_with(')') {
-            let inner = &line[6..line.len() - 1];
-            let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
-            if parts.len() < 2 {
-                return Err("alloc requires (name, size)".to_string());
+        ip: usize,
+        resolver: &RefCell<SymbolResolver>,
+    ) -> Result<usize, String> {
+        let syms = &self.symbols;
+        let dummy_resolver = |s: &str| -> Option<usize> {
+            if let Some(&addr) = syms.get(s) {
+                Some(addr)
+            } else if let Some(addr) = self.resolve_address(proc, s, &mut resolver.borrow_mut()) {
+                Some(addr)
+            } else {
+                // Return dummy forward address for deterministic sizing
+                Some(ip.wrapping_add(0x1000))
             }
-            let name = parts[0];
-            let size = parse_number(parts[1])
-                .ok_or_else(|| format!("Invalid alloc size '{}'", parts[1]))?;
+        };
 
-            let addr = proc.alloc(size, PAGE_EXECUTE_READWRITE)?;
-            self.allocations.insert(name.to_string(), (addr, size));
-            self.symbols.insert(name.to_string(), addr);
+        let bytes = Assembler::assemble_line(line, ip, &dummy_resolver)?;
+        Ok(bytes.len())
+    }
+
+    fn assemble_instruction(
+        &self,
+        proc: &Process,
+        line: &str,
+        ip: usize,
+        resolver: &RefCell<SymbolResolver>,
+    ) -> Result<Vec<u8>, String> {
+        let syms = &self.symbols;
+        let full_resolver = |s: &str| -> Option<usize> {
+            if let Some(&addr) = syms.get(s) {
+                Some(addr)
+            } else {
+                self.resolve_address(proc, s, &mut resolver.borrow_mut())
+            }
+        };
+
+        Assembler::assemble_line(line, ip, &full_resolver)
+    }
+
+    fn write_code_bytes(&mut self, proc: &Process, address: usize, bytes: &[u8]) -> Result<(), String> {
+        if bytes.is_empty() {
             return Ok(());
         }
 
-        // CE 7.7: globalalloc(symbol, size) - globalalloc symbols do not save in tables anymore
-        if lower.starts_with("globalalloc(") && line.ends_with(')') {
-            let inner = &line[12..line.len() - 1];
-            let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
-            if parts.len() < 2 {
-                return Err("globalalloc requires (name, size)".to_string());
+        let is_allocated = self
+            .allocations
+            .values()
+            .any(|&(addr, size)| address >= addr && address < addr + size);
+
+        if is_allocated {
+            proc.write_raw(address, bytes)?;
+        } else {
+            // Memory patch on existing module code -> backup original bytes
+            if let Ok(orig_bytes) = proc.read_bytes(address, bytes.len()) {
+                self.patches.push((address, orig_bytes));
             }
-            let name = parts[0];
-            let size = parse_number(parts[1])
-                .ok_or_else(|| format!("Invalid globalalloc size '{}'", parts[1]))?;
-
-            let addr = proc.alloc(size, PAGE_EXECUTE_READWRITE)?;
-            self.allocations.insert(name.to_string(), (addr, size));
-            self.symbols.insert(name.to_string(), addr);
-            self.globalalloc_symbols.insert(name.to_string());
-            return Ok(());
-        }
-
-        // 2. dealloc(symbol)
-        if lower.starts_with("dealloc(") && line.ends_with(')') {
-            let name = line[8..line.len() - 1].trim();
-            if let Some((addr, _)) = self.allocations.remove(name) {
-                let _ = proc.free(addr);
-                self.symbols.remove(name);
-            }
-            return Ok(());
-        }
-
-        // 3. registersymbol(name)
-        if lower.starts_with("registersymbol(") && line.ends_with(')') {
-            let _name = line[15..line.len() - 1].trim();
-            // Symbol already tracked if allocated or resolved
-            return Ok(());
-        }
-
-        // 4. unregistersymbol(name)
-        if lower.starts_with("unregistersymbol(") && line.ends_with(')') {
-            let name = line[17..line.len() - 1].trim();
-            self.symbols.remove(name);
-            return Ok(());
-        }
-
-        // 5. define(name, value)
-        if lower.starts_with("define(") && line.ends_with(')') {
-            let inner = &line[7..line.len() - 1];
-            let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
-            if parts.len() >= 2 {
-                let name = parts[0];
-                if let Some(val) = self.resolve_address(proc, parts[1], resolver) {
-                    self.symbols.insert(name.to_string(), val);
-                }
-            }
-            return Ok(());
-        }
-
-        // 6. aobscan / aobscanmodule(name, [module], pattern)
-        if lower.starts_with("aobscanmodule(") && line.ends_with(')') {
-            let inner = &line[14..line.len() - 1];
-            let parts: Vec<&str> = inner.splitn(3, ',').map(|s| s.trim()).collect();
-            if parts.len() >= 3 {
-                let name = parts[0];
-                let _mod_name = parts[1];
-                let pattern_str = parts[2];
-
-                let mut scanner = Scanner::new(ValType::Aob);
-                let val = ScanValue::parse(ValType::Aob, pattern_str)?;
-                scanner.first_scan(proc, ScanCondition::Exact(val))?;
-
-                if let Some(first_match) = scanner.results(1).first() {
-                    self.symbols.insert(name.to_string(), first_match.address);
-                    return Ok(());
-                } else {
-                    return Err(format!("aobscanmodule failed to find match for '{}'", name));
-                }
-            }
-        }
-
-        // aobscan(name, pattern)
-        if lower.starts_with("aobscan(") && line.ends_with(')') {
-            let inner = &line[8..line.len() - 1];
-            let parts: Vec<&str> = inner.splitn(2, ',').map(|s| s.trim()).collect();
-            if parts.len() >= 2 {
-                let name = parts[0];
-                let pattern_str = parts[1];
-
-                let mut scanner = Scanner::new(ValType::Aob);
-                let val = ScanValue::parse(ValType::Aob, pattern_str)?;
-                scanner.first_scan(proc, ScanCondition::Exact(val))?;
-
-                if let Some(first_match) = scanner.results(1).first() {
-                    self.symbols.insert(name.to_string(), first_match.address);
-                    return Ok(());
-                } else {
-                    return Err(format!("aobscan failed to find match for '{}'", name));
-                }
-            }
-        }
-
-        // aobscanfunction(name, functionstart, aob) - CE 7.7
-        if lower.starts_with("aobscanfunction(") && line.ends_with(')') {
-            let inner = &line[16..line.len() - 1];
-            let parts: Vec<&str> = inner.splitn(3, ',').map(|s| s.trim()).collect();
-            if parts.len() < 3 {
-                return Err("aobscanfunction requires (name, functionstart, aob)".to_string());
-            }
-            return self.execute_aobscanfunction_command(proc, parts[0], parts[1], parts[2], resolver);
-        }
-
-        // hook(address, addresstogoto, originalcode) - CE 7.7
-        if lower.starts_with("hook(") && line.ends_with(')') {
-            let inner = &line[5..line.len() - 1];
-            let parts: Vec<&str> = inner.splitn(3, ',').map(|s| s.trim()).collect();
-            if parts.len() < 3 {
-                return Err("hook requires (address, addresstogoto, originalcode)".to_string());
-            }
-            return self.execute_hook_command(proc, parts[0], parts[1], parts[2], resolver);
-        }
-
-        // unhook(address) - CE 7.7
-        if lower.starts_with("unhook(") && line.ends_with(')') {
-            let addr_str = line[7..line.len() - 1].trim();
-            return self.execute_unhook_command(proc, addr_str, resolver);
-        }
-
-        // 7. assert(addr, bytes)
-        if lower.starts_with("assert(") && line.ends_with(')') {
-            let inner = &line[7..line.len() - 1];
-            let parts: Vec<&str> = inner.splitn(2, ',').map(|s| s.trim()).collect();
-            if parts.len() >= 2 {
-                let addr = self.resolve_address(proc, parts[0], resolver)
-                    .ok_or_else(|| format!("Could not resolve assert address '{}'", parts[0]))?;
-                let expected = parse_hex_bytes(parts[1])?;
-                let current = proc.read_bytes(addr, expected.len())?;
-                if current != expected {
-                    return Err(format!("Assert failed at 0x{:X}", addr));
-                }
-                return Ok(());
-            }
-        }
-
-        // 8. Memory patching / raw bytes:
-        // Format: <address_or_symbol>: db 90 90 90
-        // Or: jmp <target>
-        if let Some(pos) = line.find(':') {
-            let target_str = line[..pos].trim();
-            let op_str = line[pos + 1..].trim();
-
-            let target_addr = self.resolve_address(proc, target_str, resolver)
-                .ok_or_else(|| format!("Could not resolve label/address '{}'", target_str))?;
-
-            if op_str.to_lowercase().starts_with("db ") {
-                let hex_part = &op_str[3..];
-                let bytes = parse_hex_bytes(hex_part)?;
-
-                let original = proc.read_bytes(target_addr, bytes.len())?;
-                self.patches.push((target_addr, original));
-
-                let old_protect = proc.protect(target_addr, bytes.len(), PAGE_EXECUTE_READWRITE)?;
-                proc.write_raw(target_addr, &bytes)?;
-                let _ = proc.protect(target_addr, bytes.len(), old_protect);
-                return Ok(());
-            } else if op_str.to_lowercase().starts_with("jmp ") {
-                let dest_str = op_str[4..].trim();
-                let dest_addr = self.resolve_address(proc, dest_str, resolver)
-                    .ok_or_else(|| format!("Could not resolve jmp destination '{}'", dest_str))?;
-
-                let jmp_bytes = make_absolute_jmp_64(dest_addr);
-                let original = proc.read_bytes(target_addr, jmp_bytes.len())?;
-                self.patches.push((target_addr, original));
-
-                let old_protect = proc.protect(target_addr, jmp_bytes.len(), PAGE_EXECUTE_READWRITE)?;
-                proc.write_raw(target_addr, &jmp_bytes)?;
-                let _ = proc.protect(target_addr, jmp_bytes.len(), old_protect);
-                return Ok(());
-            }
+            let old_protect = proc.protect(address, bytes.len(), PAGE_EXECUTE_READWRITE)?;
+            proc.write_raw(address, bytes)?;
+            let _ = proc.protect(address, bytes.len(), old_protect);
         }
 
         Ok(())
@@ -462,7 +636,7 @@ impl AutoAssembler {
         Err(format!("aobscanfunction: pattern '{}' not found in function at 0x{:X}", aob_str, fn_start))
     }
 
-    fn resolve_address(
+    pub fn resolve_address(
         &self,
         proc: &Process,
         s: &str,
@@ -475,7 +649,7 @@ impl AutoAssembler {
             return Some(addr);
         }
 
-        // 2. Direct hex or decimal number
+        // 2. Direct hex, CE decimal (#), or decimal number
         if let Some(num) = parse_number(trimmed) {
             return Some(num);
         }
@@ -521,9 +695,9 @@ impl AutoAssembler {
         None
     }
 
-    /// Rollback all patches applied by this script
+    /// Rollback all patches applied by this script in reverse order
     pub fn rollback(&mut self, proc: &Process) {
-        for (addr, orig_bytes) in self.patches.drain(..) {
+        for (addr, orig_bytes) in self.patches.drain(..).rev() {
             if let Ok(old_protect) = proc.protect(addr, orig_bytes.len(), PAGE_EXECUTE_READWRITE) {
                 let _ = proc.write_raw(addr, &orig_bytes);
                 let _ = proc.protect(addr, orig_bytes.len(), old_protect);
@@ -534,6 +708,7 @@ impl AutoAssembler {
         }
         self.symbols.clear();
         self.globalalloc_symbols.clear();
+        self.declared_labels.clear();
     }
 
     /// Returns symbols eligible for saving into Cheat Tables.
@@ -547,10 +722,30 @@ impl AutoAssembler {
     }
 }
 
+fn strip_comments(line: &str) -> &str {
+    let mut s = line.trim();
+    if let Some(pos) = s.find("//") {
+        s = s[..pos].trim();
+    }
+    if let Some(pos) = s.find('#') {
+        if pos == 0 || s[..pos].ends_with(|c: char| c.is_whitespace() || c == ',') {
+            let after = s[pos + 1..].trim();
+            if after.starts_with(|c: char| c.is_ascii_alphabetic()) || after.is_empty() {
+                s = s[..pos].trim();
+            }
+        }
+    }
+    s
+}
+
 fn parse_number(s: &str) -> Option<usize> {
     let t = s.trim();
     if t.starts_with("0x") || t.starts_with("0X") {
         usize::from_str_radix(&t[2..], 16).ok()
+    } else if t.starts_with('$') {
+        usize::from_str_radix(&t[1..], 16).ok()
+    } else if t.starts_with('#') {
+        t[1..].trim().parse::<usize>().ok()
     } else {
         usize::from_str_radix(t, 16).or_else(|_| t.parse::<usize>()).ok()
     }
@@ -637,5 +832,48 @@ mod tests {
         assert_eq!(addr_plus, 0x1020);
         assert_eq!(addr_minus, 0x0FF0);
     }
-}
 
+    #[test]
+    fn test_2pass_autoassembler_code_cave() {
+        let proc = Process::attach_current().expect("attach to current process");
+        let mut aa = AutoAssembler::new();
+
+        let script = r#"
+        [ENABLE]
+        alloc(newmem, 2048)
+        label(returnhere)
+        label(exit)
+
+        newmem:
+        mov [rax+0x10], 0x3E8
+        exit:
+        jmp returnhere
+
+        newmem+0x100:
+        returnhere:
+        nop
+        "#;
+
+        let res = aa.execute(&proc, script, true).expect("execute AA script");
+        let newmem_addr = *res.registered_symbols.get("newmem").expect("newmem symbol");
+        let returnhere_addr = *res.registered_symbols.get("returnhere").expect("returnhere symbol");
+        let exit_addr = *res.registered_symbols.get("exit").expect("exit symbol");
+
+        assert_eq!(returnhere_addr, newmem_addr + 0x100);
+        assert!(exit_addr > newmem_addr);
+
+        // Read written bytes at newmem
+        let bytes = proc.read_bytes(newmem_addr, 7).expect("read newmem");
+        // mov [rax+0x10], 0x3E8 -> C7 40 10 E8 03 00 00
+        assert_eq!(bytes, vec![0xC7, 0x40, 0x10, 0xE8, 0x03, 0x00, 0x00]);
+
+        // Read jmp at exit
+        let jmp_bytes = proc.read_bytes(exit_addr, 5).expect("read jmp");
+        assert_eq!(jmp_bytes[0], 0xE9);
+
+        // Test rollback
+        aa.rollback(&proc);
+        assert!(aa.symbols.is_empty());
+        assert!(aa.allocations.is_empty());
+    }
+}

@@ -223,6 +223,12 @@ impl Process {
         Ok(None)
     }
 
+    /// Attaches to the current process
+    pub fn attach_current() -> Result<Self, String> {
+        let pid = unsafe { GetCurrentProcessId() };
+        Self::attach(pid)
+    }
+
     /// Attaches to target process using Native NT API (NtOpenProcess) by default
     pub fn attach(pid: u32) -> Result<Self, String> {
         Self::attach_with_mode(pid, ProcessAccessMode::NtApi, None)
@@ -384,7 +390,7 @@ impl Process {
         })
     }
 
-    pub fn regions(&self, readable_only: bool) -> Result<Vec<MemoryRegion>, String> {
+    pub fn regions(&self, writable_only: bool) -> Result<Vec<MemoryRegion>, String> {
         let mut regions = Vec::new();
         let mut addr: usize = 0x10000; // Skip first 64KB null-page boundary
         let max_addr: usize = if size_of::<usize>() == 8 { 0x7FFF_FFFF_FFFF } else { 0x7FFF_FFFF };
@@ -431,8 +437,13 @@ impl Process {
                 mem_type: mbi.Type,
             };
 
-            if !readable_only || reg.is_readable() {
-                regions.push(reg);
+            // CRITICAL: A region MUST always be committed and readable!
+            // NEVER include PAGE_GUARD (reading it strips guard protection on target thread stacks -> crashes target app)
+            // NEVER include PAGE_NOACCESS or uncommitted MEM_RESERVE / MEM_FREE
+            if reg.is_readable() {
+                if !writable_only || reg.is_writable() {
+                    regions.push(reg);
+                }
             }
 
             let next_addr = (mbi.BaseAddress as usize).saturating_add(mbi.RegionSize);
@@ -683,6 +694,41 @@ impl Process {
         }
     }
 
+    /// Allocates memory within 2GB distance of preferred_address (for 5-byte relative jmp/call hooks)
+    pub fn alloc_near(&self, preferred_addr: usize, size: usize, protect: u32) -> Result<usize, String> {
+        if preferred_addr == 0 {
+            return self.alloc(size, protect);
+        }
+
+        let min_addr = preferred_addr.saturating_sub(0x7000_0000).max(0x10000);
+        let max_addr = preferred_addr.saturating_add(0x7000_0000);
+
+        let mut delta: usize = 0x10000;
+        while delta < 0x7000_0000 {
+            if preferred_addr + delta < max_addr {
+                let target = preferred_addr + delta;
+                let addr = unsafe {
+                    VirtualAllocEx(self.handle, target as LPVOID, size, MEM_COMMIT | MEM_RESERVE, protect)
+                };
+                if !addr.is_null() {
+                    return Ok(addr as usize);
+                }
+            }
+            if preferred_addr > min_addr + delta {
+                let target = preferred_addr - delta;
+                let addr = unsafe {
+                    VirtualAllocEx(self.handle, target as LPVOID, size, MEM_COMMIT | MEM_RESERVE, protect)
+                };
+                if !addr.is_null() {
+                    return Ok(addr as usize);
+                }
+            }
+            delta += 0x10000;
+        }
+
+        self.alloc(size, protect)
+    }
+
     /// Frees memory via NtFreeVirtualMemory or VirtualFreeEx
     pub fn free(&self, address: usize) -> Result<(), String> {
         if self.access_mode == ProcessAccessMode::NtApi || self.access_mode == ProcessAccessMode::KernelDbk {
@@ -898,6 +944,31 @@ impl Process {
             } else {
                 Ok(exit_code as usize)
             }
+        }
+    }
+
+    /// Spawns a remote thread at start_address in the target process
+    pub fn create_thread(&self, start_address: usize) -> Result<usize, String> {
+        let thread_start = unsafe {
+            std::mem::transmute::<LPVOID, unsafe extern "system" fn(LPVOID) -> DWORD>(start_address as LPVOID)
+        };
+        let mut thread_id: DWORD = 0;
+        let h_thread = unsafe {
+            CreateRemoteThread(
+                self.handle,
+                null_mut(),
+                0,
+                thread_start,
+                null_mut(),
+                0,
+                &mut thread_id,
+            )
+        };
+        if h_thread.is_null() || h_thread == INVALID_HANDLE_VALUE {
+            Err(format!("CreateRemoteThread failed (Error: {})", unsafe { GetLastError() }))
+        } else {
+            unsafe { CloseHandle(h_thread) };
+            Ok(thread_id as usize)
         }
     }
 }

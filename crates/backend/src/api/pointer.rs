@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::thread::JoinHandle;
 
 use onyx_core::pointer_scanner::{PointerPath, PointerScanConfig, PointerScanner};
-use onyx_core::process::Process;
+use onyx_core::process::{ModuleEntry, Process};
 
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -46,6 +46,7 @@ impl Default for OnyxPointerPathRecord {
 pub struct PointerScannerSession {
     pub scanner: Arc<Mutex<PointerScanner>>,
     pub results: Arc<RwLock<Vec<PointerPath>>>,
+    pub loaded_modules: Arc<RwLock<Vec<ModuleEntry>>>,
     pub phase: Arc<AtomicU32>,
     pub progress_pct: Arc<Mutex<f32>>,
     pub found_count: Arc<AtomicUsize>,
@@ -58,6 +59,7 @@ impl PointerScannerSession {
         Self {
             scanner: Arc::new(Mutex::new(PointerScanner::new())),
             results: Arc::new(RwLock::new(Vec::new())),
+            loaded_modules: Arc::new(RwLock::new(Vec::new())),
             phase: Arc::new(AtomicU32::new(OnyxPointerScanPhase::Idle as u32)),
             progress_pct: Arc::new(Mutex::new(0.0)),
             found_count: Arc::new(AtomicUsize::new(0)),
@@ -591,4 +593,178 @@ pub unsafe extern "C" fn onyx_pointer_eval_path(
     };
 
     PointerScanner::evaluate_path(p, &path).unwrap_or(0)
+}
+
+/// Saves raw pointer map to disk in high-speed binary `.ptrmap` format for offline analysis
+#[no_mangle]
+pub unsafe extern "C" fn onyx_pointer_scanner_save_map(
+    session: *mut PointerScannerSession,
+    proc: *mut Process,
+    file_path: *const c_char,
+) -> i32 {
+    if session.is_null() || file_path.is_null() {
+        return 0;
+    }
+    let path_str = match CStr::from_ptr(file_path).to_str() {
+        Ok(s) => s,
+        Err(_) => return 0,
+    };
+    let s = &*session;
+    let modules = if !proc.is_null() {
+        (*proc).modules().unwrap_or_default()
+    } else {
+        s.loaded_modules.read().map(|g| g.clone()).unwrap_or_default()
+    };
+    let scanner = match s.scanner.lock() {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    match scanner.save_map_to_file(path_str, &modules) {
+        Ok(_) => 1,
+        Err(_) => 0,
+    }
+}
+
+/// Loads raw pointer map from `.ptrmap` format
+#[no_mangle]
+pub unsafe extern "C" fn onyx_pointer_scanner_load_map(
+    session: *mut PointerScannerSession,
+    file_path: *const c_char,
+) -> i32 {
+    if session.is_null() || file_path.is_null() {
+        return 0;
+    }
+    let path_str = match CStr::from_ptr(file_path).to_str() {
+        Ok(s) => s,
+        Err(_) => return 0,
+    };
+    match PointerScanner::load_map_from_file(path_str) {
+        Ok((loaded_scanner, loaded_mods)) => {
+            let s = &*session;
+            if let Ok(mut g) = s.scanner.lock() {
+                *g = loaded_scanner;
+            }
+            if let Ok(mut g) = s.loaded_modules.write() {
+                *g = loaded_mods;
+            }
+            1
+        }
+        Err(_) => 0,
+    }
+}
+
+/// Starts an offline pointer scan using the loaded pointer map without an attached process
+#[no_mangle]
+pub unsafe extern "C" fn onyx_pointer_scanner_start_offline_scan(
+    session: *mut PointerScannerSession,
+    target_addr: usize,
+    max_depth: usize,
+    max_offset: usize,
+    alignment: usize,
+    max_results: usize,
+) -> i32 {
+    if session.is_null() || target_addr == 0 {
+        return 0;
+    }
+    let s = &mut *session;
+    s.cancel();
+    if let Some(h) = s.worker_handle.take() {
+        let _ = h.join();
+    }
+    s.cancel_flag.store(false, Ordering::SeqCst);
+    s.phase.store(OnyxPointerScanPhase::SearchingPaths as u32, Ordering::SeqCst);
+    if let Ok(mut pct) = s.progress_pct.lock() {
+        *pct = 0.0;
+    }
+    s.found_count.store(0, Ordering::SeqCst);
+    if let Ok(mut res) = s.results.write() {
+        res.clear();
+    }
+
+    let scanner_arc = Arc::clone(&s.scanner);
+    let results_arc = Arc::clone(&s.results);
+    let phase_arc = Arc::clone(&s.phase);
+    let progress_arc = Arc::clone(&s.progress_pct);
+    let count_arc = Arc::clone(&s.found_count);
+    let cancel_arc = Arc::clone(&s.cancel_flag);
+    let modules_arc = Arc::clone(&s.loaded_modules);
+
+    s.worker_handle = Some(std::thread::spawn(move || {
+        let mut config = PointerScanConfig::default();
+        config.max_depth = if max_depth == 0 { 5 } else { max_depth };
+        config.max_offset = if max_offset == 0 { 0x1000 } else { max_offset };
+        config.alignment = if alignment == 0 { 4 } else { alignment };
+        config.max_results = if max_results == 0 { 20000 } else { max_results };
+
+        let mods = match modules_arc.read() {
+            Ok(g) => g.clone(),
+            Err(e) => e.into_inner().clone(),
+        };
+
+        let scanner = match scanner_arc.lock() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
+
+        let scan_res = scanner.scan_paths_offline(&mods, target_addr, &config, &mut |pct, found| {
+            if cancel_arc.load(Ordering::Relaxed) {
+                return false;
+            }
+            if let Ok(mut g) = progress_arc.lock() {
+                *g = pct;
+            }
+            count_arc.store(found, Ordering::Relaxed);
+            true
+        });
+
+        match scan_res {
+            Ok(paths) => {
+                count_arc.store(paths.len(), Ordering::SeqCst);
+                if let Ok(mut res) = results_arc.write() {
+                    *res = paths;
+                }
+                if let Ok(mut g) = progress_arc.lock() {
+                    *g = 100.0;
+                }
+                phase_arc.store(OnyxPointerScanPhase::Completed as u32, Ordering::SeqCst);
+            }
+            Err(_) => {
+                if cancel_arc.load(Ordering::Relaxed) {
+                    phase_arc.store(OnyxPointerScanPhase::Cancelled as u32, Ordering::SeqCst);
+                } else {
+                    phase_arc.store(OnyxPointerScanPhase::Failed as u32, Ordering::SeqCst);
+                }
+            }
+        }
+    }));
+
+    1
+}
+
+/// Intersects the current session's results with another saved results file
+#[no_mangle]
+pub unsafe extern "C" fn onyx_pointer_scanner_intersect_file(
+    session: *mut PointerScannerSession,
+    other_results_file: *const c_char,
+) -> i32 {
+    if session.is_null() || other_results_file.is_null() {
+        return 0;
+    }
+    let path_str = match CStr::from_ptr(other_results_file).to_str() {
+        Ok(s) => s,
+        Err(_) => return 0,
+    };
+    let other_paths = match PointerScanner::load_from_file(path_str) {
+        Ok(p) => p,
+        Err(_) => return 0,
+    };
+    let s = &*session;
+    if let Ok(mut current) = s.results.write() {
+        let intersected = PointerScanner::intersect_paths(&current, &other_paths);
+        s.found_count.store(intersected.len(), Ordering::SeqCst);
+        *current = intersected;
+        1
+    } else {
+        0
+    }
 }

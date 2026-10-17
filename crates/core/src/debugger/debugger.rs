@@ -252,3 +252,278 @@ pub fn clear_hw_breakpoint_on_thread(tid: u32, index: usize) -> Result<(), Strin
 
     Ok(())
 }
+
+#[derive(Debug, Clone)]
+pub struct TraceRecord {
+    pub step: usize,
+    pub address: usize,
+    pub instruction: String,
+    pub rax: u64,
+    pub rbx: u64,
+    pub rcx: u64,
+    pub rdx: u64,
+    pub rsi: u64,
+    pub rdi: u64,
+    pub rsp: u64,
+    pub rbp: u64,
+    pub r8: u64,
+    pub r9: u64,
+    pub r10: u64,
+    pub r11: u64,
+    pub r12: u64,
+    pub r13: u64,
+    pub r14: u64,
+    pub r15: u64,
+    pub eflags: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct TraceConfig {
+    pub max_steps: usize,
+    pub stop_on_ret: bool,
+    pub stop_address: Option<usize>,
+}
+
+impl Default for TraceConfig {
+    fn default() -> Self {
+        Self {
+            max_steps: 1000,
+            stop_on_ret: false,
+            stop_address: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CallStackFrame {
+    pub frame_index: usize,
+    pub address: usize,
+    pub module_name: String,
+    pub offset_in_module: usize,
+}
+
+impl HardwareBreakpointMonitor {
+    /// Cheat Engine "Break and Trace" engine:
+    /// Halts execution at start_addr and traces sequential instructions via CPU Trap Flag (single-step)
+    pub fn break_and_trace(
+        proc: &Process,
+        start_addr: usize,
+        config: &TraceConfig,
+        stop_signal: Arc<AtomicBool>,
+    ) -> Result<Vec<TraceRecord>, String> {
+        let pid = proc.pid;
+        let thread_ids = proc.threads()?;
+        if thread_ids.is_empty() {
+            return Err("No active threads in target process".to_string());
+        }
+
+        let attached = unsafe { DebugActiveProcess(pid) };
+        if attached != TRUE {
+            return Err(format!("DebugActiveProcess failed for PID {}", pid));
+        }
+
+        // Arm DR0 execute breakpoint on all threads
+        for &tid in &thread_ids {
+            let _ = set_hw_breakpoint_on_thread(tid, 0, start_addr, BreakpointType::Execute, BreakpointSize::Byte1);
+        }
+
+        let mut traces = Vec::new();
+        let mut in_trace_mode = false;
+        let mut active_trace_thread: u32 = 0;
+        let mut event: DEBUG_EVENT = unsafe { zeroed() };
+
+        let max_steps = if config.max_steps == 0 { 1000 } else { config.max_steps };
+
+        while !stop_signal.load(Ordering::Relaxed) {
+            let got_event = unsafe { WaitForDebugEvent(&mut event, 100) };
+            if got_event == TRUE {
+                let mut continue_status = DBG_CONTINUE;
+
+                if event.dwDebugEventCode == EXCEPTION_DEBUG_EVENT {
+                    let ex = unsafe { event.u.Exception };
+                    let code = ex.ExceptionRecord.ExceptionCode;
+
+                    if code == EXCEPTION_SINGLE_STEP {
+                        let h_thread = unsafe { OpenThread(THREAD_ALL_ACCESS, FALSE, event.dwThreadId) };
+                        if !h_thread.is_null() && h_thread != INVALID_HANDLE_VALUE {
+                            let mut ctx: CONTEXT = unsafe { zeroed() };
+                            ctx.ContextFlags = CONTEXT_ALL;
+
+                            if unsafe { GetThreadContext(h_thread, &mut ctx) } == TRUE {
+                                let cur_ip = ctx.Rip as usize;
+
+                                if !in_trace_mode {
+                                    // Initial breakpoint hit at start_addr
+                                    in_trace_mode = true;
+                                    active_trace_thread = event.dwThreadId;
+
+                                    // Disarm initial DR0 breakpoint so we don't loop on it
+                                    for &tid in &thread_ids {
+                                        let _ = clear_hw_breakpoint_on_thread(tid, 0);
+                                    }
+
+                                    // Enable Trap Flag (TF = bit 8, 0x100) and Resume Flag (RF = bit 16, 0x10000)
+                                    ctx.EFlags |= 0x00010100;
+                                    unsafe { SetThreadContext(h_thread, &ctx) };
+                                } else if event.dwThreadId == active_trace_thread {
+                                    // Single-step trace step
+                                    let mut insn_bytes = [0u8; 15];
+                                    let read = proc.read_raw(cur_ip, &mut insn_bytes).unwrap_or(0);
+                                    let decoded = Disassembler::decode_one(cur_ip, &insn_bytes[..read]);
+
+                                    let record = TraceRecord {
+                                        step: traces.len() + 1,
+                                        address: cur_ip,
+                                        instruction: format!("{} {}", decoded.mnemonic, decoded.operands),
+                                        rax: ctx.Rax,
+                                        rbx: ctx.Rbx,
+                                        rcx: ctx.Rcx,
+                                        rdx: ctx.Rdx,
+                                        rsi: ctx.Rsi,
+                                        rdi: ctx.Rdi,
+                                        rsp: ctx.Rsp,
+                                        rbp: ctx.Rbp,
+                                        r8: ctx.R8,
+                                        r9: ctx.R9,
+                                        r10: ctx.R10,
+                                        r11: ctx.R11,
+                                        r12: ctx.R12,
+                                        r13: ctx.R13,
+                                        r14: ctx.R14,
+                                        r15: ctx.R15,
+                                        eflags: ctx.EFlags as u64,
+                                    };
+                                    traces.push(record);
+
+                                    let should_stop = traces.len() >= max_steps
+                                        || (config.stop_on_ret && decoded.mnemonic == "ret")
+                                        || (config.stop_address == Some(cur_ip));
+
+                                    if should_stop {
+                                        // Clear TF flag to resume normal execution
+                                        ctx.EFlags &= !0x00000100;
+                                        ctx.EFlags |= 0x00010000; // RF
+                                        unsafe { SetThreadContext(h_thread, &ctx) };
+                                        unsafe { CloseHandle(h_thread) };
+                                        unsafe { ContinueDebugEvent(event.dwProcessId, event.dwThreadId, DBG_CONTINUE) };
+                                        break;
+                                    } else {
+                                        // Re-enable TF and RF for next single step
+                                        ctx.EFlags |= 0x00010100;
+                                        unsafe { SetThreadContext(h_thread, &ctx) };
+                                    }
+                                }
+                            }
+                            unsafe { CloseHandle(h_thread) };
+                        }
+                    } else if code == EXCEPTION_BREAKPOINT {
+                        continue_status = DBG_CONTINUE;
+                    } else {
+                        continue_status = DBG_EXCEPTION_NOT_HANDLED;
+                    }
+                }
+
+                unsafe {
+                    ContinueDebugEvent(event.dwProcessId, event.dwThreadId, continue_status);
+                }
+            }
+        }
+
+        // Clean up
+        for &tid in &thread_ids {
+            let _ = clear_hw_breakpoint_on_thread(tid, 0);
+        }
+        unsafe {
+            DebugActiveProcessStop(pid);
+        }
+
+        Ok(traces)
+    }
+
+    /// Walks the thread stack to extract return addresses and active stack frames
+    pub fn walk_call_stack(proc: &Process, thread_id: u32, max_depth: usize) -> Result<Vec<CallStackFrame>, String> {
+        let h_thread = unsafe { OpenThread(THREAD_ALL_ACCESS, FALSE, thread_id) };
+        if h_thread.is_null() || h_thread == INVALID_HANDLE_VALUE {
+            return Err(format!("Could not open thread {}", thread_id));
+        }
+
+        let mut ctx: CONTEXT = unsafe { zeroed() };
+        ctx.ContextFlags = CONTEXT_ALL;
+
+        let got_ctx = unsafe {
+            SuspendThread(h_thread);
+            let ok = GetThreadContext(h_thread, &mut ctx);
+            ResumeThread(h_thread);
+            CloseHandle(h_thread);
+            ok
+        };
+
+        if got_ctx != TRUE {
+            return Err("Failed to retrieve thread context for stack walk".to_string());
+        }
+
+        let modules = proc.modules()?;
+        let mut frames = Vec::new();
+
+        // Frame 0: Current Instruction Pointer
+        let cur_rip = ctx.Rip as usize;
+        let (mod_name, offset) = if let Some(m) = modules.iter().find(|m| cur_rip >= m.base && cur_rip < m.base + m.size) {
+            (m.name.clone(), cur_rip - m.base)
+        } else {
+            ("Unknown".to_string(), cur_rip)
+        };
+        frames.push(CallStackFrame {
+            frame_index: 0,
+            address: cur_rip,
+            module_name: mod_name,
+            offset_in_module: offset,
+        });
+
+        // Walk stack from RSP
+        const STACK_SCAN_BYTES: usize = 4096;
+        let mut stack_buf = vec![0u8; STACK_SCAN_BYTES];
+        let bytes_read = proc.read_raw(ctx.Rsp as usize, &mut stack_buf).unwrap_or(0);
+
+        let ptr_size = std::mem::size_of::<usize>();
+        if bytes_read >= ptr_size {
+            let count = (bytes_read - ptr_size) / ptr_size;
+            for i in 0..count {
+                if frames.len() >= max_depth {
+                    break;
+                }
+                let ptr_val = usize::from_ne_bytes(
+                    stack_buf[i * ptr_size..(i + 1) * ptr_size].try_into().unwrap_or_default(),
+                );
+
+                if let Some(m) = modules.iter().find(|m| ptr_val >= m.base && ptr_val < m.base + m.size) {
+                    frames.push(CallStackFrame {
+                        frame_index: frames.len(),
+                        address: ptr_val,
+                        module_name: m.name.clone(),
+                        offset_in_module: ptr_val - m.base,
+                    });
+                }
+            }
+        }
+
+        Ok(frames)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_call_stack_walk_current_thread() {
+        let proc = Process::attach_current().expect("attach to current process");
+        let threads = proc.threads().expect("threads");
+        if let Some(&tid) = threads.first() {
+            let frames = HardwareBreakpointMonitor::walk_call_stack(&proc, tid, 10);
+            assert!(frames.is_ok());
+            let list = frames.unwrap();
+            assert!(!list.is_empty());
+            assert_eq!(list[0].frame_index, 0);
+        }
+    }
+}

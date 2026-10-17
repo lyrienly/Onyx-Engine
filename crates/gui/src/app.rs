@@ -373,18 +373,18 @@ dealloc(newmem)
 
     pub fn parse_val_type_from_idx(&self) -> ValType {
         match self.val_type_idx {
-            0 => ValType::I8,
-            1 => ValType::U8,
-            2 => ValType::I16,
-            3 => ValType::U16,
-            4 => ValType::I32,
-            5 => ValType::U32,
-            6 => ValType::I64,
-            7 => ValType::U64,
-            8 => ValType::Float,
-            9 => ValType::Double,
-            10 => ValType::Str,
-            11 => ValType::Aob,
+            0 => ValType::U8,     // Binary
+            1 => ValType::I8,     // Byte
+            2 => ValType::I16,    // 2 Bytes
+            3 => ValType::I32,    // 4 Bytes
+            4 => ValType::I64,    // 8 Bytes
+            5 => ValType::Float,  // Float
+            6 => ValType::Double, // Double
+            7 => ValType::Str,    // String
+            8 => ValType::Aob,    // Array of byte
+            9 => ValType::All,    // All
+            10 => ValType::Group,  // Grouped
+            11 => ValType::Aob,   // AOB (CE 7.7 Notation)
             _ => ValType::I32,
         }
     }
