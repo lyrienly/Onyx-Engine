@@ -121,6 +121,7 @@ type
   end;
   POnyxRegisterComparison = ^TOnyxRegisterComparison;
 
+  TOnyxStructureDifference = packed record
     offset: PtrUInt;
     g1_constant: integer;
     g1_value: UInt64;
