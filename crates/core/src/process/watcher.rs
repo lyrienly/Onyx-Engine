@@ -1,6 +1,3 @@
-// language: Rust, file: watcher.rs, target: Windows 11, MSVC
-// Background process watcher and auto-attach monitor
-// Mirrors Cheat Engine frmProcessWatcherUnit.pas
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
@@ -32,28 +29,24 @@ impl ProcessWatcher {
         }
     }
 
-    /// Adds a process name (e.g. "game.exe") to the auto-watch list
     pub fn add_target(&self, name: &str) {
         if let Ok(mut set) = self.target_names.lock() {
             set.insert(name.to_lowercase());
         }
     }
 
-    /// Removes a process name from the auto-watch list
     pub fn remove_target(&self, name: &str) {
         if let Ok(mut set) = self.target_names.lock() {
             set.remove(&name.to_lowercase());
         }
     }
 
-    /// Clears target filter (when empty, monitors all process events)
     pub fn clear_targets(&self) {
         if let Ok(mut set) = self.target_names.lock() {
             set.clear();
         }
     }
 
-    /// Starts the background monitoring loop
     pub fn start(&mut self, poll_interval_ms: u64) -> Result<(), String> {
         if self.running.load(Ordering::SeqCst) {
             return Ok(());
@@ -69,7 +62,6 @@ impl ProcessWatcher {
             .spawn(move || {
                 let mut known_pids: HashMap<u32, ProcessEntry> = HashMap::new();
 
-                // Initial baseline snapshot
                 if let Ok(initial_list) = Process::list_all_nt() {
                     for p in initial_list {
                         known_pids.insert(p.pid, p);
@@ -91,7 +83,6 @@ impl ProcessWatcher {
                     let mut current_map: HashMap<u32, ProcessEntry> = HashMap::new();
                     let targets = targets_lock.lock().ok().map(|t| t.clone()).unwrap_or_default();
 
-                    // Detect newly created processes
                     for p in current_list {
                         let pid = p.pid;
                         let p_name_lower = p.name.to_lowercase();
@@ -107,7 +98,6 @@ impl ProcessWatcher {
                         current_map.insert(pid, p);
                     }
 
-                    // Detect terminated processes
                     for (&pid, old_proc) in &known_pids {
                         if !current_map.contains_key(&pid) {
                             let old_name_lower = old_proc.name.to_lowercase();
@@ -129,13 +119,11 @@ impl ProcessWatcher {
         Ok(())
     }
 
-    /// Retrieves next queued event (FIFO)
     pub fn poll_event(&self) -> Option<ProcessWatchEvent> {
         let mut q = self.events.lock().ok()?;
         q.pop_front()
     }
 
-    /// Stops the watcher thread
     pub fn stop(&mut self) {
         if self.running.load(Ordering::SeqCst) {
             self.running.store(false, Ordering::SeqCst);
@@ -169,10 +157,10 @@ mod tests {
         assert!(watcher.start(50).is_ok());
         assert!(watcher.is_running());
 
-        // Polling should return None because no process of that name was launched
         assert!(watcher.poll_event().is_none());
 
         watcher.stop();
         assert!(!watcher.is_running());
     }
 }
+

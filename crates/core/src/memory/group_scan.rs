@@ -1,5 +1,3 @@
-// language: Rust, file: group_scan.rs, target: Windows 11, MSVC
-// High-performance Cheat Engine 7.7 Group Scan Parser and Execution Engine
 
 use crate::memory::scanner::ValType;
 
@@ -203,7 +201,6 @@ impl GroupScanConfig {
                 continue;
             }
 
-            // Find first colon
             let colon_idx = match t.find(':') {
                 Some(idx) => idx,
                 None => continue,
@@ -224,7 +221,6 @@ impl GroupScanConfig {
                 continue;
             }
 
-            // Parse type prefix: 1, 2, 4, 8, F, D, P, S, W
             let first_char = cmd_part.chars().next().ok_or("Empty command")?;
             let (scan_type, mut bytesize) = match first_char {
                 '1' | 'B' => (GroupScanType::Byte, 1),
@@ -339,7 +335,6 @@ impl GroupScanConfig {
         })
     }
 
-    /// Check if memory starting at `buf` matches the group scan specification
     pub fn matches_block(&self, buf: &[u8], matched_offsets: &mut Vec<u32>) -> bool {
         if buf.len() < self.blocksize {
             return false;
@@ -348,7 +343,7 @@ impl GroupScanConfig {
         matched_offsets.clear();
 
         if !self.out_of_order {
-            // Ordered match: check each element at its fixed sequential offset
+
             for elem in &self.elements {
                 if elem.offset + elem.bytesize > buf.len() {
                     return false;
@@ -360,7 +355,7 @@ impl GroupScanConfig {
             }
             true
         } else {
-            // Out of Order match: each non-wildcard element must be found at non-overlapping offsets
+
             let mut used_ranges: Vec<(usize, usize)> = Vec::new();
 
             for elem in &self.elements {
@@ -431,7 +426,6 @@ mod tests {
         assert_eq!(config.blocksize, 12);
         assert!(!config.out_of_order);
 
-        // Build matching memory buffer
         let mut buf = vec![0u8; 16];
         buf[0..4].copy_from_slice(&100u32.to_ne_bytes());
         buf[4..8].copy_from_slice(&200u32.to_ne_bytes());
@@ -449,7 +443,6 @@ mod tests {
         assert!(config.out_of_order);
         assert_eq!(config.blocksize, 32);
 
-        // Place 1000 at offset 8, and 500 at offset 16
         let mut buf = vec![0u8; 32];
         buf[8..12].copy_from_slice(&1000u32.to_ne_bytes());
         buf[16..20].copy_from_slice(&500u32.to_ne_bytes());
@@ -459,3 +452,4 @@ mod tests {
         assert_eq!(offsets, vec![16, 8]);
     }
 }
+

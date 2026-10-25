@@ -1,5 +1,3 @@
-// language: Rust, file: lib.rs (vehdebug_dll), target: Windows 11, MSVC
-// Standalone injectable Vectored Exception Handling (VEH) debugger DLL
 
 #![allow(non_snake_case, non_camel_case_types, dead_code, unsafe_op_in_unsafe_fn, static_mut_refs)]
 
@@ -158,12 +156,10 @@ unsafe extern "system" fn VectoredExceptionHandler(ex: *mut EXCEPTION_POINTERS) 
             dr6: (*p_ctx).Dr6,
         };
 
-        // Store last hit
         if let Ok(mut lock) = LAST_HIT.lock() {
             *lock = Some(report);
         }
 
-        // Clear status and set Resume Flag (RF = bit 16) in EFlags
         (*p_ctx).Dr6 = 0;
         (*p_ctx).EFlags |= 0x00010000;
 
@@ -217,3 +213,4 @@ pub unsafe extern "system" fn DllMain(
     }
     1
 }
+

@@ -2,67 +2,61 @@ if getTranslationFolder()~='' then
   loadPOFile(getTranslationFolder()..'pseudocodediagram.po')
 end
 
-
---[[pseudocodediagram.lua]]--
-
 local DPIAdjust=getScreenDPI()/96
 
---Global
 diagramstyle = {}
-diagramstyle.instruction_registerstyle       = '[31;1m' --red + bold
-diagramstyle.instruction_hexstyle            = '[34;1m' --blue + bold
-diagramstyle.instruction_symbolstyle         = '[32;1m' --green + bold
-diagramstyle.instruction_opcodestyle         = '[1m' --bold
-diagramstyle.link_defaultcolor               = 0x00FF00FF --fuchsia
-diagramstyle.link_nottakencolor              = 0x000000FF --red
-diagramstyle.link_takencolor                 = 0x00FF0000 --blue
+diagramstyle.instruction_registerstyle       = '[31;1m'
+diagramstyle.instruction_hexstyle            = '[34;1m'
+diagramstyle.instruction_symbolstyle         = '[32;1m'
+diagramstyle.instruction_opcodestyle         = '[1m'
+diagramstyle.link_defaultcolor               = 0x00FF00FF
+diagramstyle.link_nottakencolor              = 0x000000FF
+diagramstyle.link_takencolor                 = 0x00FF0000
 diagramstyle.link_linethickness              = 3*DPIAdjust
 diagramstyle.link_arrowsize                  = math.ceil(5*DPIAdjust)
-diagramstyle.link_pointdepth                 = 20*DPIAdjust --distance between links
+diagramstyle.link_pointdepth                 = 20*DPIAdjust
 diagramstyle.block_headershowsymbol          = true
 diagramstyle.block_bodyshowaddresses         = false
 diagramstyle.block_bodyshowaddressesassymbol = true
 diagramstyle.block_bodyshowbytes             = false
-diagramstyle.block_backgroundcolor           = 0x00FFFFFF --white
-diagramstyle.diagram_backgroundcolor         = 0x0099FFCC --light green
+diagramstyle.block_backgroundcolor           = 0x00FFFFFF
+diagramstyle.diagram_backgroundcolor         = 0x0099FFCC
 diagramstyle.zoom_min                        = 0.25
 diagramstyle.zoom_max                        = 16.0
 diagramstyle.zoom_step                       = 0.25
-diagramstyle.highlight_linktakencolor        = 0x000000FF --red
-diagramstyle.highlight_linknottakencolor     = diagramstyle.diagram_backgroundcolor  --invisible
-diagramstyle.highlight_blockexecutedcolor    = diagramstyle.block_backgroundcolor 
-diagramstyle.highlight_blocknotexecutedcolor = 0 --black   
-
-
+diagramstyle.highlight_linktakencolor        = 0x000000FF
+diagramstyle.highlight_linknottakencolor     = diagramstyle.diagram_backgroundcolor
+diagramstyle.highlight_blockexecutedcolor    = diagramstyle.block_backgroundcolor
+diagramstyle.highlight_blocknotexecutedcolor = 0
 
 local function disassembleDecoratedInstruction(address)
   local disassembler, result, bytes, temp = getVisibleDisassembler(), ' '
   temp = disassembler.disassemble(address)
   temp, temp, bytes, temp = splitDisassembledString(temp)
-  if (diagramstyle.block_bodyshowaddresses and diagramstyle.block_bodyshowaddressesassymbol and inModule(address)) then 
-    result = result .. 
+  if (diagramstyle.block_bodyshowaddresses and diagramstyle.block_bodyshowaddressesassymbol and inModule(address)) then
+    result = result ..
              string.char(27) .. diagramstyle.instruction_symbolstyle ..
-             getNameFromAddress(disassembler.LastDisassembleData.address) .. 
+             getNameFromAddress(disassembler.LastDisassembleData.address) ..
              string.char(27) .. '[0m' ..  ' - '
-  elseif (diagramstyle.block_bodyshowaddresses) then 
-    result = result .. 
-             string.format('%X', disassembler.LastDisassembleData.address) .. ' - ' 
+  elseif (diagramstyle.block_bodyshowaddresses) then
+    result = result ..
+             string.format('%X', disassembler.LastDisassembleData.address) .. ' - '
   end
   if (diagramstyle.block_bodyshowbytes) then result = result .. bytes .. ' - '  end
-  result =  result .. 
-            string.char(27).. diagramstyle.instruction_opcodestyle .. 
+  result =  result ..
+            string.char(27).. diagramstyle.instruction_opcodestyle ..
             disassembler.LastDisassembleData.opcode ..
             string.char(27) .. '[0m' .. ' '
   for word in string.gmatch(disassembler.LastDisassembleData.parameters,'[^{*}]*') do
     if result then
-       if word == 'R' then --{R}=Register
+       if word == 'R' then
           result = result .. string.char(27) .. diagramstyle.instruction_registerstyle
-       elseif word == 'H' then --{H}=Hex value
+       elseif word == 'H' then
           result = result .. string.char(27) .. diagramstyle.instruction_hexstyle
-       elseif word == 'S' then --{S}=Symbol
+       elseif word == 'S' then
           result = result .. string.char(27) .. diagramstyle.instruction_symbolstyle
-       elseif word == 'N' then --{N}=Nothing special
-          result = result .. string.char(27) .. 'c' --nothing
+       elseif word == 'N' then
+          result = result .. string.char(27) .. 'c'
        else
           result = result .. word
        end
@@ -83,13 +77,11 @@ local function createDiagramForm(diagram, name)
 end
 
 local function calculateInbetweenColor(c1,c2,v)
-  --v=0 : c1
-  --v=1 : c2
+
   if (c1==nil) or (c2==nil) or (v==nil) then
     print("calculateInbetweenColor invalid paramer")
-    return nil  
+    return nil
   end
-  --print(string.format('calculateInbetweenColor(%x,%x,%f)',c1,c2,v))
 
   local r1=c1 & 0xFF
   local g1=c1 >> 8 & 0xFF
@@ -99,7 +91,6 @@ local function calculateInbetweenColor(c1,c2,v)
   local g2=c2 >> 8 & 0xFF
   local b2=c2 >> 16 & 0xFF
 
-
   local rr=((r2-r1)/255 * v)*255
   local rg=((g2-g1)/255 * v)*255
   local rb=((b2-b1)/255 * v)*255
@@ -108,53 +99,49 @@ local function calculateInbetweenColor(c1,c2,v)
   local newg=g1+rg
   local newb=b1+rb
 
- 
   local newv=math.floor(newr)+(math.floor(newg)<<8)+(math.floor(newb)<<16)
 
   return newv
 end
 
-
 local function showTracerPath(diagram, tracerform)
-  --go through the blocklist and see if the start/stop address is in there
+
   local blockheat={}
   local linkheat={}
-  local linkstaken={} 
+  local linkstaken={}
   local maxblockheat=1
   local maxlinkheat=1
   local i
-  local acl={} --address count list
+  local acl={}
   local selectedonly=tracerform.SelectionCount>1
-  
+
   local blockaddresses={}
   for i=1,#diagram.blocks do
     blockaddresses[diagram.blocks[i].stop]=diagram.blocks[i]
   end
-  
+
   for i=0,tracerform.Count-1 do
     local e=tracerform.Entry[i]
-    
-    
-    if e and ((selectedonly==false) or e.selected) then            
-      --if diagram.state.branchOrigins[e.address] then
+
+    if e and ((selectedonly==false) or e.selected) then
+
       if blockaddresses[e.address] then
-        --branching address, check the next address
-        
-        if i<tracerform.Count-1 then        
+
+        if i<tracerform.Count-1 then
           local e2=tracerform.Entry[i+1]
-          
-          if linkstaken[e.address]==nil then --new originaddress
-            linkstaken[e.address]={} 
+
+          if linkstaken[e.address]==nil then
+            linkstaken[e.address]={}
           end
-          
-          if linkstaken[e.address][e2.address]==nil then --new destinationaddress
-            linkstaken[e.address][e2.address]=1 --start at 0
+
+          if linkstaken[e.address][e2.address]==nil then
+            linkstaken[e.address][e2.address]=1
           else
             linkstaken[e.address][e2.address]=linkstaken[e.address][e2.address]+1
           end
         end
       end
-    
+
       if acl[e.address] == nil then
         acl[e.address] = 1
       else
@@ -162,125 +149,110 @@ local function showTracerPath(diagram, tracerform)
       end
     end
   end
-  
+
   for i=1,#diagram.dblocks do
-    local blockdata=diagram.blocks[diagram.dblocks[i].tag] --diagram.dblocks[i].tag 'should' be i, but in case that ever changes use the tag
-    local count=acl[blockdata.start] or acl[blockdata.stop] --in case the trace starts from the center of a function    
+    local blockdata=diagram.blocks[diagram.dblocks[i].tag]
+    local count=acl[blockdata.start] or acl[blockdata.stop]
 
     blockheat[i]={}
     blockheat[i].Block=diagram.dblocks[i]
-      
+
     if count then
-      blockheat[i].Count=count                  
+      blockheat[i].Count=count
     else
       blockheat[i].Count=0
     end
-    
-    maxblockheat=math.max(maxblockheat, blockheat[i].Count) 
+
+    maxblockheat=math.max(maxblockheat, blockheat[i].Count)
   end
-  
+
   for i=0,diagram.diagram.LinkCount-1 do
-    local l=diagram.diagram.Link[i]    
+    local l=diagram.diagram.Link[i]
     local obt=l.OriginBlock.Tag
     local dbt=l.DestinationBlock.Tag
-    
+
     local originaddress=diagram.blocks[obt].stop
     local destinationaddress=diagram.blocks[dbt].start
-    
-    
-    linkheat[i+1]={}
-    linkheat[i+1].Link=l        
-    
-    if linkstaken[originaddress] and linkstaken[originaddress][destinationaddress] then
-      linkheat[i+1].Count=linkstaken[originaddress][destinationaddress]      
-    else
-      linkheat[i+1].Count=0      
-    end  
-    
-    maxlinkheat=math.max(maxlinkheat, linkheat[i+1].Count)    
-  end
-  
-  --[[
-  local origin,destination
-  for origin,destination in pairs(linkstaken) do
-    for d2,count in pairs(destination) do
-      print(origin..'->'..destination..' '..count..' times')
-    end
-  end
-  --]]  
-  
-  --blockheat and linkheat are set
-  
-  --now apply colors to the links and blocks
 
-  
+    linkheat[i+1]={}
+    linkheat[i+1].Link=l
+
+    if linkstaken[originaddress] and linkstaken[originaddress][destinationaddress] then
+      linkheat[i+1].Count=linkstaken[originaddress][destinationaddress]
+    else
+      linkheat[i+1].Count=0
+    end
+
+    maxlinkheat=math.max(maxlinkheat, linkheat[i+1].Count)
+  end
+
   local v
   for i=1,#blockheat do
-    v=blockheat[i].Count/maxblockheat --v now contains a value between 0 and 1, 0 is absolutely not executed, 1 is fully executed
+    v=blockheat[i].Count/maxblockheat
     blockheat[i].Block.BackgroundColor=calculateInbetweenColor(diagramstyle.highlight_blocknotexecutedcolor, diagramstyle.highlight_blockexecutedcolor, v)
   end
-    
+
   for i=1,#linkheat do
-    v=linkheat[i].Count/maxlinkheat --v now contains a value between 0 and 1, 0 is absolutely not executed, 1 is fully executed
+    v=linkheat[i].Count/maxlinkheat
     linkheat[i].Link.LineColor=calculateInbetweenColor(diagramstyle.highlight_linknottakencolor, diagramstyle.highlight_linktakencolor, v)
-  end  
-  
+  end
+
   diagram.diagram.DrawPlotPoints=false
-  
+
   diagram.diagram.repaint()
   return blockheat,linkheat
 end
 
 local function showUltimap2Path(diagram, ultimapform)
-  --no link data, it's non sequential data (yet, until I add seperate tracefile parsing which does contains sequential TNT packets)
+
   local blockheat={}
   local maxblockheat=1
-  
-  for i=1,#diagram.dblocks do    
+
+  for i=1,#diagram.dblocks do
     local blockdata=diagram.blocks[diagram.dblocks[i].tag]
     local isin,count=ultimapform.isInList(blockdata.start)
-    
-    blockheat[i]={} 
+
+    blockheat[i]={}
     blockheat[i].Block=diagram.dblocks[i]
-    
-    if isin then      
+
+    if isin then
       blockheat[i].Count=count or 1
     else
       blockheat[i].Count=0
     end
-    
-    maxblockheat=math.max(maxblockheat, blockheat[i].Count) 
+
+    maxblockheat=math.max(maxblockheat, blockheat[i].Count)
   end
-  
+
   local v
   for i=1,#blockheat do
-    v=blockheat[i].Count/maxblockheat --v now contains a value between 0 and 1, 0 is absolutely not executed, 1 is fully executed
+    v=blockheat[i].Count/maxblockheat
     blockheat[i].Block.BackgroundColor=calculateInbetweenColor(diagramstyle.highlight_blocknotexecutedcolor, diagramstyle.highlight_blockexecutedcolor, v)
-  end 
-  
+  end
+
   diagram.diagram.repaint()
   return blockheat
 end
 
 local function showCodeFilterPath(diagram, codefilterform)
-  --no link data 
-  return showUltimap2Path(diagram, codefilerform) --codefilterform also has isInList just count is nil
+
+  return showUltimap2Path(diagram, codefilerform)
 end
 
 local function createMenu(diagram)
   local mv=getMemoryViewForm()
   local mm=createMainMenu(diagram.form)
   local FileMenu=createMenuItem(mm)
-  mm.Images = mv.mvImageList --icons from the memoryviewer's form
+  mm.Images = mv.mvImageList
   FileMenu.Caption=translate('File')
   FileMenu.Name='miFile'
-  
+
   local miLoad=createMenuItem(mm)
   miLoad.Caption=translate('Load from file')
   miLoad.Name='miLoad'
   miLoad.ImageIndex=23
   miLoad.Shortcut='Ctrl+O'
-  
+
   miLoad.OnClick=function(s)
     local fd=createOpenDialog()
     fd.Title=translate('Select the file you wish to open')
@@ -288,11 +260,11 @@ local function createMenu(diagram)
     fd.Filter=translate('Diagram files (*.CEDIAG )|*.CEDIAG')
     if fd.Execute() then
       local fs=createFileStream(fd.FileName,fmOpenRead)
-      
-      diagram.diagram.loadFromStream(fs)   
-      
+
+      diagram.diagram.loadFromStream(fs)
+
       diagram.dblocks={}
-      
+
       for i=0,diagram.diagram.BlockCount-1 do
         diagram.dblocks[i+1]=diagram.diagram.Block[i]
         diagram.dblocks[i+1].OnDoubleClickHeader=function(bl)
@@ -302,22 +274,20 @@ local function createMenu(diagram)
           mwform.show()
         end
       end
-      
-      --Load sorted addresslist
+
       diagram.sortedAddressList={}
       local i
       local count=fs.readDword()
-      --print("sortedAddressList count = "..count)
+
       for i=1,count do
-        diagram.sortedAddressList[i]=fs.readQword() 
+        diagram.sortedAddressList[i]=fs.readQword()
       end
-      
-      --Load diagram.blocks info
+
       diagram.blocks={}
       count=fs.readDword()
-      --print("diagram.blocks count="..count)
+
       for i=1,count do
-        --print("loading block "..i)
+
         diagram.blocks[i]={}
         diagram.blocks[i].start=fs.readQword()
         diagram.blocks[i].stop=fs.readQword()
@@ -328,26 +298,21 @@ local function createMenu(diagram)
           local j
           for j=1,jc do
             diagram.blocks[i].getsJumpedToBy[j]=fs.readQword()
-          end          
+          end
         end
-        
+
         local jtc=fs.readByte()
         if jtc>0 then
           diagram.blocks[i].jumpsTo={}
           diagram.blocks[i].jumpsTo.destinationtaken=fs.readQword()
-          diagram.blocks[i].jumpsTo.destinationtaken=fs.readByte()==1          
-        end        
-      end 
+          diagram.blocks[i].jumpsTo.destinationtaken=fs.readByte()==1
+        end
+      end
 
-      --print("reached end of load file")      
-      
       fs.destroy()
     end
-    
 
-    
-    
-    fd.destroy()    
+    fd.destroy()
   end
 
   local miSave=createMenuItem(mm)
@@ -356,7 +321,7 @@ local function createMenu(diagram)
   miSave.ImageIndex=22
   miSave.Shortcut='Ctrl+S'
   miSave.OnClick=function(s)
-    
+
     local fd=createSaveDialog()
     fd.Title=translate('Fill in the filename you wish to save this diagram as')
     fd.DefaultExt='CEDIAG'
@@ -365,36 +330,31 @@ local function createMenu(diagram)
     if fd.Execute() then
       local fs=createFileStream(fd.FileName,fmCreate)
       diagram.diagram.saveToStream(fs)
-      
+
       local i
-      --save sorted addresslist
 
       fs.writeDword(#diagram.sortedAddressList)
       for i=1,#diagram.sortedAddressList do
         fs.WriteQword(diagram.sortedAddressList[i])
-      end      
-      
-      
-      --save diagram.blocks info
-      
+      end
+
       fs.writeDword(#diagram.blocks)
       for i=1,#diagram.blocks do
-        --print("Saving block "..i)
+
         fs.writeQword(diagram.blocks[i].start)
         fs.writeQword(diagram.blocks[i].stop)
         fs.writeDword(diagram.blocks[i].salstopindex)
         if diagram.blocks[i].getsJumpedToBy then
           fs.writeWord(#diagram.blocks[i].getsJumpedToBy)
-          local j          
+          local j
           for j=1,#diagram.blocks[i].getsJumpedToBy do
-            fs.writeQword(diagram.blocks[i].getsJumpedToBy[j])          
+            fs.writeQword(diagram.blocks[i].getsJumpedToBy[j])
           end
-          
-          
-        else 
+
+        else
           fs.writeWord(0)
         end
-        
+
         if diagram.blocks[i].jumpsTo then
           fs.writeByte(1)
           fs.writeQword(diagram.blocks[i].jumpsTo.destinationtaken or 0)
@@ -402,22 +362,19 @@ local function createMenu(diagram)
             fs.writeByte(1)
           else
             fs.writeByte(0)
-          end             
+          end
 
-        else 
+        else
           fs.writeByte(0)
-        end        
-        
-        
-        
+        end
+
       end
-      
-      
-      fs.destroy() 
+
+      fs.destroy()
     end
-    fd.destroy()    
+    fd.destroy()
   end
-  
+
   local miSaveAsImage=createMenuItem(mm)
   miSaveAsImage.Caption=translate('Save diagram to image')
   miSaveAsImage.Name='miSaveAsImage'
@@ -428,34 +385,32 @@ local function createMenu(diagram)
     fd.DefaultExt='PNG'
     fd.Filter=translate('PNG files (*.PNG )|*.PNG')
     if fd.Execute() then
-      diagram.diagram.saveAsImage(fd.FileName)    
+      diagram.diagram.saveAsImage(fd.FileName)
     end
-    fd.destroy()    
+    fd.destroy()
   end
-  
+
   local miClose=createMenuItem(mm)
   miClose.Caption=translate('Close')
   miClose.OnClick=function(s) diagram.form.close() end
   miClose.Name='miClose'
   miClose.ImageIndex=37
-  
+
   local miSep=createMenuItem(mv)
   miSep.Caption='-'
-  
 
   FileMenu.add(miLoad)
   FileMenu.add(miSave)
   FileMenu.add(miSaveAsImage)
   FileMenu.add(miSep)
   FileMenu.add(miClose)
-  
-  
-  local DisplayMenu=createMenuItem(mm)  
+
+  local DisplayMenu=createMenuItem(mm)
   DisplayMenu.Caption=translate('Display')
   DisplayMenu.Name='miDisplay'
-  
+
   local miPaths=createMenuItem(mm)
-  miPaths.Caption=translate('Show path from Ultimap1/2 or Codefilter')  
+  miPaths.Caption=translate('Show path from Ultimap1/2 or Codefilter')
   miPaths.ImageIndex=67
   miPaths.Name='miPaths'
   miPaths.OnClick=function(sender)
@@ -464,15 +419,15 @@ local function createMenu(diagram)
       showUltimap2Path(diagram, um)
       return
     end
-    
+
     local cf=getCodeFilter()
     if cf then
       showCodeFilterPath(diagram, cf)
     end
   end
-  
+
   local miTracerPaths=createMenuItem(mm)
-  miTracerPaths.Caption=translate('Show path from tracer window') --if more than 1 show a list of tracer windows and pick one 
+  miTracerPaths.Caption=translate('Show path from tracer window')
   miTracerPaths.ImageIndex=67
   miTracerPaths.Name='miTracerPaths'
   miTracerPaths.OnClick=function(sender)
@@ -484,46 +439,44 @@ local function createMenu(diagram)
         if f.Count>0 then
           tracers[#tracers+1]=f
         end
-      end      
+      end
     end
-    
+
     if #tracers>0 then
       local tracer=tracers[1]
-      if #tracers>1 then      
+      if #tracers>1 then
         local list=createStringlist()
-        --create a list
-        
+
         for i=1,#tracers do
           if tracers[i].Count>0 then
             local first
             first=tracers[i].Entry[0].address
-          
+
             list.add(string.format(translate('Tracer starting at %8x (%s)'), first, getNameFromAddress(first)))
           end
         end
-        
+
         local r=showSelectionList(translate('Tracer paths'), translate('Which tracer window shall be used?'), list, false)
         if r then
           tracer=tracers[r+1]
-        end        
-        
+        end
+
         list.destroy()
       end
-      
+
       if tracer then
-        --print("Showing path")
+
         showTracerPath(diagram, tracer)
-      end 
-    else      
+      end
+    else
       showMessage(translate('No tracerform with results visible'));
     end
   end
-  
+
   DisplayMenu.add(miPaths)
   DisplayMenu.add(miTracerPaths)
-  
 
-  local ViewMenu=createMenuItem(mm)  
+  local ViewMenu=createMenuItem(mm)
   ViewMenu.Caption=translate('View')
   ViewMenu.Name='miView'
 
@@ -533,7 +486,7 @@ local function createMenu(diagram)
   miZoom.Name='miZoom'
 
   local miZoom100=createMenuItem(mm)
-  miZoom100.Caption=translate('100%')  
+  miZoom100.Caption=translate('100%')
   miZoom100.ImageIndex=63
   miZoom100.Name='miZoom100'
   miZoom100.OnClick=function()
@@ -541,37 +494,37 @@ local function createMenu(diagram)
     local newY=diagram.diagram.ScrollY/diagram.diagram.MaxScrollY
     diagram.diagram.Zoom=1
     diagram.diagram.ScrollX=newX*diagram.diagram.MaxScrollX
-    diagram.diagram.ScrollY=newY*diagram.diagram.MaxScrollY     
+    diagram.diagram.ScrollY=newY*diagram.diagram.MaxScrollY
   end
 
   local miZoomIn=createMenuItem(mm)
-  miZoomIn.Caption=translate('Zoom in')  
+  miZoomIn.Caption=translate('Zoom in')
   miZoomIn.ImageIndex=61
   miZoomIn.Name='miZoomIn'
   miZoomIn.OnClick=function()
     if (diagram.diagram.Zoom < diagramstyle.zoom_max) then
       local newX=diagram.diagram.ScrollX/diagram.diagram.MaxScrollX
-      local newY=diagram.diagram.ScrollY/diagram.diagram.MaxScrollY  
+      local newY=diagram.diagram.ScrollY/diagram.diagram.MaxScrollY
       diagram.diagram.Zoom = diagram.diagram.Zoom + diagramstyle.zoom_step
       diagram.diagram.ScrollX=newX*diagram.diagram.MaxScrollX
-      diagram.diagram.ScrollY=newY*diagram.diagram.MaxScrollY  
-    end  
+      diagram.diagram.ScrollY=newY*diagram.diagram.MaxScrollY
+    end
   end
 
   local miZoomOut=createMenuItem(mm)
-  miZoomOut.Caption=translate('Zoom out')  
+  miZoomOut.Caption=translate('Zoom out')
   miZoomOut.ImageIndex=62
   miZoomOut.Name='miZoomOut'
   miZoomOut.OnClick=function()
     if (diagram.diagram.Zoom > diagramstyle.zoom_min) then
       local newX=diagram.diagram.ScrollX/diagram.diagram.MaxScrollX
-      local newY=diagram.diagram.ScrollY/diagram.diagram.MaxScrollY  
+      local newY=diagram.diagram.ScrollY/diagram.diagram.MaxScrollY
       diagram.diagram.Zoom = diagram.diagram.Zoom - diagramstyle.zoom_step
       diagram.diagram.ScrollX=newX*diagram.diagram.MaxScrollX
-      diagram.diagram.ScrollY=newY*diagram.diagram.MaxScrollY  
+      diagram.diagram.ScrollY=newY*diagram.diagram.MaxScrollY
     end
   end
-  
+
   local miChangeBackground=createMenuItem(mm)
   miChangeBackground.caption=translate('Change background color')
   miChangeBackground.OnClick=function()
@@ -581,51 +534,44 @@ local function createMenu(diagram)
       diagram.diagram.BackgroundColor=cp.Color
     end
   end
-    
-
 
   ViewMenu.add(miZoom)
   ViewMenu.add(miChangeBackground)
   miZoom.add(miZoom100)
   miZoom.add(miZoomIn)
   miZoom.add(miZoomOut)
-  
-  
+
   mm.Items.add(FileMenu)
   mm.Items.add(DisplayMenu)
   mm.Items.add(ViewMenu)
-  
-  --todo, add code to the menu items
+
 end
 
 local function DiagramContextPopup(sender, mousepos)
-  --sender is the diagram object
-  --showMessage('weee '..mousepos.x..','..mousepos.y)
-  local diagram=getRef(sender.Tag) --diagram has in it's tag value a reference to the diagram table
+
+  local diagram=getRef(sender.Tag)
 
   local islink=false
   local isblock=false
   local isheaderlessblock=false
-  
+
   mousepos.x=(mousepos.x+diagram.diagram.ScrollX)/diagram.diagram.Zoom
   mousepos.y=(mousepos.y+diagram.diagram.ScrollY)/diagram.diagram.Zoom
 
-    
   local obj=sender.getObjectAt(mousepos)
   if (obj) then
     islink=obj.ClassName=='TDiagramLink'
     isblock=(obj.ClassName=='TDiagramBlock') and (obj.ShowHeader)
     isheaderlessblock=(obj.ClassName=='TDiagramBlock') and (not obj.ShowHeader)
   end
-  
+
   local i
-  
+
   for i=1,#diagram.popup.LinkItems do diagram.popup.LinkItems[i].visible=islink end
   for i=1,#diagram.popup.BlockItems do diagram.popup.BlockItems[i].visible=isblock end
   for i=1,#diagram.popup.HeaderlessBlockItems do diagram.popup.HeaderlessBlockItems[i].visible=isheaderlessblock end
 
   diagram.popup.All[1].Visible=islink or isblock
-
 
   diagram.popup.lastobject=obj
   diagram.popup.lastpos=mousepos
@@ -639,7 +585,7 @@ local function scrollToDiagramBlock(diagram, dblock)
 end
 
 local function PopupMenuGoToSourceClick(sender)
-  local diagram=getRef(sender.Owner.Owner.Tag) --the owner of the menuitem is the popupmenu, and the owner of that is the diagram (alternatively, the menuitem tag could be set to the diagram table as well)
+  local diagram=getRef(sender.Owner.Owner.Tag)
   local sourceblock = diagram.popup.lastobject.OriginBlock
   scrollToDiagramBlock(diagram, sourceblock)
 end
@@ -662,7 +608,7 @@ local function PopupMenuEditBlockHeaderClick(sender)
   if newheader ~= nil then diagram.popup.lastobject.caption = newheader end
 end
 
-local function PopupMenuEditBlockBackgroundColorClick(sender) --a color dialog would be better
+local function PopupMenuEditBlockBackgroundColorClick(sender)
   local diagram=getRef(sender.Owner.Owner.Tag)
   local colordialog=createColorDialog()
   if colordialog.execute() then
@@ -678,7 +624,7 @@ local function PopupMenuListSourcesClick(sender)
   local linkz = diagram.popup.lastobject.getLinks()
   local stringlist = createStringlist()
   for i=1, #linkz.asDestination do
-    
+
     if linkz.asDestination[i].OriginBlock==nil then
       error('linkz.asDestination[i].OriginBlock is nil')
     end
@@ -719,53 +665,51 @@ local function editBlockStrings(b)
   m.Align=alClient
   m.ScrollBars=ssAutoBoth
   m.WordWrap=false
-  
-      
+
   local btnOK=createButton(cbh)
   local btnCancel=createButton(cbh)
-  
+
   btnOK.Caption=translate('OK')
   btnOK.Default=true
   btnOK.ModalResult=mrOK
   btnCancel.Caption=translate('Cancel')
   btnCancel.Cancel=true
-  btnCancel.ModalResult=mrCancel  
-  
+  btnCancel.ModalResult=mrCancel
+
   btnOK.AnchorSideLeft.Control=cbh
   btnOK.AnchorSideLeft.Side=asrLeft
   btnOK.AnchorSideTop.Control=cbh
   btnOK.AnchorSideTop.Side=asrTop
-  
+
   btnCancel.AnchorSideLeft.Control=btnOK
   btnCancel.AnchorSideLeft.Side=asrRight
   btnCancel.BorderSpacing.Left=DPIAdjust*5
-  
+
   btnOK.AutoSize=true
   btnCancel.AutoSize=true
   cbh.AutoSize=true
   bh.AutoSize=true
-  
+
   cbh.AnchorSideLeft.Control=bh
   cbh.AnchorSideLeft.Side=asrCenter
   cbh.BorderSpacing.Top=3*DPIAdjust
   cbh.BorderSpacing.Bottom=3*DPIAdjust
-  
-  
+
   m.Lines.Text=b.Strings.Text
-  
+
   mf.Position=poScreenCenter
   if mf.showModal()==mrOK then
     b.Strings.Text=m.Lines.Text
     b.owner.repaint()
     result=true
-  end   
-  mf.destroy()   
+  end
+  mf.destroy()
 
-  return result  
-end 
+  return result
+end
 
 local function PopupMenuCreateAnnotationClick(sender)
-  --create a new dialog at the popup location
+
   local diagram=getRef(sender.Owner.Owner.Tag)
   local b=diagram.diagram.createBlock()
   b.ShowHeader=false
@@ -774,9 +718,9 @@ local function PopupMenuCreateAnnotationClick(sender)
   b.Y=diagram.popup.lastpos.y
   b.Width=100*DPIAdjust
   b.Height=100*DPIAdjust
-  
-  diagram.diagram.repaint() --show the new block
-  
+
+  diagram.diagram.repaint()
+
   b.OnDoubleClickBody=function(s)
     return editBlockStrings(b)
   end
@@ -784,15 +728,15 @@ local function PopupMenuCreateAnnotationClick(sender)
   if r then
     b.AutoSize=true
   else
-    b.destroy()    
+    b.destroy()
   end
-  
+
   diagram.diagram.repaint()
 end
 
 local function PopupMenuDeleteAnnotationClick(sender)
   local diagram=getRef(sender.Owner.Owner.Tag)
-  
+
   if diagram.popup.lastobject and diagram.popup.lastobject.ShowHeader==false then
     diagram.popup.lastobject.destroy()
     diagram.diagram.repaint()
@@ -800,13 +744,12 @@ local function PopupMenuDeleteAnnotationClick(sender)
   end
 end
 
-
 local function createDiagramPopupMenu(diagram)
   local pm=createPopupMenu(diagram.diagram)
-  pm.Images = getMemoryViewForm().mvImageList --icons from the memoryviewer's form
+  pm.Images = getMemoryViewForm().mvImageList
   diagram.diagram.PopupMenu=pm
   diagram.diagram.OnContextPopup=DiagramContextPopup
-  
+
   diagram.popup={}
   diagram.popup.Menu=pm
   diagram.popup.LinkItems={}
@@ -821,18 +764,18 @@ local function createDiagramPopupMenu(diagram)
   diagram.popup.LinkItems[2].OnClick=PopupMenuGoToDestinationClick
 
   diagram.popup.LinkItems[3]=CreateMenuItem(diagram.diagram)
-  diagram.popup.LinkItems[3].Caption='-' --separator
-  
+  diagram.popup.LinkItems[3].Caption='-'
+
   diagram.popup.LinkItems[4]=CreateMenuItem(pm)
-  diagram.popup.LinkItems[4].Caption=translate('Remove all points')      
+  diagram.popup.LinkItems[4].Caption=translate('Remove all points')
   diagram.popup.LinkItems[4].ImageIndex=32
   diagram.popup.LinkItems[4].OnClick=PopupMenuRemoveAllPointsClick
-  
+
   pm.Items.add(diagram.popup.LinkItems[1])
   pm.Items.add(diagram.popup.LinkItems[2])
   pm.Items.add(diagram.popup.LinkItems[3])
   pm.Items.add(diagram.popup.LinkItems[4])
-  
+
   diagram.popup.BlockItems={}
   diagram.popup.BlockItems[1]=CreateMenuItem(pm)
   diagram.popup.BlockItems[1].Caption=translate('Edit block header')
@@ -845,27 +788,24 @@ local function createDiagramPopupMenu(diagram)
   diagram.popup.BlockItems[2].OnClick=PopupMenuEditBlockBackgroundColorClick
 
   diagram.popup.BlockItems[3]=CreateMenuItem(pm)
-  diagram.popup.BlockItems[3].Caption='-' --separator
-  
+  diagram.popup.BlockItems[3].Caption='-'
+
   diagram.popup.BlockItems[4]=CreateMenuItem(pm)
-  diagram.popup.BlockItems[4].Caption=translate('List sources')      
+  diagram.popup.BlockItems[4].Caption=translate('List sources')
   diagram.popup.BlockItems[4].ImageIndex=36
-  diagram.popup.BlockItems[4].OnClick=PopupMenuListSourcesClick  
-  
+  diagram.popup.BlockItems[4].OnClick=PopupMenuListSourcesClick
+
   diagram.popup.BlockItems[5]=CreateMenuItem(pm)
-  diagram.popup.BlockItems[5].Caption=translate('List destinations')  
-  diagram.popup.BlockItems[5].ImageIndex=36    
-  diagram.popup.BlockItems[5].OnClick=PopupMenuListDestinationsClick    
-  
-  
+  diagram.popup.BlockItems[5].Caption=translate('List destinations')
+  diagram.popup.BlockItems[5].ImageIndex=36
+  diagram.popup.BlockItems[5].OnClick=PopupMenuListDestinationsClick
+
   pm.Items.add(diagram.popup.BlockItems[1])
   pm.Items.add(diagram.popup.BlockItems[2])
-  pm.Items.add(diagram.popup.BlockItems[3])   
+  pm.Items.add(diagram.popup.BlockItems[3])
   pm.Items.add(diagram.popup.BlockItems[4])
   pm.Items.add(diagram.popup.BlockItems[5])
-  
 
-  
   diagram.popup.HeaderlessBlockItems={}
   diagram.popup.HeaderlessBlockItems[1]=CreateMenuItem(pm)
   diagram.popup.HeaderlessBlockItems[1].Caption=translate('Edit annotation color')
@@ -879,17 +819,17 @@ local function createDiagramPopupMenu(diagram)
 
   pm.Items.add(diagram.popup.HeaderlessBlockItems[1])
   pm.Items.add(diagram.popup.HeaderlessBlockItems[2])
-  
+
   diagram.popup.All={}
   diagram.popup.All[1]=CreateMenuItem(pm)
   diagram.popup.All[1].Caption='-'
-  
+
   diagram.popup.All[2]=CreateMenuItem(pm)
-  diagram.popup.All[2].Caption=translate('Create annotation') 
+  diagram.popup.All[2].Caption=translate('Create annotation')
   diagram.popup.All[2].ImageIndex=65
-  diagram.popup.All[2].OnClick=PopupMenuCreateAnnotationClick    
+  diagram.popup.All[2].OnClick=PopupMenuCreateAnnotationClick
   pm.Items.add(diagram.popup.All[1])
-  pm.Items.add(diagram.popup.All[2])    
+  pm.Items.add(diagram.popup.All[2])
 end
 
 local function createDiagramDiagram(diagram)
@@ -901,49 +841,43 @@ local function createDiagramDiagram(diagram)
   diagram.diagram.LineThickness=diagramstyle.link_linethickness
   diagram.diagram.ArrowSize=diagramstyle.link_arrowsize
   diagram.diagram.Tag=createRef(diagram)
-  
+
   local leftdown=false
   local dragstart
-  
-  local function handledrag(x,y)    
+
+  local function handledrag(x,y)
     local delta={}
     local mousepos={}
     mousepos.x=x
     mousepos.y=y
     mousepos.x=(mousepos.x-diagram.diagram.ScrollX)/diagram.diagram.Zoom
     mousepos.y=(mousepos.y-diagram.diagram.ScrollY)/diagram.diagram.Zoom
-    
+
     delta.x=x-dragstart.x
     delta.y=y-dragstart.y
-    
+
     dragstart={}
     dragstart.x=x
     dragstart.y=y
-      
-    
-  
+
     diagram.diagram.ScrollX=diagram.diagram.ScrollX-(delta.x/diagram.diagram.Zoom)
     diagram.diagram.ScrollY=diagram.diagram.ScrollY-(delta.y/diagram.diagram.Zoom)
-  
-    
+
   end
-  
+
   diagram.diagram.OnMouseMove=function(sender, x, y)
     if leftdown then
       handledrag(x,y)
     end
   end
-  
+
   diagram.diagram.OnMouseDown=function(sender, button, x, y)
     local mousepos={}
     mousepos.x=x
     mousepos.y=y
     mousepos.x=(mousepos.x+diagram.diagram.ScrollX)/diagram.diagram.Zoom
     mousepos.y=(mousepos.y+diagram.diagram.ScrollY)/diagram.diagram.Zoom
-  
 
-    
-  
     if leftdown==false and button==mbLeft and sender.getObjectAt(mousepos)==nil then
       dragstart={}
       dragstart.x=x
@@ -951,18 +885,14 @@ local function createDiagramDiagram(diagram)
       leftdown=true
     end
   end
-  
+
   diagram.diagram.OnMouseUp=function(sender, button, x, y)
     if leftdown and (button==mbLeft) then
       leftdown=false
-      handledrag(x,y)      
-    end  
-  end  
-  
-  
-  --diagram.diagram.AllowUserToCreatePlotPoints = false
-  --diagram.diagram.AllowUserToMovePlotPoints = false
-  --diagram.diagram.AllowUserToChangeAttachPoints = false
+      handledrag(x,y)
+    end
+  end
+
 end
 
 local function onBlockDrag(dblock)
@@ -1007,7 +937,7 @@ local function createDiagramLink(diagram, sourceblock, destinationblock, color, 
   local sourceBSD={}
   sourceBSD.Block=diagram.dblocks[sourceblock]
   sourceBSD.Side=dbsBottom
-  sourceBSD.Position=offset 
+  sourceBSD.Position=offset
 
   local offset2 = 0
   local linkz = diagram.dblocks[destinationblock].getLinks()
@@ -1021,26 +951,26 @@ local function createDiagramLink(diagram, sourceblock, destinationblock, color, 
   elseif (diagram.dblocks[destinationblock].x+(diagram.dblocks[destinationblock].width / 2) + offset2) <= diagram.dblocks[destinationblock].x then
     diagram.dblocks[destinationblock].width=diagram.dblocks[destinationblock].width+math.abs(diagram.dblocks[destinationblock].x-(diagram.dblocks[destinationblock].x+(diagram.dblocks[destinationblock].width / 2)+offset2))+40*DPIAdjust
   end
-  
+
   local destinationBSD={}
   destinationBSD.Block=diagram.dblocks[destinationblock]
   destinationBSD.Side=dbsTop
   destinationBSD.Position=offset2
-  
+
   local diagramlink = diagram.diagram.addConnection(sourceBSD, destinationBSD)
-  
+
   diagramlink.LineColor=color
 
   return diagramlink
 end
 
 local function createDiagramBlocks(diagram)
-  -- _G.d=diagram
+
   diagram.dblocks = {}
   for i=1, #diagram.blocks do
     if diagram.state.parsed[diagram.blocks[i].start] then
       if (diagramstyle.block_headershowsymbol and inModule(diagram.blocks[i].start)) then
-        diagram.dblocks[i] = createDiagramBlock(diagram, ' ' .. string.char(27) .. diagramstyle.instruction_symbolstyle .. 
+        diagram.dblocks[i] = createDiagramBlock(diagram, ' ' .. string.char(27) .. diagramstyle.instruction_symbolstyle ..
                                                         getNameFromAddress(diagram.blocks[i].start))
       else
         diagram.dblocks[i] = createDiagramBlock(diagram, ' ' .. string.format('%X', diagram.blocks[i].start))
@@ -1051,9 +981,9 @@ local function createDiagramBlocks(diagram)
       local current = diagram.blocks[i].start
       while (current <= diagram.blocks[i].stop) do
         diagram.dblocks[i].Strings.add(disassembleDecoratedInstruction(current))
-        if diagram.state.parsed[current] ~= nil and diagram.state.parsed[current].bytesize ~= 0 then 
+        if diagram.state.parsed[current] ~= nil and diagram.state.parsed[current].bytesize ~= 0 then
           current = current + diagram.state.parsed[current].bytesize
-        else break end  
+        else break end
       end
       diagram.dblocks[i].AutoSize = true
     end
@@ -1081,8 +1011,8 @@ end
 local function diagramBlockInputToInputIndex(dblock, idblock)
   local linkz = dblock.getLinks()
   for i=1, #linkz.asDestination do
-    if linkz.asDestination[i].OriginBlock == idblock then 
-      return i 
+    if linkz.asDestination[i].OriginBlock == idblock then
+      return i
     end
   end
   return 0
@@ -1090,38 +1020,38 @@ end
 
 local function linkDiagramBlocks(diagram)
   for i=1, #diagram.dblocks do
-    if i > 1 then --skip starting block
+    if i > 1 then
       for j=1, #diagram.blocks[i].getsJumpedToBy do
         if diagram.blocks[i].getsJumpedToBy[j] == diagram.blocks[i-1].stop then
-          local link=createDiagramLink(diagram, i-1, i, diagramstyle.link_nottakencolor,10*DPIAdjust) --not taken branches
+          local link=createDiagramLink(diagram, i-1, i, diagramstyle.link_nottakencolor,10*DPIAdjust)
           local linkdata={}
-          linkdata.isTaken=true          
+          linkdata.isTaken=true
           link.Tag=createRef(linkdata)
         end
       end
     end
-    if (diagram.blocks[i].jumpsTo) then --skip leaf blocks
+    if (diagram.blocks[i].jumpsTo) then
       local destinationblock = blockAddressToBlockIndex(diagram, diagram.blocks[i].jumpsTo.destinationtaken)
 
       if destinationblock then
         local linkdata={}
         local color=diagramstyle.link_takencolor
         local offset=-10*DPIAdjust
-  
+
         if diagram.blocks[i].jumpsTo.destinationnottaken==nil then
-          linkdata.unconditional=true  --also true for logicalFollow, but those where logicalFollow is false are jmp's
+          linkdata.unconditional=true
           color=diagramstyle.link_defaultcolor
-          offset=0          
+          offset=0
         end
-        
-        if diagram.blocks[i].jumpsTo.logicalFollow then          
+
+        if diagram.blocks[i].jumpsTo.logicalFollow then
           linkdata.logicalFollow=true
           color=diagramstyle.link_defaultcolor
           offset=0
-        end        
-                
-        local link=createDiagramLink(diagram, i, destinationblock, color, offset) --taken branches
-          
+        end
+
+        local link=createDiagramLink(diagram, i, destinationblock, color, offset)
+
         linkdata.isTaken=false
         link.Tag=createRef(linkdata)
       end
@@ -1149,10 +1079,10 @@ local function createDiagramPseudoBlocks(diagram)
     diagram.dpblocks[i].odescriptor = {}
     diagram.dpblocks[i].ddescriptor = {}
     diagram.dpblocks[i].link = {}
-    for j=1, #linkz.asDestination do 
+    for j=1, #linkz.asDestination do
       diagram.dpblocks[i].input[j] = diagramBlockToDiagramBlockIndex(diagram, linkz.asDestination[j].OriginBlock)
     end
-    for j=1, #linkz.asSource do 
+    for j=1, #linkz.asSource do
       diagram.dpblocks[i].output[j] = diagramBlockToDiagramBlockIndex(diagram, linkz.asSource[j].DestinationBlock)
       diagram.dpblocks[i].odescriptor[j] = linkz.asSource[j].OriginDescriptor
       diagram.dpblocks[i].ddescriptor[j] = linkz.asSource[j].DestinationDescriptor
@@ -1180,8 +1110,8 @@ end
 
 local function popRight (queue)
   local last = queue.last
-  if queue.first > last then 
-    return nil 
+  if queue.first > last then
+    return nil
   end
   local value = queue[last]
   queue[last] = nil
@@ -1189,17 +1119,13 @@ local function popRight (queue)
   return value
 end
 
---[[
-  makes all the multiple inputs blocks, single input blocks
-  the goal is to obtain a better block arrangement
---]]
 local function ComputeBetterArrangement(diagram)
   local dvblocks, more, branchqueue, nextbranch = {}, true, createQueue(), {}
   initDiagramVisitedBlocks(diagram, dvblocks)
   dvblocks[1].visited = true
-  pushLeft(branchqueue, 1) --starting block
+  pushLeft(branchqueue, 1)
 
-  while (more) do 
+  while (more) do
     more=false
     while branchqueue.first <= branchqueue.last do
       local nextbranch = popRight(branchqueue)
@@ -1220,12 +1146,12 @@ local function ComputeBetterArrangement(diagram)
     nextbranch.branch_min=nil
     nextbranch.input_count_min=nil
     nextbranch.input_min=nil
-    
+
     for i=1, #diagram.dblocks do
       if dvblocks[i].visited then
         for j=1, diagram.dpblocks[i].output_count do
           if not dvblocks[diagram.dpblocks[i].output[j]].visited then
-            if (nextbranch.branch_min == nil) or (diagram.dpblocks[diagram.dpblocks[i].output[j]].input_count_extra == nextbranch.input_count_min) or 
+            if (nextbranch.branch_min == nil) or (diagram.dpblocks[diagram.dpblocks[i].output[j]].input_count_extra == nextbranch.input_count_min) or
             ((diagram.dpblocks[diagram.dpblocks[i].output[j]].input_count_extra == nextbranch.input_count_min) and (diagram.dpblocks[i].output[j] < nextbranch.branch_min)) then
               nextbranch.branch_min=diagram.dpblocks[i].output[j]
               nextbranch.input_count_min=diagram.dpblocks[diagram.dpblocks[i].output[j]].input_count_extra
@@ -1255,10 +1181,6 @@ local function adjustEverything(diagram, dpblock, column, row)
   end
 end
 
---[[
-  computes the diagram's rows and columns
-  we'll need them in order to arrange blocks, links and points
---]]
 local function computeLayers(diagram, dpblock)
   local column, row_count, c_column = 0, 0, 0
   for i=1, diagram.dpblocks[dpblock].betteroutput_count do
@@ -1364,7 +1286,7 @@ local function initLayerRelatedStuff(diagram)
 end
 
 local function computePoints(diagram)
-  --output vertical points
+
   for i=1, #diagram.dpblocks do
     local origin = i
     for j=1, diagram.dpblocks[i].output_count do
@@ -1372,7 +1294,7 @@ local function computePoints(diagram)
       diagram.points[i].output_input[j].point = diagram.column_links_count[diagram.dpblocks[origin].row].count
     end
   end
-  --input vertical points
+
   for i=1, #diagram.dpblocks do
     local destination = i
     for j=1, diagram.dpblocks[i].input_count do
@@ -1380,7 +1302,7 @@ local function computePoints(diagram)
       diagram.points[i].output_input[j+#diagram.dpblocks[i].output].point = diagram.column_links_count[diagram.dpblocks[destination].row-1].count
     end
   end
-  --remaining horizontal points
+
   for i=1, #diagram.dpblocks do
     for j=1, diagram.dpblocks[i].output_count do
       local destination, path = diagram.dpblocks[i].output[j], 0
@@ -1401,11 +1323,11 @@ local function arrangeDiagramLayers(diagram)
     diagram.links_column[i].x=x
     x=x+(diagramstyle.link_pointdepth*diagram.row_max_depth[i].count)+diagramstyle.link_pointdepth
   end
-  diagram.row[-1].y=0 --extra row
-  diagram.row[-1].height=diagramstyle.link_pointdepth * (diagram.column_links_count[-1].count) --size = inputs * pointdepth
+  diagram.row[-1].y=0
+  diagram.row[-1].height=diagramstyle.link_pointdepth * (diagram.column_links_count[-1].count)
   local y=diagram.row[-1].height+diagramstyle.link_pointdepth
   for i=0, diagram.row_count-1 do
-    diagram.row[i].y=y 
+    diagram.row[i].y=y
     y=y+diagram.row[i].height
     diagram.links_row[i].y=y
     y=y+(diagramstyle.link_pointdepth*diagram.column_links_count[i].count)+diagramstyle.link_pointdepth
@@ -1431,7 +1353,7 @@ local function arrangeDiagramLinks(diagram)
       local link=diagram.dpblocks[i].link[j]
       local origin_index=i
       local destination_index=diagram.dpblocks[i].output[j]
-      local input_index=diagramBlockInputToInputIndex(link.DestinationBlock, link.OriginBlock)+#diagram.dpblocks[destination_index].output    
+      local input_index=diagramBlockInputToInputIndex(link.DestinationBlock, link.OriginBlock)+#diagram.dpblocks[destination_index].output
       link.addPoint(link.OriginBlock.X+(link.OriginBlock.Width/2)+diagram.dpblocks[origin_index].odescriptor[j].Position, diagram.links_row[origin_row].y+diagramstyle.link_pointdepth*diagram.points[origin_index].output_input[j].point, 0)
       if (origin_row+1 == destination_row) then
         link.addPoint(link.DestinationBlock.X+(link.DestinationBlock.Width/2)+diagram.dpblocks[origin_index].ddescriptor[j].Position, diagram.links_row[origin_row].y+diagramstyle.link_pointdepth*diagram.points[origin_index].output_input[j].point, 1)
@@ -1482,12 +1404,12 @@ local function createDiagramInfoBlock(diagram)
 end
 
 local function spawnDiagram(start, limit)
-  --local
+
   diagram = {}
   diagram.state=pseudocode.parseFunction(start, limit)
   diagram.blocks,diagram.sortedAddressList=pseudocode.createBlocks(diagram.state)
   createDiagramForm(diagram, translate('Diagram'))
-  createMenu(diagram)   
+  createMenu(diagram)
   createDiagramDiagram(diagram)
   createDiagramPopupMenu(diagram)
   createDiagramBlocks(diagram)
@@ -1499,13 +1421,13 @@ local function spawnDiagram(start, limit)
     initLayerRelatedStuff(diagram)
     computePoints(diagram)
     arrangeDiagramLayers(diagram)
-    arrangeDiagramBlocks(diagram)    
+    arrangeDiagramBlocks(diagram)
     arrangeDiagramLinks(diagram)
   elseif #diagram.dblocks > 0 then centerDiagramBlock(diagram, 1) end
   createDiagramInfoBlock(diagram)
   diagram.form.Visible=true
   diagram.diagram.repaint()
-  --focus on first block
+
   if #diagram.dblocks > 0 then scrollToDiagramBlock(diagram, diagram.dblocks[1]) end
   return diagram
 end
@@ -1538,91 +1460,56 @@ mv.debuggerpopup.OnPopup=function(Sender)
   miSpawnDiagram.Enabled=targetIsX86()
 end
 
-
 registerFormAddNotification(function(f)
-  --watch for tracerforms and add a 'Spawn Diagram' option there as well
+
   if f.ClassName=='TfrmTracer' then
     local callback=123
     callback=f.registerFirstShowCallback(function(f)
-      --print("calling unregisterFirstShowCallback using callback. ClassName="..callback.ClassName)
-      f.unregisterFirstShowCallback(callback) --cleans up memory
 
-      --add a spawn diagram option
+      f.unregisterFirstShowCallback(callback)
+
       local mi=createMenuItem(f.pmTracer)
-      mi.Caption=translate('Spawn diagram')    
+      mi.Caption=translate('Spawn diagram')
       mi.Shortcut='Ctrl+Shift+D'
       mi.ImageIndex=4
       mi.OnClick=function(s)
         local entrynr
         local i
-        
-        --print("Spawn Diagram menuitem")
-        --print("f classname="..f.ClassName)
-        --print("f.Count="..f.Count)
-        
+
         if f.Count>0 then
           local entrynr
-        
-          if f.lvTracer.Selected then 
-            --find the first selected entry
+
+          if f.lvTracer.Selected then
+
             for i=0,f.Count-1 do
-              --print("Getting entry "..i)
+
               local e=f.Entry[i]
               if e then
-                if entrynr==nil then --get first valid entry
+                if entrynr==nil then
                   entrynr=i
                 end
-                
-                if e.selected then --selections take precedence               
-                  entrynr=i        
-                  break            
+
+                if e.selected then
+                  entrynr=i
+                  break
                 end
               end
-            end       
+            end
           end
-          
-          if entrynr then          
-            --print("calling spawnDiagram with entrynr "..entrynr..' which has address '..string.format('%x',f.Entry[entrynr].address ))
-            spawnDiagram(f.Entry[entrynr].address,100000)   
+
+          if entrynr then
+
+            spawnDiagram(f.Entry[entrynr].address,100000)
           else
             return
           end
-        end        
+        end
       end
-      
+
       f.pmTracer.Items.add(mi)
-    
+
     end)
-    
-    --print("Registered FirstShowCallback c.classname="..callback.ClassName)
-    --callback.OnDestroy=function(sender) print("I got destroyed") end
+
   end
 end)
 
-
---[[
-diagram structure:
-diagram = {}
-diagram.form
-diagram.diagram
-diagram.popup = {}
-diagram.blocks = {}
-diagram.sortedAddressList = {} --array sorted from 1..#sortedAddressList containing addresses
-diagram.dblocks = {}
-diagram.dpblocks = {}
-diagram.points = {}
-diagram.column_count
-diagram.row_count
-diagram.column = {}
-diagram.row = {}
-diagram.paths = {}
-diagram.links_column = {}
-diagram.links_row = {}
-diagram.column_links_count = {}
-diagram.row_max_depth = {}
-]]
-
---_G.diagramstyle.diagram_backgroundcolor = 0xFFFFFF (edit style from the outside example)
-
---[[todolist]]
---have a rightclick on an address function, then find the start of the function and then parse and display the diagram

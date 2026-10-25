@@ -702,7 +702,7 @@ begin
     begin
       if ((DirInfo.Attr and FaDirectory) <> FaDirectory) then
       begin
-        i:=lua_dofile(luavm, pchar( UTF8ToWinCP(autorunpath+DirInfo.name)));
+        i:=lua_dofile(luavm, pchar( UTF8ToWinCP(path+DirInfo.name)));
         if i<>0 then //error
         begin
           i:=lua_gettop(luavm);
@@ -725,7 +725,7 @@ begin
           lua_getglobal(LuaVM,'MainForm');
           if lua_isnil(LuaVM,-1) then
           begin
-            MessageDlg(format(rsScriptCorruptedVar, [autorunpath+DirInfo.name, 'MainForm']), mtError,[mbOK],0);
+            MessageDlg(format(rsScriptCorruptedVar, [path+DirInfo.name, 'MainForm']), mtError,[mbOK],0);
             mainformwasset:=false;
           end;
           lua_pop(LuaVM,1);
@@ -736,7 +736,7 @@ begin
           lua_getglobal(LuaVM,'AddressList');
           if lua_isnil(LuaVM,-1) then
           begin
-            MessageDlg(format(rsScriptCorruptedVar, [autorunpath+DirInfo.name, 'AddressList']), mtError,[mbOK],0);
+            MessageDlg(format(rsScriptCorruptedVar, [path+DirInfo.name, 'AddressList']), mtError,[mbOK],0);
             addresslistwasset:=false;
           end;
           lua_pop(LuaVM,1);
@@ -5298,6 +5298,78 @@ begin
   MainForm.ProcessLabel.Caption:=strPhysicalMemory;
   {$ENDIF}
   result:=0;
+end;
+
+function lua_onyx_kernelConnect(L: Plua_State): integer; cdecl;
+var dev: PAnsiChar;
+begin
+  if lua_gettop(L) >= 1 then
+    dev := PAnsiChar(lua_tostring(L, 1))
+  else
+    dev := nil;
+  lua_pushboolean(L, onyx_kernel_connect(dev) = 0);
+  result := 1;
+end;
+
+function lua_onyx_kernelIsConnected(L: Plua_State): integer; cdecl;
+begin
+  lua_pushboolean(L, onyx_kernel_is_connected() <> 0);
+  result := 1;
+end;
+
+function lua_onyx_kernelHideDriver(L: Plua_State): integer; cdecl;
+begin
+  lua_pushboolean(L, onyx_kernel_hide_driver() = 0);
+  result := 1;
+end;
+
+function lua_onyx_kernelStripCallbacks(L: Plua_State): integer; cdecl;
+var restore: integer;
+begin
+  restore := 0;
+  if lua_gettop(L) >= 1 then
+    if lua_toboolean(L, 1) then restore := 1;
+  lua_pushboolean(L, onyx_kernel_strip_callbacks(restore) = 0);
+  result := 1;
+end;
+
+function lua_onyx_kernelCleanTraces(L: Plua_State): integer; cdecl;
+begin
+  lua_pushboolean(L, onyx_kernel_clean_traces() = 0);
+  result := 1;
+end;
+
+function lua_onyx_kernelSetProtection(L: Plua_State): integer; cdecl;
+var pid, enable: integer;
+begin
+  pid := lua_tointeger(L, 1);
+  enable := 1;
+  if lua_gettop(L) >= 2 then
+    if not lua_toboolean(L, 2) then enable := 0;
+  lua_pushboolean(L, onyx_kernel_set_protection(pid, enable) = 0);
+  result := 1;
+end;
+
+function lua_onyx_kernelFreezeProcess(L: Plua_State): integer; cdecl;
+var pid, freeze: integer;
+begin
+  pid := lua_tointeger(L, 1);
+  freeze := 1;
+  if lua_gettop(L) >= 2 then
+    if not lua_toboolean(L, 2) then freeze := 0;
+  lua_pushboolean(L, onyx_kernel_freeze_process(pid, freeze) = 0);
+  result := 1;
+end;
+
+function lua_onyx_kernelCloakSymlink(L: Plua_State): integer; cdecl;
+var sym: PAnsiChar;
+begin
+  if lua_gettop(L) >= 1 then
+    sym := PAnsiChar(lua_tostring(L, 1))
+  else
+    sym := nil;
+  lua_pushboolean(L, onyx_kernel_cloak_symlink(sym) = 0);
+  result := 1;
 end;
 
 function dbk_setSaferPhysicalMemoryScanning(L: Plua_State): integer; cdecl;
@@ -17067,6 +17139,16 @@ begin
 
     lua_register(L, 'darkMode', lua_darkMode);
     lua_register(L, 'getCEName', lua_getCEName);
+
+    // OnyxEngine Kernel Driver (OwMemDriver) Ring-0 bindings
+    lua_register(L, 'onyx_kernelConnect', lua_onyx_kernelConnect);
+    lua_register(L, 'onyx_kernelIsConnected', lua_onyx_kernelIsConnected);
+    lua_register(L, 'onyx_kernelHideDriver', lua_onyx_kernelHideDriver);
+    lua_register(L, 'onyx_kernelStripCallbacks', lua_onyx_kernelStripCallbacks);
+    lua_register(L, 'onyx_kernelCleanTraces', lua_onyx_kernelCleanTraces);
+    lua_register(L, 'onyx_kernelSetProtection', lua_onyx_kernelSetProtection);
+    lua_register(L, 'onyx_kernelFreezeProcess', lua_onyx_kernelFreezeProcess);
+    lua_register(L, 'onyx_kernelCloakSymlink', lua_onyx_kernelCloakSymlink);
     lua_register(L, 'getTempFolder', lua_getTempFolder);
     lua_register(L, 'fileExists', lua_fileExists);
     lua_register(L, 'deleteFile', lua_deleteFile);

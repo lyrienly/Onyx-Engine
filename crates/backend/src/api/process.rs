@@ -1,13 +1,23 @@
-// OnyxEngine Process & Memory Win32 Backend API
-// Direct C-ABI bridge for Pascal Cheat Engine front-end
 
 use std::ffi::{c_void, CStr};
 use std::os::raw::c_char;
-use onyx_core::process::{Process, ProcessWatcher, ProcessWatchEvent, DbgHelpSymbolEngine, PeInfoParser};
+use std::sync::{Arc, Mutex, OnceLock};
+use onyx_core::process::{Process, ProcessAccessMode, ProcessWatcher, ProcessWatchEvent, DbgHelpSymbolEngine, PeInfoParser};
+use onyx_core::kernel::DbkDriver;
 use crate::types::{OnyxModuleEntry, OnyxProcessEntry, OnyxMemoryRegion, OnyxPeSection, OnyxPeImport};
 
-/// Enumerate all running processes into out_entries buffer
-/// Returns the number of processes written, or -1 on error
+static GLOBAL_DBK: OnceLock<Mutex<Option<Arc<DbkDriver>>>> = OnceLock::new();
+
+fn get_dbk_mutex() -> &'static Mutex<Option<Arc<DbkDriver>>> {
+    GLOBAL_DBK.get_or_init(|| {
+        Mutex::new(DbkDriver::connect().ok().map(Arc::new))
+    })
+}
+
+pub fn get_global_dbk() -> Option<Arc<DbkDriver>> {
+    get_dbk_mutex().lock().ok().and_then(|guard| guard.clone())
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn onyx_process_list(
     out_entries: *mut OnyxProcessEntry,
@@ -34,17 +44,21 @@ pub unsafe extern "C" fn onyx_process_list(
     }
 }
 
-/// Attach to a target process by PID
-/// Returns an opaque pointer to the Process struct, or NULL on error
 #[no_mangle]
 pub unsafe extern "C" fn onyx_process_attach(pid: u32) -> *mut Process {
-    match Process::attach(pid) {
+    let dbk = get_global_dbk();
+    let mode = if dbk.is_some() {
+        ProcessAccessMode::KernelDbk
+    } else {
+        ProcessAccessMode::NtApi
+    };
+
+    match Process::attach_with_mode(pid, mode, dbk) {
         Ok(proc) => Box::into_raw(Box::new(proc)),
         Err(_) => std::ptr::null_mut(),
     }
 }
 
-/// Close and free an attached process handle
 #[no_mangle]
 pub unsafe extern "C" fn onyx_process_close(handle: *mut Process) {
     if !handle.is_null() {
@@ -52,8 +66,6 @@ pub unsafe extern "C" fn onyx_process_close(handle: *mut Process) {
     }
 }
 
-/// Read process memory (compatible with ReadProcessMemory calling convention)
-/// Returns 1 on success, 0 on failure
 #[no_mangle]
 pub unsafe extern "C" fn onyx_process_read(
     handle: *mut Process,
@@ -80,8 +92,6 @@ pub unsafe extern "C" fn onyx_process_read(
     }
 }
 
-/// Write process memory (compatible with WriteProcessMemory calling convention)
-/// Returns 1 on success, 0 on failure
 #[no_mangle]
 pub unsafe extern "C" fn onyx_process_write(
     handle: *mut Process,
@@ -108,8 +118,6 @@ pub unsafe extern "C" fn onyx_process_write(
     }
 }
 
-/// Change memory protection (compatible with VirtualProtectEx)
-/// Returns 1 on success, 0 on failure
 #[no_mangle]
 pub unsafe extern "C" fn onyx_process_protect(
     handle: *mut Process,
@@ -134,8 +142,6 @@ pub unsafe extern "C" fn onyx_process_protect(
     }
 }
 
-/// Allocate memory in target process (compatible with VirtualAllocEx)
-/// Returns allocated base address, or 0 on error
 #[no_mangle]
 pub unsafe extern "C" fn onyx_process_alloc(
     handle: *mut Process,
@@ -152,8 +158,6 @@ pub unsafe extern "C" fn onyx_process_alloc(
     proc.alloc(size, protect).unwrap_or(0)
 }
 
-/// Free memory in target process (compatible with VirtualFreeEx)
-/// Returns 1 on success, 0 on error
 #[no_mangle]
 pub unsafe extern "C" fn onyx_process_free(
     handle: *mut Process,
@@ -172,8 +176,6 @@ pub unsafe extern "C" fn onyx_process_free(
     }
 }
 
-/// Enumerate modules of attached process
-/// Returns number of modules written, or -1 on error
 #[no_mangle]
 pub unsafe extern "C" fn onyx_process_modules(
     handle: *mut Process,
@@ -201,7 +203,6 @@ pub unsafe extern "C" fn onyx_process_modules(
     }
 }
 
-/// Enumerate memory regions of attached process
 #[no_mangle]
 pub unsafe extern "C" fn onyx_process_regions(
     handle: *mut Process,
@@ -235,8 +236,6 @@ pub unsafe extern "C" fn onyx_process_regions(
     }
 }
 
-/// Atomically suspends target process via NtSuspendProcess
-/// Returns 1 on success, 0 on failure
 #[no_mangle]
 pub unsafe extern "C" fn onyx_process_suspend(handle: *mut Process) -> i32 {
     if handle.is_null() {
@@ -248,8 +247,6 @@ pub unsafe extern "C" fn onyx_process_suspend(handle: *mut Process) -> i32 {
     }
 }
 
-/// Atomically resumes target process via NtResumeProcess
-/// Returns 1 on success, 0 on failure
 #[no_mangle]
 pub unsafe extern "C" fn onyx_process_resume(handle: *mut Process) -> i32 {
     if handle.is_null() {
@@ -260,8 +257,6 @@ pub unsafe extern "C" fn onyx_process_resume(handle: *mut Process) -> i32 {
         Err(_) => 0,
     }
 }
-
-// Process Watcher API
 
 #[no_mangle]
 pub unsafe extern "C" fn onyx_process_watcher_create() -> *mut ProcessWatcher {
@@ -308,9 +303,6 @@ pub unsafe extern "C" fn onyx_process_watcher_stop(watcher: *mut ProcessWatcher)
     }
 }
 
-/// Polls for next process event.
-/// Returns 1 if event returned, 0 if queue empty.
-/// out_event_type: 1 = Created, 2 = Terminated
 #[no_mangle]
 pub unsafe extern "C" fn onyx_process_watcher_poll(
     watcher: *mut ProcessWatcher,
@@ -334,8 +326,6 @@ pub unsafe extern "C" fn onyx_process_watcher_poll(
         None => 0,
     }
 }
-
-// PDB Symbol Resolver API
 
 #[no_mangle]
 pub unsafe extern "C" fn onyx_symbol_init_pdb(
@@ -430,7 +420,6 @@ pub unsafe extern "C" fn onyx_symbol_resolve_address(
     }
 }
 
-/// Parses all PE sections of a loaded module
 #[no_mangle]
 pub unsafe extern "C" fn onyx_pe_parse_sections(
     handle: *mut Process,
@@ -473,7 +462,6 @@ pub unsafe extern "C" fn onyx_pe_parse_sections(
     }
 }
 
-/// Parses the Import Address Table (IAT) and imported modules/APIs of a loaded module
 #[no_mangle]
 pub unsafe extern "C" fn onyx_pe_parse_imports(
     handle: *mut Process,
@@ -525,3 +513,130 @@ pub unsafe extern "C" fn onyx_pe_parse_imports(
         Err(_) => -1,
     }
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_kernel_connect(device_path: *const c_char) -> i32 {
+    let res = if !device_path.is_null() {
+        if let Ok(c_str) = CStr::from_ptr(device_path).to_str() {
+            DbkDriver::connect_device(c_str)
+        } else {
+            DbkDriver::connect()
+        }
+    } else {
+        DbkDriver::connect()
+    };
+
+    match res {
+        Ok(driver) => {
+            if let Ok(mut guard) = get_dbk_mutex().lock() {
+                *guard = Some(Arc::new(driver));
+            }
+            1
+        }
+        Err(_) => 0,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn onyx_kernel_is_connected() -> i32 {
+    if let Some(ref dbk) = get_global_dbk() {
+        if dbk.test() { 1 } else { 0 }
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn onyx_kernel_hide_driver() -> i32 {
+    if let Some(ref dbk) = get_global_dbk() {
+        if dbk.hide_driver().is_ok() { 1 } else { 0 }
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn onyx_kernel_strip_callbacks(restore: i32) -> i32 {
+    if let Some(ref dbk) = get_global_dbk() {
+        match dbk.strip_callbacks(restore != 0) {
+            Ok(count) => count as i32,
+            Err(_) => -1,
+        }
+    } else {
+        -1
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn onyx_kernel_clean_traces() -> i32 {
+    if let Some(ref dbk) = get_global_dbk() {
+        if dbk.clean_traces().is_ok() { 1 } else { 0 }
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn onyx_kernel_set_protection(pid: u32, enable: i32) -> i32 {
+    if let Some(ref dbk) = get_global_dbk() {
+        if dbk.set_protection(pid, enable != 0).is_ok() { 1 } else { 0 }
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn onyx_kernel_freeze_process(pid: u32, freeze: i32) -> i32 {
+    if let Some(ref dbk) = get_global_dbk() {
+        if dbk.freeze_process(pid, freeze != 0).is_ok() { 1 } else { 0 }
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_kernel_cloak_symlink(new_symlink: *const c_char) -> i32 {
+    if new_symlink.is_null() {
+        return 0;
+    }
+    if let Ok(c_str) = CStr::from_ptr(new_symlink).to_str() {
+        if let Some(ref dbk) = get_global_dbk() {
+            if dbk.cloak_symlink(c_str).is_ok() { 1 } else { 0 }
+        } else {
+            0
+        }
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_kernel_enum_vad(
+    pid: u32,
+    out_modules: *mut OnyxModuleEntry,
+    max_count: u32,
+    out_total: *mut u32,
+) -> i32 {
+    if out_modules.is_null() || max_count == 0 {
+        return -1;
+    }
+
+    if let Some(ref dbk) = get_global_dbk() {
+        match dbk.enum_vad_modules(pid) {
+            Ok(mods) => {
+                if !out_total.is_null() {
+                    *out_total = mods.len() as u32;
+                }
+                let write_count = mods.len().min(max_count as usize);
+                for i in 0..write_count {
+                    *out_modules.add(i) = OnyxModuleEntry::new(mods[i].base, mods[i].size, &mods[i].name);
+                }
+                write_count as i32
+            }
+            Err(_) => -1,
+        }
+    } else {
+        -1
+    }
+}
+

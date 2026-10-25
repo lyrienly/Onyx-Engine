@@ -4,10 +4,6 @@ end
 
 require([[autorun\javaClassEditor]])
 
---parser for .class files and java bytecode
---http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html
-
---constant type values
 java_CONSTANT_Class=7
 java_CONSTANT_Fieldref=9
 java_CONSTANT_Methodref=10
@@ -23,14 +19,12 @@ java_CONSTANT_MethodHandle=15
 java_CONSTANT_MethodType=16
 java_CONSTANT_InvokeDynamic=18
 
-
 function java_read_u4(stream)
   local b={string.byte(stream.data, stream.index,stream.index+4-1)}
   stream.index=stream.index+4
 
   return byteTableToDword({b[4],b[3],b[2],b[1]})
 end
-
 
 function java_read_u2(stream)
   local b={string.byte(stream.data, stream.index,stream.index+2-1)}
@@ -77,7 +71,6 @@ function java_parseConstantPool_InterfaceMethodref(stream)
   return result
 end
 
-
 function java_parseConstantPool_String(stream)
   result={}
   result.tag=java_CONSTANT_String
@@ -85,7 +78,6 @@ function java_parseConstantPool_String(stream)
 
   return result
 end
-
 
 function java_parseConstantPool_Integer(stream)
   result={}
@@ -103,7 +95,6 @@ function java_parseConstantPool_Float(stream)
   result.value=byteTableToFloat(dwordToByteTable(result.bytes))
   return result
 end
-
 
 function java_parseConstantPool_Long(stream)
   result={}
@@ -186,11 +177,6 @@ function java_parseConstantPool_InvokeDynamic(stream)
   return result
 end
 
-
-
-
-
-
 java_parseConstantPoolTag={}
 java_parseConstantPoolTag[java_CONSTANT_Class]=java_parseConstantPool_Class
 java_parseConstantPoolTag[java_CONSTANT_Fieldref]=java_parseConstantPool_Fieldref
@@ -207,16 +193,12 @@ java_parseConstantPoolTag[java_CONSTANT_MethodHandle]=java_parseConstantPool_Met
 java_parseConstantPoolTag[java_CONSTANT_MethodType]=java_parseConstantPool_MethodType
 java_parseConstantPoolTag[java_CONSTANT_InvokeDynamic]=java_parseConstantPool_InvokeDynamic
 
-
 function java_parseConstantPool(s, count)
   local i
   local result={}
 
-
   for i=1,count-1 do
     local tag=java_read_u1(s)
-
-  --print(tag.." "..string.format("%x",s.index))
 
   if java_parseConstantPoolTag[tag]~=nil then
     result[i]=java_parseConstantPoolTag[tag](s)
@@ -230,7 +212,7 @@ function java_parseConstantPool(s, count)
 end
 
 function java_parseAttribute_ConstantValue(cp, a)
-  --create a local stream for parsing the info bytes of the attribute
+
   local s={}
   s.data=a.info
   s.index=1
@@ -247,9 +229,7 @@ function java_parseBytecode(cp, s, code_length)
   local result={}
   local bytes={string.byte(s.data, s.index, s.index+code_length-1)}
 
-  --parse the bytes into an array of programcounter and interpreted bytecode command
   result=bytecodeDisassembler(bytes)
-
 
   s.index=s.index+code_length
   return result
@@ -296,16 +276,10 @@ function java_parseAttribute_Exceptions(cp, a)
   end
 end
 
-
-
 java_parseAttribute={}
 java_parseAttribute["ConstantValue"]=java_parseAttribute_ConstantValue
 java_parseAttribute["Code"]=java_parseAttribute_Code
 java_parseAttribute["Exceptions"]=java_parseAttribute_Exceptions
-
-
-
---add more yourself...
 
 function java_parseAttributes(cp, s, count)
   local i
@@ -317,15 +291,11 @@ function java_parseAttributes(cp, s, count)
   result[i].info=string.sub(s.data, s.index, s.index+result[i].attribute_length-1)
   s.index=s.index+result[i].attribute_length
 
-  --fill in some extra data (not required for rebuilding)
   result[i].attribute_name=cp[result[i].attribute_name_index].utf8
 
-
-
-  if java_parseAttribute[result[i].attribute_name]~=nil then --extra data for this attribute is available
+  if java_parseAttribute[result[i].attribute_name]~=nil then
     java_parseAttribute[result[i].attribute_name](cp, result[i])
   end
-
 
   end
   return result
@@ -335,7 +305,6 @@ function java_parseFields(cp, s, count)
   local i
   local result={}
 
-
   for i=1,count do
     result[i]={}
     result[i].access_flags=java_read_u2(s)
@@ -347,14 +316,11 @@ function java_parseFields(cp, s, count)
 
   return result
 end
-
-
 
 function java_parseMethods(cp, s, count)
   local i
   local result={}
 
-
   for i=1,count do
     result[i]={}
     result[i].access_flags=java_read_u2(s)
@@ -364,13 +330,8 @@ function java_parseMethods(cp, s, count)
   result[i].attributes=java_parseAttributes(cp, s, result[i].attributes_count)
   end
 
-
   return result
 end
-
-
-
-
 
 function java_parseClass(data)
   local result={}
@@ -407,21 +368,15 @@ function java_parseClass(data)
   result.methods_count=java_read_u2(s)
   result.methods=java_parseMethods(result.constant_pool, s, result.methods_count)
 
-
   result.attributes_count=java_read_u2(s)
   result.attributes=java_parseAttributes(result.constant_pool, s, result.attributes_count)
-
 
   return result
 end
 
-----------------------------------------Write class---------------------------------------
-
-
 function java_write_u4(stream, value)
   assert(value)
   local b=dwordToByteTable(value)
-
 
   stream.data=stream.data..string.char(b[4], b[3], b[2],b[1])
   stream.index=stream.index+4
@@ -441,8 +396,6 @@ function java_write_u1(stream, value)
   stream.data=stream.data..string.char(value)
   stream.index=stream.index+1
 end
-
-
 
 function java_writeConstantPool_Class(s, cpitem)
   java_write_u2(s, cpitem.name_index)
@@ -514,7 +467,6 @@ function java_writeConstantPool_InvokeDynamic(s, cpitem)
   java_write_u2(s, cpitem.name_and_type_index)
 end
 
-
 java_writeConstantPoolTag={}
 java_writeConstantPoolTag[java_CONSTANT_Class]=java_writeConstantPool_Class
 java_writeConstantPoolTag[java_CONSTANT_Fieldref]=java_writeConstantPool_Fieldref
@@ -530,7 +482,6 @@ java_writeConstantPoolTag[java_CONSTANT_Utf8]=java_writeConstantPool_Utf8
 java_writeConstantPoolTag[java_CONSTANT_MethodHandle]=java_writeConstantPool_MethodHandle
 java_writeConstantPoolTag[java_CONSTANT_MethodType]=java_writeConstantPool_MethodType
 java_writeConstantPoolTag[java_CONSTANT_InvokeDynamic]=java_writeConstantPool_InvokeDynamic
-
 
 function java_writeConstantPool(s, constant_pool, constant_pool_count)
   local i
@@ -553,7 +504,6 @@ function java_writeAttributes(s, attributes, attributes_count)
   end
 
 end
-
 
 function java_writeFields(s, fields, field_count)
   local i
@@ -579,10 +529,6 @@ function java_writeMethods(s, methods, method_count)
   java_writeAttributes(s, methods[i].attributes, methods[i].attributes_count)
   end
 end
-
-
-
-
 
 function java_writeClass(class)
   local s={}
@@ -618,9 +564,6 @@ function java_writeClass(class)
   return s.data
 end
 
-
-----------------------------------------runtime helpers----------------------------------------
-
 function javaclass_getMethodName(class, method)
   return class.constant_pool[method.name_index].utf8
 end
@@ -629,7 +572,7 @@ function javaclass_getExceptionTable(class, method)
 end
 
 function javaclass_findMethod(class, methodname)
-  --returns the method table for the requested method
+
   local i
 
   for i=1, class.methods_count do
@@ -657,26 +600,3 @@ function javaclass_method_findCodeAttribute(method)
   return nil
 end
 
-
---teststuff
-
---function trace(event, line)
---  print(line)
---end
-
-
---f=io.open([[c:\Users\DB\workspace\guitest\bin\Test.class]],"rb")
---data=f:read("*all")
---f:close()
-
---x=java_parseClass(data)
-
---debug.sethook(trace, "l")
-
---newdata=java_writeClass(x)
-
---f2=io.open([[c:\Users\DB\workspace\guitest\bin\bla\Test.class]],"wb")
---f2:write(newdata)
---f2:close()
-
---x2=java_parseClass(newdata)

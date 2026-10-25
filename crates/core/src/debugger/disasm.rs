@@ -1,6 +1,3 @@
-// language: Rust, file: disasm.rs, target: Windows 11, MSVC
-// Full-featured x86/x64 instruction decoder and disassembler for Cheat Engine
-// Mirrors Cheat Engine 7.5 Disassembler.pas & DisassemblerViewUnit.pas
 
 use crate::process::ModuleEntry;
 
@@ -82,10 +79,9 @@ impl Disassembler {
         let mut idx = 0;
         let mut rex = 0u8;
         let mut operand_size_override = false;
-        let mut repeat_prefix = 0u8; // 0xF2 or 0xF3 for SSE scalar
+        let mut repeat_prefix = 0u8;
         let mut segment_override = "";
 
-        // Parse prefixes
         while idx < code.len() {
             let b = code[idx];
             match b {
@@ -117,7 +113,7 @@ impl Disassembler {
         let rex_b = (rex & 0x01) != 0;
 
         match opcode {
-            // NOP
+
             0x90 => DecodedInsn {
                 address: addr,
                 bytes: code[..idx].to_vec(),
@@ -126,7 +122,7 @@ impl Disassembler {
                 length: idx,
                 target_addr: None,
             },
-            // INT3
+
             0xCC => DecodedInsn {
                 address: addr,
                 bytes: code[..idx].to_vec(),
@@ -135,7 +131,7 @@ impl Disassembler {
                 length: idx,
                 target_addr: None,
             },
-            // INT imm8
+
             0xCD => {
                 let imm = if idx < code.len() { let b = code[idx]; idx += 1; b } else { 0 };
                 DecodedInsn {
@@ -147,7 +143,7 @@ impl Disassembler {
                     target_addr: None,
                 }
             }
-            // RET
+
             0xC3 => DecodedInsn {
                 address: addr,
                 bytes: code[..idx].to_vec(),
@@ -156,7 +152,7 @@ impl Disassembler {
                 length: idx,
                 target_addr: None,
             },
-            // RET imm16
+
             0xC2 => {
                 let imm = if idx + 2 <= code.len() {
                     let v = u16::from_le_bytes([code[idx], code[idx + 1]]);
@@ -172,7 +168,7 @@ impl Disassembler {
                     target_addr: None,
                 }
             }
-            // LEAVE
+
             0xC9 => DecodedInsn {
                 address: addr,
                 bytes: code[..idx].to_vec(),
@@ -181,7 +177,7 @@ impl Disassembler {
                 length: idx,
                 target_addr: None,
             },
-            // PUSH reg64
+
             0x50..=0x57 => {
                 let reg_id = (opcode - 0x50) + if rex_b { 8 } else { 0 };
                 DecodedInsn {
@@ -193,7 +189,7 @@ impl Disassembler {
                     target_addr: None,
                 }
             }
-            // POP reg64
+
             0x58..=0x5F => {
                 let reg_id = (opcode - 0x58) + if rex_b { 8 } else { 0 };
                 DecodedInsn {
@@ -205,7 +201,7 @@ impl Disassembler {
                     target_addr: None,
                 }
             }
-            // PUSH imm8
+
             0x6A => {
                 let imm = if idx < code.len() { let b = code[idx] as i8; idx += 1; b } else { 0 };
                 DecodedInsn {
@@ -217,7 +213,7 @@ impl Disassembler {
                     target_addr: None,
                 }
             }
-            // PUSH imm32
+
             0x68 => {
                 let imm = if idx + 4 <= code.len() {
                     let v = u32::from_le_bytes([code[idx], code[idx + 1], code[idx + 2], code[idx + 3]]);
@@ -233,7 +229,7 @@ impl Disassembler {
                     target_addr: None,
                 }
             }
-            // JMP rel8
+
             0xEB => {
                 if idx < code.len() {
                     let rel = code[idx] as i8;
@@ -251,7 +247,7 @@ impl Disassembler {
                     fallback(addr, code)
                 }
             }
-            // JMP rel32
+
             0xE9 => {
                 if idx + 4 <= code.len() {
                     let rel = i32::from_le_bytes([code[idx], code[idx + 1], code[idx + 2], code[idx + 3]]);
@@ -269,7 +265,7 @@ impl Disassembler {
                     fallback(addr, code)
                 }
             }
-            // CALL rel32
+
             0xE8 => {
                 if idx + 4 <= code.len() {
                     let rel = i32::from_le_bytes([code[idx], code[idx + 1], code[idx + 2], code[idx + 3]]);
@@ -287,7 +283,7 @@ impl Disassembler {
                     fallback(addr, code)
                 }
             }
-            // Jcc rel8
+
             0x70..=0x7F => {
                 if idx < code.len() {
                     let rel = code[idx] as i8;
@@ -306,7 +302,7 @@ impl Disassembler {
                     fallback(addr, code)
                 }
             }
-            // MOV reg8, imm8 (0xB0..=0xB7)
+
             0xB0..=0xB7 => {
                 let reg_id = (opcode - 0xB0) + if rex_b { 8 } else { 0 };
                 let imm = if idx < code.len() { let b = code[idx]; idx += 1; b } else { 0 };
@@ -319,7 +315,7 @@ impl Disassembler {
                     target_addr: None,
                 }
             }
-            // MOV reg, imm32 / imm64 (0xB8..=0xBF)
+
             0xB8..=0xBF => {
                 let reg_id = (opcode - 0xB8) + if rex_b { 8 } else { 0 };
                 if rex_w {
@@ -358,7 +354,7 @@ impl Disassembler {
                     }
                 }
             }
-            // XCHG rax, reg
+
             0x91..=0x97 => {
                 let reg_id = (opcode - 0x90) + if rex_b { 8 } else { 0 };
                 let r1 = if rex_w { "rax" } else { "eax" };
@@ -372,11 +368,11 @@ impl Disassembler {
                     target_addr: None,
                 }
             }
-            // Two-byte opcodes (0x0F ...)
+
             0x0F => {
                 decode_two_byte_op(addr, code, idx, rex_w, rex_r, rex_x, rex_b, operand_size_override, repeat_prefix, segment_override)
             }
-            // Standard ModR/M opcodes
+
             _ => {
                 decode_one_byte_modrm(addr, code, idx, opcode, rex_w, rex_r, rex_x, rex_b, operand_size_override, segment_override)
             }
@@ -418,12 +414,11 @@ fn decode_one_byte_modrm(
         reg32_name(reg_idx)
     };
 
-    // Standard ALU (ADD, OR, ADC, SBB, AND, SUB, XOR, CMP)
     let alu_ops = ["add", "or", "adc", "sbb", "and", "sub", "xor", "cmp"];
     let alu_idx = (op >> 3) & 0x07;
 
     let (mnemonic, operands) = match op {
-        // ALU reg/mem (0x00..=0x3F)
+
         0x00..=0x3B => {
             let mnem = alu_ops[alu_idx as usize];
             if is_reg_dest {
@@ -432,11 +427,11 @@ fn decode_one_byte_modrm(
                 (mnem, format!("{}, {}", rm_desc, reg_name))
             }
         }
-        // ALU al/eax, imm (0x04, 0x05, 0x0C, 0x0D, etc.)
+
         0x3C..=0x3D => ("cmp", format!("{}, {}", reg_name, rm_desc)),
-        // MOVSXD (0x63)
+
         0x63 => ("movsxd", format!("{}, {}", reg64_name(reg_idx), rm_desc)),
-        // IMUL reg, rm, imm
+
         0x69 => {
             let imm = if idx + 4 <= code.len() {
                 let v = u32::from_le_bytes([code[idx], code[idx+1], code[idx+2], code[idx+3]]);
@@ -448,12 +443,12 @@ fn decode_one_byte_modrm(
             let imm = if idx < code.len() { let b = code[idx] as i8; idx += 1; b } else { 0 };
             ("imul", format!("{}, {}, 0x{:02X}", reg_name, rm_desc, imm as u8))
         }
-        // Group 1 immediate ALU (0x80, 0x81, 0x82, 0x83)
+
         0x80..=0x83 => {
             let subop = (modrm >> 3) & 0x07;
             let mnem = alu_ops[subop as usize];
             if op == 0x83 {
-                // 8-bit sign-extended immediate
+
                 let imm = if idx < code.len() { let b = code[idx] as i8; idx += 1; b } else { 0 };
                 (mnem, format!("{}, 0x{:02X}", rm_desc, imm as u8))
             } else if op == 0x80 || op == 0x82 {
@@ -467,17 +462,17 @@ fn decode_one_byte_modrm(
                 (mnem, format!("{}, 0x{:08X}", rm_desc, imm))
             }
         }
-        // TEST (0x84, 0x85)
+
         0x84 | 0x85 => ("test", format!("{}, {}", rm_desc, reg_name)),
-        // XCHG (0x86, 0x87)
+
         0x86 | 0x87 => ("xchg", format!("{}, {}", rm_desc, reg_name)),
-        // MOV (0x88, 0x89) - rm is dest
+
         0x88 | 0x89 => ("mov", format!("{}, {}", rm_desc, reg_name)),
-        // MOV (0x8A, 0x8B) - reg is dest
+
         0x8A | 0x8B => ("mov", format!("{}, {}", reg_name, rm_desc)),
-        // LEA (0x8D)
+
         0x8D => ("lea", format!("{}, {}", reg_name, rm_desc)),
-        // Group 2 Shift/Rotate imm8 (0xC0, 0xC1)
+
         0xC0 | 0xC1 => {
             let subop = (modrm >> 3) & 0x07;
             let shift_ops = ["rol", "ror", "rcl", "rcr", "shl", "shr", "sal", "sar"];
@@ -485,7 +480,7 @@ fn decode_one_byte_modrm(
             let imm = if idx < code.len() { let b = code[idx]; idx += 1; b } else { 0 };
             (mnem, format!("{}, 0x{:02X}", rm_desc, imm))
         }
-        // MOV rm, imm (0xC6, 0xC7)
+
         0xC6 => {
             let imm = if idx < code.len() { let b = code[idx]; idx += 1; b } else { 0 };
             ("mov", format!("byte ptr {}, 0x{:02X}", rm_desc, imm))
@@ -497,7 +492,7 @@ fn decode_one_byte_modrm(
             } else { 0 };
             ("mov", format!("{}, 0x{:08X}", rm_desc, imm))
         }
-        // Group 2 Shift/Rotate 1 / cl (0xD0..=0xD3)
+
         0xD0..=0xD3 => {
             let subop = (modrm >> 3) & 0x07;
             let shift_ops = ["rol", "ror", "rcl", "rcr", "shl", "shr", "sal", "sar"];
@@ -505,7 +500,7 @@ fn decode_one_byte_modrm(
             let count = if (op & 0x02) != 0 { "cl" } else { "1" };
             (mnem, format!("{}, {}", rm_desc, count))
         }
-        // Group 3 (0xF6, 0xF7): test, not, neg, mul, imul, div, idiv
+
         0xF6 | 0xF7 => {
             let subop = (modrm >> 3) & 0x07;
             match subop {
@@ -529,7 +524,7 @@ fn decode_one_byte_modrm(
                 _ => ("grp3", rm_desc),
             }
         }
-        // Group 4 (0xFE)
+
         0xFE => {
             let subop = (modrm >> 3) & 0x07;
             match subop {
@@ -538,7 +533,7 @@ fn decode_one_byte_modrm(
                 _ => ("grp4", rm_desc),
             }
         }
-        // Group 5 (0xFF): inc, dec, call, jmp, push
+
         0xFF => {
             let subop = (modrm >> 3) & 0x07;
             match subop {
@@ -551,7 +546,7 @@ fn decode_one_byte_modrm(
             }
         }
         _ => {
-            // General fallback
+
             ("db", format!("0x{:02X}", op))
         }
     };
@@ -586,7 +581,7 @@ fn decode_two_byte_op(
     idx += 1;
 
     match op2 {
-        // SYSCALL
+
         0x05 => DecodedInsn {
             address: addr,
             bytes: code[..idx].to_vec(),
@@ -595,7 +590,7 @@ fn decode_two_byte_op(
             length: idx,
             target_addr: None,
         },
-        // CPUID
+
         0xA2 => DecodedInsn {
             address: addr,
             bytes: code[..idx].to_vec(),
@@ -604,7 +599,7 @@ fn decode_two_byte_op(
             length: idx,
             target_addr: None,
         },
-        // Jcc rel32 (0x0F 0x80..=0x8F)
+
         0x80..=0x8F => {
             if idx + 4 <= code.len() {
                 let rel = i32::from_le_bytes([code[idx], code[idx + 1], code[idx + 2], code[idx + 3]]);
@@ -623,7 +618,7 @@ fn decode_two_byte_op(
                 fallback(addr, code)
             }
         }
-        // ModR/M 2-byte opcodes
+
         _ => {
             if idx >= code.len() {
                 return fallback(addr, code);
@@ -636,9 +631,9 @@ fn decode_two_byte_op(
             let xmm_name = format!("xmm{}", reg_idx);
 
             let (mnemonic, operands) = match op2 {
-                // NOP multi-byte (0x0F 0x1F)
+
                 0x1F => ("nop", format!("dword ptr {}", rm_desc)),
-                // MOVUPS / MOVSS / MOVSD (0x0F 0x10, 0x11)
+
                 0x10 => {
                     let mnem = if repeat_prefix == 0xF3 { "movss" } else if repeat_prefix == 0xF2 { "movsd" } else { "movups" };
                     (mnem, format!("{}, {}", xmm_name, rm_desc))
@@ -647,35 +642,35 @@ fn decode_two_byte_op(
                     let mnem = if repeat_prefix == 0xF3 { "movss" } else if repeat_prefix == 0xF2 { "movsd" } else { "movups" };
                     (mnem, format!("{}, {}", rm_desc, xmm_name))
                 }
-                // MOVAPS / MOVAPD (0x0F 0x28, 0x29)
+
                 0x28 => ("movaps", format!("{}, {}", xmm_name, rm_desc)),
                 0x29 => ("movaps", format!("{}, {}", rm_desc, xmm_name)),
-                // COMISS / UCOMISS (0x0F 0x2E, 0x2F)
+
                 0x2E => ("ucomiss", format!("{}, {}", xmm_name, rm_desc)),
                 0x2F => ("comiss", format!("{}, {}", xmm_name, rm_desc)),
-                // XORPS (0x0F 0x57)
+
                 0x57 => ("xorps", format!("{}, {}", xmm_name, rm_desc)),
-                // ADDSS / ADDPS (0x0F 0x58)
+
                 0x58 => {
                     let mnem = if repeat_prefix == 0xF3 { "addss" } else if repeat_prefix == 0xF2 { "addsd" } else { "addps" };
                     (mnem, format!("{}, {}", xmm_name, rm_desc))
                 }
-                // MULSS / MULPS (0x0F 0x59)
+
                 0x59 => {
                     let mnem = if repeat_prefix == 0xF3 { "mulss" } else if repeat_prefix == 0xF2 { "mulsd" } else { "mulps" };
                     (mnem, format!("{}, {}", xmm_name, rm_desc))
                 }
-                // SUBSS / SUBPS (0x0F 0x5C)
+
                 0x5C => {
                     let mnem = if repeat_prefix == 0xF3 { "subss" } else if repeat_prefix == 0xF2 { "subsd" } else { "subps" };
                     (mnem, format!("{}, {}", xmm_name, rm_desc))
                 }
-                // DIVSS / DIVPS (0x0F 0x5E)
+
                 0x5E => {
                     let mnem = if repeat_prefix == 0xF3 { "divss" } else if repeat_prefix == 0xF2 { "divsd" } else { "divps" };
                     (mnem, format!("{}, {}", xmm_name, rm_desc))
                 }
-                // SETcc (0x0F 0x90..=0x9F)
+
                 0x90..=0x9F => {
                     let cond = jcc_name(op2 & 0x0F);
                     let mnem = match cond {
@@ -687,15 +682,15 @@ fn decode_two_byte_op(
                     };
                     (mnem, format!("byte ptr {}", rm_desc))
                 }
-                // IMUL reg, rm (0x0F 0xAF)
+
                 0xAF => ("imul", format!("{}, {}", reg_name, rm_desc)),
-                // MOVZX reg, byte ptr (0x0F 0xB6)
+
                 0xB6 => ("movzx", format!("{}, byte ptr {}", reg_name, rm_desc)),
-                // MOVZX reg, word ptr (0x0F 0xB7)
+
                 0xB7 => ("movzx", format!("{}, word ptr {}", reg_name, rm_desc)),
-                // MOVSX reg, byte ptr (0x0F 0xBE)
+
                 0xBE => ("movsx", format!("{}, byte ptr {}", reg_name, rm_desc)),
-                // MOVSX reg, word ptr (0x0F 0xBF)
+
                 0xBF => ("movsx", format!("{}, word ptr {}", reg_name, rm_desc)),
                 _ => ("0x0F", format!("0x{:02X} {}", op2, rm_desc)),
             };
@@ -729,7 +724,7 @@ fn parse_modrm_operands(
     let rm = (modrm & 0x07) | if rex_b { 8 } else { 0 };
 
     if md == 3 {
-        // Register direct
+
         let name = if rex_w {
             reg64_name(rm).to_string()
         } else if op_override {
@@ -740,13 +735,11 @@ fn parse_modrm_operands(
         return (name, reg, None);
     }
 
-    // Memory addressing
     let mut disp: i64 = 0;
     let mut has_disp = false;
     let mut is_rip_relative = false;
     let mut sib_str = String::new();
 
-    // Check SIB
     if (rm & 0x07) == 4 {
         if *idx < code.len() {
             let sib = code[*idx];
@@ -757,7 +750,7 @@ fn parse_modrm_operands(
 
             if index != 4 {
                 if base == 5 && md == 0 {
-                    // base is disp32
+
                     sib_str = format!("{}{}*{}", seg, reg64_name(index), scale);
                 } else {
                     sib_str = format!("{}{}+{ }*{}", seg, reg64_name(base), reg64_name(index), scale);
@@ -768,9 +761,8 @@ fn parse_modrm_operands(
         }
     }
 
-    // Displacement
     if md == 0 && (rm & 0x07) == 5 {
-        // RIP-relative in 64-bit mode
+
         if *idx + 4 <= code.len() {
             let d = i32::from_le_bytes([code[*idx], code[*idx+1], code[*idx+2], code[*idx+3]]);
             *idx += 4;
@@ -928,3 +920,4 @@ mod tests {
         assert_eq!(insns[0].target_addr, Some(0x1015));
     }
 }
+

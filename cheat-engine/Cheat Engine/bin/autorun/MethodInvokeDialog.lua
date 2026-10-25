@@ -1,23 +1,3 @@
---[[
-Just a generic form for filling in fields. The caller is responsible for the callbacks
-Can be other types besides .NET  so no .net/mono specific code here  (just generic OOP things)
-
-createMethodInvokeDialog returns true on ok, false on cancel
-
-invokeDialogParams:{
-name
-nonmodal: boolean - When true the form won't close on clicking ok, but instead calls an OnOKClick function
-isStatic: boolean (true/false/nil) - When true the instance address field will be hidden
-allowCustomAddress: boolean (true/false/nil) - When true the instance address field will be editable
-address: integer - address of the instance
-parameters[]={varname=xxx, isObject=true/false/nil}, whatever else you wish, value=undefined} : After the call returns, the element named 'value' will be filled in by the users input
-onCreateInstanceClick: function(dialog, invokeDialogParams, parameterindex) : string - Called when the + button is clicked. Return a string with the address or 'other' constructor code if you created an object (up to the caller)
-onOKClick: function(dialog, invokeDialogParams, output) --called when nonmodal is true . Output is a strings object of the listbox used to show results to the user
-}
-
-
---]]
-
 
 local dpiscale=getScreenDPI()/96
 
@@ -52,7 +32,6 @@ local function createMethodInvokeDialogEx(invokeDialogParams)
   midinfo.pnlButtons.BorderSpacing.Bottom=5
   midinfo.pnlButtons.ChildSizing.HorizontalSpacing=8
 
-
   midinfo.btnOk=createButton(midinfo.mid)
   midinfo.btnCancel=createButton(midinfo.mid)
 
@@ -71,7 +50,6 @@ local function createMethodInvokeDialogEx(invokeDialogParams)
   midinfo.pnlButtons.AnchorSideLeft.Side=asrCenter
   midinfo.pnlButtons.Anchors='[akLeft, akTop]'
 
-
   midinfo.output=createListBox(midinfo.mid)
   midinfo.output.Visible=false
   midinfo.output.AnchorSideBottom.Control=midinfo.mid
@@ -84,14 +62,6 @@ local function createMethodInvokeDialogEx(invokeDialogParams)
   midinfo.output.AnchorSideRight.Side=asrRight
 
   midinfo.output.Anchors='[akLeft, akRight, akBottom, akTop]'
-  --midinfo.output.Anchors='[akLeft, akRight, akBottom]'
-
-
-
-
-
- -- midinfo.pnlButtons.Color=clRed
-
 
   if (not invokeDialogParams.isStatic) and invokeDialogParams.allowCustomAddress then
     midinfo.lblInstanceAddress.AnchorSideTop.Control=midinfo.mid
@@ -121,12 +91,9 @@ local function createMethodInvokeDialogEx(invokeDialogParams)
   midinfo.gbParams.AnchorSideRight.Control=midinfo.mid
   midinfo.gbParams.AnchorSideRight.Side=asrRight
 
-
   midinfo.gbParams.Anchors='[akLeft, akRight, akTop]'
 
   midinfo.gbParams.autoSize=true
-
-  --midinfo.mid.AutoSize=true
 
   midinfo.parameters={}
 
@@ -159,27 +126,21 @@ local function createMethodInvokeDialogEx(invokeDialogParams)
     lblVarName.AnchorSideTop.Control=edtVarText
     lblVarName.AnchorSideTop.Side=asrCenter
 
-
     if i==1 then
-
 
       edtVarText.AnchorSideTop.Control=midinfo.gbParams
       edtVarText.AnchorSideTop.Side=asrTop
       edtVarText.AnchorSideLeft.Control=midinfo.gbParams
       edtVarText.AnchorSideLeft.Side=asrLeft
-      
-      
 
-      --borderspacing.Left will set the position
     else
-
 
       edtVarText.AnchorSideTop.Control=midinfo.parameters[i-1].edtVarText
       edtVarText.AnchorSideTop.Side=asrBottom
       edtVarText.AnchorSideLeft.Control=midinfo.parameters[i-1].edtVarText
-      edtVarText.AnchorSideLeft.Side=asrLeft --same position as the top (which gets set later)
+      edtVarText.AnchorSideLeft.Side=asrLeft
     end
-    
+
     edtVarText.TabOrder=i-1
 
     btnCreateInstance.AnchorSideTop.Control=edtVarText
@@ -190,24 +151,20 @@ local function createMethodInvokeDialogEx(invokeDialogParams)
     edtVarText.AnchorSideRight.Side=asrLeft
     edtVarText.BorderSpacing.Right=2*dpiscale
 
-
     edtVarText.Anchors='[akLeft, akRight, akTop]'
 
     btnCreateInstance.caption='+'
     btnCreateInstance.Anchors='[akTop, akRight]'
 
-
     midinfo.parameters[i]={}
-
 
     if type(parameters[i])=='table' then
       lblVarName.Caption=parameters[i].varname:trim()
       btnCreateInstance.visible=parameters[i].isObject
-    elseif type(parameters[i])=='string' then --old code
+    elseif type(parameters[i])=='string' then
       lblVarName.Caption=parameters[i]:trim()
       btnCreateInstance.visible=false
     end
-
 
     midinfo.parameters[i].lblVarName=lblVarName
     midinfo.parameters[i].edtVarText=edtVarText
@@ -215,7 +172,7 @@ local function createMethodInvokeDialogEx(invokeDialogParams)
     lblVarName.BorderSpacing.CellAlignVertical='ccaCenter'
 
     if btnCreateInstance.Visible then
-      --return the parameters field provided in this call (the caller is responsible for adding enough extra data to be able to create an instance using that)
+
       btnCreateInstance.OnClick=function(sender)
         if invokeDialogParams.onCreateInstanceClick then
           edtVarText.Text=invokeDialogParams.onCreateInstanceClick(midinfo.mid, invokeDialogParams, i)
@@ -239,7 +196,6 @@ local function createMethodInvokeDialogEx(invokeDialogParams)
       invokeDialogParams.parameters[i].value=midinfo.parameters[i].edtVarText.Text
     end
 
-
     if invokeDialogParams.nonmodal and invokeDialogParams.onOKClick then
       local output=midinfo.output.Items
       invokeDialogParams.onOKClick(midinfo.mid, invokeDialogParams, output)
@@ -250,30 +206,28 @@ local function createMethodInvokeDialogEx(invokeDialogParams)
         end
       end
     else
-      midinfo.mid.ModalResult=mrOK --setting modalresult closes a modal form
+      midinfo.mid.ModalResult=mrOK
     end
   end
 
   midinfo.btnCancel.OnClick=function(b) midinfo.mid.close() end
 
-
   midinfo.mid.OnShow=function(s)
     midinfo.mid.autoSize=false
     midinfo.mid.width=midinfo.mid.canvas.getTextWidth(midinfo.mid.Caption)+180*dpiscale
-
 
     idf=s
     if #midinfo.parameters>0 then
       local labelwidth=0
       local i
-      for i=1,#parameters do --get the min width needed
+      for i=1,#parameters do
         labelwidth=math.max(labelwidth, midinfo.parameters[i].lblVarName.Width)
       end
 
       midinfo.parameters[1].edtVarText.BorderSpacing.Left=labelwidth+7*dpiscale
     end
 
-    midinfo.mid.position='poDesigned' --recenters the form
+    midinfo.mid.position='poDesigned'
     midinfo.mid.position='poScreenCenter'
   end
 
@@ -282,7 +236,7 @@ local function createMethodInvokeDialogEx(invokeDialogParams)
   end
 
   midinfo.mid.onDestroy=function(f)
-    --destroy all objects
+
     midinfo.btnOk.destroy()
     midinfo.btnOk=nil
 
@@ -296,8 +250,6 @@ local function createMethodInvokeDialogEx(invokeDialogParams)
 
     midinfo.gbParams.destroy()
     midinfo.gbParams=nil
-
-    --midinfo.mid.saveFormPosition()
 
     midinfo=nil
   end
@@ -313,13 +265,11 @@ end
 function createMethodInvokeDialog(name, parameters, okclickfunction, customAddress, static)
 
   if type(name)=='table' then
-    --called with the params for createMethodInvokeDialogEx
+
     return createMethodInvokeDialogEx(name)
   else
     print("Warning: Obsolete method of calling createMethodInvokeDialog")
 
-
-    --pack the parameters into an invokeDialogParams block
     local params={}
     params.name=name
     params.isStatic=static
@@ -348,4 +298,4 @@ function createMethodInvokeDialog(name, parameters, okclickfunction, customAddre
 
 end
 
-createMethodInvokedialog=createMethodInvokeDialog --backward compatibility
+createMethodInvokedialog=createMethodInvokeDialog

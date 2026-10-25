@@ -1,6 +1,3 @@
-// language: Rust, file: dissect_code.rs, target: Windows 11, MSVC
-// Code Dissection and Cross-Reference (XRef) Engine
-// Mirrors Cheat Engine 7.5 DissectCodeThread.pas & dissectcodeunit.pas
 
 use std::collections::{HashMap, HashSet};
 use crate::process::Process;
@@ -25,14 +22,14 @@ pub struct DissectBranch {
 pub struct DissectCodeResult {
     pub branches: Vec<DissectBranch>,
     pub function_starts: Vec<usize>,
-    // callee -> list of caller addresses (XRefs)
+
     pub xrefs: HashMap<usize, Vec<usize>>,
 }
 
 pub struct DissectCodeEngine;
 
 impl DissectCodeEngine {
-    /// Dissects a slice of executable code bytes at base_address.
+
     pub fn dissect_buffer(code: &[u8], base_address: usize) -> DissectCodeResult {
         let mut result = DissectCodeResult::default();
         let mut function_starts = HashSet::new();
@@ -42,7 +39,7 @@ impl DissectCodeEngine {
         let mut last_was_ret = true;
 
         while offset < code.len() {
-            // Skip alignment padding runs (0x90 NOP or 0xCC INT3 or 0x00 0x00)
+
             if code[offset] == 0xCC || code[offset] == 0x90 {
                 last_was_ret = true;
                 offset += 1;
@@ -95,7 +92,7 @@ impl DissectCodeEngine {
                 }
                 last_was_ret = true;
             } else if m.starts_with('j') {
-                // Conditional jump (je, jne, jz, jnz, ja, jb, jg, jl, etc.)
+
                 if let Some(target) = insn.target_addr {
                     result.branches.push(DissectBranch {
                         from_address: insn_addr,
@@ -117,7 +114,6 @@ impl DissectCodeEngine {
         result
     }
 
-    /// Dissects executable memory regions of target process within [start, stop].
     pub fn dissect_range(
         proc: &Process,
         start: usize,
@@ -166,13 +162,7 @@ mod tests {
 
     #[test]
     fn test_dissect_buffer_call_and_ret() {
-        // Function 1 at 0x1000:
-        // E8 10 00 00 00 -> call 0x1015 (rel32: 0x1000 + 5 + 0x10 = 0x1015)
-        // C3             -> ret
-        // CC CC          -> padding
-        // Function 2 at 0x1015:
-        // 90             -> nop
-        // C3             -> ret
+
         let mut code = vec![0xE8, 0x10, 0x00, 0x00, 0x00, 0xC3, 0xCC, 0xCC];
         while code.len() < 0x15 {
             code.push(0xCC);
@@ -182,18 +172,16 @@ mod tests {
 
         let result = DissectCodeEngine::dissect_buffer(&code, 0x1000);
 
-        // Function starts: should contain 0x1000 and the called target 0x1015
         assert!(result.function_starts.contains(&0x1000));
         assert!(result.function_starts.contains(&0x1015));
 
-        // XRef to 0x1015 should be 0x1000
         let callers = result.xrefs.get(&0x1015).expect("XRef should exist");
         assert!(callers.contains(&0x1000));
 
-        // Branches: should have 1 call and 2 returns
         let calls: Vec<_> = result.branches.iter().filter(|b| b.kind == BranchKind::Call).collect();
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].from_address, 0x1000);
         assert_eq!(calls[0].to_address, 0x1015);
     }
 }
+

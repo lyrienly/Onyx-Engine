@@ -1,5 +1,3 @@
-// OnyxEngine Native GUI Entrypoint
-// Powered by egui + wgpu + winit hardware-accelerated rendering
 
 #![windows_subsystem = "windows"]
 #![allow(dead_code, unused_variables, unsafe_op_in_unsafe_fn, static_mut_refs)]
@@ -30,16 +28,14 @@ fn main() -> eframe::Result<()> {
         "CheatEngine",
         native_options,
         Box::new(|cc| {
-            // Configure authentic Cheat Engine 7.7 dark aesthetic
+
             let mut visuals = egui::Visuals::dark();
 
-            // Background palettes: Authentic CE Dark Theme
             visuals.panel_fill = Color32::from_rgb(30, 33, 40);
             visuals.window_fill = Color32::from_rgb(34, 38, 46);
             visuals.faint_bg_color = Color32::from_rgb(25, 28, 35);
             visuals.extreme_bg_color = Color32::from_rgb(16, 18, 23);
 
-            // Widget base strokes and precise Win32 rounding
             let border_stroke = Stroke::new(1.0_f32, Color32::from_rgb(55, 62, 75));
             visuals.widgets.noninteractive.bg_stroke = border_stroke;
             visuals.widgets.noninteractive.rounding = Rounding::same(3.0);
@@ -58,7 +54,6 @@ fn main() -> eframe::Result<()> {
 
             visuals.widgets.open.rounding = Rounding::same(3.0);
 
-            // Apply visuals and high-density Cheat Engine spacing
             cc.egui_ctx.set_visuals(visuals);
 
             let mut style = (*cc.egui_ctx.style()).clone();
@@ -71,3 +66,4 @@ fn main() -> eframe::Result<()> {
         }),
     )
 }
+

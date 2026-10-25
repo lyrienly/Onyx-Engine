@@ -1,5 +1,3 @@
-// language: Rust, file: lib.rs (onyx_pointer), target: Windows 11, MSVC
-// Modular Pointer Scanner Sub-DLL (modules/pointer/onyx_pointer.dll)
 
 use std::ffi::{c_char, CStr};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
@@ -150,7 +148,6 @@ pub unsafe extern "C" fn onyx_pointer_scanner_start_scan(
         config.alignment = if alignment == 0 { 4 } else { alignment };
         config.max_results = if max_results == 0 { 20000 } else { max_results };
 
-        // Phase 1: Map Memory
         {
             let mut scanner = match scanner_arc.lock() {
                 Ok(guard) => guard,
@@ -182,7 +179,6 @@ pub unsafe extern "C" fn onyx_pointer_scanner_start_scan(
             return;
         }
 
-        // Phase 2: Traverse Paths
         phase_arc.store(OnyxPointerScanPhase::SearchingPaths as u32, Ordering::SeqCst);
 
         let scanner = match scanner_arc.lock() {
@@ -751,3 +747,4 @@ pub unsafe extern "C" fn onyx_pointer_scanner_intersect_file(
         0
     }
 }
+

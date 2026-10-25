@@ -1,5 +1,3 @@
-// OnyxEngine GUI State Definitions
-// Clean, strongly-typed state structures for memory scanner and inspection interface
 
 use onyx_core::scanner::ValType;
 
@@ -7,10 +5,10 @@ use onyx_core::scanner::ValType;
 pub struct GuiTableEntry {
     pub active: bool,
     pub description: String,
-    pub address: usize, // live resolved address
+    pub address: usize,
     pub module_name: Option<String>,
     pub base_offset: usize,
-    pub offsets: Vec<usize>, // If non-empty, this is a multi-level Pointer!
+    pub offsets: Vec<usize>,
     pub val_type: ValType,
     pub current_val: String,
     pub target_val: String,
@@ -55,3 +53,4 @@ impl GuiTableEntry {
         !self.offsets.is_empty()
     }
 }
+

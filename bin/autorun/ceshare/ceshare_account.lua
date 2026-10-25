@@ -4,12 +4,12 @@ function ceshare.login(username,password)
   local parameters='';
   if username then
     parameters=parameters..'username='..ceshare.url_encode(username)
-  end 
-  
+  end
+
   if password then
     parameters=parameters..'&password='..ceshare.url_encode(password)
   end
-  
+
   local r=i.postURL(ceshare.base..'login.php',parameters)
   if r then
     if (r:sub(1,2)=='<?') then
@@ -17,7 +17,7 @@ function ceshare.login(username,password)
       if s then
         if s.Valid then
           ceshare.LoggedIn=true
-          return true        
+          return true
         else
           if s.error then
             ceshare.showError(s.error:value())
@@ -41,11 +41,11 @@ function ceshare.logout()
   ceshare.LoggedIn=false
 end
 
-function ceshare.spawnLoginDialog() --I could also use a frm for this, but just showing how to use pure lua for a dialog (designer is still easier though)
-  --check if already logged in (cookies)
+function ceshare.spawnLoginDialog()
+
   if ceshare.login() then return true end
-  
-  if ceshare.loginform==nil then 
+
+  if ceshare.loginform==nil then
     f=createForm(false)
     lblUsername=createLabel(f)
     edtUsername=createEdit(f)
@@ -91,7 +91,6 @@ function ceshare.spawnLoginDialog() --I could also use a frm for this, but just 
     edtUsername.name='username'
     edtUsername.Text=''
 
-
     lblPassword.Caption=translate('Password')
     lblPassword.AnchorSideTop.Control=edtUsername
     lblPassword.AnchorSideTop.Side=asrBottom
@@ -111,7 +110,7 @@ function ceshare.spawnLoginDialog() --I could also use a frm for this, but just 
     edtPassword.TextHint='Password'
     edtPassword.name='password';
     edtPassword.Text=''
-    
+
     lblRegister.Caption=translate('Register')
     lblRegister.Font.Color=0xff0000
     lblRegister.Font.Style='[fsUnderline]'
@@ -119,14 +118,12 @@ function ceshare.spawnLoginDialog() --I could also use a frm for this, but just 
     lblRegister.AnchorSideTop.Control=edtPassword
     lblRegister.AnchorSideTop.Side=asrBottom
     lblRegister.BorderSpacing.Top=4
-    lblRegister.BorderSpacing.Bottom=4    
+    lblRegister.BorderSpacing.Bottom=4
     lblRegister.AnchorSideLeft.Control=edtPassword
-    lblRegister.AnchorSideLeft.Side=asrCenter    
+    lblRegister.AnchorSideLeft.Side=asrCenter
     lblRegister.OnMouseDown=function()
       shellExecute(ceshare.base..'RegisterPage.php')
     end
-    
-    
 
     pnlBtns.AnchorSideTop.Control=lblRegister
     pnlBtns.AnchorSideTop.Side=asrBottom
@@ -141,50 +138,46 @@ function ceshare.spawnLoginDialog() --I could also use a frm for this, but just 
 
     pnlBtns.BorderSpacing.Top=6
     pnlBtns.BorderSpacing.Bottom=4
-    
+
     cbLogoutWhenLoadingTables.Caption=translate('Logout when loading ceshare tables')
     cbLogoutWhenLoadingTables.Name='cbLogoutWhenLoadingTables'
     cbLogoutWhenLoadingTables.AnchorSideTop.Control=pnlBtns
-    cbLogoutWhenLoadingTables.AnchorSideTop.Side=asrBottom    
+    cbLogoutWhenLoadingTables.AnchorSideTop.Side=asrBottom
     cbLogoutWhenLoadingTables.AnchorSideLeft.Control=lblUsername
     cbLogoutWhenLoadingTables.AnchorSideLeft.Side=asrLeft
-    
-    cbLogoutWhenLoadingTables.Hint=translate('When checked you will get logged out when loading a ceshare table. This to prevent malicious tables from using your account')
-    cbLogoutWhenLoadingTables.ShowHint=true    
-    cbLogoutWhenLoadingTables.Checked=ceshare.settings.Value['logoutWhenLoadingTables']~='0'
-    
 
-    f.OnClose=nil --by default forms created with createForm will have an OnClose that will free themself on close. That's not needed in this case where the form needs to be reused
-    
+    cbLogoutWhenLoadingTables.Hint=translate('When checked you will get logged out when loading a ceshare table. This to prevent malicious tables from using your account')
+    cbLogoutWhenLoadingTables.ShowHint=true
+    cbLogoutWhenLoadingTables.Checked=ceshare.settings.Value['logoutWhenLoadingTables']~='0'
+
+    f.OnClose=nil
+
     f.BorderIcons='[]'
     f.AutoSize=true
     ceshare.loginform=f
   end
-  
+
   if ceshare.loginform.showModal()==mrOK then
     local username=ceshare.loginform.username.text
     local password=ceshare.loginform.password.text
 
     ceshare.loginform.username.text=''
-    ceshare.loginform.password.text=''    
-    
+    ceshare.loginform.password.text=''
+
     local v
-    if ceshare.loginform.cbLogoutWhenLoadingTables.checked then    
+    if ceshare.loginform.cbLogoutWhenLoadingTables.checked then
       ceshare.settings.Value['logoutWhenLoadingTables']='1'
     else
       ceshare.settings.Value['logoutWhenLoadingTables']='0'
     end
-    
-    return ceshare.login(username, password)  
+
+    return ceshare.login(username, password)
   end
 end
 
-
-
-
 function ceshare.ClearCredentials()
-  --print("Forgetting who you are")
-  ceshare.logout()  --in case some idiot tablemaker wants to make 
+
+  ceshare.logout()
 
   if ceshare.loginform then
     ceshare.loginform.password.Text=''
@@ -193,3 +186,4 @@ function ceshare.ClearCredentials()
     ceshare.loginform=nil
   end
 end
+

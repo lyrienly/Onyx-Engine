@@ -1,5 +1,3 @@
-// OnyxEngine Backend C-ABI Types
-// Data structures designed for zero-copy FFI interaction with Pascal / Lazarus frontend
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -228,3 +226,4 @@ pub struct OnyxSignatureResult {
     pub match_count: usize,
     pub is_unique: i32,
 }
+

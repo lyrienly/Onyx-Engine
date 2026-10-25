@@ -1,5 +1,3 @@
-// language: Rust, file: lib.rs (speedhack_dll), target: Windows 11, MSVC
-// Standalone injectable speedhack DLL for x86_64 target processes
 
 #![allow(non_snake_case, non_camel_case_types, dead_code, unsafe_op_in_unsafe_fn, static_mut_refs)]
 
@@ -61,7 +59,6 @@ struct SpeedState {
 static SPEED_STATE: Mutex<Option<SpeedState>> = Mutex::new(None);
 static HOOKS_INSTALLED: AtomicBool = AtomicBool::new(false);
 
-// Function pointer signatures
 type FnQpc = unsafe extern "system" fn(*mut i64) -> BOOL;
 type FnGtc = unsafe extern "system" fn() -> DWORD;
 type FnGtc64 = unsafe extern "system" fn() -> u64;
@@ -82,7 +79,6 @@ unsafe extern "system" {
     fn GetCurrentProcess() -> HANDLE;
 }
 
-// Hook implementations
 unsafe extern "system" fn Hooked_QueryPerformanceCounter(lpCount: *mut i64) -> BOOL {
     let mut real_qpc: i64 = 0;
     let orig = TRAMPOLINE_QPC.unwrap_or(QueryPerformanceCounter);
@@ -92,7 +88,7 @@ unsafe extern "system" fn Hooked_QueryPerformanceCounter(lpCount: *mut i64) -> B
         let mut lock = SPEED_STATE.lock().unwrap();
         if let Some(state) = lock.as_mut() {
             if state.multiplier <= 0.0 {
-                // Unity / Mono IL2CPP freeze: lock virtual counter to baseline
+
                 *lpCount = state.initial_virtual_qpc;
             } else {
                 let delta = real_qpc - state.initial_real_qpc;
@@ -173,7 +169,7 @@ unsafe extern "system" fn Hooked_Sleep(dwMilliseconds: DWORD) {
     let orig = TRAMPOLINE_SLEEP.unwrap_or(Sleep);
 
     if mult <= 0.0 {
-        // Freeze / Paused: sleep in small chunks while frozen
+
         orig(50);
     } else if dwMilliseconds > 0 {
         let scaled = ((dwMilliseconds as f32) / mult) as DWORD;
@@ -193,7 +189,6 @@ pub extern "system" fn SetSpeed(speed: f32) {
             let cur_tick = GetTickCount();
             let cur_tick64 = GetTickCount64();
 
-            // Rescale baselines
             let qpc_delta = ((cur_qpc - state.initial_real_qpc) as f64 * state.multiplier as f64) as i64;
             state.initial_virtual_qpc += qpc_delta;
             state.initial_real_qpc = cur_qpc;
@@ -256,10 +251,8 @@ unsafe fn create_detour_64(target: *mut c_void, detour: *mut c_void) -> *mut c_v
     let stolen_len = 14;
     let tramp = TRAMPOLINE_BUF.add(TRAMPOLINE_POS);
 
-    // 1. Copy original 14 bytes into trampoline
     std::ptr::copy_nonoverlapping(target as *const u8, tramp, stolen_len);
 
-    // 2. Append 14-byte jump to target + 14: FF 25 00 00 00 00 [target + 14]
     let jmp_back = tramp.add(stolen_len);
     *jmp_back = 0xFF;
     *jmp_back.add(1) = 0x25;
@@ -272,7 +265,6 @@ unsafe fn create_detour_64(target: *mut c_void, detour: *mut c_void) -> *mut c_v
 
     TRAMPOLINE_POS += stolen_len + 14;
 
-    // 3. Patch target function with jump to detour
     let mut old_protect: DWORD = 0;
     if VirtualProtect(target, stolen_len, PAGE_EXECUTE_READWRITE, &mut old_protect) != 0 {
         let t_ptr = target as *mut u8;
@@ -297,7 +289,6 @@ unsafe fn install_inline_hooks() {
     let kbase = GetModuleHandleA(b"kernelbase.dll\0".as_ptr());
     let winmm = GetModuleHandleA(b"winmm.dll\0".as_ptr());
 
-    // QPC: prefer kernelbase, fallback kernel32
     let p_qpc = if !kbase.is_null() {
         GetProcAddress(kbase, b"QueryPerformanceCounter\0".as_ptr())
     } else if !k32.is_null() {
@@ -311,7 +302,6 @@ unsafe fn install_inline_hooks() {
         TRAMPOLINE_QPC = Some(std::mem::transmute(tramp));
     }
 
-    // GetTickCount
     let p_gtc = if !kbase.is_null() {
         GetProcAddress(kbase, b"GetTickCount\0".as_ptr())
     } else if !k32.is_null() {
@@ -325,7 +315,6 @@ unsafe fn install_inline_hooks() {
         TRAMPOLINE_GTC = Some(std::mem::transmute(tramp));
     }
 
-    // GetTickCount64
     let p_gtc64 = if !kbase.is_null() {
         GetProcAddress(kbase, b"GetTickCount64\0".as_ptr())
     } else if !k32.is_null() {
@@ -339,7 +328,6 @@ unsafe fn install_inline_hooks() {
         TRAMPOLINE_GTC64 = Some(std::mem::transmute(tramp));
     }
 
-    // timeGetTime (winmm.dll)
     if !winmm.is_null() {
         let p_tgt = GetProcAddress(winmm, b"timeGetTime\0".as_ptr());
         if !p_tgt.is_null() {
@@ -348,7 +336,6 @@ unsafe fn install_inline_hooks() {
         }
     }
 
-    // Sleep (kernel32.dll)
     if !k32.is_null() {
         let p_sleep = GetProcAddress(k32, b"Sleep\0".as_ptr());
         if !p_sleep.is_null() {
@@ -367,8 +354,8 @@ fn start_pipe_listener() {
             let h_pipe = unsafe {
                 CreateNamedPipeA(
                     pipe_name.as_ptr(),
-                    0x00000003, // PIPE_ACCESS_DUPLEX
-                    0x00000000, // PIPE_TYPE_BYTE
+                    0x00000003,
+                    0x00000000,
                     1,
                     512,
                     512,
@@ -428,13 +415,11 @@ mod tests {
             initial_virtual_tick64: 500,
         };
 
-        // Simulated real tick advances by 100ms
         let real_now = 600u32;
         let delta = real_now - state.initial_real_tick;
         let scaled_delta = ((delta as f64) * (state.multiplier as f64)) as u32;
         let virtual_now = state.initial_virtual_tick + scaled_delta;
 
-        // With multiplier 2.0, virtual time should advance 200ms
         assert_eq!(scaled_delta, 200);
         assert_eq!(virtual_now, 700);
     }
@@ -452,7 +437,7 @@ mod tests {
         };
 
         assert_eq!(state.multiplier, 0.0);
-        // At 0.0, virtual counter stays locked at 500
+
         assert_eq!(state.initial_virtual_tick, 500);
     }
 }

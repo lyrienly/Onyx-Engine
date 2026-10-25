@@ -1,5 +1,3 @@
-// language: Rust, file: structure.rs, target: Windows 11, MSVC
-// Data structure dissector and heuristic type analysis engine
 
 use std::mem::size_of;
 use crate::process::Process;
@@ -18,7 +16,7 @@ pub enum GuessedType {
     Int64(i64),
     Binary(u8),
     Bytes([u8; 8]),
-    // CE 7.7: Unreal Engine structure dissect support
+
     UnrealTArray { data_ptr: usize, count: i32, max: i32 },
     UnrealFString { data_ptr: usize, len: i32, text: Option<String> },
     UnrealFName { index: u32, number: u32 },
@@ -83,9 +81,9 @@ pub struct StructField {
     pub offset: usize,
     pub raw_bytes: [u8; 8],
     pub guessed: GuessedType,
-    // CE 7.7: Preview field for pointers and nested types
+
     pub preview: Option<String>,
-    // CE 7.7: Field display priority (1 = highest, e.g. VTable/Unreal/Names, 10 = default)
+
     pub priority: u8,
 }
 
@@ -97,7 +95,7 @@ impl StructureDissector {
         let buf = proc.read_bytes(address, total)?;
         let regions = proc.regions(false).unwrap_or_default();
 
-        let stride = size_of::<usize>(); // 8 bytes in x64
+        let stride = size_of::<usize>();
         let mut fields = Vec::new();
         let mut offset = 0;
 
@@ -109,7 +107,6 @@ impl StructureDissector {
             let u64_val = u64::from_le_bytes(raw_bytes);
             let ptr_val = u64_val as usize;
 
-            // CE 7.7: Basic Unreal Engine structure dissect support (TArray, FString, FName)
             let is_unreal_container = if offset + 16 <= buf.len() {
                 let count_bytes = [buf[offset + 8], buf[offset + 9], buf[offset + 10], buf[offset + 11]];
                 let max_bytes = [buf[offset + 12], buf[offset + 13], buf[offset + 14], buf[offset + 15]];
@@ -118,7 +115,7 @@ impl StructureDissector {
 
                 if count >= 0 && max >= count && max < 1_000_000 && (count > 0 || max > 0) {
                     if let Some(_target_reg) = regions.iter().find(|r| ptr_val >= r.base && ptr_val < r.base + r.size) {
-                        // Check if wide characters (FString)
+
                         let mut wide_buf = [0u16; 32];
                         let read_chars = (count as usize).min(32);
                         if proc.read_raw(ptr_val, unsafe { std::slice::from_raw_parts_mut(wide_buf.as_mut_ptr() as *mut u8, read_chars * 2) }).is_ok() {
@@ -146,7 +143,7 @@ impl StructureDissector {
             } else if u64_val == 0 {
                 (GuessedType::Null, None, 9)
             } else if let Some(target_reg) = regions.iter().find(|r| ptr_val >= r.base && ptr_val < r.base + r.size) {
-                // Address points into a valid committed memory region!
+
                 if target_reg.is_executable() {
                     (GuessedType::FunctionPointer(ptr_val), Some(format!("Exec at 0x{:X}", ptr_val)), 2)
                 } else if let Ok(str_val) = proc.read_string(ptr_val, 64, false) {
@@ -204,12 +201,10 @@ impl StructureDissector {
         Ok(fields)
     }
 
-    /// Sorts fields prioritizing high-signal structures (VTable, Unreal containers, strings, pointers) first
     pub fn sort_by_priority(fields: &mut [StructField]) {
         fields.sort_by_key(|f| f.priority);
     }
 
-    /// Emits a C++ struct definition representing the dissected memory layout
     pub fn generate_cpp_struct(struct_name: &str, fields: &[StructField]) -> String {
         let mut s = format!("struct {} {{\n", struct_name);
         for f in fields {
@@ -226,7 +221,6 @@ impl StructureDissector {
         s
     }
 
-    /// Emits a Rust struct definition
     pub fn generate_rust_struct(struct_name: &str, fields: &[StructField]) -> String {
         let mut s = format!("#[repr(C)]\npub struct {} {{\n", struct_name);
         for f in fields {
@@ -256,9 +250,6 @@ impl StructureDissector {
         s
     }
 
-    /// Multi-instance structure comparison ("Side by Side Diff")
-    /// Compares multiple instances of a structure (e.g. Player vs Enemy 1 vs Enemy 2)
-    /// Classifies offsets as Identical (constant/vtable), PointerMatch, or Variable (stats/position)
     pub fn compare_instances(
         proc: &Process,
         addresses: &[usize],
@@ -328,7 +319,6 @@ impl StructureDissector {
         })
     }
 
-    /// Crawls pointers transitively up to max_depth, discovering interconnected structures (Structure Spider)
     pub fn spider_crawl(
         proc: &Process,
         root_address: usize,
@@ -414,7 +404,7 @@ pub struct SpiderNode {
     pub address: usize,
     pub depth: usize,
     pub fields: Vec<StructField>,
-    pub child_pointers: Vec<(usize, usize)>, // (offset, child_address)
+    pub child_pointers: Vec<(usize, usize)>,
 }
 
 #[derive(Debug, Clone)]
@@ -435,16 +425,13 @@ mod tests {
     fn test_structure_diff_comparison() {
         let proc = Process::attach_current().expect("attach current process");
 
-        // Allocate two mock objects
         let obj1 = proc.alloc(64, crate::win32::PAGE_READWRITE).unwrap();
         let obj2 = proc.alloc(64, crate::win32::PAGE_READWRITE).unwrap();
 
-        // Offset 0: Identical VTable mock (points to ntdll/current process code)
         let vtable_addr = 0x140001000usize;
         proc.write_raw(obj1, &vtable_addr.to_le_bytes()).unwrap();
         proc.write_raw(obj2, &vtable_addr.to_le_bytes()).unwrap();
 
-        // Offset 8: Different integer (e.g. HP 100 vs 200)
         let hp1: u64 = 100;
         let hp2: u64 = 200;
         proc.write_raw(obj1 + 8, &hp1.to_le_bytes()).unwrap();
@@ -465,3 +452,4 @@ mod tests {
         let _ = proc.free(obj2);
     }
 }
+

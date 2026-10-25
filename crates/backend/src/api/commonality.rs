@@ -1,5 +1,3 @@
-// language: Rust, file: commonality.rs, target: Windows 11, MSVC
-// Commonality and Structure Difference Analysis C-ABI Bridge
 
 use onyx_core::process::Process;
 use onyx_core::debugger::commonality::{CommonalityAnalyzer, RegisterSnapshot};
@@ -106,3 +104,4 @@ pub unsafe extern "C" fn onyx_commonality_analyze_structures(
         Err(_) => -1,
     }
 }
+

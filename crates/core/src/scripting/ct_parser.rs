@@ -1,5 +1,3 @@
-// language: Rust, file: ct_parser.rs, target: Windows 11, MSVC
-// Cheat Engine (.CT) XML Cheat Table parser and serializer
 
 use std::fs::File;
 use std::io::{Read, Write};
@@ -9,7 +7,7 @@ use crate::table::{CheatTable, TableEntry};
 pub struct CtParser;
 
 impl CtParser {
-    /// Loads a .CT file and parses its CheatEntry elements into a CheatTable
+
     pub fn load_ct_file(path: &str) -> Result<CheatTable, String> {
         let mut file = File::open(path).map_err(|e| format!("Failed to open {}: {}", path, e))?;
         let mut content = String::new();
@@ -18,11 +16,9 @@ impl CtParser {
         Self::parse_ct_xml(&content)
     }
 
-    /// Parses raw XML content of a CheatTable
     pub fn parse_ct_xml(xml: &str) -> Result<CheatTable, String> {
         let mut table = CheatTable::new();
 
-        // Simple and robust parser for <CheatEntry> tags without requiring heavy XML dependencies
         let mut cursor = 0;
         while let Some(start_pos) = xml[cursor..].find("<CheatEntry>") {
             let entry_start = cursor + start_pos + "<CheatEntry>".len();
@@ -49,7 +45,6 @@ impl CtParser {
             let address_str = extract_tag_content(entry_block, "Address")
                 .unwrap_or_default();
 
-            // Check if there are nested <Offsets>
             let mut offsets = Vec::new();
             if let Some(offsets_block) = extract_block(entry_block, "Offsets") {
                 let mut off_cursor = 0;
@@ -67,7 +62,6 @@ impl CtParser {
                 }
             }
 
-            // Parse base address and module
             let (module_name, base_offset) = parse_ct_address(&address_str);
 
             table.entries.push(TableEntry {
@@ -85,7 +79,6 @@ impl CtParser {
         Ok(table)
     }
 
-    /// Saves a CheatTable to an official Cheat Engine compatible .CT XML file
     pub fn save_ct_file(table: &CheatTable, path: &str) -> Result<(), String> {
         let mut file = File::create(path).map_err(|e| format!("Failed to create {}: {}", path, e))?;
 
@@ -190,3 +183,4 @@ fn parse_ct_address(s: &str) -> (Option<String>, usize) {
         (None, parse_offset_str(trimmed).unwrap_or(0))
     }
 }
+

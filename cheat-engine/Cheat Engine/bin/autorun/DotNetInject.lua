@@ -1,11 +1,3 @@
---[[
-You have a d:\bla.dll with namespace ClassLibraryX, with a class named "MyClass"
-That class contains a function defined as:
-public static int MyInitFunctionName(string parameters)
-
-then you do: injectDotNetDLL('d:\\bla.dll','ClassLibraryX.MyClass','MyInitFunctionName','Something')
-
---]]
 
 local DotNetCoreInjectScript=[[
 [enable]
@@ -33,7 +25,6 @@ dw '%s',0
 
 paramstr:
 dw '%s',0
-
 
 IID_ICLRRuntimeHost4:
 db 66 d3 f6 64 c2 d7 1f 4f b4 b2 e8 16 0c ac 43 af
@@ -108,9 +99,6 @@ dealloc(errorvalue)
 
 ]]
 
-
-----------------------dot net---------------------------------------
-
 local DotNetStandardInjectScript=[[
 [enable]
 alloc(injectdotnetdll,4096)
@@ -129,7 +117,6 @@ alloc(errorvalue,4)
 
 alloc(rti_flags,4)
 alloc(rti_started,4)
-
 
 alloc(paramstr,256)
 alloc(methodname,256)
@@ -152,7 +139,6 @@ dw '%s',0
 
 paramstr:
 dw '%s',0
-
 
 IID_ICLRMetaHost:
 db 9E DB 32 D3 B3 B9 25 41 82 07 A1 48 84 F5 32 16
@@ -202,10 +188,8 @@ push ecx
 call [eax+6*4] //EnumerateLoadedRuntimes
 [/32-bit]
 
-
 cmp eax,0
 jne error
-
 
 RuntimeEnumLoop:
 [64-bit]
@@ -336,28 +320,26 @@ dealloc(errorvalue)
 dealloc(rti_flags)
 dealloc(rti_started)
 
-
 dealloc(paramstr)
 dealloc(methodname)
 dealloc(classname)
 dealloc(dllpath)
 
-
 ]]
 
 function injectDotNetDLL(path, classname, methodname, parameter, timeout)
   if monopipe then
-    --inject the dll using mono
+
     local assembly=mono_loadAssemblyFromFile(path)
-    
+
     if (classname==nil) and (method==nil) then return assembly end
-    
+
     if assembly and classname and methodname then
       local image=mono_getImageFromAssembly(assembly)
       if image then
-        --find class
+
         local c=mono_image_enumClasses(image)
-        for i=1,#c do        
+        for i=1,#c do
           if c[i].classname==classname then
             local m=mono_class_enumMethods(c[i].class)
             if m.name==methodname then
@@ -366,24 +348,23 @@ function injectDotNetDLL(path, classname, methodname, parameter, timeout)
                 local args={}
                 args[1]={}
                 args[1].type=vtString
-                args[1].value=parameter               
-                
+                args[1].value=parameter
+
                 result=mono_invoke_method(nil,m,nil,{})
               else
                 result=mono_invoke_method(nil,m,nil,nil)
               end
-            
+
               return result
             end
           end
         end
       end
-      
+
     end
-    
+
     return
   end
-  
 
   local m=enumModules()
   local isDotNetCore=false
@@ -409,9 +390,8 @@ function injectDotNetDLL(path, classname, methodname, parameter, timeout)
   elseif isDotNetStandard then
     script=DotNetStandardInjectScript
   else
-    return nil,-4 --no dotnet architecture detected. Todo: Create a .net host in the target?
+    return nil,-4
   end
-
 
   local script=string.format(script,path, classname, methodname, parameter)
   status, disableInfo=autoAssemble(script)
@@ -422,14 +402,14 @@ function injectDotNetDLL(path, classname, methodname, parameter, timeout)
     autoAssemble(script, disableInfo)
 
     if errorValue==nil then
-      return nil,-3   --target crashed...
+      return nil,-3
     end
 
-    if errorValue~=0 then --not a successful load
+    if errorValue~=0 then
       if errorValue==0xffffffff then
-        return nil, -2 --failed getting to the execute part
+        return nil, -2
       else
-        return nil, errorValue --execution gave this error (ntstatus)
+        return nil, errorValue
       end
     end
 

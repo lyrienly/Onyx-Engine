@@ -16,7 +16,7 @@ use crate::state::GuiTableEntry;
 use crate::ui;
 
 pub struct OnyxEngineApp {
-    // Process State
+
     pub attached_proc: Option<Process>,
     pub proc_name: String,
     pub proc_pid: u32,
@@ -28,10 +28,8 @@ pub struct OnyxEngineApp {
     pub icon_cache: HashMap<String, egui::TextureHandle>,
     pub icons: Option<crate::ui::CeIcons>,
 
-    // Performance & Responsiveness
     pub last_table_update: Instant,
 
-    // Scanner State
     pub scanner: Scanner,
     pub scan_val_text: String,
     pub scan_val_second_text: String,
@@ -43,7 +41,6 @@ pub struct OnyxEngineApp {
     pub has_scanned: bool,
     pub status_msg: String,
 
-    // Memory Scan Options
     pub start_addr_text: String,
     pub stop_addr_text: String,
     pub fast_scan: bool,
@@ -52,11 +49,9 @@ pub struct OnyxEngineApp {
     pub executable: bool,
     pub copy_on_write: bool,
 
-    // Cheat Table (Address List)
     pub cheat_table: Vec<GuiTableEntry>,
     pub freezer: Freezer,
 
-    // Subsystem Modals
     pub show_memory_view: bool,
     pub show_pointer_scanner: bool,
     pub show_lua_console: bool,
@@ -66,16 +61,13 @@ pub struct OnyxEngineApp {
     pub show_settings_modal: bool,
     pub settings_tab: usize,
 
-    // Process Access Mode & Official CE DBK Driver Link
     pub access_mode: ProcessAccessMode,
     pub dbk_driver: Option<Arc<DbkDriver>>,
     pub dbk_status_msg: String,
     pub freeze_interval_ms: u64,
 
-    // CE 7.7: Ghost property (Overlay click-through)
     pub ghost_mode: bool,
 
-    // Pointer Scanner State
     pub pointer_scanner: PointerScanner,
     pub ptr_target_addr_text: String,
     pub ptr_max_depth: usize,
@@ -86,7 +78,6 @@ pub struct OnyxEngineApp {
     pub ptr_map_nodes: usize,
     pub ptr_is_busy: bool,
 
-    // Memory View (Disassembler & Hex Browser)
     pub mem_addr_text: String,
     pub hex_addr_text: String,
     pub mem_history: Vec<usize>,
@@ -106,25 +97,20 @@ pub struct OnyxEngineApp {
     pub mem_is_maximized: bool,
     pub show_data_inspector: bool,
 
-    // Auto Assembler
     pub aa_script: String,
     pub aa_status: String,
 
-    // Lua Scripting
     pub lua_engine: Option<CeLuaEngine>,
     pub lua_script: String,
     pub lua_output: Vec<String>,
 
-    // Speedhack
     pub speedhack_enabled: bool,
     pub speedhack_val: f32,
     pub speedhack_injector: SpeedhackInjector,
 
-    // Table item editing modal
     pub edit_entry_idx: Option<usize>,
     pub edit_val_text: String,
 
-    // Manual Add Address state
     pub manual_addr_text: String,
     pub manual_desc_text: String,
     pub manual_type_idx: usize,
@@ -133,7 +119,6 @@ pub struct OnyxEngineApp {
     pub manual_base_offset_text: String,
     pub manual_offsets: Vec<String>,
 
-    // Mono / .NET Runtime Dissector
     pub mono_dissector: MonoDissector,
     pub show_mono_modal: bool,
     pub mono_search_text: String,
@@ -281,10 +266,10 @@ dealloc(newmem)
                 if let Some(ref mut proc) = self.attached_proc {
                     proc.set_dbk(Some(arc));
                 }
-                self.status_msg = "Official Cheat Engine DBK driver connected.".to_string();
+                self.status_msg = "OwMemDriver (Stealth Ring-0) connected.".to_string();
             }
             Err(e) => {
-                self.dbk_status_msg = format!("DBK connection failed: {}", e);
+                self.dbk_status_msg = format!("Driver connection failed: {}", e);
                 self.dbk_driver = None;
             }
         }
@@ -373,18 +358,18 @@ dealloc(newmem)
 
     pub fn parse_val_type_from_idx(&self) -> ValType {
         match self.val_type_idx {
-            0 => ValType::U8,     // Binary
-            1 => ValType::I8,     // Byte
-            2 => ValType::I16,    // 2 Bytes
-            3 => ValType::I32,    // 4 Bytes
-            4 => ValType::I64,    // 8 Bytes
-            5 => ValType::Float,  // Float
-            6 => ValType::Double, // Double
-            7 => ValType::Str,    // String
-            8 => ValType::Aob,    // Array of byte
-            9 => ValType::All,    // All
-            10 => ValType::Group,  // Grouped
-            11 => ValType::Aob,   // AOB (CE 7.7 Notation)
+            0 => ValType::U8,
+            1 => ValType::I8,
+            2 => ValType::I16,
+            3 => ValType::I32,
+            4 => ValType::I64,
+            5 => ValType::Float,
+            6 => ValType::Double,
+            7 => ValType::Str,
+            8 => ValType::Aob,
+            9 => ValType::All,
+            10 => ValType::Group,
+            11 => ValType::Aob,
             _ => ValType::I32,
         }
     }
@@ -701,7 +686,7 @@ dealloc(newmem)
                     ValType::Float => proc.read::<f32>(entry.address).map(|v| format!("{:.2}", v)).unwrap_or("???".to_string()),
                     ValType::Double => proc.read::<f64>(entry.address).map(|v| format!("{:.4}", v)).unwrap_or("???".to_string()),
                     ValType::Str => {
-                        // CE 7.7: don't render strings longer than 1000 characters in the addresslist
+
                         match proc.read_string(entry.address, 1001, false) {
                             Ok(s) => {
                                 if s.chars().count() > 1000 {
@@ -889,14 +874,12 @@ impl eframe::App for OnyxEngineApp {
             self.last_table_update = Instant::now();
         }
 
-        // Keep 60 FPS pacing when pulsing/animated, zero stutter
         if self.attached_proc.is_none() {
             ctx.request_repaint_after(std::time::Duration::from_millis(16));
         } else {
             ctx.request_repaint_after(std::time::Duration::from_millis(33));
         }
 
-        // Global Shortcuts
         if ctx.input(|i| (i.modifiers.ctrl && i.key_pressed(egui::Key::Comma)) || i.key_pressed(egui::Key::F2)) {
             self.show_settings_modal = !self.show_settings_modal;
         }
@@ -926,7 +909,6 @@ impl eframe::App for OnyxEngineApp {
             }
         }
 
-        // CE 7.7: Ghost Mode toggle via hotkey (F10 or Ctrl+Shift+G)
         if ctx.input(|i| i.key_pressed(egui::Key::F10) || (i.modifiers.ctrl && i.modifiers.shift && i.key_pressed(egui::Key::G))) {
             self.ghost_mode = !self.ghost_mode;
             self.status_msg = if self.ghost_mode {
@@ -942,13 +924,10 @@ impl eframe::App for OnyxEngineApp {
             }));
         }
 
-        // 1. Top Menubar
         ui::render_top_menu(self, ctx);
 
-        // 2. Status Bar
         ui::render_bottom_bar(self, ctx);
 
-        // 3. Central Working Area
         egui::CentralPanel::default().show(ctx, |ui| {
             ui::render_header_bar(self, ui);
 
@@ -959,16 +938,13 @@ impl eframe::App for OnyxEngineApp {
             let spacing_h = 16.0;
             let content_h = (available_h - divider_h - spacing_h).max(320.0);
 
-            // Responsive split: ~52% to Scanner, ~48% to Cheat Table
             let upper_h = (content_h * 0.52).clamp(240.0, 560.0);
             let lower_h = (content_h - upper_h).max(160.0);
 
-            // Upper Work Area: Scanner & Found Candidates
             ui::scanner_panel::render(self, ui, upper_h);
 
             ui.add_space(4.0);
 
-            // Authentic Cheat Engine Middle Bar: Memory View, Red Arrow (\/), Add Address Manually
             let mut add_top_candidate = false;
             egui::Frame::none()
                 .fill(Color32::from_rgb(22, 25, 32))
@@ -979,7 +955,7 @@ impl eframe::App for OnyxEngineApp {
                     ui.set_height(28.0);
                     let total_w = ui.available_width();
                     ui.horizontal(|ui| {
-                        // Left: Memory View button
+
                         let mem_btn_resp = if let Some(ref icons) = self.icons {
                             let img = egui::Image::new(&icons.memory_view).fit_to_exact_size(Vec2::splat(18.0));
                             ui.add(
@@ -1007,7 +983,6 @@ impl eframe::App for OnyxEngineApp {
                             self.show_memory_view = true;
                         }
 
-                        // Center: Cheat Engine Iconic Red Downward Arrow
                         let arrow_w = 40.0;
                         let mem_w = 120.0;
                         let space_to_center = ((total_w / 2.0) - mem_w - (arrow_w / 2.0) - 8.0).max(8.0);
@@ -1036,7 +1011,6 @@ impl eframe::App for OnyxEngineApp {
                             add_top_candidate = true;
                         }
 
-                        // Right: Add Address Manually
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             let manual_btn = egui::Button::new(RichText::new("+ Add Address Manually").size(12.0).color(Color32::WHITE).strong())
                                 .fill(Color32::from_rgb(28, 70, 42))
@@ -1062,11 +1036,10 @@ impl eframe::App for OnyxEngineApp {
 
             ui.add_space(4.0);
 
-            // Lower Work Area: Cheat Table (Address List)
             ui::cheat_table::render(self, ui, lower_h);
         });
 
-        // 4. Modals and Secondary Viewports
         ui::modals::render_all_modals(self, ctx);
     }
 }
+

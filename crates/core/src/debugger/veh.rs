@@ -1,5 +1,3 @@
-// language: Rust, file: veh.rs, target: Windows 11, MSVC
-// Stealth Vectored Exception Handling (VEH) and thread context debugger
 
 use std::mem::zeroed;
 use crate::debugger::{clear_hw_breakpoint_on_thread, set_hw_breakpoint_on_thread, BreakpointSize, BreakpointType};
@@ -19,8 +17,6 @@ impl VehDebugger {
         }
     }
 
-    /// Sets a stealth hardware breakpoint across all threads without attaching DebugActiveProcess
-    /// (bypasses CheckRemoteDebuggerPresent, ProcessDebugPort, and HideThreadFromDebugger)
     pub fn set_stealth_breakpoint(
         &mut self,
         proc: &Process,
@@ -43,7 +39,6 @@ impl VehDebugger {
         Ok(bp_index)
     }
 
-    /// Clears stealth hardware breakpoint from all threads
     pub fn clear_stealth_breakpoint(&mut self, proc: &Process, index: usize) -> Result<(), String> {
         let threads = proc.threads()?;
         for &tid in &threads {
@@ -57,7 +52,6 @@ impl VehDebugger {
         Ok(())
     }
 
-    /// Polls thread contexts to inspect if any thread hit a breakpoint (DR6 status)
     pub fn poll_hit(&self, proc: &Process) -> Option<(u32, usize)> {
         let threads = proc.threads().ok()?;
         for &tid in &threads {
@@ -72,12 +66,12 @@ impl VehDebugger {
                 ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS | CONTEXT_CONTROL;
 
                 let hit = if GetThreadContext(h_thread, &mut ctx) == TRUE {
-                    // DR6 bits 0..3 indicate which breakpoint fired
+
                     let dr6 = ctx.Dr6;
                     if (dr6 & 0x0F) != 0 {
-                        // Clear DR6 status bit
+
                         ctx.Dr6 = 0;
-                        ctx.EFlags |= 0x00010000; // RF
+                        ctx.EFlags |= 0x00010000;
                         SetThreadContext(h_thread, &ctx);
                         Some((tid, ctx.Rip as usize))
                     } else {
@@ -98,3 +92,4 @@ impl VehDebugger {
         None
     }
 }
+

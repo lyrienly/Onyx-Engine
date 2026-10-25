@@ -32,7 +32,6 @@ pmAddToNewGroup.OnClick=function(s)
     end
   end
 
-
   local groupname=translate(string.format('Group %d',count+1))
   if (isKeyPressed(VK_CONTROL)==false) then
     groupname=InputQuery(translate('Groups'), translate('What do you want the groupname to be?'), groupname)
@@ -45,8 +44,6 @@ pmAddToNewGroup.OnClick=function(s)
     end
   end
 
-
-  --create a new group and add all selected records to the list
   local header=AddressList.createMemoryRecord()
   header.IsGroupHeader=true
   header.IsAddressGroupHeader=withAddress
@@ -73,3 +70,4 @@ pmAddToNewGroup.OnClick=function(s)
     records[i].Parent=header
   end
 end
+

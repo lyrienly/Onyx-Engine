@@ -1,5 +1,3 @@
-// OnyxEngine Memory Freezer Backend API
-// Multi-threaded background memory freezing for Pascal / Lazarus
 
 use std::ffi::CStr;
 use std::os::raw::c_char;
@@ -9,20 +7,19 @@ use onyx_core::scanner::{ScanValue, ValType};
 
 fn map_val_type(idx: i32) -> ValType {
     match idx {
-        // Direct CE TVariableType enum ordinals
-        0 => ValType::I8,     // vtByte = 0
-        1 => ValType::I16,    // vtWord = 1
-        2 => ValType::I32,    // vtDword = 2
-        3 => ValType::I64,    // vtQword = 3
-        4 => ValType::Float,  // vtSingle = 4
-        5 => ValType::Double, // vtDouble = 5
-        6 | 7 | 16 => ValType::Str, // vtString = 6, vtUnicodeString = 7, vtCodePageString = 16
-        8 | 15 => ValType::Aob,     // vtByteArray = 8, vtByteArrays = 15
+
+        0 => ValType::I8,
+        1 => ValType::I16,
+        2 => ValType::I32,
+        3 => ValType::I64,
+        4 => ValType::Float,
+        5 => ValType::Double,
+        6 | 7 | 16 => ValType::Str,
+        8 | 15 => ValType::Aob,
         _ => ValType::I32,
     }
 }
 
-/// Create a new background freezer thread bound to a target process
 #[no_mangle]
 pub unsafe extern "C" fn onyx_freezer_create(process: *mut Process, interval_ms: u64) -> *mut Freezer {
     if process.is_null() {
@@ -35,7 +32,6 @@ pub unsafe extern "C" fn onyx_freezer_create(process: *mut Process, interval_ms:
     Box::into_raw(Box::new(freezer))
 }
 
-/// Dynamically update target process handle in freezer
 #[no_mangle]
 pub unsafe extern "C" fn onyx_freezer_set_process(freezer: *mut Freezer, process: *mut Process) -> i32 {
     if freezer.is_null() || process.is_null() {
@@ -47,7 +43,6 @@ pub unsafe extern "C" fn onyx_freezer_set_process(freezer: *mut Freezer, process
     1
 }
 
-/// Stop and destroy the background freezer
 #[no_mangle]
 pub unsafe extern "C" fn onyx_freezer_destroy(freezer: *mut Freezer) {
     if !freezer.is_null() {
@@ -56,8 +51,6 @@ pub unsafe extern "C" fn onyx_freezer_destroy(freezer: *mut Freezer) {
     }
 }
 
-/// Add an address to be actively frozen with a specific value
-/// Returns the frozen entry ID (>0), or 0 on error
 #[no_mangle]
 pub unsafe extern "C" fn onyx_freezer_add(
     freezer: *mut Freezer,
@@ -85,7 +78,6 @@ pub unsafe extern "C" fn onyx_freezer_add(
     }
 }
 
-/// Update a frozen value dynamically by entry ID
 #[no_mangle]
 pub unsafe extern "C" fn onyx_freezer_update(
     freezer: *mut Freezer,
@@ -107,7 +99,6 @@ pub unsafe extern "C" fn onyx_freezer_update(
     }
 }
 
-/// Remove an address from the freezer by entry ID
 #[no_mangle]
 pub unsafe extern "C" fn onyx_freezer_remove(freezer: *mut Freezer, entry_id: usize) -> i32 {
     if freezer.is_null() {
@@ -117,7 +108,6 @@ pub unsafe extern "C" fn onyx_freezer_remove(freezer: *mut Freezer, entry_id: us
     if f.unfreeze(entry_id) { 1 } else { 0 }
 }
 
-/// Clear all frozen addresses
 #[no_mangle]
 pub unsafe extern "C" fn onyx_freezer_clear(freezer: *mut Freezer) {
     if !freezer.is_null() {
@@ -125,3 +115,4 @@ pub unsafe extern "C" fn onyx_freezer_clear(freezer: *mut Freezer) {
         f.clear();
     }
 }
+

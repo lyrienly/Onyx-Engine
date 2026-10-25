@@ -174,7 +174,6 @@ ret 8
 ]])
 end
 
-
 local function registerBigEndianFloat()
 scripts['Float Big Endian'].type=registerCustomTypeAutoAssembler([[
 alloc(TypeName,256)
@@ -182,19 +181,16 @@ alloc(ByteSize,4)
 alloc(ConvertRoutine,1024)
 alloc(ConvertBackRoutine,1024)
 alloc(UsesFloat,1)
-  
-  
+
 TypeName:
 db 'Float Big Endian',0
-  
-  
+
 ByteSize:
 dd 4
 
 UsesFloat:
 db 1
-  
-  
+
 ConvertRoutine:
 [64-bit]
 xor eax,eax
@@ -212,8 +208,7 @@ bswap eax
 pop ebp
 ret 4
 [/32-bit]
-  
-  
+
 ConvertBackRoutine:
 [64-bit]
 bswap ecx //convert the little endian input into a big endian input
@@ -229,27 +224,24 @@ push ebx
 mov eax,[ebp+8] //load the value into eax
 mov ebx,[ebp+c] //load the address into ebx
 bswap eax
-  
+
 mov [ebx],eax //write the value into the address
 pop ebx
 pop eax
 pop ebp
 ret 8
-[/32-bit] 
+[/32-bit]
 ]])
 end
-
 
 scripts['2 Byte Big Endian']={func=registerBigEndianInt16,reg='EnableBigEndianInt16'}
 scripts['4 Byte Big Endian']={func=registerBigEndianInt32,reg='EnableBigEndianInt32'}
 scripts['Float Big Endian']={func=registerBigEndianFloat,reg='EnableBigEndianFloat'}
 local scriptnames={'2 Byte Big Endian','4 Byte Big Endian','Float Big Endian'}
 
-
---when loaded check if it should load the custom types
 local i
 local s=getSettings()
-for i=1,#scriptnames do 
+for i=1,#scriptnames do
   if (s.Value[scripts[scriptnames[i]].reg]=='1') then
     scripts[scriptnames[i]].func()
   end
@@ -259,17 +251,17 @@ local sf=getSettingsForm()
 
 local CustomTypesPage=nil
 for i=0, sf.SettingsPageControl.PageCount-1 do
-  if sf.SettingsPageControl.Page[i].Name=='CustomTypes' then --Do NOT translate this
+  if sf.SettingsPageControl.Page[i].Name=='CustomTypes' then
     CustomTypesPage=sf.SettingsPageControl.Page[i]
   end
 end
 if CustomTypesPage==nil then
-  --first script to add it
+
   CustomTypesPage=sf.SettingsPageControl.addTab()
-  CustomTypesPage.Name='CustomTypes' --again, do NOT translate this
+  CustomTypesPage.Name='CustomTypes'
   CustomTypesPage.Caption=translate('Extra Custom Types')
 
-  local insertNode=sf.SettingsTreeView.Items[3]  --insert it near the unrandomizer since it'd be used as often as that setting
+  local insertNode=sf.SettingsTreeView.Items[3]
   local node=sf.SettingsTreeView.Items.insert(insertNode, CustomTypesPage.Caption)
   node.data=userDataToInteger(CustomTypesPage)
 
@@ -277,7 +269,6 @@ if CustomTypesPage==nil then
   clb.Align='alClient'
   clb.Name='List'
 end
-
 
 for i=1, #scriptnames do
   CustomTypesPage.List.Items.Add(scriptnames[i])
@@ -290,35 +281,33 @@ sf.OnClose=function(sender, closeAction)
   if oldOnClose~=nil then
     result=oldOnClose(sender, closeAction)
   end
-  
+
   if (result==caHide) and (sender.ModalResult==mrOK) then
     local i
     for i=0, CustomTypesPage.List.Items.Count-1 do
       local ctname=CustomTypesPage.List.Items[i]
-      
-      
-      if scripts[ctname] then --known name
+
+      if scripts[ctname] then
         if CustomTypesPage.List.Checked[i] then
           if scripts[ctname].type==nil then
-            scripts[ctname].func()                    
-          end               
+            scripts[ctname].func()
+          end
           local regname=scripts[ctname].reg;
-          s.Value[scripts[ctname].reg]='1' 
-         -- print(s.ClassName)
+          s.Value[scripts[ctname].reg]='1'
+
         else
-          
+
           if scripts[ctname].type then
-            --print("destroy")
+
             scripts[ctname].type.destroy()
             scripts[ctname].type=nil
           end
           s.Value[scripts[ctname].reg]='0'
-       
+
         end
       end
     end
   end
   return result
 end
-
 

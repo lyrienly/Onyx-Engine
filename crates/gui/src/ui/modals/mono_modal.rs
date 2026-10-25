@@ -1,5 +1,3 @@
-// Mono & .NET CLR Runtime Dissector Modal for OnyxEngine
-// In-depth inspection of assemblies, classes, live field values, and JIT compiled methods
 
 use eframe::egui::{self, Color32, RichText, Stroke, Vec2};
 use onyx_core::mono::MonoDissector;
@@ -24,7 +22,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                 app.show_mono_modal = false;
             }
 
-            // 1. Header Toolbar
             egui::TopBottomPanel::top("mono_top_bar").show(ctx, |ui| {
                 ui.add_space(4.0);
                 ui.horizontal(|ui| {
@@ -59,7 +56,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                 ui.add_space(4.0);
             });
 
-            // 2. Bottom Status Bar
             egui::TopBottomPanel::bottom("mono_bottom_bar").show(ctx, |ui| {
                 ui.add_space(4.0);
                 ui.horizontal(|ui| {
@@ -76,7 +72,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                 ui.add_space(4.0);
             });
 
-            // 3. Central Working Area
             egui::CentralPanel::default().show(ctx, |ui| {
                 let avail = ui.available_size();
                 let left_w = (avail.x * 0.30).clamp(260.0, 360.0);
@@ -84,13 +79,12 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                 let full_h = avail.y;
 
                 ui.horizontal(|ui| {
-                    // LEFT MASTER PANEL
+
                     ui.vertical(|ui| {
                         ui.set_width(left_w);
                         let asm_h = (full_h * 0.38).clamp(100.0, 220.0);
                         let cls_h = (full_h - asm_h - 14.0).max(120.0);
 
-                        // Card 1: Assemblies
                         egui::Frame::group(ui.style())
                             .fill(Color32::from_rgb(22, 26, 34))
                             .stroke(Stroke::new(1.0_f32, Color32::from_rgb(44, 52, 66)))
@@ -121,7 +115,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
 
                         ui.add_space(6.0);
 
-                        // Card 2: Classes
                         let search_lower = app.mono_search_text.trim().to_lowercase();
                         let sel_asm = app.selected_assembly_idx.and_then(|idx| app.mono_dissector.assemblies.get(idx));
                         let class_count = sel_asm.map(|a| a.classes.len()).unwrap_or(0);
@@ -170,7 +163,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
 
                     ui.add_space(8.0);
 
-                    // RIGHT DETAIL PANEL
                     ui.vertical(|ui| {
                         ui.set_width(right_w);
                         egui::Frame::group(ui.style())
@@ -219,7 +211,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                                     let fields_h = (rem_h * 0.58).max(120.0);
                                     let methods_h = (rem_h - fields_h - 28.0).max(100.0);
 
-                                    // Fields
                                     ui.label(RichText::new(format!("Fields ({})", cls.fields.len())).strong().color(Color32::from_rgb(120, 210, 255)));
                                     egui::ScrollArea::vertical()
                                         .id_salt("mono_fields_scroll")
@@ -287,7 +278,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                                     ui.add_space(4.0);
                                     ui.separator();
 
-                                    // Methods
                                     ui.label(RichText::new(format!("Methods ({})", cls.methods.len())).strong().color(Color32::from_rgb(255, 170, 170)));
                                     egui::ScrollArea::vertical()
                                         .id_salt("mono_methods_scroll")
@@ -361,3 +351,4 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
         },
     );
 }
+

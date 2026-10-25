@@ -1,12 +1,9 @@
-// language: Rust, file: kernel.rs, target: Windows 11, MSVC
-// Cheat Engine DBKKernel driver client interface (DBK64 / DBK32)
 
 use std::mem::size_of;
 use std::ptr::null_mut;
 use crate::win32::*;
+use crate::process::ModuleEntry;
 
-// Exact IOCTL codes calculated from Cheat Engine DBKKernel/IOPLDispatcher.h:
-// CTL_CODE(FILE_DEVICE_UNKNOWN = 0x22, func, METHOD_BUFFERED = 0, FILE_READ_ACCESS | FILE_WRITE_ACCESS = 3)
 pub const IOCTL_CE_READMEMORY: DWORD = 0x22E000;
 pub const IOCTL_CE_WRITEMEMORY: DWORD = 0x22E004;
 pub const IOCTL_CE_OPENPROCESS: DWORD = 0x22E008;
@@ -19,6 +16,23 @@ pub const IOCTL_CE_GETPHYSICALADDRESS: DWORD = 0x22E020;
 pub const IOCTL_CE_GETCR3: DWORD = 0x22E028;
 pub const IOCTL_CE_SETCR3: DWORD = 0x22E02C;
 pub const IOCTL_CE_GETVERSION: DWORD = 0x22E058;
+
+pub const IOCTL_CE_GET_BASE: DWORD = 0x22E18C;
+pub const IOCTL_CE_HIDEDRIVER: DWORD = 0x22E190;
+pub const IOCTL_CE_ENUM_VAD_MODULES: DWORD = 0x22E194;
+pub const IOCTL_CE_TRANSLATE_CR3: DWORD = 0x22E198;
+pub const IOCTL_CE_CLOAK_PAGE: DWORD = 0x22E19C;
+pub const IOCTL_CE_UNCLOAK_PAGE: DWORD = 0x22E1A0;
+pub const IOCTL_CE_WRITE_CLOAKED: DWORD = 0x22E1A4;
+pub const IOCTL_CE_BULK_DUMP_CR3: DWORD = 0x22E1A8;
+pub const IOCTL_CE_STEALTH_READ_PTE: DWORD = 0x22E1AC;
+pub const IOCTL_CE_STRIP_CALLBACKS: DWORD = 0x22E1B4;
+pub const IOCTL_CE_PATTERN_SCAN: DWORD = 0x22E1B8;
+pub const IOCTL_CE_FREEZE_PROCESS: DWORD = 0x22E1BC;
+pub const IOCTL_CE_SET_PROCESS_PROTECTION: DWORD = 0x22E1C0;
+pub const IOCTL_CE_CLEAN_KERNEL_TRACES: DWORD = 0x22E1C4;
+pub const IOCTL_CE_CLOAK_DEVICE_SYMLINK: DWORD = 0x22E1C8;
+pub const IOCTL_CE_PHYSICAL_RAM_SCAVENGE: DWORD = 0x22E1CC;
 
 #[repr(C, packed)]
 struct CeReadMemoryInput {
@@ -41,6 +55,65 @@ struct CeOpenProcessOutput {
     special: u8,
 }
 
+#[repr(C, packed)]
+struct CeTranslateCr3Input {
+    process_id: u32,
+    virtual_address: u64,
+}
+
+#[repr(C, packed)]
+struct CeBulkDumpInput {
+    process_id: u64,
+    base_address: u64,
+    size: u32,
+}
+
+#[repr(C, packed)]
+struct CeStripCallbacksInput {
+    restore: u32,
+}
+
+#[repr(C, packed)]
+struct CeFreezeProcessInput {
+    process_id: u64,
+    freeze: u32,
+}
+
+#[repr(C, packed)]
+struct CeSetProtectionInput {
+    process_id: u64,
+    enable: u32,
+}
+
+#[repr(C, packed)]
+struct CePatternScanInput {
+    process_id: u64,
+    start_address: u64,
+    scan_size: u64,
+    pattern_length: u32,
+    pattern: [u8; 64],
+    mask: [u8; 64],
+}
+
+#[repr(C)]
+struct CePatternScanOutput {
+    match_count: u32,
+    matches: [u64; 32],
+}
+
+#[repr(C)]
+struct VadModuleEntryRaw {
+    base_address: u64,
+    module_size: u64,
+    module_name: [u16; 64],
+    full_path: [u16; 260],
+}
+
+#[repr(C)]
+struct VadEnumOutputHeader {
+    count: u32,
+}
+
 pub struct DbkDriver {
     pub device_handle: HANDLE,
     pub device_name: String,
@@ -50,9 +123,39 @@ unsafe impl Send for DbkDriver {}
 unsafe impl Sync for DbkDriver {}
 
 impl DbkDriver {
-    /// Attempts to open a handle to \\.\DBK64, \\.\DBK32 or official CE driver versions
+
+    pub fn connect_device(device_path: &str) -> Result<Self, String> {
+        let wide_name: Vec<u16> = device_path.encode_utf16().chain(std::iter::once(0)).collect();
+        let handle = unsafe {
+            CreateFileW(
+                wide_name.as_ptr(),
+                GENERIC_READ | GENERIC_WRITE,
+                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                null_mut(),
+                OPEN_EXISTING,
+                FILE_ATTRIBUTE_NORMAL,
+                null_mut(),
+            )
+        };
+
+        if handle != INVALID_HANDLE_VALUE && !handle.is_null() {
+            let driver = DbkDriver {
+                device_handle: handle,
+                device_name: device_path.to_string(),
+            };
+
+            let _ = driver.hide_driver();
+            let _ = driver.clean_traces();
+            Ok(driver)
+        } else {
+            Err(format!("Failed to open device {}", device_path))
+        }
+    }
+
     pub fn connect() -> Result<Self, String> {
         let names = [
+            "\\\\.\\OwMemDriver",
+            "\\\\.\\lydumen",
             "\\\\.\\DBK64",
             "\\\\.\\DBK32",
             "\\\\.\\CEDRIVER77",
@@ -63,31 +166,14 @@ impl DbkDriver {
         ];
 
         for name in &names {
-            let wide_name: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
-            let handle = unsafe {
-                CreateFileW(
-                    wide_name.as_ptr(),
-                    GENERIC_READ | GENERIC_WRITE,
-                    FILE_SHARE_READ | FILE_SHARE_WRITE,
-                    null_mut(),
-                    OPEN_EXISTING,
-                    FILE_ATTRIBUTE_NORMAL,
-                    null_mut(),
-                )
-            };
-
-            if handle != INVALID_HANDLE_VALUE && !handle.is_null() {
-                return Ok(DbkDriver {
-                    device_handle: handle,
-                    device_name: name.to_string(),
-                });
+            if let Ok(driver) = Self::connect_device(name) {
+                return Ok(driver);
             }
         }
 
-        Err("Failed to connect to Cheat Engine kernel driver (DBK64/CEDRIVER77). Is DBK loaded?".to_string())
+        Err("Failed to connect to kernel driver (OwMemDriver/lydumen/DBK64). Is driver loaded?".to_string())
     }
 
-    /// Verifies driver communication via IOCTL_CE_TEST
     pub fn test(&self) -> bool {
         let mut returned: DWORD = 0;
         let mut test_val: u32 = 0xAA55AA55;
@@ -106,7 +192,6 @@ impl DbkDriver {
         ok == TRUE
     }
 
-    /// Queries DBK driver version
     pub fn get_version(&self) -> Result<u32, String> {
         let mut version: u32 = 0;
         let mut returned: DWORD = 0;
@@ -129,7 +214,319 @@ impl DbkDriver {
         }
     }
 
-    /// Kernel-level process handle acquisition (strips anti-cheat handle protection)
+    pub fn hide_driver(&self) -> Result<(), String> {
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_HIDEDRIVER,
+                null_mut(),
+                0,
+                null_mut(),
+                0,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            Ok(())
+        } else {
+            Err("Failed to hide driver from PsLoadedModuleList".to_string())
+        }
+    }
+
+    pub fn strip_callbacks(&self, restore: bool) -> Result<u32, String> {
+        let mut inp = CeStripCallbacksInput {
+            restore: if restore { 1 } else { 0 },
+        };
+        let mut affected: u32 = 0;
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_STRIP_CALLBACKS,
+                &mut inp as *mut _ as LPVOID,
+                size_of::<CeStripCallbacksInput>() as DWORD,
+                &mut affected as *mut _ as LPVOID,
+                size_of::<u32>() as DWORD,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            Ok(affected)
+        } else {
+            Err("Failed to strip process callbacks".to_string())
+        }
+    }
+
+    pub fn clean_traces(&self) -> Result<(), String> {
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_CLEAN_KERNEL_TRACES,
+                null_mut(),
+                0,
+                null_mut(),
+                0,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            Ok(())
+        } else {
+            Err("Failed to clean kernel driver traces".to_string())
+        }
+    }
+
+    pub fn set_protection(&self, pid: u32, enable: bool) -> Result<(), String> {
+        let mut inp = CeSetProtectionInput {
+            process_id: pid as u64,
+            enable: if enable { 1 } else { 0 },
+        };
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_SET_PROCESS_PROTECTION,
+                &mut inp as *mut _ as LPVOID,
+                size_of::<CeSetProtectionInput>() as DWORD,
+                null_mut(),
+                0,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            Ok(())
+        } else {
+            Err(format!("Failed to set process protection for PID {}", pid))
+        }
+    }
+
+    pub fn freeze_process(&self, pid: u32, freeze: bool) -> Result<(), String> {
+        let mut inp = CeFreezeProcessInput {
+            process_id: pid as u64,
+            freeze: if freeze { 1 } else { 0 },
+        };
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_FREEZE_PROCESS,
+                &mut inp as *mut _ as LPVOID,
+                size_of::<CeFreezeProcessInput>() as DWORD,
+                null_mut(),
+                0,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            Ok(())
+        } else {
+            Err(format!("Failed to {} process PID {}", if freeze { "freeze" } else { "thaw" }, pid))
+        }
+    }
+
+    pub fn cloak_symlink(&self, new_symlink: &str) -> Result<(), String> {
+        let wide: Vec<u16> = new_symlink.encode_utf16().chain(std::iter::once(0)).collect();
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_CLOAK_DEVICE_SYMLINK,
+                wide.as_ptr() as LPVOID,
+                (wide.len() * 2) as DWORD,
+                null_mut(),
+                0,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            Ok(())
+        } else {
+            Err("Failed to cloak device symlink".to_string())
+        }
+    }
+
+    pub fn get_process_base(&self, pid: u32) -> Result<u64, String> {
+        let mut input_pid = pid;
+        let mut base_addr: u64 = 0;
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_GET_BASE,
+                &mut input_pid as *mut _ as LPVOID,
+                size_of::<u32>() as DWORD,
+                &mut base_addr as *mut _ as LPVOID,
+                size_of::<u64>() as DWORD,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE && base_addr != 0 {
+            Ok(base_addr)
+        } else {
+            Err(format!("Failed to resolve process base via kernel for PID {}", pid))
+        }
+    }
+
+    pub fn translate_cr3(&self, pid: u32, virtual_address: u64) -> Result<u64, String> {
+        let mut inp = CeTranslateCr3Input {
+            process_id: pid,
+            virtual_address,
+        };
+        let mut phys_addr: u64 = 0;
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_TRANSLATE_CR3,
+                &mut inp as *mut _ as LPVOID,
+                size_of::<CeTranslateCr3Input>() as DWORD,
+                &mut phys_addr as *mut _ as LPVOID,
+                size_of::<u64>() as DWORD,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE && phys_addr != 0 {
+            Ok(phys_addr)
+        } else {
+            Err(format!("Failed to translate VA 0x{:X} via CR3 for PID {}", virtual_address, pid))
+        }
+    }
+
+    pub fn bulk_dump_cr3(&self, pid: u32, base_address: u64, size: usize) -> Result<Vec<u8>, String> {
+        let mut output = vec![0u8; size];
+        let inp = CeBulkDumpInput {
+            process_id: pid as u64,
+            base_address,
+            size: size as u32,
+        };
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_BULK_DUMP_CR3,
+                &inp as *const _ as LPVOID,
+                size_of::<CeBulkDumpInput>() as DWORD,
+                output.as_mut_ptr() as LPVOID,
+                size as DWORD,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE && returned > 0 {
+            output.truncate(returned as usize);
+            Ok(output)
+        } else {
+            Err(format!("Bulk dump CR3 failed at 0x{:X}", base_address))
+        }
+    }
+
+    pub fn pattern_scan_cr3(
+        &self,
+        pid: u32,
+        start_address: u64,
+        scan_size: u64,
+        pattern: &[u8],
+        mask: &[u8],
+    ) -> Result<Vec<u64>, String> {
+        if pattern.is_empty() || pattern.len() > 64 || pattern.len() != mask.len() {
+            return Err("Invalid pattern or mask length (max 64 bytes)".to_string());
+        }
+
+        let mut inp = CePatternScanInput {
+            process_id: pid as u64,
+            start_address,
+            scan_size,
+            pattern_length: pattern.len() as u32,
+            pattern: [0u8; 64],
+            mask: [0u8; 64],
+        };
+        inp.pattern[..pattern.len()].copy_from_slice(pattern);
+        inp.mask[..mask.len()].copy_from_slice(mask);
+
+        let mut out: CePatternScanOutput = unsafe { std::mem::zeroed() };
+        let mut returned: DWORD = 0;
+
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_PATTERN_SCAN,
+                &mut inp as *mut _ as LPVOID,
+                size_of::<CePatternScanInput>() as DWORD,
+                &mut out as *mut _ as LPVOID,
+                size_of::<CePatternScanOutput>() as DWORD,
+                &mut returned,
+                null_mut(),
+            )
+        };
+
+        if ok == TRUE {
+            let count = (out.match_count as usize).min(32);
+            Ok(out.matches[..count].to_vec())
+        } else {
+            Err("Kernel pattern scan failed".to_string())
+        }
+    }
+
+    pub fn enum_vad_modules(&self, pid: u32) -> Result<Vec<ModuleEntry>, String> {
+        const MAX_MODULES: usize = 256;
+        let buf_size = size_of::<VadEnumOutputHeader>() + MAX_MODULES * size_of::<VadModuleEntryRaw>();
+        let mut buffer = vec![0u8; buf_size];
+        let mut input_pid = pid;
+        let mut returned: DWORD = 0;
+
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_ENUM_VAD_MODULES,
+                &mut input_pid as *mut _ as LPVOID,
+                size_of::<u32>() as DWORD,
+                buffer.as_mut_ptr() as LPVOID,
+                buf_size as DWORD,
+                &mut returned,
+                null_mut(),
+            )
+        };
+
+        if ok != TRUE || returned < size_of::<VadEnumOutputHeader>() as DWORD {
+            return Err(format!("Failed to enumerate VAD modules for PID {}", pid));
+        }
+
+        let header = unsafe { &*(buffer.as_ptr() as *const VadEnumOutputHeader) };
+        let count = (header.count as usize).min(MAX_MODULES);
+        let entries_ptr = unsafe { buffer.as_ptr().add(size_of::<VadEnumOutputHeader>()) as *const VadModuleEntryRaw };
+
+        let mut modules = Vec::with_capacity(count);
+        for i in 0..count {
+            let entry = unsafe { &*entries_ptr.add(i) };
+            let name_len = entry.module_name.iter().position(|&c| c == 0).unwrap_or(entry.module_name.len());
+            let name = String::from_utf16_lossy(&entry.module_name[..name_len]);
+
+            let path_len = entry.full_path.iter().position(|&c| c == 0).unwrap_or(entry.full_path.len());
+            let path = String::from_utf16_lossy(&entry.full_path[..path_len]);
+
+            if !name.is_empty() && entry.base_address > 0 {
+                modules.push(ModuleEntry {
+                    name,
+                    path,
+                    base: entry.base_address as usize,
+                    size: entry.module_size as usize,
+                });
+            }
+        }
+
+        Ok(modules)
+    }
+
     pub fn open_process(&self, pid: u32) -> Result<HANDLE, String> {
         let mut input_pid: u64 = pid as u64;
         let mut output: CeOpenProcessOutput = unsafe { std::mem::zeroed() };
@@ -155,12 +552,10 @@ impl DbkDriver {
         }
     }
 
-    /// Reads process memory via the DBKKernel driver (bypasses usermode hooks and stripped handles)
     pub fn read_memory(&self, pid: u32, address: usize, len: usize) -> Result<Vec<u8>, String> {
         let mut result = Vec::with_capacity(len);
         let mut offset = 0;
 
-        // DBK reads in chunks of max 65535 bytes
         while offset < len {
             let chunk_len = ((len - offset).min(0xFFFF)) as u16;
             let inp = CeReadMemoryInput {
@@ -196,7 +591,6 @@ impl DbkDriver {
         Ok(result)
     }
 
-    /// Writes process memory via DBKKernel driver
     pub fn write_memory(&self, pid: u32, address: usize, data: &[u8]) -> Result<usize, String> {
         let mut total_written = 0;
         let mut offset = 0;
@@ -250,7 +644,6 @@ impl DbkDriver {
         Ok(total_written)
     }
 
-    /// Obtains CR3 register for a process
     pub fn get_cr3(&self, pid: u32) -> Result<u64, String> {
         let mut input_pid = pid;
         let mut cr3: u64 = 0;
@@ -286,3 +679,4 @@ impl Drop for DbkDriver {
         }
     }
 }
+

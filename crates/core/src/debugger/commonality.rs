@@ -1,8 +1,3 @@
-// language: Rust, file: commonality.rs, target: Windows 11, MSVC
-// Commonality and Structure Variance Analyzer
-// Mirrors Cheat Engine frmchangedaddressescommonalityscannerunit.pas
-// Analyzes register values and structure offsets across multiple breakpoint hits
-// to automatically isolate differentiating keys (e.g. Player vs Enemy).
 
 use crate::process::Process;
 
@@ -83,7 +78,7 @@ pub struct StructureDifference {
 pub struct CommonalityAnalyzer;
 
 impl CommonalityAnalyzer {
-    /// Compares register states across two groups of breakpoint snapshots (e.g. Group 1: Player, Group 2: Enemy).
+
     pub fn analyze_registers(
         group1: &[RegisterSnapshot],
         group2: &[RegisterSnapshot],
@@ -104,7 +99,7 @@ impl CommonalityAnalyzer {
                 if g1_constant && g2_constant {
                     g1_sample != g2_sample
                 } else {
-                    // Check if disjoint sets
+
                     !g1_vals.iter().any(|v1| g2_vals.contains(v1))
                 }
             } else {
@@ -125,8 +120,6 @@ impl CommonalityAnalyzer {
         results
     }
 
-    /// Reads memory for candidate base pointers in Group 1 vs Group 2 and isolates structure offsets
-    /// where Group 1 and Group 2 differ consistently (e.g. team ID offset, entity type offset).
     pub fn analyze_structures(
         proc: &Process,
         group1_ptrs: &[usize],
@@ -156,7 +149,7 @@ impl CommonalityAnalyzer {
         }
 
         let mut differences = Vec::new();
-        let step = 4; // Check 4-byte boundaries (standard 32-bit int/float fields)
+        let step = 4;
 
         let mut offset = 0;
         while offset + 4 <= struct_size {
@@ -222,7 +215,6 @@ mod tests {
 
         let comps = CommonalityAnalyzer::analyze_registers(&[snap_p1, snap_p2], &[snap_e1, snap_e2]);
 
-        // RAX: Player is constant (0x100), Enemy is constant (0x200), distinguishes is true!
         let rax_comp = comps.iter().find(|c| c.reg_name == "RAX").unwrap();
         assert!(rax_comp.g1_constant);
         assert_eq!(rax_comp.g1_sample, 0x100);
@@ -230,10 +222,10 @@ mod tests {
         assert_eq!(rax_comp.g2_sample, 0x200);
         assert!(rax_comp.distinguishes_groups);
 
-        // RSI: Player is constant, Enemy varies (0x7FFE5000 != 0x7FFE6000), but disjoint sets!
         let rsi_comp = comps.iter().find(|c| c.reg_name == "RSI").unwrap();
         assert!(rsi_comp.g1_constant);
         assert!(!rsi_comp.g2_constant);
         assert!(rsi_comp.distinguishes_groups);
     }
 }
+

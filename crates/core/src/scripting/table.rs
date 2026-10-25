@@ -1,5 +1,3 @@
-// language: Rust, file: table.rs, target: Windows 11, MSVC
-// Address table and cheat record manager with pointer chain evaluation
 
 use std::fs::File;
 use std::io::Write;
@@ -128,3 +126,4 @@ impl CheatTable {
         Ok(())
     }
 }
+

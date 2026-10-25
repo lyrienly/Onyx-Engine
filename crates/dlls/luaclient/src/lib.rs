@@ -1,6 +1,3 @@
-// language: Rust, file: lib.rs, target: Windows 11, MSVC
-// Cheat Engine Lua Client DLL (luaclient equivalent in modern Rust)
-// Allows target process to remotely execute Lua in Cheat Engine via Named Pipes
 
 #![allow(non_snake_case, non_camel_case_types, dead_code, unsafe_op_in_unsafe_fn, static_mut_refs)]
 
@@ -98,10 +95,10 @@ pub unsafe extern "system" fn CELUA_Initialize(pipename: *const c_char) -> BOOL 
 
     let h = CreateFileA(
         full_path.as_ptr(),
-        0xC0000000, // GENERIC_READ | GENERIC_WRITE
+        0xC0000000,
         0,
         null_mut(),
-        3, // OPEN_EXISTING
+        3,
         0,
         null_mut(),
     );
@@ -130,13 +127,11 @@ pub unsafe extern "system" fn CELUA_ExecuteFunction(script: *const c_char, _para
     let bytes = c_str.to_bytes();
     let len = bytes.len() as u32;
 
-    // Command 1 = Execute synchronous script
     let cmd: [u8; 1] = [1];
     if !write_exact(h, &cmd) { return 0; }
     if !write_exact(h, &len.to_le_bytes()) { return 0; }
     if !write_exact(h, bytes) { return 0; }
 
-    // Read result status: 1 byte return type, 8 bytes return value
     let mut resp = [0u8; 9];
     if !read_exact(h, &mut resp) {
         return 0;
@@ -161,7 +156,6 @@ pub unsafe extern "system" fn CELUA_ExecuteFunctionAsync(script: *const c_char, 
     let bytes = c_str.to_bytes();
     let len = bytes.len() as u32;
 
-    // Command 2 = Execute asynchronous script
     let cmd: [u8; 1] = [2];
     if !write_exact(h, &cmd) { return 0; }
     if !write_exact(h, &len.to_le_bytes()) { return 0; }
@@ -186,7 +180,6 @@ pub unsafe extern "system" fn CELUA_GetFunctionReferenceFromName(functionname: *
     let bytes = c_str.to_bytes();
     let len = bytes.len() as u32;
 
-    // Command 4 = Get function reference ID
     let cmd: [u8; 1] = [4];
     if !write_exact(h, &cmd) { return -1; }
     if !write_exact(h, &len.to_le_bytes()) { return -1; }
@@ -214,7 +207,6 @@ pub unsafe extern "system" fn CELUA_ExecuteFunctionByReference(
     }
     let h = h_val as HANDLE;
 
-    // Command 3 = Execute by reference
     let cmd: [u8; 1] = [3];
     let is_async: [u8; 1] = [if async_call != 0 { 1 } else { 0 }];
 
@@ -235,7 +227,6 @@ pub unsafe extern "system" fn CELUA_ExecuteFunctionByReference(
         return 1;
     }
 
-    // Wait for return value
     let mut ret_count = [0u8; 1];
     if !read_exact(h, &mut ret_count) {
         return 0;
@@ -258,7 +249,7 @@ pub unsafe extern "system" fn DllMain(
     fdw_reason: u32,
     _lpv_reserved: *mut c_void,
 ) -> BOOL {
-    if fdw_reason == 0 { // DLL_PROCESS_DETACH
+    if fdw_reason == 0 {
         let h_val = PIPE_HANDLE.swap(-1, Ordering::SeqCst);
         if h_val != -1 {
             CloseHandle(h_val as HANDLE);
@@ -266,3 +257,4 @@ pub unsafe extern "system" fn DllMain(
     }
     1
 }
+

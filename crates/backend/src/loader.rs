@@ -1,5 +1,3 @@
-// language: Rust, file: loader.rs, target: Windows 11, MSVC
-// Dynamic Sub-DLL Module Loader & Coordinator for Central onyx_backend.dll
 
 use std::ffi::c_void;
 use std::path::PathBuf;
@@ -93,7 +91,6 @@ pub fn cleanup_modules() {
     }
 }
 
-/// Query whether a specific modular sub-DLL is currently loaded
 #[no_mangle]
 pub extern "C" fn onyx_module_is_loaded(module_idx: u32) -> i32 {
     let guard = REGISTRY.lock().unwrap();
@@ -109,3 +106,4 @@ pub extern "C" fn onyx_module_is_loaded(module_idx: u32) -> i32 {
         0
     }
 }
+

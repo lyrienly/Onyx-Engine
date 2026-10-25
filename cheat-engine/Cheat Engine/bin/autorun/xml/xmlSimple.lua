@@ -1,34 +1,15 @@
---module(..., package.seeall)
+
 local f={}
 
----------------------------------------------------------------------------------
----------------------------------------------------------------------------------
---
--- Original source: https://github.com/Cluain/Lua-Simple-XML-Parser
---
--- xml.lua - XML parser for use with the Corona SDK.
---
--- version: 1.2
---
--- CHANGELOG:
---
--- 1.2 - Created new structure for returned table
--- 1.1 - Fixed base directory issue with the loadFile() function.
---
--- NOTE: This is a modified version of Alexander Makeev's Lua-only XML parser
--- found here: http://lua-users.org/wiki/LuaXml
---
----------------------------------------------------------------------------------
----------------------------------------------------------------------------------
 function f.newParser()
 
     XmlParser = {};
 
     function XmlParser:ToXmlString(value)
-        value = string.gsub(value, "&", "&amp;"); -- '&' -> "&amp;"
-        value = string.gsub(value, "<", "&lt;"); -- '<' -> "&lt;"
-        value = string.gsub(value, ">", "&gt;"); -- '>' -> "&gt;"
-        value = string.gsub(value, "\"", "&quot;"); -- '"' -> "&quot;"
+        value = string.gsub(value, "&", "&amp;");
+        value = string.gsub(value, "<", "&lt;");
+        value = string.gsub(value, ">", "&gt;");
+        value = string.gsub(value, "\"", "&quot;");
         value = string.gsub(value, "([^%w%&%;%p%\t% ])",
             function(c)
                 return string.format("&#x%X;", string.byte(c))
@@ -73,17 +54,17 @@ function f.newParser()
                 local lVal = (top:value() or "") .. self:FromXmlString(text)
                 stack[#stack]:setValue(lVal)
             end
-            if empty == "/" then -- empty element tag
+            if empty == "/" then
                 local lNode = f.newNode(label)
                 self:ParseArgs(lNode, xarg)
                 top:addChild(lNode)
-            elseif c == "" then -- start tag
+            elseif c == "" then
                 local lNode = f.newNode(label)
                 self:ParseArgs(lNode, xarg)
                 table.insert(stack, lNode)
 		top = lNode
-            else -- end tag
-                local toclose = table.remove(stack) -- remove top
+            else
+                local toclose = table.remove(stack)
 
                 top = stack[#stack]
                 if #stack < 1 then
@@ -112,7 +93,7 @@ function f.newParser()
         local hFile, err = io.open(path, "r");
 
         if hFile and not err then
-            local xmlText = hFile:read("*a"); -- read file content
+            local xmlText = hFile:read("*a");
             io.close(hFile);
             return self:ParseXmlText(xmlText), nil;
         else
@@ -172,3 +153,4 @@ function f.newNode(name)
 end
 
 return f
+

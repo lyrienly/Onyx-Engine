@@ -1,5 +1,3 @@
-// language: Rust, file: scanner.rs, target: Windows 11, MSVC
-// High-performance multi-threaded Cheat Engine memory scanner
 
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -58,22 +56,22 @@ impl ValType {
             ValType::I8 | ValType::U8 | ValType::Str | ValType::Aob | ValType::All => 1,
             ValType::I16 | ValType::U16 => 2,
             ValType::I32 | ValType::U32 | ValType::Float | ValType::Group => 4,
-            ValType::I64 | ValType::U64 | ValType::Double => 4, // CE default for 8-byte is often 4
+            ValType::I64 | ValType::U64 | ValType::Double => 4,
         }
     }
 
     pub fn ce_type_ordinal(&self) -> u32 {
         match self {
-            ValType::I8 | ValType::U8 => 0,     // vtByte = 0
-            ValType::I16 | ValType::U16 => 1,   // vtWord = 1
-            ValType::I32 | ValType::U32 => 2,   // vtDword = 2
-            ValType::I64 | ValType::U64 => 3,   // vtQword = 3
-            ValType::Float => 4,                // vtSingle = 4
-            ValType::Double => 5,               // vtDouble = 5
-            ValType::Str => 6,                  // vtString = 6
-            ValType::Aob => 8,                  // vtByteArray = 8
-            ValType::All => 10,                 // vtAll = 10
-            ValType::Group => 14,               // vtGrouped = 14
+            ValType::I8 | ValType::U8 => 0,
+            ValType::I16 | ValType::U16 => 1,
+            ValType::I32 | ValType::U32 => 2,
+            ValType::I64 | ValType::U64 => 3,
+            ValType::Float => 4,
+            ValType::Double => 5,
+            ValType::Str => 6,
+            ValType::Aob => 8,
+            ValType::All => 10,
+            ValType::Group => 14,
         }
     }
 }
@@ -103,7 +101,6 @@ impl AobByte {
             return Ok(Self::wildcard());
         }
 
-        // CE 7.7 binary notation: |010**010|
         if t.starts_with('|') && t.ends_with('|') && t.len() >= 3 {
             let bits = &t[1..t.len() - 1];
             if bits.len() != 8 {
@@ -123,7 +120,7 @@ impl AobByte {
                         mask |= 1;
                     }
                     '*' | '?' | 'x' | 'X' => {
-                        // wildcard bit
+
                     }
                     _ => return Err(format!("Invalid char in binary token '{}' in {}", ch, t)),
                 }
@@ -615,7 +612,6 @@ impl Scanner {
                     }
                 }
 
-                // Prevent drop closing handle
                 std::mem::forget(dummy_proc);
 
                 let mut lock = res_clone.lock().unwrap();
@@ -947,7 +943,6 @@ unsafe fn scan_aob_exact_avx2(
 
     let max_idx = len - pat_len;
 
-    // Find the first non-wildcard byte to use as anchor
     let anchor_info = pattern.iter().enumerate().find(|(_, b)| b.mask == 0xFF);
 
     if let (Some((anchor_idx, anchor_byte)), 1) = (anchor_info, alignment) {
@@ -988,7 +983,6 @@ unsafe fn scan_aob_exact_avx2(
             i += 32;
         }
 
-        // Tail bytes
         let mut tail_idx = if len >= 32 { len - 32 } else { 0 };
         if tail_idx <= max_idx {
             while tail_idx <= max_idx {
@@ -1016,7 +1010,6 @@ unsafe fn scan_aob_exact_avx2(
         return;
     }
 
-    // Fallback scalar loop
     let mut i = 0;
     while i <= max_idx {
         let mut matched = true;
@@ -1093,7 +1086,6 @@ fn scan_buffer(
         return;
     }
 
-    // SIMD AVX2 acceleration for Exact scans
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx2") {
@@ -1186,7 +1178,6 @@ fn scan_buffer_all(
                 let div2 = (addr % 2) == 0;
                 let div4 = (addr % 4) == 0;
 
-                // 1. vtByte = 0 (1 byte)
                 if let Some(target) = targets.u8_val {
                     if buf[i] == target {
                         out.push(ScanCandidate::new(addr, ScanValue::U8(target), 0));
@@ -1197,7 +1188,6 @@ fn scan_buffer_all(
                     }
                 }
 
-                // 2. vtWord = 1 (2 bytes)
                 if div2 && i + 2 <= len {
                     let w = u16::from_ne_bytes([buf[i], buf[i + 1]]);
                     if let Some(target) = targets.u16_val {
@@ -1211,7 +1201,6 @@ fn scan_buffer_all(
                     }
                 }
 
-                // 3. vtDword = 2 & vtSingle = 4 (4 bytes)
                 if div4 && i + 4 <= len {
                     let d = u32::from_ne_bytes([buf[i], buf[i + 1], buf[i + 2], buf[i + 3]]);
                     if let Some(target) = targets.u32_val {
@@ -1232,7 +1221,6 @@ fn scan_buffer_all(
                     }
                 }
 
-                // 4. vtQword = 3 & vtDouble = 5 (8 bytes)
                 if div4 && i + 8 <= len {
                     let q = u64::from_ne_bytes([
                         buf[i], buf[i + 1], buf[i + 2], buf[i + 3],
@@ -1268,17 +1256,14 @@ fn scan_buffer_all(
                 let div2 = (addr % 2) == 0;
                 let div4 = (addr % 4) == 0;
 
-                // vtByte
                 let b = buf[i];
                 out.push(ScanCandidate::new(addr, ScanValue::U8(b), 0));
 
-                // vtWord
                 if div2 && i + 2 <= len {
                     let w = u16::from_ne_bytes([buf[i], buf[i + 1]]);
                     out.push(ScanCandidate::new(addr, ScanValue::U16(w), 1));
                 }
 
-                // vtDword & vtSingle
                 if div4 && i + 4 <= len {
                     let d = u32::from_ne_bytes([buf[i], buf[i + 1], buf[i + 2], buf[i + 3]]);
                     out.push(ScanCandidate::new(addr, ScanValue::U32(d), 2));
@@ -1289,7 +1274,6 @@ fn scan_buffer_all(
                     }
                 }
 
-                // vtQword & vtDouble
                 if div4 && i + 8 <= len {
                     let q = u64::from_ne_bytes([
                         buf[i], buf[i + 1], buf[i + 2], buf[i + 3],
@@ -1505,9 +1489,7 @@ mod tests {
 
     #[test]
     fn test_scan_buffer_all_candidates() {
-        // Build a buffer with:
-        // offset 0: 100 as u32 (and float 100.0) -> div4 match
-        // offset 8: 100 as u8
+
         let mut buf = vec![0u8; 32];
         let val_u32: u32 = 100;
         buf[0..4].copy_from_slice(&val_u32.to_ne_bytes());
@@ -1517,15 +1499,13 @@ mod tests {
         let mut candidates = Vec::new();
         scan_buffer_all(0x1000, &buf, 1, &cond, &mut candidates);
 
-        // Should find u8, u16, u32 at offset 0 (0x1000)
         let addr_0_cands: Vec<_> = candidates.iter().filter(|c| c.address == 0x1000).collect();
-        assert!(addr_0_cands.iter().any(|c| c.extra_type == 0)); // vtByte
-        assert!(addr_0_cands.iter().any(|c| c.extra_type == 1)); // vtWord
-        assert!(addr_0_cands.iter().any(|c| c.extra_type == 2)); // vtDword
+        assert!(addr_0_cands.iter().any(|c| c.extra_type == 0));
+        assert!(addr_0_cands.iter().any(|c| c.extra_type == 1));
+        assert!(addr_0_cands.iter().any(|c| c.extra_type == 2));
 
-        // Should find vtByte at offset 8 (0x1008)
         let addr_8_cands: Vec<_> = candidates.iter().filter(|c| c.address == 0x1008).collect();
-        assert!(addr_8_cands.iter().any(|c| c.extra_type == 0)); // vtByte
+        assert!(addr_8_cands.iter().any(|c| c.extra_type == 0));
     }
 
     #[test]
@@ -1548,3 +1528,4 @@ mod tests {
         assert_eq!(candidates[0].group_offsets, vec![0, 4, 8]);
     }
 }
+

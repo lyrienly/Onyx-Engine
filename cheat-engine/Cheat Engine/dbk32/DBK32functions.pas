@@ -433,7 +433,7 @@ implementation
 
 {$ifdef windows}
 uses vmxfunctions, DBK64SecondaryLoader, NewKernelHandler, frmDriverLoadedUnit,
-  CEFuncProc, Parsers, mainunit2, libcepack;
+  CEFuncProc, Parsers, mainunit2, libcepack, OnyxBackend;
 
 resourcestring
 
@@ -3190,22 +3190,16 @@ begin
 
         if not fileexists(dataloc) then
         begin
-
-          servicename:='CEDRIVER73';
+          servicename:='OwMemDriver';
+          sysfile:='OwMemDriver.sys';
           ultimapservicename:='ULTIMAP2';
-          processeventname:='DBKProcList60';
-          threadeventname:='DBKThreadList60';
+          processeventname:='OwMemProcList';
+          threadeventname:='OwMemThreadList';
 
           if iswow64 then
-          begin
-            sysfile:='dbk64.sys';
-            ultimapsysfile:='ultimap2-64.sys';
-          end
+            ultimapsysfile:='ultimap2-64.sys'
           else
-          begin
-            sysfile:='dbk32.sys';
             ultimapsysfile:='';
-          end;
 
           vmx_p1_txt:='76543210';
           vmx_p2_txt:='fedcba98';
@@ -3441,6 +3435,24 @@ begin
                       OPEN_EXISTING,
                       FILE_FLAG_OVERLAPPED,
                       0);
+
+        if hdevice=INVALID_HANDLE_VALUE then
+          hDevice := CreateFileW(pwidechar('\\.\OwMemDriver'), GENERIC_READ or GENERIC_WRITE, FILE_SHARE_READ or FILE_SHARE_WRITE, nil, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, 0);
+
+        if hdevice=INVALID_HANDLE_VALUE then
+          hDevice := CreateFileW(pwidechar('\\.\lydumen'), GENERIC_READ or GENERIC_WRITE, FILE_SHARE_READ or FILE_SHARE_WRITE, nil, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, 0);
+
+        if hdevice=INVALID_HANDLE_VALUE then
+          hDevice := CreateFileW(pwidechar('\\.\DBK64'), GENERIC_READ or GENERIC_WRITE, FILE_SHARE_READ or FILE_SHARE_WRITE, nil, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, 0);
+
+        if (hdevice <> INVALID_HANDLE_VALUE) and (hdevice <> 0) then
+        begin
+          try
+            onyx_kernel_hide_driver;
+            onyx_kernel_clean_traces;
+          except
+          end;
+        end;
 
 
         if hdevice=INVALID_HANDLE_VALUE then

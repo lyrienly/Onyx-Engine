@@ -1,5 +1,3 @@
-// language: Rust, file: symbol.rs, target: Windows 11, MSVC
-// PE Header parsing and Export Directory symbol resolver
 
 use std::collections::HashMap;
 use std::mem::size_of;
@@ -8,9 +6,9 @@ use crate::process::Process;
 #[repr(C, packed)]
 #[derive(Copy, Clone)]
 struct ImageDosHeader {
-    e_magic: u16,      // Magic number 'MZ' (0x5A4D)
+    e_magic: u16,
     _reserved: [u16; 29],
-    e_lfanew: i32,     // File address of new exe header
+    e_lfanew: i32,
 }
 
 #[repr(C, packed)]
@@ -56,9 +54,9 @@ pub struct ExportSymbol {
 }
 
 pub struct SymbolResolver {
-    // module_name (lowercase) -> (export_name -> absolute_address)
+
     cache: HashMap<String, HashMap<String, usize>>,
-    // CE 7.7: Priority list for symbol resolution when module is unspecified
+
     pub module_preference: Vec<String>,
 }
 
@@ -97,8 +95,6 @@ impl SymbolResolver {
         }
     }
 
-    /// Resolves expressions like "kernel32.dll!CreateProcessW" or "ntdll.dll!NtQuerySystemInformation"
-    /// When unspecified, uses CE 7.7 modulePreference priority order.
     pub fn resolve(&mut self, proc: &Process, expr: &str) -> Option<usize> {
         let trimmed = expr.trim();
         if let Some(pos) = trimmed.find('!') {
@@ -110,7 +106,6 @@ impl SymbolResolver {
 
             let preferences = self.module_preference.clone();
 
-            // 1. CE 7.7: Check modules in order of modulePreference first
             for pref in &preferences {
                 if let Some(m) = mods.iter().find(|m| {
                     let mn = m.name.to_lowercase();
@@ -122,7 +117,6 @@ impl SymbolResolver {
                 }
             }
 
-            // 2. Search remaining loaded modules
             for m in &mods {
                 let mn = m.name.to_lowercase();
                 let already_checked = preferences.iter().any(|pref| {
@@ -159,29 +153,26 @@ impl SymbolResolver {
 
         let base = m.base;
 
-        // 1. Read DOS Header
         let dos: ImageDosHeader = proc.read(base)?;
         if dos.e_magic != 0x5A4D {
             return Err("Invalid MZ magic".to_string());
         }
 
-        // 2. Read NT Headers signature
         let nt_sig_addr = base + dos.e_lfanew as usize;
         let sig: u32 = proc.read(nt_sig_addr)?;
-        if sig != 0x00004550 { // 'PE\0\0'
+        if sig != 0x00004550 {
             return Err("Invalid PE signature".to_string());
         }
 
-        // 3. Read Optional Header (magic determines 32 or 64-bit)
         let opt_hdr_addr = nt_sig_addr + 4 + size_of::<ImageFileHeader>();
         let opt_magic: u16 = proc.read(opt_hdr_addr)?;
 
         let export_dir_rva: u32 = if opt_magic == 0x020B {
-            // PE32+ (64-bit): Export Directory is at offset 112 in Optional Header
+
             let export_data_dir: ImageDataDirectory = proc.read(opt_hdr_addr + 112)?;
             export_data_dir.virtual_address
         } else if opt_magic == 0x010B {
-            // PE32 (32-bit): Export Directory is at offset 96 in Optional Header
+
             let export_data_dir: ImageDataDirectory = proc.read(opt_hdr_addr + 96)?;
             export_data_dir.virtual_address
         } else {
@@ -192,7 +183,6 @@ impl SymbolResolver {
             return Err("Module has no export directory".to_string());
         }
 
-        // 4. Read Export Directory Table
         let export_dir_addr = base + export_dir_rva as usize;
         let exp_dir: ImageExportDirectory = proc.read(export_dir_addr)?;
 
@@ -203,7 +193,6 @@ impl SymbolResolver {
             return Ok(0);
         }
 
-        // Read Name RVAs
         let names_addr = base + exp_dir.address_of_names as usize;
         let ords_addr = base + exp_dir.address_of_name_ordinals as usize;
         let funcs_addr = base + exp_dir.address_of_functions as usize;

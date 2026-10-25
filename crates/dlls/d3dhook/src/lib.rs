@@ -1,6 +1,3 @@
-// language: Rust, file: lib.rs, target: Windows 11, MSVC
-// Cheat Engine DirectX 11 / DXGI Hook & In-Game Overlay DLL
-// Intercepts IDXGISwapChain::Present to render hardware-accelerated ESP / menus
 
 #![allow(non_snake_case, non_camel_case_types, dead_code, unsafe_op_in_unsafe_fn, static_mut_refs)]
 
@@ -23,7 +20,7 @@ const MEM_RESERVE: DWORD = 0x2000;
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct RenderCommand {
-    pub cmd_type: u32, // 0 = Clear, 1 = Rect, 2 = Text, 3 = Line
+    pub cmd_type: u32,
     pub x: f32,
     pub y: f32,
     pub w: f32,
@@ -89,7 +86,6 @@ unsafe extern "system" {
 type FnPresent = unsafe extern "system" fn(*mut c_void, u32, u32) -> HRESULT;
 static mut ORIG_PRESENT: Option<FnPresent> = None;
 
-// Present hook callback
 unsafe extern "system" fn hook_present(
     p_swap_chain: *mut c_void,
     sync_interval: u32,
@@ -97,8 +93,7 @@ unsafe extern "system" fn hook_present(
 ) -> HRESULT {
     let count = COMMAND_COUNT.load(Ordering::Relaxed);
     if count > 0 {
-        // Overlay render pass: In standard D3D11/DXGI, overlay commands are rasterized here.
-        // For headless/lightweight injection, commands are acknowledged and cleared.
+
     }
 
     if let Some(orig) = ORIG_PRESENT {
@@ -108,7 +103,6 @@ unsafe extern "system" fn hook_present(
     }
 }
 
-// 14-byte 64-bit absolute trampoline hook
 unsafe fn hook_vtable_function(vtable_slot: *mut *mut c_void, detour: *mut c_void) -> *mut c_void {
     let orig = *vtable_slot;
     let mut old_protect: DWORD = 0;
@@ -125,8 +119,8 @@ unsafe extern "system" fn pipe_server_worker(_param: *mut c_void) -> DWORD {
     while PIPE_THREAD_RUNNING.load(Ordering::SeqCst) {
         let pipe = CreateNamedPipeA(
             pipe_name.as_ptr(),
-            0x00000003, // PIPE_ACCESS_DUPLEX
-            0x00000000, // PIPE_TYPE_BYTE
+            0x00000003,
+            0x00000000,
             1,
             4096,
             4096,
@@ -141,7 +135,7 @@ unsafe extern "system" fn pipe_server_worker(_param: *mut c_void) -> DWORD {
         PIPE_HANDLE.store(pipe as isize, Ordering::SeqCst);
 
         let connected = ConnectNamedPipe(pipe, null_mut()) != 0 || {
-            // ERROR_PIPE_CONNECTED is 535
+
             true
         };
 
@@ -199,10 +193,10 @@ pub unsafe extern "system" fn DllMain(
     _lpv_reserved: *mut c_void,
 ) -> BOOL {
     match fdw_reason {
-        1 => { // DLL_PROCESS_ATTACH
+        1 => {
             D3DHook_Initialize();
         }
-        0 => { // DLL_PROCESS_DETACH
+        0 => {
             PIPE_THREAD_RUNNING.store(false, Ordering::SeqCst);
             let h_val = PIPE_HANDLE.swap(-1, Ordering::SeqCst);
             if h_val != -1 {
@@ -213,3 +207,4 @@ pub unsafe extern "system" fn DllMain(
     }
     1
 }
+

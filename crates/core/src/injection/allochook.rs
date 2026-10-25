@@ -1,5 +1,3 @@
-// language: Rust, file: allochook.rs, target: Windows 11, MSVC
-// Memory allocation tracker and heap monitor (Cheat Engine allochook equivalent)
 
 use crate::process::{MemoryRegion, Process};
 
@@ -23,19 +21,17 @@ impl AllocHookMonitor {
         }
     }
 
-    /// Snapshots current memory regions to compare against future allocations
     pub fn snapshot(&mut self, proc: &Process) -> Result<usize, String> {
         self.initial_regions = proc.regions(false)?;
         Ok(self.initial_regions.len())
     }
 
-    /// Detects all newly allocated memory regions since the last snapshot
     pub fn detect_new_allocations(&self, proc: &Process) -> Result<Vec<AllocationRecord>, String> {
         let current = proc.regions(false)?;
         let mut new_allocs = Vec::new();
 
         for cur in &current {
-            // Check if this region was absent in initial snapshot
+
             let was_present = self.initial_regions.iter().any(|r| r.base == cur.base);
             if !was_present && cur.is_committed() {
                 new_allocs.push(AllocationRecord {
@@ -51,3 +47,4 @@ impl AllocHookMonitor {
         Ok(new_allocs)
     }
 }
+

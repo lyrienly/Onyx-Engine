@@ -1,5 +1,3 @@
-// language: Rust, file: lib.rs (onyx_freezer), target: Windows 11, MSVC
-// Modular Value Freezer Sub-DLL (modules/freezer/onyx_freezer.dll)
 
 use std::ffi::CStr;
 use std::os::raw::c_char;
@@ -9,15 +7,15 @@ use onyx_core::scanner::{ScanValue, ValType};
 
 fn map_val_type(idx: i32) -> ValType {
     match idx {
-        // Direct CE TVariableType enum ordinals
-        0 => ValType::I8,     // vtByte = 0
-        1 => ValType::I16,    // vtWord = 1
-        2 => ValType::I32,    // vtDword = 2
-        3 => ValType::I64,    // vtQword = 3
-        4 => ValType::Float,  // vtSingle = 4
-        5 => ValType::Double, // vtDouble = 5
-        6 | 7 | 16 => ValType::Str, // vtString = 6, vtUnicodeString = 7, vtCodePageString = 16
-        8 | 15 => ValType::Aob,     // vtByteArray = 8, vtByteArrays = 15
+
+        0 => ValType::I8,
+        1 => ValType::I16,
+        2 => ValType::I32,
+        3 => ValType::I64,
+        4 => ValType::Float,
+        5 => ValType::Double,
+        6 | 7 | 16 => ValType::Str,
+        8 | 15 => ValType::Aob,
         _ => ValType::I32,
     }
 }
@@ -122,3 +120,4 @@ pub unsafe extern "C" fn onyx_freezer_clear(freezer: *mut Freezer) {
         f.clear();
     }
 }
+

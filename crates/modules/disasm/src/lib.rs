@@ -1,5 +1,3 @@
-// language: Rust, file: lib.rs (onyx_disasm), target: Windows 11, MSVC
-// Modular Disassembler Sub-DLL (modules/debugger/onyx_disasm.dll)
 
 use onyx_core::disasm::Disassembler;
 
@@ -110,3 +108,4 @@ pub unsafe extern "C" fn onyx_disasm_block(
 
     count as i32
 }
+

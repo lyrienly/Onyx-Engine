@@ -1,5 +1,3 @@
-// OnyxEngine Pointer Scanner Backend API
-// Asynchronous, non-blocking multilevel pointer scanner engine
 
 use std::ffi::{c_char, CStr};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
@@ -73,13 +71,11 @@ impl PointerScannerSession {
     }
 }
 
-/// Creates a new asynchronous pointer scanner session
 #[no_mangle]
 pub extern "C" fn onyx_pointer_scanner_create() -> *mut PointerScannerSession {
     Box::into_raw(Box::new(PointerScannerSession::new()))
 }
 
-/// Destroys a pointer scanner session, cancelling any active background scan
 #[no_mangle]
 pub unsafe extern "C" fn onyx_pointer_scanner_destroy(session: *mut PointerScannerSession) {
     if session.is_null() {
@@ -92,8 +88,6 @@ pub unsafe extern "C" fn onyx_pointer_scanner_destroy(session: *mut PointerScann
     }
 }
 
-/// Starts an asynchronous pointer scan on a background thread (NON-BLOCKING)
-/// Returns 1 if started successfully, 0 on failure
 #[no_mangle]
 pub unsafe extern "C" fn onyx_pointer_scanner_start_scan(
     session: *mut PointerScannerSession,
@@ -149,7 +143,6 @@ pub unsafe extern "C" fn onyx_pointer_scanner_start_scan(
         config.alignment = if alignment == 0 { 4 } else { alignment };
         config.max_results = if max_results == 0 { 20000 } else { max_results };
 
-        // Phase 1: Map Memory
         {
             let mut scanner = match scanner_arc.lock() {
                 Ok(guard) => guard,
@@ -161,7 +154,7 @@ pub unsafe extern "C" fn onyx_pointer_scanner_start_scan(
                     return false;
                 }
                 if let Ok(mut guard) = progress_arc.lock() {
-                    *guard = pct * 0.5; // Map is 0-50%
+                    *guard = pct * 0.5;
                 }
                 true
             });
@@ -181,7 +174,6 @@ pub unsafe extern "C" fn onyx_pointer_scanner_start_scan(
             return;
         }
 
-        // Phase 2: Traverse Paths
         phase_arc.store(OnyxPointerScanPhase::SearchingPaths as u32, Ordering::SeqCst);
 
         let scanner = match scanner_arc.lock() {
@@ -194,7 +186,7 @@ pub unsafe extern "C" fn onyx_pointer_scanner_start_scan(
                 return false;
             }
             if let Ok(mut guard) = progress_arc.lock() {
-                *guard = 50.0 + (pct * 0.5); // Search is 50-100%
+                *guard = 50.0 + (pct * 0.5);
             }
             count_arc.store(found, Ordering::Relaxed);
             true
@@ -224,7 +216,6 @@ pub unsafe extern "C" fn onyx_pointer_scanner_start_scan(
     1
 }
 
-/// Starts an asynchronous rescan of current pointer paths against a new target address
 #[no_mangle]
 pub unsafe extern "C" fn onyx_pointer_scanner_start_rescan(
     session: *mut PointerScannerSession,
@@ -305,9 +296,6 @@ pub unsafe extern "C" fn onyx_pointer_scanner_start_rescan(
     1
 }
 
-/// Start an asynchronous background rescan to filter pointer paths by expected memory value
-/// val_bytes: pointer to byte array of the expected value
-/// val_len: size in bytes (e.g. 4 for dword/float, 8 for qword/double, etc.)
 #[no_mangle]
 pub unsafe extern "C" fn onyx_pointer_scanner_start_value_rescan(
     session: *mut PointerScannerSession,
@@ -390,7 +378,6 @@ pub unsafe extern "C" fn onyx_pointer_scanner_start_value_rescan(
     1
 }
 
-/// Cancels active pointer scan or rescan immediately
 #[no_mangle]
 pub unsafe extern "C" fn onyx_pointer_scanner_cancel(session: *mut PointerScannerSession) -> i32 {
     if session.is_null() {
@@ -400,7 +387,6 @@ pub unsafe extern "C" fn onyx_pointer_scanner_cancel(session: *mut PointerScanne
     1
 }
 
-/// Queries current status, progress percentage (0.0 - 100.0), and count of found paths
 #[no_mangle]
 pub unsafe extern "C" fn onyx_pointer_scanner_get_status(
     session: *mut PointerScannerSession,
@@ -425,7 +411,6 @@ pub unsafe extern "C" fn onyx_pointer_scanner_get_status(
     1
 }
 
-/// Returns the total number of found pointer paths in memory
 #[no_mangle]
 pub unsafe extern "C" fn onyx_pointer_scanner_get_count(session: *mut PointerScannerSession) -> usize {
     if session.is_null() {
@@ -435,7 +420,6 @@ pub unsafe extern "C" fn onyx_pointer_scanner_get_count(session: *mut PointerSca
     s.found_count.load(Ordering::SeqCst)
 }
 
-/// Fetches a pointer path record by index
 #[no_mangle]
 pub unsafe extern "C" fn onyx_pointer_scanner_get_path(
     session: *mut PointerScannerSession,
@@ -458,7 +442,6 @@ pub unsafe extern "C" fn onyx_pointer_scanner_get_path(
     let p = &guard[index];
     let mut rec = OnyxPointerPathRecord::default();
 
-    // Module name copy
     let mod_bytes = p.module_name.as_bytes();
     let copy_len = mod_bytes.len().min(259);
     for i in 0..copy_len {
@@ -477,7 +460,6 @@ pub unsafe extern "C" fn onyx_pointer_scanner_get_path(
     1
 }
 
-/// Saves pointer scan results to `.onyxptr` binary file
 #[no_mangle]
 pub unsafe extern "C" fn onyx_pointer_scanner_save_results(
     session: *mut PointerScannerSession,
@@ -503,7 +485,6 @@ pub unsafe extern "C" fn onyx_pointer_scanner_save_results(
     }
 }
 
-/// Loads pointer scan results from `.onyxptr` binary file
 #[no_mangle]
 pub unsafe extern "C" fn onyx_pointer_scanner_load_results(
     session: *mut PointerScannerSession,
@@ -531,8 +512,6 @@ pub unsafe extern "C" fn onyx_pointer_scanner_load_results(
     }
 }
 
-/// Resolves a pointer chain (base_addr + offsets)
-/// Returns final resolved virtual address, or 0 if pointer chain is broken
 #[no_mangle]
 pub unsafe extern "C" fn onyx_pointer_resolve(
     proc: *mut Process,
@@ -564,7 +543,6 @@ pub unsafe extern "C" fn onyx_pointer_resolve(
     current
 }
 
-/// Evaluates a PointerPath against the process
 #[no_mangle]
 pub unsafe extern "C" fn onyx_pointer_eval_path(
     proc: *mut Process,
@@ -595,7 +573,6 @@ pub unsafe extern "C" fn onyx_pointer_eval_path(
     PointerScanner::evaluate_path(p, &path).unwrap_or(0)
 }
 
-/// Saves raw pointer map to disk in high-speed binary `.ptrmap` format for offline analysis
 #[no_mangle]
 pub unsafe extern "C" fn onyx_pointer_scanner_save_map(
     session: *mut PointerScannerSession,
@@ -625,7 +602,6 @@ pub unsafe extern "C" fn onyx_pointer_scanner_save_map(
     }
 }
 
-/// Loads raw pointer map from `.ptrmap` format
 #[no_mangle]
 pub unsafe extern "C" fn onyx_pointer_scanner_load_map(
     session: *mut PointerScannerSession,
@@ -653,7 +629,6 @@ pub unsafe extern "C" fn onyx_pointer_scanner_load_map(
     }
 }
 
-/// Starts an offline pointer scan using the loaded pointer map without an attached process
 #[no_mangle]
 pub unsafe extern "C" fn onyx_pointer_scanner_start_offline_scan(
     session: *mut PointerScannerSession,
@@ -741,7 +716,6 @@ pub unsafe extern "C" fn onyx_pointer_scanner_start_offline_scan(
     1
 }
 
-/// Intersects the current session's results with another saved results file
 #[no_mangle]
 pub unsafe extern "C" fn onyx_pointer_scanner_intersect_file(
     session: *mut PointerScannerSession,
@@ -768,3 +742,4 @@ pub unsafe extern "C" fn onyx_pointer_scanner_intersect_file(
         0
     }
 }
+

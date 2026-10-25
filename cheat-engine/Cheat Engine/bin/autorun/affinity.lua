@@ -42,7 +42,7 @@ function GetAffinity(ph)
   end
 
   if ph==nil then
-    writePointerLocal(s.Memory,-1) --currentProcessHandle
+    writePointerLocal(s.Memory,-1)
   else
     writePointerLocal(s.Memory,ph)
   end
@@ -50,7 +50,6 @@ function GetAffinity(ph)
   writePointerLocal(s.Memory+psize,s.Memory)
   writePointerLocal(s.Memory+psize*2,s.Memory+psize)
   if executeCodeLocal("GetAffinity", s.Memory)==0 then return nil end
-
 
   local r={}
   r.ProcessAffinity=readPointerLocal(s.Memory)
@@ -60,10 +59,6 @@ function GetAffinity(ph)
   return r
 end
 
-
-----------------------------------------------------------------------
---                           Set Affinity                           --
-----------------------------------------------------------------------
 autoAssemble([[
   alloc(SetAffinity, 128)
   registersymbol(SetAffinity)
@@ -106,7 +101,7 @@ function SetAffinity(mask, ph)
   end
 
   if ph==nil then
-    writePointerLocal(s.Memory,-1) --currentProcessHandle
+    writePointerLocal(s.Memory,-1)
   else
     writePointerLocal(s.Memory,ph)
   end
@@ -117,8 +112,6 @@ function SetAffinity(mask, ph)
   s.destroy()
   return true
 end
-
-----
 
 autoAssemble([[
   alloc(SetAffinityThread, 128)
@@ -134,15 +127,15 @@ autoAssemble([[
   [/32-bit]
 
   [64-bit]
-  push rbx 
+  push rbx
   push rdi
   sub rsp,28
-  
+
   mov rbx,rcx
 
-//  call GetCurrentThread    
+//  call GetCurrentThread
 //  mov rcx,rax
-  mov rcx,[rbx]  
+  mov rcx,[rbx]
   mov rdx,[rbx+8]
 
   [/64-bit]
@@ -160,7 +153,6 @@ autoAssemble([[
 
 ]], true)
 
-
 function SetAffinityThread(mask, th)
   local psize
   local s=createMemoryStream()
@@ -174,9 +166,9 @@ function SetAffinityThread(mask, th)
   end
 
   if (th==nil) then
-    writePointerLocal(s.Memory,-2) --currentthreadhandle
+    writePointerLocal(s.Memory,-2)
   else
-    writePointerLocal(s.Memory,th) --currentthreadhandle
+    writePointerLocal(s.Memory,th)
   end
 
   writePointerLocal(s.Memory+psize,mask)
@@ -197,8 +189,7 @@ function getCPUCount()
   return c
 end
 
-function getCPUNR() --to test if it works or not
+function getCPUNR()
   return CPUID(1).ebx >> 24
 end
 
---return GetAffinity(), string.format("%x", getAddress('GetAffinity', true))

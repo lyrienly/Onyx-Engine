@@ -210,6 +210,17 @@ function onyx_process_free(handle: Pointer; base_address: PtrUInt; size: PtrUInt
 function onyx_process_modules(handle: Pointer; out_modules: Pointer; max_count: DWORD; out_total: PDWORD): integer; stdcall; external OnyxBackendDLL;
 function onyx_process_regions(handle: Pointer; out_regions: Pointer; max_count: DWORD; out_total: PDWORD): integer; stdcall; external OnyxBackendDLL;
 
+// Lydumen Stealth & Ring-0 Kernel Engine
+function onyx_kernel_connect(device_path: PAnsiChar): integer; stdcall; external OnyxBackendDLL;
+function onyx_kernel_is_connected: integer; stdcall; external OnyxBackendDLL;
+function onyx_kernel_hide_driver: integer; stdcall; external OnyxBackendDLL;
+function onyx_kernel_strip_callbacks(restore: integer): integer; stdcall; external OnyxBackendDLL;
+function onyx_kernel_clean_traces: integer; stdcall; external OnyxBackendDLL;
+function onyx_kernel_set_protection(pid: DWORD; enable: integer): integer; stdcall; external OnyxBackendDLL;
+function onyx_kernel_freeze_process(pid: DWORD; freeze: integer): integer; stdcall; external OnyxBackendDLL;
+function onyx_kernel_cloak_symlink(new_symlink: PAnsiChar): integer; stdcall; external OnyxBackendDLL;
+function onyx_kernel_enum_vad(pid: DWORD; out_modules: Pointer; max_count: DWORD; out_total: PDWORD): integer; stdcall; external OnyxBackendDLL;
+
 // Process Watcher
 function onyx_process_watcher_create: Pointer; stdcall; external OnyxBackendDLL;
 procedure onyx_process_watcher_destroy(watcher: Pointer); stdcall; external OnyxBackendDLL;
@@ -705,6 +716,8 @@ begin
 end;
 
 function OnyxOpenProcess(dwDesiredAccess: DWORD; bInheritHandle: BOOL; dwProcessId: DWORD): THandle; stdcall;
+var
+  h: THandle;
 begin
   if (CurrentOnyxProcessHandle <> nil) and (CurrentOnyxPID <> dwProcessId) then
   begin
@@ -715,10 +728,22 @@ begin
   CurrentOnyxProcessHandle := onyx_process_attach(dwProcessId);
   CurrentOnyxPID := dwProcessId;
 
+  h := 0;
   if Assigned(OriginalOpenProcess) then
-    Result := OriginalOpenProcess(dwDesiredAccess, bInheritHandle, dwProcessId)
+    h := OriginalOpenProcess(dwDesiredAccess, bInheritHandle, dwProcessId);
+
+  // If usermode OpenProcess was stripped or blocked by ObRegisterCallbacks,
+  // return a synthetic valid handle so the Cheat Engine UI never errors out,
+  // since memory operations are already intercepted and handled via Ring-0 CR3 in Rust!
+  if (h = 0) or (h = INVALID_HANDLE_VALUE) then
+  begin
+    if CurrentOnyxProcessHandle <> nil then
+      Result := THandle($FFFF0000 or (dwProcessId and $FFFF))
+    else
+      Result := 0;
+  end
   else
-    Result := THandle(CurrentOnyxProcessHandle);
+    Result := h;
 end;
 
 procedure HookKernelHandlerWithOnyx;

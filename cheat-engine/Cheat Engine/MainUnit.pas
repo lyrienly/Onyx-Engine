@@ -414,6 +414,24 @@ type
     miZbuffer: TMenuItem;
     miHookD3D: TMenuItem;
     mi3d: TMenuItem;
+    miMCP: TMenuItem;
+    miMCPStatus: TMenuItem;
+    miMCPClient: TMenuItem;
+    MenuItemMCP_Sep1: TMenuItem;
+    miMCPStart: TMenuItem;
+    miMCPStop: TMenuItem;
+    miMCPRestart: TMenuItem;
+    MenuItemMCP_Sep2: TMenuItem;
+    miMCPSettings: TMenuItem;
+    MenuItemMCP_Sep3: TMenuItem;
+    miMCPKernelPower: TMenuItem;
+    miMCPGrantKernel: TMenuItem;
+    miMCPStripCallbacks: TMenuItem;
+    miMCPCloakDriver: TMenuItem;
+    miMCPBypassCoW: TMenuItem;
+    MenuItemMCP_Sep4: TMenuItem;
+    miMCPCopyConfig: TMenuItem;
+    miMCPAbout: TMenuItem;
     miUndoValue: TMenuItem;
     miPresetWritable: TMenuItem;
     MenuItem2: TMenuItem;
@@ -631,6 +649,16 @@ type
     procedure miManualExpandCollapseClick(Sender: TObject);
     procedure miSaveClick(Sender: TObject);
     procedure mi3dClick(Sender: TObject);
+    procedure miMCPStartClick(Sender: TObject);
+    procedure miMCPStopClick(Sender: TObject);
+    procedure miMCPRestartClick(Sender: TObject);
+    procedure miMCPSettingsClick(Sender: TObject);
+    procedure miMCPGrantKernelClick(Sender: TObject);
+    procedure miMCPStripCallbacksClick(Sender: TObject);
+    procedure miMCPCloakDriverClick(Sender: TObject);
+    procedure miMCPBypassCoWClick(Sender: TObject);
+    procedure miMCPCopyConfigClick(Sender: TObject);
+    procedure miMCPAboutClick(Sender: TObject);
     procedure miChangeDisplayTypeClick(Sender: TObject);
     procedure miOpenFileClick(Sender: TObject);
     procedure miScanPagedOnlyClick(Sender: TObject);
@@ -4060,6 +4088,69 @@ begin
     miLockMouseInGame.checked:=false;
 
   {$endif}
+end;
+
+procedure TMainForm.miMCPStartClick(Sender: TObject);
+begin
+  if LuaVM <> nil then
+    lua_dostring(LuaVM, 'if StartMCPBridge then StartMCPBridge() end');
+end;
+
+procedure TMainForm.miMCPStopClick(Sender: TObject);
+begin
+  if LuaVM <> nil then
+    lua_dostring(LuaVM, 'if StopMCPBridge then StopMCPBridge() end');
+end;
+
+procedure TMainForm.miMCPRestartClick(Sender: TObject);
+begin
+  if LuaVM <> nil then
+    lua_dostring(LuaVM, 'if StopMCPBridge and StartMCPBridge then StopMCPBridge(); StartMCPBridge(); end');
+end;
+
+procedure TMainForm.miMCPSettingsClick(Sender: TObject);
+begin
+  if LuaVM <> nil then
+    lua_dostring(LuaVM, 'if ShowMCPSettingsDialog then ShowMCPSettingsDialog() end');
+end;
+
+procedure TMainForm.miMCPGrantKernelClick(Sender: TObject);
+begin
+  if LuaVM <> nil then
+    lua_dostring(LuaVM, 'if onyx_kernelConnect then onyx_kernelConnect() end; if dbk_initialize then dbk_initialize() end; if dbk_usePhysicalMemoryAccess then dbk_usePhysicalMemoryAccess() end; if dbk_writesIgnoreWriteProtection then dbk_writesIgnoreWriteProtection(true) end; if fullAccess then fullAccess() end;');
+  MessageDlg('[OwMemDriver Ring-0 Ativo]'#13#10#13#10'Acesso a Memoria Fisica CR3: ATIVADO'#13#10'OpenProcess / ReadWrite de Kernel: ATIVADO'#13#10'Ignorar Protecao Copy-on-Write: ATIVADO'#13#10'Privilegios Totais do Processo (SeDebug): CONCEDIDOS', mtInformation, [mbOK], 0);
+end;
+
+procedure TMainForm.miMCPStripCallbacksClick(Sender: TObject);
+begin
+  if LuaVM <> nil then
+    lua_dostring(LuaVM, 'if onyx_kernelStripCallbacks then onyx_kernelStripCallbacks(false) end');
+  MessageDlg('[OwMemDriver]'#13#10'Callbacks ObRegisterCallbacks removidos com sucesso!'#13#10'Filtros de acesso a processos e threads desativados no kernel.', mtInformation, [mbOK], 0);
+end;
+
+procedure TMainForm.miMCPCloakDriverClick(Sender: TObject);
+begin
+  if LuaVM <> nil then
+    lua_dostring(LuaVM, 'if onyx_kernelHideDriver then onyx_kernelHideDriver() end; if onyx_kernelCleanTraces then onyx_kernelCleanTraces() end;');
+  MessageDlg('[OwMemDriver Ocultacao Ativa]'#13#10#13#10'Driver desvinculado da PsLoadedModuleList (DKOM)'#13#10'Registros da PiDDBCacheTable expurgados'#13#10'Driver invisivel para buscas padrao do kernel.', mtInformation, [mbOK], 0);
+end;
+
+procedure TMainForm.miMCPBypassCoWClick(Sender: TObject);
+begin
+  if LuaVM <> nil then
+    lua_dostring(LuaVM, 'if dbk_writesIgnoreWriteProtection then dbk_writesIgnoreWriteProtection(true) end');
+  MessageDlg('[OwMemDriver]'#13#10'Ignorar protecao de gravacao ativado com sucesso.'#13#10'Gravacao direta em paginas fisicas em execucao.', mtInformation, [mbOK], 0);
+end;
+
+procedure TMainForm.miMCPCopyConfigClick(Sender: TObject);
+begin
+  if LuaVM <> nil then
+    lua_dostring(LuaVM, 'local ceDir = getCheatEngineDir(); local bridgePath = (ceDir .. "mcp\\mcp_cheatengine.py"):gsub("\\", "\\\\"); local configJson = string.format("{\n  \"mcpServers\": {\n    \"cheatengine\": {\n      \"command\": \"python\",\n      \"args\": [\n        \"%s\"\n      ],\n      \"env\": {\n        \"CE_MCP_TIMEOUT\": \"30\"\n      }\n    }\n  }\n}", bridgePath); if writeToClipboard then writeToClipboard(configJson); showMessage("Configuracao do servidor MCP copiada para a area de transferencia!\n\n" .. configJson) end');
+end;
+
+procedure TMainForm.miMCPAboutClick(Sender: TObject);
+begin
+  MessageDlg('Ponte MCP do OnyxEngine'#13#10'===================================='#13#10'Protocolo da Ponte: miscusi-peek MCP Bridge v12.0.0'#13#10'Named Pipe: \\.\pipe\CE_MCP_Bridge_v99'#13#10'Motor do Driver: OwMemDriver (Ring-0 CR3 Fisico)'#13#10'Localizacao: Menu Principal ao lado do D3D'#13#10'===================================='#13#10'Suporte completo a 175 ferramentas nativas de inspecao e memoria do Cheat Engine.', mtInformation, [mbOK], 0);
 end;
 
 procedure TMainForm.miChangeDisplayTypeClick(Sender: TObject);

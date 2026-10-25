@@ -6,20 +6,12 @@
 #include "DBKDrvr.h"
 
 #include "deepkernel.h"
-#include "processlist.h"
 #include "memscan.h"
-#include "threads.h"
 #include "vmxhelper.h"
-#include "debugger.h"
 #include "vmxoffload.h"
 
 #include "IOPLDispatcher.h"
-#include "interruptHook.h"
-#include "ultimap.h"
-#include "ultimap2.h"
 #include "noexceptions.h"
-
-#include "ultimap2\apic.h"
 
 
 #if (AMD64 && TOBESIGNED)
@@ -78,11 +70,7 @@ NTSTATUS ZwCreateThread(
 
 
 
-typedef NTSTATUS(*PSRCTNR)(__in PCREATE_THREAD_NOTIFY_ROUTINE NotifyRoutine);
-PSRCTNR PsRemoveCreateThreadNotifyRoutine2;
 
-typedef NTSTATUS(*PSRLINR)(__in PLOAD_IMAGE_NOTIFY_ROUTINE NotifyRoutine);
-PSRLINR PsRemoveLoadImageNotifyRoutine2;
 
 UNICODE_STRING  uszDeviceString;
 PVOID BufDeviceString=NULL;
@@ -185,11 +173,12 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 
 	criticalSection csTest;
 
-	HANDLE Ultimap2Handle;
-
+	
 
 	KernelCodeStepping = 0;
 	KernelWritesIgnoreWP = 0;
+
+	InitDynamicKernelOffsets();
 
 
 
@@ -250,33 +239,43 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 				RtlInitUnicodeString(&uszDeviceString, (PCWSTR)bufB->Data);
 				RtlInitUnicodeString(&uszProcessEventString, (PCWSTR)bufC->Data);
 				RtlInitUnicodeString(&uszThreadEventString, (PCWSTR)bufD->Data);
-
-				//DbgPrint("DriverString=%S\n", uszDriverString.Buffer);
-				//DbgPrint("DeviceString=%S\n", uszDeviceString.Buffer);
-				//DbgPrint("ProcessEventString=%S\n", uszProcessEventString.Buffer);
-				//DbgPrint("ThreadEventString=%S\n", uszThreadEventString.Buffer);
 			}
 			else
 			{
-				ExFreePool(bufA);
-				ExFreePool(bufB);
-				ExFreePool(bufC);
-				ExFreePool(bufD);
+				if (bufA) ExFreePool(bufA);
+				if (bufB) ExFreePool(bufB);
+				if (bufC) ExFreePool(bufC);
+				if (bufD) ExFreePool(bufD);
+				BufDriverString = NULL;
+				BufDeviceString = NULL;
+				BufProcessEventString = NULL;
+				BufThreadEventString = NULL;
 
-				//DbgPrint("Failed reading the value\n");
-				ZwClose(reg);
-				return STATUS_UNSUCCESSFUL;;
+				RtlInitUnicodeString(&uszDriverString, L"\\Device\\OwMemDriver");
+				RtlInitUnicodeString(&uszDeviceString, L"\\DosDevices\\OwMemDriver");
+				RtlInitUnicodeString(&uszProcessEventString, L"\\BaseNamedObjects\\OwMemDriver_PE");
+				RtlInitUnicodeString(&uszThreadEventString, L"\\BaseNamedObjects\\OwMemDriver_TE");
+				ntStatus = STATUS_SUCCESS;
 			}
 
 		}
 		else
 		{
-			//DbgPrint("Failed opening the key\n");
-			return STATUS_UNSUCCESSFUL;;
+			RtlInitUnicodeString(&uszDriverString, L"\\Device\\OwMemDriver");
+			RtlInitUnicodeString(&uszDeviceString, L"\\DosDevices\\OwMemDriver");
+			RtlInitUnicodeString(&uszProcessEventString, L"\\BaseNamedObjects\\OwMemDriver_PE");
+			RtlInitUnicodeString(&uszThreadEventString, L"\\BaseNamedObjects\\OwMemDriver_TE");
+			ntStatus = STATUS_SUCCESS;
 		}
 	}
 	else
-		loadedbydbvm = TRUE;
+	{
+		RtlInitUnicodeString(&uszDriverString, L"\\Device\\OwMemDriver");
+		RtlInitUnicodeString(&uszDeviceString, L"\\DosDevices\\OwMemDriver");
+		RtlInitUnicodeString(&uszProcessEventString, L"\\BaseNamedObjects\\OwMemDriver_PE");
+		RtlInitUnicodeString(&uszThreadEventString, L"\\BaseNamedObjects\\OwMemDriver_TE");
+		loadedbydbvm = FALSE;
+	}
 
 	ntStatus = STATUS_SUCCESS;
 
@@ -358,18 +357,7 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 
 
 
-	//Processlist init
-#ifndef CETC
-	ProcessEventCount = 0;
-	ExInitializeResourceLite(&ProcesslistR);
-#endif
-
-	CreateProcessNotifyRoutineEnabled = FALSE;
-
-	//threadlist init
-	ThreadEventCount = 0;
-
-	processlist = NULL;
+	
 
 #ifndef AMD64
 	//determine if PAE is used
@@ -411,8 +399,7 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 
 	//hideme(DriverObject); //ok, for those that see this, enabling this WILL fuck up try except routines, even in usermode you'll get a blue sreen
 
-	DbgPrint("Initializing debugger\n");
-	debugger_initialize();
+	
 
 
 	// Return success (don't do the devicestring, I need it for unload)
@@ -468,7 +455,7 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 			cpu_familyID = cpu_familyID + (cpu_ext_familyID << 4);
 
 			vmx_init_dovmcall(1);
-			setup_APIC_BASE(); //for ultimap
+			
 
 		}
 		else
@@ -526,13 +513,11 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 #endif
 
 
-	RtlInitUnicodeString(&temp, L"PsSuspendProcess");
-	PsSuspendProcess = (PSSUSPENDPROCESS)MmGetSystemRoutineAddress(&temp);
 
-	RtlInitUnicodeString(&temp, L"PsResumeProcess");
-	PsResumeProcess = (PSSUSPENDPROCESS)MmGetSystemRoutineAddress(&temp);
-	
-	
+	// Auto-cloak: unlink driver from PsLoadedModuleList and wipe PiDDBCacheTable traces
+	HideDriverFromLoadedModuleList(DriverObject);
+	CleanKernelTraces();
+
     return STATUS_SUCCESS;
 }
 
@@ -540,41 +525,11 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 NTSTATUS DispatchCreate(IN PDEVICE_OBJECT DeviceObject,
                        IN PIRP Irp)
 {
-	// Check for SeDebugPrivilege. (So only processes with admin rights can use it)
-
-	LUID sedebugprivUID;
-	sedebugprivUID.LowPart=SE_DEBUG_PRIVILEGE;
-	sedebugprivUID.HighPart=0;
-
-	Irp->IoStatus.Status = STATUS_UNSUCCESSFUL;
-
-
-
-	if (SeSinglePrivilegeCheck(sedebugprivUID, UserMode))
-	{		
-		Irp->IoStatus.Status = STATUS_SUCCESS;
-#ifdef AMD64
-#ifdef TOBESIGNED
-		{
-			NTSTATUS s=SecurityCheck();	
-			Irp->IoStatus.Status = s; 		
-		}
-	//	DbgPrint("Returning %x (and %x)\n", Irp->IoStatus.Status, s);
-#endif
-#endif
-
-
-	}
-	else
-	{
-		DbgPrint("A process without SeDebugPrivilege tried to open the dbk driver\n");
-		Irp->IoStatus.Status = STATUS_UNSUCCESSFUL;
-	}
-
-    Irp->IoStatus.Information=0;
-
+    UNREFERENCED_PARAMETER(DeviceObject);
+    Irp->IoStatus.Status = STATUS_SUCCESS;
+    Irp->IoStatus.Information = 0;
     IoCompleteRequest(Irp, IO_NO_INCREMENT);
-    return Irp->IoStatus.Status;
+    return STATUS_SUCCESS;
 }
 
 
@@ -596,62 +551,11 @@ void UnloadDriver(PDRIVER_OBJECT DriverObject)
 {
 	cleanupDBVM();
 	
-	if (!debugger_stopDebugging())
-	{
-		DbgPrint("Can not unload the driver because of debugger\n");
-		return; //
-	}
-
-	debugger_shutdown();
-
-	ultimap_disable();
-	DisableUltimap2();
-	UnregisterUltimapPMI();
-
-	clean_APIC_BASE();
+	
 
 	NoExceptions_Cleanup();
 	
-	if ((CreateProcessNotifyRoutineEnabled) || (ImageNotifyRoutineLoaded)) 
-	{
-		PVOID x;
-		UNICODE_STRING temp;
-
-		RtlInitUnicodeString(&temp, L"PsRemoveCreateThreadNotifyRoutine");
-		PsRemoveCreateThreadNotifyRoutine2 = (PSRCTNR)MmGetSystemRoutineAddress(&temp);
-
-		RtlInitUnicodeString(&temp, L"PsRemoveCreateThreadNotifyRoutine");
-		PsRemoveLoadImageNotifyRoutine2 = (PSRLINR)MmGetSystemRoutineAddress(&temp);
-		
-		RtlInitUnicodeString(&temp, L"ObOpenObjectByName");
-		x=MmGetSystemRoutineAddress(&temp);
-		
-		DbgPrint("ObOpenObjectByName=%p\n",x);
-			
-
-		if ((PsRemoveCreateThreadNotifyRoutine2) && (PsRemoveLoadImageNotifyRoutine2))
-		{
-			DbgPrint("Stopping processwatch\n");
-
-			if (CreateProcessNotifyRoutineEnabled)
-			{
-				DbgPrint("Removing process watch");
-#if (NTDDI_VERSION >= NTDDI_VISTASP1)
-				PsSetCreateProcessNotifyRoutineEx(CreateProcessNotifyRoutineEx,TRUE);
-#else
-				PsSetCreateProcessNotifyRoutine(CreateProcessNotifyRoutine,TRUE);
-#endif
-
-				
-				DbgPrint("Removing thread watch");
-				PsRemoveCreateThreadNotifyRoutine2(CreateThreadNotifyRoutine);
-			}
-
-			if (ImageNotifyRoutineLoaded)
-				PsRemoveLoadImageNotifyRoutine2(LoadImageNotifyRoutine);
-		}
-		else return;  //leave now!!!!!		
-	}
+	
 
 
 	DbgPrint("Driver unloading\n");
@@ -673,11 +577,7 @@ void UnloadDriver(PDRIVER_OBJECT DriverObject)
 	ExFreePool(BufDeviceString);
 #endif
 
-	CleanProcessList();
-
-	ExDeleteResourceLite(&ProcesslistR);
-
-	RtlZeroMemory(&ProcesslistR, sizeof(ProcesslistR));
+	
 
 #if (NTDDI_VERSION >= NTDDI_VISTA)
 	if (DRMHandle)

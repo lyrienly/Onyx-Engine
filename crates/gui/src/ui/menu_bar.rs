@@ -1,5 +1,3 @@
-// Cheat Engine 7.7 Main Menu Bar and Toolbar
-// Replicates official MainUnit.lfm menu structure and clean Win32 toolbar
 
 use eframe::egui::{self, Color32, RichText, Rounding, Stroke, Vec2};
 use onyx_core::ct_parser::CtParser;
@@ -13,7 +11,7 @@ pub fn render_top_menu(app: &mut OnyxEngineApp, ctx: &egui::Context) {
             .stroke(Stroke::new(1.0_f32, Color32::from_rgb(46, 52, 65))))
         .show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
-                // 1. File Menu
+
                 ui.menu_button(RichText::new("File").size(12.0), |ui| {
                     if ui.button("Open Process... [Ctrl+O]").clicked() {
                         app.refresh_proc_list();
@@ -63,7 +61,6 @@ pub fn render_top_menu(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                     }
                 });
 
-                // 2. Edit Menu
                 ui.menu_button(RichText::new("Edit").size(12.0), |ui| {
                     if ui.button("Settings [Ctrl+,]").clicked() {
                         app.show_settings_modal = true;
@@ -76,7 +73,6 @@ pub fn render_top_menu(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                     }
                 });
 
-                // 3. Table Menu
                 ui.menu_button(RichText::new("Table").size(12.0), |ui| {
                     if ui.button("Add Address Manually").clicked() {
                         app.show_add_addr_modal = true;
@@ -132,7 +128,6 @@ pub fn render_top_menu(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                     }
                 });
 
-                // 4. Dbi / DBVM Menu
                 ui.menu_button(RichText::new("Dbi").size(12.0), |ui| {
                     if ui.button("Connect to DBK Driver (\\.\\DBK64)").clicked() {
                         app.try_connect_dbk();
@@ -153,13 +148,11 @@ pub fn render_top_menu(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                     }
                 });
 
-                // 5. Memory View Menu
                 if ui.button(RichText::new("Memory View").size(12.0)).clicked() {
                     app.update_memory_view();
                     app.show_memory_view = true;
                 }
 
-                // 6. Tools Menu
                 ui.menu_button(RichText::new("Tools").size(12.0), |ui| {
                     if ui.button("Memory Browser (Disassembler & Hex) [Ctrl+M]").clicked() {
                         app.update_memory_view();
@@ -197,7 +190,6 @@ pub fn render_top_menu(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                     }
                 });
 
-                // 7. Help Menu
                 ui.menu_button(RichText::new("Help").size(12.0), |ui| {
                     if ui.button("About Cheat Engine 7.7").clicked() {
                         app.status_msg = "Cheat Engine 7.7 (Rust Edition) - High performance native memory suite.".to_string();
@@ -219,7 +211,7 @@ pub fn render_header_bar(app: &mut OnyxEngineApp, ui: &mut egui::Ui) {
             let pulse = (ui.input(|i| i.time * 4.5).sin() * 0.5 + 0.5) as f32;
 
             ui.horizontal(|ui| {
-                // 1. Official Cheat Engine Computer Icon with blinking green highlight
+
                 let (border_col, btn_fill) = if !is_attached {
                     let g = (140.0 + pulse * 115.0) as u8;
                     (Color32::from_rgb(40, g, 80), Color32::from_rgb(22, 45, 30))
@@ -252,7 +244,6 @@ pub fn render_header_bar(app: &mut OnyxEngineApp, ui: &mut egui::Ui) {
                     app.show_proc_modal = true;
                 }
 
-                // 2. Open Cheat Table Folder Icon
                 if let Some(ref icons) = app.icons {
                     let img = egui::Image::new(&icons.open).fit_to_exact_size(Vec2::splat(22.0));
                     let open_btn = egui::Button::image(img)
@@ -279,7 +270,6 @@ pub fn render_header_bar(app: &mut OnyxEngineApp, ui: &mut egui::Ui) {
                         }
                     }
 
-                    // 3. Save Cheat Table Floppy Disk Icon
                     let save_img = egui::Image::new(&icons.save).fit_to_exact_size(Vec2::splat(22.0));
                     let save_btn = egui::Button::image(save_img)
                         .fill(Color32::from_rgb(26, 30, 38))
@@ -302,7 +292,6 @@ pub fn render_header_bar(app: &mut OnyxEngineApp, ui: &mut egui::Ui) {
 
                 ui.add_space(8.0);
 
-                // 4. Process Label (Exact Cheat Engine style)
                 let text_color = if is_attached { Color32::from_rgb(110, 240, 140) } else { Color32::from_rgb(220, 225, 235) };
                 ui.horizontal(|ui| {
                     if is_attached {
@@ -323,16 +312,14 @@ pub fn render_header_bar(app: &mut OnyxEngineApp, ui: &mut egui::Ui) {
                     );
                 });
 
-                // 5. Right side: CE Logo, Access Mode Switcher & Settings
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    // Cheat Engine Official Logo
+
                     if let Some(ref icons) = app.icons {
                         let logo_img = egui::Image::new(&icons.ce_logo).fit_to_exact_size(Vec2::new(36.0, 32.0));
                         ui.add(logo_img);
                         ui.add_space(4.0);
                     }
 
-                    // Settings icon button
                     if let Some(ref icons) = app.icons {
                         let img = egui::Image::new(&icons.settings).fit_to_exact_size(Vec2::splat(18.0));
                         if ui.add(
@@ -346,7 +333,6 @@ pub fn render_header_bar(app: &mut OnyxEngineApp, ui: &mut egui::Ui) {
                         }
                     }
 
-                    // Mode badge
                     let mode_badge = app.access_mode.badge();
                     let mode_col = match app.access_mode {
                         onyx_core::process::ProcessAccessMode::NtApi => Color32::from_rgb(100, 240, 140),
@@ -377,7 +363,7 @@ pub fn render_bottom_bar(app: &mut OnyxEngineApp, ctx: &egui::Context) {
             .stroke(Stroke::new(1.0_f32, Color32::from_rgb(46, 52, 65))))
         .show(ctx, |ui| {
             ui.horizontal(|ui| {
-                // Left: Advanced Options button (MainUnit.Panel4)
+
                 let adv_btn = egui::Button::new(RichText::new("Advanced Options").size(11.0).color(Color32::from_rgb(200, 205, 215)))
                     .fill(Color32::from_rgb(28, 32, 40))
                     .stroke(Stroke::new(1.0_f32, Color32::from_rgb(48, 54, 68)))
@@ -390,7 +376,7 @@ pub fn render_bottom_bar(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                 ui.label(RichText::new(&app.status_msg).size(11.5).color(Color32::from_rgb(200, 205, 215)));
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    // Right: Table Extras button (MainUnit.Panel4)
+
                     let extras_btn = egui::Button::new(RichText::new("Table Extras").size(11.0).color(Color32::from_rgb(200, 205, 215)))
                         .fill(Color32::from_rgb(28, 32, 40))
                         .stroke(Stroke::new(1.0_f32, Color32::from_rgb(48, 54, 68)))
@@ -415,3 +401,4 @@ pub fn render_bottom_bar(app: &mut OnyxEngineApp, ctx: &egui::Context) {
             });
         });
 }
+

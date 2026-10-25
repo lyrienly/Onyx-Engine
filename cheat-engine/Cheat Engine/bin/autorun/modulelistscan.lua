@@ -3,8 +3,7 @@ local c=createComboBox(MainForm.gbScanOptions)
 c.Style='csDropDownList'
 c.Items.add('All')
 c.ItemIndex=0
-c.Name='ScanOptionsModuleList'  
-
+c.Name='ScanOptionsModuleList'
 
 c.Align=alTop
 c.BorderSpacing.Left=6
@@ -21,14 +20,14 @@ function FillList()
   else
     op='64'
   end
-  synchronize(function()  
+  synchronize(function()
     while c.Items.Count>1 do
       c.Items.delete(1)
     end
   end)
 
   modulelist=enumModules()
-  
+
   synchronize(function()
     if modulelist then
       local i
@@ -45,9 +44,9 @@ function FillList()
   end)
 end
 
-c.OnMouseEnter=function(d)  
+c.OnMouseEnter=function(d)
   if c.Items.Count<=1 then
-    --print("enter")
+
     if FillListThread==nil then
       FillListThread=createThread(function(t)
         FillList()
@@ -63,9 +62,9 @@ c.OnDropDown=function(d)
     FillListThread=createThread(function(t)
       FillList()
       FillListThread=nil
-    end) 
+    end)
   end
-    
+
   while FillListThread do
     checkSynchronize(50)
   end
@@ -89,3 +88,4 @@ c.OnSelect=function(d)
 end
 
 c.Enabled=false
+

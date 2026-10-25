@@ -145,3 +145,4 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
         app.show_add_addr_modal = false;
     }
 }
+

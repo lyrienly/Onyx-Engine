@@ -1,5 +1,3 @@
-// language: Rust, file: freeze.rs, target: Windows 11, MSVC
-// Address value freezing / locking engine with background refresh thread
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -45,7 +43,7 @@ impl Freezer {
         self.update_process(proc);
 
         if self.running.swap(true, Ordering::SeqCst) {
-            return; // Already running
+            return;
         }
 
         let entries_clone = Arc::clone(&self.entries);
@@ -91,7 +89,7 @@ impl Freezer {
 
     pub fn freeze(&mut self, address: usize, value: ScanValue, desc: &str) -> usize {
         let mut lock = self.entries.lock().unwrap();
-        // If address already exists, update it rather than creating a duplicate
+
         for entry in lock.values_mut() {
             if entry.address == address {
                 entry.value = value;
@@ -166,3 +164,4 @@ impl Freezer {
         lock.clear();
     }
 }
+

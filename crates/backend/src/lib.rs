@@ -1,5 +1,3 @@
-// OnyxEngine Backend Native Dynamic Library (onyx_backend.dll)
-// High-performance Rust backend engine for Pascal / Lazarus frontend
 
 #![allow(unsafe_op_in_unsafe_fn, unused_mut, static_mut_refs, dead_code)]
 
@@ -17,13 +15,11 @@ pub use api::mono::*;
 pub use api::veh::*;
 pub use loader::*;
 
-/// Query backend version code (e.g. 100 for v1.0.0)
 #[no_mangle]
 pub extern "C" fn onyx_backend_version() -> u32 {
     100
 }
 
-/// Check if the backend is initialized and healthy
 #[no_mangle]
 pub extern "C" fn onyx_backend_ping() -> i32 {
     1
@@ -51,3 +47,4 @@ pub extern "system" fn DllMain(
 
     1
 }
+

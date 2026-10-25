@@ -1,5 +1,3 @@
-// Cheat Engine 7.7 Settings Modal (formsettingsunit)
-// Replicates official Free Pascal / Lazarus formSettings layout
 
 use eframe::egui::{self, Color32, RichText, Rounding, Stroke, Vec2};
 use onyx_core::process::ProcessAccessMode;
@@ -31,7 +29,7 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
             let total_h = ui.available_height() - 36.0;
 
             ui.horizontal_top(|ui| {
-                // LEFT SIDEBAR: Win32 TreeView (tvMenuSelection)
+
                 let sidebar_w = 170.0;
                 ui.vertical(|ui| {
                     ui.set_width(sidebar_w);
@@ -77,7 +75,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
 
                 ui.add_space(6.0);
 
-                // RIGHT CONTENT AREA: Classic Win32 Property Sheet
                 let content_w = ui.available_width() - 4.0;
                 ui.vertical(|ui| {
                     ui.set_width(content_w);
@@ -110,7 +107,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
 
             ui.add_space(6.0);
 
-            // BOTTOM BAR: Classic Win32 OK / Cancel
             ui.horizontal(|ui| {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.add(
@@ -141,7 +137,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
     }
 }
 
-// Win32 GroupBox Helper
 fn render_group_box(ui: &mut egui::Ui, title: &str, content: impl FnOnce(&mut egui::Ui)) {
     ui.add_space(4.0);
     ui.label(RichText::new(title).size(11.5).strong().color(Color32::from_rgb(140, 180, 240)));
@@ -328,3 +323,4 @@ fn render_extra_tab(app: &mut OnyxEngineApp, ui: &mut egui::Ui) {
         ui.label("Mono / IL2CPP generic method and parameter lookup");
     });
 }
+

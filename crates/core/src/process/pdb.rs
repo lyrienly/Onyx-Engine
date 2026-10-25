@@ -1,6 +1,3 @@
-// language: Rust, file: pdb.rs, target: Windows 11, MSVC
-// PDB and CodeView debug symbol engine using dynamically loaded dbghelp.dll
-// Mirrors Cheat Engine symbolhandler.pas PDB / Symbol Server integration
 
 use std::ffi::{c_void, OsStr};
 use std::os::windows::ffi::OsStrExt;
@@ -68,7 +65,7 @@ unsafe impl Send for DbgHelpSymbolEngine {}
 unsafe impl Sync for DbgHelpSymbolEngine {}
 
 impl DbgHelpSymbolEngine {
-    /// Loads dbghelp.dll dynamically and initializes symbol handler for given process handle.
+
     pub fn new(process_handle: HANDLE) -> Result<Self, String> {
         unsafe {
             let dbghelp_name: Vec<u16> = OsStr::new("dbghelp.dll")
@@ -108,7 +105,6 @@ impl DbgHelpSymbolEngine {
                 | SYMOPT_AUTO_PUBLICS;
             (fn_sym_set_options)(options);
 
-            // Default Microsoft Symbol Server search path
             let default_path = "SRV*C:\\Symbols*https://msdl.microsoft.com/download/symbols";
             let path_wide: Vec<u16> = OsStr::new(default_path)
                 .encode_wide()
@@ -123,7 +119,7 @@ impl DbgHelpSymbolEngine {
 
             let init_res = (fn_sym_initialize)(target_handle, path_wide.as_ptr(), FALSE);
             if init_res != TRUE {
-                // If already initialized for this handle, continue
+
             }
 
             Ok(Self {
@@ -141,7 +137,6 @@ impl DbgHelpSymbolEngine {
         }
     }
 
-    /// Sets symbol search path (local folders and/or symbol servers)
     pub fn set_search_path(&self, path: &str) -> bool {
         let wide: Vec<u16> = OsStr::new(path)
             .encode_wide()
@@ -150,7 +145,6 @@ impl DbgHelpSymbolEngine {
         unsafe { (self.fn_sym_set_search_path)(self.handle, wide.as_ptr()) == TRUE }
     }
 
-    /// Loads symbols for a module (PE image path, base address, module size)
     pub fn load_module(&self, image_path: &str, base: usize, size: usize) -> Result<u64, String> {
         let path_wide: Vec<u16> = OsStr::new(image_path)
             .encode_wide()
@@ -180,7 +174,6 @@ impl DbgHelpSymbolEngine {
         Ok(base_res)
     }
 
-    /// Resolves symbol name to virtual address via PDB/DbgHelp
     pub fn resolve_name(&self, symbol_name: &str) -> Option<usize> {
         let name_wide: Vec<u16> = OsStr::new(symbol_name)
             .encode_wide()
@@ -200,7 +193,6 @@ impl DbgHelpSymbolEngine {
         }
     }
 
-    /// Resolves an address to symbol name and displacement (e.g. ("Entity::Update", 0x14))
     pub fn resolve_address(&self, address: usize) -> Option<(String, usize)> {
         unsafe {
             let mut info: SYMBOL_INFOW = zeroed();
@@ -237,10 +229,11 @@ mod tests {
 
     #[test]
     fn test_dbghelp_initialization() {
-        // Initializes DbgHelp for current process
+
         let engine = DbgHelpSymbolEngine::new(null_mut());
         assert!(engine.is_ok(), "DbgHelpSymbolEngine should load dbghelp.dll on Windows");
         let eng = engine.unwrap();
         assert!(eng.initialized);
     }
 }
+

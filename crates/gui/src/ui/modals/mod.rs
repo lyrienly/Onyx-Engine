@@ -1,4 +1,3 @@
-// Modal Dialog Aggregator for OnyxEngine
 
 pub mod process_modal;
 pub mod memory_view;
@@ -26,3 +25,4 @@ pub fn render_all_modals(app: &mut OnyxEngineApp, ctx: &egui::Context) {
     edit_byte_modal::render(app, ctx);
     settings_modal::render(app, ctx);
 }
+

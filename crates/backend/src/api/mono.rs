@@ -1,5 +1,3 @@
-// OnyxEngine Mono & .NET CLR Dissector Backend API
-// Runtime inspection, assembly dissection, and class hierarchy extraction
 
 use std::ffi::CStr;
 use std::os::raw::c_char;
@@ -8,7 +6,6 @@ use onyx_core::process::Process;
 
 static mut GLOBAL_DISSECTOR: Option<MonoDissector> = None;
 
-/// Detect runtime type: 0 = None, 1 = Mono, 2 = .NET CLR, 3 = Unity IL2CPP
 #[no_mangle]
 pub unsafe extern "C" fn onyx_mono_detect(process: *mut Process) -> i32 {
     if process.is_null() {
@@ -25,8 +22,6 @@ pub unsafe extern "C" fn onyx_mono_detect(process: *mut Process) -> i32 {
     }
 }
 
-/// Dissect assemblies and classes for the active runtime
-/// Returns total number of classes discovered
 #[no_mangle]
 pub unsafe extern "C" fn onyx_mono_dissect(process: *mut Process) -> i32 {
     if process.is_null() {
@@ -45,7 +40,6 @@ pub unsafe extern "C" fn onyx_mono_dissect(process: *mut Process) -> i32 {
     }
 }
 
-/// Get number of classes found in last dissection
 #[no_mangle]
 pub unsafe extern "C" fn onyx_mono_class_count() -> i32 {
     if let Some(d) = &GLOBAL_DISSECTOR {
@@ -55,7 +49,6 @@ pub unsafe extern "C" fn onyx_mono_class_count() -> i32 {
     }
 }
 
-/// Get class name and address by flat class index
 #[no_mangle]
 pub unsafe extern "C" fn onyx_mono_get_class_info(
     index: i32,
@@ -97,8 +90,6 @@ pub unsafe extern "C" fn onyx_mono_get_class_info(
     0
 }
 
-/// Find offset of a field in a class by name (e.g. "health", "coins")
-/// Returns -1 if not found
 #[no_mangle]
 pub unsafe extern "C" fn onyx_mono_find_field_offset(
     class_name: *const c_char,
@@ -131,8 +122,6 @@ pub unsafe extern "C" fn onyx_mono_find_field_offset(
     -1
 }
 
-/// Find live JIT / native address of a method in a class
-/// Returns 0 if not found
 #[no_mangle]
 pub unsafe extern "C" fn onyx_mono_find_method_address(
     class_name: *const c_char,
@@ -165,7 +154,6 @@ pub unsafe extern "C" fn onyx_mono_find_method_address(
     0
 }
 
-/// Generate Cheat Engine Auto Assembler hook script for a managed method
 #[no_mangle]
 pub unsafe extern "C" fn onyx_mono_generate_hook(
     method_name: *const c_char,
@@ -187,7 +175,6 @@ pub unsafe extern "C" fn onyx_mono_generate_hook(
     1
 }
 
-/// Forces JIT compilation of a managed method and returns its native code pointer
 #[no_mangle]
 pub unsafe extern "C" fn onyx_mono_compile_method(
     process: *mut Process,
@@ -214,7 +201,6 @@ pub unsafe extern "C" fn onyx_mono_compile_method(
     }
 }
 
-/// Reads a managed field value in real-time from an object instance
 #[no_mangle]
 pub unsafe extern "C" fn onyx_mono_read_field_value(
     process: *mut Process,
@@ -257,7 +243,6 @@ pub unsafe extern "C" fn onyx_mono_read_field_value(
     0
 }
 
-/// Get total number of loaded managed assemblies
 #[no_mangle]
 pub unsafe extern "C" fn onyx_mono_get_assembly_count() -> i32 {
     if let Some(d) = &GLOBAL_DISSECTOR {
@@ -267,7 +252,6 @@ pub unsafe extern "C" fn onyx_mono_get_assembly_count() -> i32 {
     }
 }
 
-/// Get assembly name by index
 #[no_mangle]
 pub unsafe extern "C" fn onyx_mono_get_assembly_name(
     index: i32,
@@ -294,7 +278,6 @@ pub unsafe extern "C" fn onyx_mono_get_assembly_name(
     }
 }
 
-/// Dissect a CLR object instance by reading its MethodTable and EEClass pointers
 #[no_mangle]
 pub unsafe extern "C" fn onyx_mono_dissect_clr_object(
     process: *mut Process,

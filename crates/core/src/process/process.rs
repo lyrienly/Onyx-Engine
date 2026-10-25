@@ -1,5 +1,3 @@
-// language: Rust, file: process.rs, target: Windows 11, MSVC
-// Target process management, memory R/W, module enumeration, and privilege escalation
 
 use std::ffi::c_void;
 use std::mem::{size_of, zeroed};
@@ -11,16 +9,16 @@ use crate::kernel::DbkDriver;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProcessAccessMode {
-    NtApi,      // Native NT syscalls via ntdll (NtOpenProcess, NtReadVirtualMemory, NtWriteVirtualMemory)
-    KernelDbk,  // Official Cheat Engine DBK64/DBK32 driver
-    Win32,      // Standard Win32 fallback
+    NtApi,
+    KernelDbk,
+    Win32,
 }
 
 impl ProcessAccessMode {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::NtApi => "NT Native API",
-            Self::KernelDbk => "Kernel DBK64",
+            Self::KernelDbk => "Kernel OwMemDriver",
             Self::Win32 => "Win32 API",
         }
     }
@@ -28,7 +26,7 @@ impl ProcessAccessMode {
     pub fn badge(&self) -> &'static str {
         match self {
             Self::NtApi => "[NT API]",
-            Self::KernelDbk => "[DBK64]",
+            Self::KernelDbk => "[OwMemDriver]",
             Self::Win32 => "[WIN32]",
         }
     }
@@ -223,18 +221,15 @@ impl Process {
         Ok(None)
     }
 
-    /// Attaches to the current process
     pub fn attach_current() -> Result<Self, String> {
         let pid = unsafe { GetCurrentProcessId() };
         Self::attach(pid)
     }
 
-    /// Attaches to target process using Native NT API (NtOpenProcess) by default
     pub fn attach(pid: u32) -> Result<Self, String> {
         Self::attach_with_mode(pid, ProcessAccessMode::NtApi, None)
     }
 
-    /// Attaches to target process with specified access mode (NtApi, KernelDbk, Win32)
     pub fn attach_with_mode(
         pid: u32,
         mode: ProcessAccessMode,
@@ -244,7 +239,6 @@ impl Process {
 
         let mut handle: HANDLE = null_mut();
 
-        // 1. If KernelDbk mode and driver available, attempt kernel open
         if mode == ProcessAccessMode::KernelDbk {
             if let Some(ref driver) = dbk {
                 if let Ok(h) = driver.open_process(pid) {
@@ -253,7 +247,6 @@ impl Process {
             }
         }
 
-        // 2. Native NT API: NtOpenProcess (bypasses usermode hooks on OpenProcess)
         if handle.is_null() && (mode == ProcessAccessMode::NtApi || mode == ProcessAccessMode::KernelDbk) {
             let mut client_id = CLIENT_ID {
                 UniqueProcess: pid as usize as HANDLE,
@@ -275,7 +268,7 @@ impl Process {
             if status == STATUS_SUCCESS && !proc_handle.is_null() {
                 handle = proc_handle;
             } else {
-                // Secondary attempt with VM_READ | VM_WRITE | VM_OPERATION | QUERY_INFORMATION
+
                 let fallback_access = PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION | PROCESS_QUERY_INFORMATION;
                 let status_fb = unsafe {
                     NtOpenProcess(
@@ -291,7 +284,6 @@ impl Process {
             }
         }
 
-        // 3. Fallback to standard Win32 OpenProcess
         if handle.is_null() {
             let h = unsafe { OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid) };
             if h.is_null() {
@@ -307,7 +299,6 @@ impl Process {
             }
         }
 
-        // Resolve process name
         let name = Self::list_all()
             .ok()
             .and_then(|list| list.into_iter().find(|p| p.pid == pid).map(|p| p.name))
@@ -344,7 +335,6 @@ impl Process {
         Self::attach(found.pid)
     }
 
-    /// Atomically suspends all threads in target process via NtSuspendProcess
     pub fn suspend(&self) -> Result<(), String> {
         let status = unsafe { NtSuspendProcess(self.handle) };
         if status == 0 {
@@ -354,7 +344,6 @@ impl Process {
         }
     }
 
-    /// Atomically resumes all threads in target process via NtResumeProcess
     pub fn resume(&self) -> Result<(), String> {
         let status = unsafe { NtResumeProcess(self.handle) };
         if status == 0 {
@@ -365,10 +354,27 @@ impl Process {
     }
 
     pub fn modules(&self) -> Result<Vec<ModuleEntry>, String> {
+
+        if self.access_mode == ProcessAccessMode::KernelDbk {
+            if let Some(ref dbk) = self.dbk {
+                if let Ok(vad_mods) = dbk.enum_vad_modules(self.pid) {
+                    if !vad_mods.is_empty() {
+                        return Ok(vad_mods);
+                    }
+                }
+            }
+        }
+
         let snapshot = unsafe {
             CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, self.pid)
         };
         if snapshot == INVALID_HANDLE_VALUE {
+
+            if let Some(ref dbk) = self.dbk {
+                if let Ok(vad_mods) = dbk.enum_vad_modules(self.pid) {
+                    return Ok(vad_mods);
+                }
+            }
             return Err(format!("Failed to create module snapshot for PID {}", self.pid));
         }
 
@@ -412,7 +418,7 @@ impl Process {
 
     pub fn regions(&self, writable_only: bool) -> Result<Vec<MemoryRegion>, String> {
         let mut regions = Vec::new();
-        let mut addr: usize = 0x10000; // Skip first 64KB null-page boundary
+        let mut addr: usize = 0x10000;
         let max_addr: usize = if size_of::<usize>() == 8 { 0x7FFF_FFFF_FFFF } else { 0x7FFF_FFFF };
 
         let mut mbi: MEMORY_BASIC_INFORMATION = unsafe { zeroed() };
@@ -424,7 +430,7 @@ impl Process {
                     NtQueryVirtualMemory(
                         self.handle,
                         addr as PVOID,
-                        0, // MemoryBasicInformation
+                        0,
                         &mut mbi as *mut _ as PVOID,
                         size_of::<MEMORY_BASIC_INFORMATION>(),
                         &mut return_len,
@@ -444,7 +450,7 @@ impl Process {
             };
 
             if !success {
-                // Advance 4KB on error to avoid stalling
+
                 addr += 0x1000;
                 continue;
             }
@@ -457,9 +463,6 @@ impl Process {
                 mem_type: mbi.Type,
             };
 
-            // CRITICAL: A region MUST always be committed and readable!
-            // NEVER include PAGE_GUARD (reading it strips guard protection on target thread stacks -> crashes target app)
-            // NEVER include PAGE_NOACCESS or uncommitted MEM_RESERVE / MEM_FREE
             if reg.is_readable() {
                 if !writable_only || reg.is_writable() {
                     regions.push(reg);
@@ -476,15 +479,22 @@ impl Process {
         Ok(regions)
     }
 
-    /// Reads raw memory bytes via DBK kernel, NtReadVirtualMemory, or fallback RPM
     pub fn read_raw(&self, address: usize, buf: &mut [u8]) -> Result<usize, String> {
         if buf.is_empty() {
             return Ok(0);
         }
 
-        // 1. Kernel DBK Mode
         if self.access_mode == ProcessAccessMode::KernelDbk {
             if let Some(ref dbk) = self.dbk {
+
+                if let Ok(bytes) = dbk.bulk_dump_cr3(self.pid, address as u64, buf.len()) {
+                    if !bytes.is_empty() {
+                        let to_copy = bytes.len().min(buf.len());
+                        buf[..to_copy].copy_from_slice(&bytes[..to_copy]);
+                        return Ok(to_copy);
+                    }
+                }
+
                 if let Ok(bytes) = dbk.read_memory(self.pid, address, buf.len()) {
                     let to_copy = bytes.len().min(buf.len());
                     buf[..to_copy].copy_from_slice(&bytes[..to_copy]);
@@ -493,7 +503,6 @@ impl Process {
             }
         }
 
-        // 2. Native NT API: NtReadVirtualMemory (bypasses usermode hooks on ReadProcessMemory)
         if self.access_mode == ProcessAccessMode::NtApi || self.access_mode == ProcessAccessMode::KernelDbk {
             let mut bytes_read: SIZE_T = 0;
             let status = unsafe {
@@ -511,7 +520,6 @@ impl Process {
             }
         }
 
-        // 3. Fallback: Win32 ReadProcessMemory
         let mut bytes_read: SIZE_T = 0;
         let ok = unsafe {
             ReadProcessMemory(
@@ -563,13 +571,11 @@ impl Process {
         }
     }
 
-    /// Writes raw memory bytes via DBK kernel, NtWriteVirtualMemory, or fallback WPM
     pub fn write_raw(&self, address: usize, data: &[u8]) -> Result<usize, String> {
         if data.is_empty() {
             return Ok(0);
         }
 
-        // 1. Kernel DBK Mode
         if self.access_mode == ProcessAccessMode::KernelDbk {
             if let Some(ref dbk) = self.dbk {
                 if let Ok(written) = dbk.write_memory(self.pid, address, data) {
@@ -578,7 +584,6 @@ impl Process {
             }
         }
 
-        // 2. Native NT API: NtProtectVirtualMemory + NtWriteVirtualMemory
         if self.access_mode == ProcessAccessMode::NtApi || self.access_mode == ProcessAccessMode::KernelDbk {
             let mut base_addr = address as PVOID;
             let mut region_size: SIZE_T = data.len();
@@ -625,7 +630,6 @@ impl Process {
             }
         }
 
-        // 3. Fallback: Win32 VirtualProtectEx + WriteProcessMemory
         let mut bytes_written: SIZE_T = 0;
         let mut old_protect: DWORD = 0;
 
@@ -677,7 +681,6 @@ impl Process {
         Ok(())
     }
 
-    /// Allocates memory via NtAllocateVirtualMemory or VirtualAllocEx
     pub fn alloc(&self, size: usize, protect: u32) -> Result<usize, String> {
         if self.access_mode == ProcessAccessMode::NtApi || self.access_mode == ProcessAccessMode::KernelDbk {
             let mut base_addr: PVOID = null_mut();
@@ -697,7 +700,6 @@ impl Process {
             }
         }
 
-        // Fallback
         let addr = unsafe {
             VirtualAllocEx(
                 self.handle,
@@ -714,7 +716,6 @@ impl Process {
         }
     }
 
-    /// Allocates memory within 2GB distance of preferred_address (for 5-byte relative jmp/call hooks)
     pub fn alloc_near(&self, preferred_addr: usize, size: usize, protect: u32) -> Result<usize, String> {
         if preferred_addr == 0 {
             return self.alloc(size, protect);
@@ -749,7 +750,6 @@ impl Process {
         self.alloc(size, protect)
     }
 
-    /// Frees memory via NtFreeVirtualMemory or VirtualFreeEx
     pub fn free(&self, address: usize) -> Result<(), String> {
         if self.access_mode == ProcessAccessMode::NtApi || self.access_mode == ProcessAccessMode::KernelDbk {
             let mut base_addr = address as PVOID;
@@ -767,7 +767,6 @@ impl Process {
             }
         }
 
-        // Fallback
         let ok = unsafe { VirtualFreeEx(self.handle, address as LPVOID, 0, MEM_RELEASE) };
         if ok == TRUE {
             Ok(())
@@ -776,7 +775,6 @@ impl Process {
         }
     }
 
-    /// Modifies memory protection via NtProtectVirtualMemory or VirtualProtectEx
     pub fn protect(&self, address: usize, size: usize, new_protect: u32) -> Result<u32, String> {
         if self.access_mode == ProcessAccessMode::NtApi || self.access_mode == ProcessAccessMode::KernelDbk {
             let mut base_addr = address as PVOID;
@@ -796,7 +794,6 @@ impl Process {
             }
         }
 
-        // Fallback
         let mut old_protect: DWORD = 0;
         let ok = unsafe {
             VirtualProtectEx(
@@ -847,7 +844,6 @@ impl Process {
             return std::fs::canonicalize(p).map_err(|e| e.to_string());
         }
 
-        // 1. Next to current executable (ce_rust_gui.exe / CE_rust.exe)
         if let Ok(exe_path) = std::env::current_exe() {
             if let Some(exe_dir) = exe_path.parent() {
                 let candidate = exe_dir.join(p);
@@ -863,12 +859,10 @@ impl Process {
             }
         }
 
-        // 2. Relative to working directory
         if p.exists() {
             return std::fs::canonicalize(p).map_err(|e| e.to_string());
         }
 
-        // 3. Known project paths
         if let Some(filename) = p.file_name() {
             let candidates = [
                 PathBuf::from(filename),
@@ -967,7 +961,6 @@ impl Process {
         }
     }
 
-    /// Spawns a remote thread at start_address in the target process
     pub fn create_thread(&self, start_address: usize) -> Result<usize, String> {
         let thread_start = unsafe {
             std::mem::transmute::<LPVOID, unsafe extern "system" fn(LPVOID) -> DWORD>(start_address as LPVOID)
@@ -1062,7 +1055,6 @@ mod tests {
         let p = proc.unwrap();
         assert_eq!(p.access_mode, ProcessAccessMode::NtApi);
 
-        // Read a known local variable via NtReadVirtualMemory
         let magic: u64 = 0xDEADBEEFCAFE1337;
         let addr = &magic as *const u64 as usize;
         let val: Result<u64, String> = p.read(addr);

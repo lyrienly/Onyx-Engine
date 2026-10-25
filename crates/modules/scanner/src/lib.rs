@@ -1,5 +1,3 @@
-// language: Rust, file: lib.rs (onyx_scanner), target: Windows 11, MSVC
-// Modular Memory Scanner Sub-DLL (modules/scanner/onyx_scanner.dll)
 
 use std::ffi::CStr;
 use std::os::raw::c_char;
@@ -301,3 +299,4 @@ pub unsafe extern "C" fn onyx_scanner_save_results_file(
 
     total as i64
 }
+

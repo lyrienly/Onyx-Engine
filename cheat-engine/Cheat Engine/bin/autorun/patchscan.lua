@@ -19,7 +19,6 @@ function byteTableToHexString(bt)
   return r
 end
 
-
 function scanModuleForPatches(modulepath, loadedModuleBase, thread)
 
   local original=createMemoryStream()
@@ -29,7 +28,6 @@ function scanModuleForPatches(modulepath, loadedModuleBase, thread)
     return false,e
   end
   original.Position=0
-
 
   if (byteTableToString(original.read(2))~='MZ') then
     original.destroy()
@@ -64,7 +62,7 @@ function scanModuleForPatches(modulepath, loadedModuleBase, thread)
 
   local BaseOfData
   local ImageBase
-  --scan the reloc table
+
   if Machine==0x8664 then
     BaseOfData=nil
     ImageBase=original.readQword()
@@ -77,7 +75,6 @@ function scanModuleForPatches(modulepath, loadedModuleBase, thread)
 
   local RelocDistance=loadedModuleBase-ImageBase;
 
-
   local LoaderFlags=original.readDword()
   local RVACount=original.readDword()
 
@@ -86,20 +83,18 @@ function scanModuleForPatches(modulepath, loadedModuleBase, thread)
     return nil,translate('This type of module is currently not supported')
   end
 
-  --DataDirectory follows
   local DataDirPosition=original.Position
   local ImageSectionHeaderPosition=OptHeaderStart+OptHeaderSize
 
-  --parse the sections so VirtualToFile can function
   local sections={}
   original.Position=ImageSectionHeaderPosition
 
   local i
   for i=1,SectionCount do
-    if thread and thread.Terminated then 
-      original.destroy()    
-      return nil,'Terminated' 
-    end  
+    if thread and thread.Terminated then
+      original.destroy()
+      return nil,'Terminated'
+    end
     sections[i]={}
     sections[i].name=byteTableToString(original.read(8))
     sections[i].misc=original.readDword()
@@ -113,7 +108,7 @@ function scanModuleForPatches(modulepath, loadedModuleBase, thread)
   end
 
   local function VirtualToFile(VA)
-    --scan the address in the sections list
+
     local i
     local offset
     for i=1,#sections do
@@ -123,10 +118,8 @@ function scanModuleForPatches(modulepath, loadedModuleBase, thread)
     end
   end
 
-
   local ImportTableRVAInfo=DataDirPosition+1*8
   local RelocationTableRVAInfo=DataDirPosition+5*8
-
 
   original.Position=ImportTableRVAInfo
   local ImportTableAddress=original.readDword()
@@ -138,31 +131,29 @@ function scanModuleForPatches(modulepath, loadedModuleBase, thread)
   local RelocationTableSize=original.readDword()
   local RelocationTablePosition=VirtualToFile(RelocationTableAddress)
 
-
   local relocs={}
   if RelocationTablePosition then
 
     original.position=RelocationTablePosition
     repeat
-      if thread and thread.Terminated then 
-        original.destroy()    
-        return nil,'Terminated' 
-      end  
-    
+      if thread and thread.Terminated then
+        original.destroy()
+        return nil,'Terminated'
+      end
+
       local oldpos=original.position
       local VABase=original.readDword()
       local Size=original.readDword()
 
       local Entries=math.floor((Size - 8) / 2)
-      --print(string.format("VABase=%x (Size=%d Entries=%d)", VABase, Size, Entries))
 
       local i
       for i=1,Entries do
-        if thread and thread.Terminated then 
-          original.destroy()    
-          return nil,'Terminated' 
-        end 
-        
+        if thread and thread.Terminated then
+          original.destroy()
+          return nil,'Terminated'
+        end
+
         local relinfo=original.readWord()
         local reltype=relinfo >> 12
         local VA=VABase+(relinfo & 0xfff);
@@ -173,7 +164,7 @@ function scanModuleForPatches(modulepath, loadedModuleBase, thread)
             writeQwordLocal(original.Memory+VirtualToFile(VA),readQwordLocal(original.Memory+VirtualToFile(VA))+RelocDistance)
           else
             if reltype ~= 0 then
-              relocs[VA]=true --just mark it as a "I don't know"
+              relocs[VA]=true
             end
           end
         end
@@ -185,13 +176,11 @@ function scanModuleForPatches(modulepath, loadedModuleBase, thread)
 
   end
 
-  --all information has been gathered. Now scan the code sections and compare against the target process
-  --print("Scanning for differences...")
   local results={}
 
   for i=1 , #sections do
-    if thread and thread.Terminated then return nil,'Terminated' end   
-    
+    if thread and thread.Terminated then return nil,'Terminated' end
+
     if sections[i].Executable then
       local VA=loadedModuleBase+sections[i].virtualAddress
       local FA=original.Memory+sections[i].PointerToRawData
@@ -199,24 +188,22 @@ function scanModuleForPatches(modulepath, loadedModuleBase, thread)
       local bytesOK
       local result=false
 
-      --print(string.format("Checking section %s ranging from %x to %x", sections[i].name, VA,VA+sections[i].sizeOfRawData))
-
       while (result==false) and (bytesLeft>0) do
-        if thread and thread.Terminated then 
-          original.destroy()    
-          return nil,'Terminated' 
-        end 
-        
-        result,bytesOK=compareMemory(VA,FA,bytesLeft,1) --VA in target, FA in CE, so method 1
+        if thread and thread.Terminated then
+          original.destroy()
+          return nil,'Terminated'
+        end
+
+        result,bytesOK=compareMemory(VA,FA,bytesLeft,1)
         if (result==false) then
-          --local addressString=getNameFromAddress(VA+bytesOK)
+
           local entrynr=#results+1
           if (entrynr==1) or ((results[entrynr-1].Address+8)~=(VA+bytesOK)) then
-            results[entrynr]={}            
+            results[entrynr]={}
             results[entrynr].Address=VA+bytesOK
             results[entrynr].FileAddress=FA+bytesOK
             results[entrynr].FileOffset=sections[i].PointerToRawData+bytesOK
-            
+
             results[entrynr].Size=8
           else
             results[entrynr-1].Size=results[entrynr-1].Size+8
@@ -235,18 +222,16 @@ function scanModuleForPatches(modulepath, loadedModuleBase, thread)
     end
   end
 
-  --get the bytes
   for i=1,#results do
     if thread and thread.Terminated then
       original.destroy()
-      return nil,'Terminated' 
-    end   
-      
-    results[i].OriginalBytes=readBytesLocal(results[i].FileAddress, results[i].Size, true) --original.read(results[i].Size)    
+      return nil,'Terminated'
+    end
+
+    results[i].OriginalBytes=readBytesLocal(results[i].FileAddress, results[i].Size, true)
     results[i].PatchedBytes=readBytes(results[i].Address, results[i].Size, true)
     results[i].ModulePath=modulepath
   end
-
 
   original.destroy()
 
@@ -285,7 +270,6 @@ function startPatchScan()
   btnCancel.Cancel=true
   btnCancel.ModalResult=mrCancel
 
-
   btnPanel.Align='alBottom'
   btnPanel.AutoSize=true
   btnPanel.BevelOuter='bvNone'
@@ -307,38 +291,32 @@ function startPatchScan()
     local allpatches={}
     local i
 
-    --todo: use a thread to do the scan
-
-    --progressbar + currently scanned module + cancel button
     local pform=createForm(false)
     pform.position='poScreenCenter'
     pform.ClientWidth = DPIMultiplier*600
-    
+
     local psprogress = createProgressBar(pform)
-    --psprogress.ClientWidth = 600
-    --psprogress.ClientHeight = 30
+
     psprogress.Max = listbox.Items.Count-1
     psprogress.Min = 0
     psprogress.Position = 1
     psprogress.Style = "pbstMarquee"
-    
 
     pform.AutoSize=true
     pform.show()
-    
+
     local scanThread=nil
 
     pform.OnClose=function()
-      --print('done')
-      --terminate the scanner if needed       
-      if scanThread then   
-        --don't wait , it's a free on terminate thread anyhow     
-        scanThread.terminate()          
+
+      if scanThread then
+
+        scanThread.terminate()
         scanThread=nil
       end
-      
-      local rform=createForm(false) 
-      local lv=createListView(rform)    
+
+      local rform=createForm(false)
+      local lv=createListView(rform)
 
       rform.Caption=translate('Patch list')
       lv.Align='alClient'
@@ -347,10 +325,10 @@ function startPatchScan()
       lv.MultiSelect=true
       lv.RowSelect=true
       lv.HideSelection=false
-      lv.Name="lvResults"     
-      local caddress=lv.Columns.add()            
-      local coriginal=lv.Columns.add()          
-      local cpatched=lv.Columns.add()      
+      lv.Name="lvResults"
+      local caddress=lv.Columns.add()
+      local coriginal=lv.Columns.add()
+      local cpatched=lv.Columns.add()
 
       caddress.Width=rform.Canvas.GetTextWidth('XXXXXXXXXXXXXXXXXXXXXXXX')
       caddress.Caption=translate('Address')
@@ -370,7 +348,7 @@ function startPatchScan()
       end
 
       lv.OnDblClick=function(s)
-        --_G.dbglv=lv
+
         if lv.Selected then
           local ref=getRef(lv.Selected.Data)
 
@@ -379,7 +357,7 @@ function startPatchScan()
       end
 
       local pm=createPopupMenu(rform)
-      local miRestore=createMenuItem(pm)    
+      local miRestore=createMenuItem(pm)
       local miPatch=createMenuItem(pm)
       local miSeperator=createMenuItem(pm)
       local miPatchExe=createMenuItem(pm)
@@ -390,12 +368,12 @@ function startPatchScan()
       miRestore.ImageIndex=44
       miPatch.Caption=translate('Reapply patch')
       miPatch.ImageIndex=49
-      
+
       miSeperator.Caption='-'
-      
+
       miPatchExe.Caption=translate('Create patched exe from selected entries')
       miPatchExe.ImageIndex=49
-      
+
       pm.Items.add(miRestore)
       pm.Items.add(miPatch)
       pm.Items.add(miSeperator)
@@ -422,76 +400,74 @@ function startPatchScan()
           end
         end
       end
-      
+
       miPatchExe.OnClick=function(s)
-        --check if all the same module
-        if not lv.Selected then 
-          messageDialog('Please select at least one entry') 
-          return 
+
+        if not lv.Selected then
+          messageDialog('Please select at least one entry')
+          return
         end
-        
+
         local i
         local ModulePath=nil
-        patches={}       
-        
+        patches={}
+
         for i=0, lv.Items.Count-1 do
           if lv.Items[i].Selected then
             local ref=getRef(lv.Items[i].Data)
             local mp=ref.ModulePath
-            
-            if ModulePath==nil then            
+
+            if ModulePath==nil then
               ModulePath=ref.ModulePath
-            else            
+            else
               if ModulePath~=ref.ModulePath then
                 messageDialog('You can only select the same type of modules when making a patched exe')
                 return
               end
             end
-            
+
             table.insert(patches, ref)
-          end          
-        end              
-      
+          end
+        end
+
         local sd=createSaveDialog(rform)
         sd.DefaultExt='.EXE'
         sd.Filter='Executable Files (*.EXE; *.DLL)|*.EXE;*.DLL'
         sd.Options='[ofOverwritePrompt]'
         sd.FileName=extractFileNameWithoutExt(ModulePath)..'_Patched'..extractFileExt(ModulePath)
         sd.InitialDir=extractFilePath(ModulePath)
-        
-        if sd.execute() then                
+
+        if sd.execute() then
           local filename=sd.FileName
-          
+
           local ms=createMemoryStream()
-          local r,e=ms.loadFromFileNoError(ModulePath) --load the original file
+          local r,e=ms.loadFromFileNoError(ModulePath)
           if r then
-            --apply the patches                    
+
             for i=1, #patches do
-              --printf("%d: Writing to patch offset %d", i, patches[i].FileOffset) 
-              
-              --only apply the changed bytes (in case of applied relocations)
+
               local j
               for j=1,#patches[i].PatchedBytes do
                 if patches[i].PatchedBytes[j]~=patches[i].OriginalBytes[j] then
-                  writeBytesLocal(ms.Memory+patches[i].FileOffset+j-1, patches[i].PatchedBytes[j]) 
+                  writeBytesLocal(ms.Memory+patches[i].FileOffset+j-1, patches[i].PatchedBytes[j])
                 end
               end
-              
-            end          
-            
-            r,e=ms.saveToFileNoError(filename)          
+
+            end
+
+            r,e=ms.saveToFileNoError(filename)
             if r then
               messageDialog(filename..' has been created')
-            else              
+            else
               messageDialog(e)
             end
           else
             messageDialog(e)
           end
-          
+
           ms.destroy()
         end
-        
+
         sd.destroy()
       end
 
@@ -502,14 +478,11 @@ function startPatchScan()
       rform.ClientWidth=caddress.Width+coriginal.Width+cpatched.Width
       rform.ClientHeight=MainForm.Canvas.getTextHeight('XGgxj')*10
       rform.BorderStyle='bsSizeable'
-      rform.show()      
+      rform.show()
       processMessages()
-      
-      
-     -- print('done')
 
       rform.OnClose=function(f)
---        print('rform closed')
+
         local i
         for i=0,lv.Items.Count-1 do
           local ref=lv.Items[i].Data
@@ -517,60 +490,55 @@ function startPatchScan()
         end
 
         rform=nil
-        
+
         msf.destroy()
         msf=nil
         return caFree
-      end      
+      end
       pform=nil
       return caFree
     end
-    
-    
-    --spawn the scanner thread
+
     local scannedmodules={}
     local i
     for i=0,listbox.Items.Count-1 do
-      if listbox.Selected[i] then            
-        table.insert(scannedmodules, l[i+1])      
-      end      
+      if listbox.Selected[i] then
+        table.insert(scannedmodules, l[i+1])
+      end
     end
-    
+
     _G.debug1=scannedmodules
     _G.debug2=allpatches
-    
-    
+
     scanThread=createThread(function(t)
       local i
-      for i=1,#scannedmodules do      
+      for i=1,#scannedmodules do
         local modulepatches,emsg=scanModuleForPatches(scannedmodules[i].PathToFile, scannedmodules[i].Address, t)
-        
+
         if modulepatches then
           local j
           for j=1,#modulepatches do
             local c=#allpatches+1
             allpatches[c]=modulepatches[j]
-            allpatches[c].Modulename=l[i+1].Name --add the modulename (scanModuleForPatches doesn't add that)
-          end        
+            allpatches[c].Modulename=l[i+1].Name
+          end
         else
           synchronize(function()
-            messageDialog("Patch scan error:"..emsg)           
-          end)        
+            messageDialog("Patch scan error:"..emsg)
+          end)
         end
       end
-      
-      --done 
-      if not t.Terminated then      
-        synchronize(function(t)          
+
+      if not t.Terminated then
+        synchronize(function(t)
           if pform then
-            pform.close() --scanThread=nil so it won't free this thread
+            pform.close()
           end
-        end,t) 
+        end,t)
       end
-      
-      --got to the end.  This means the form has been closed and no longer needed. It can be freed now
+
     end)
-    
+
   else
     msf.destroy()
     msf=nil

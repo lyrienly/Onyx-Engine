@@ -1,4 +1,3 @@
-// Multilevel Pointer Scanner Modal for OnyxEngine
 
 use std::time::Instant;
 use eframe::egui::{self, Color32, RichText, Vec2};
@@ -23,7 +22,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                 app.show_pointer_scanner = false;
             }
 
-            // Bottom Bar
             egui::TopBottomPanel::bottom("ptr_scanner_bottom_bar").show(ctx, |ui| {
                 ui.add_space(3.0);
                 ui.horizontal(|ui| {
@@ -52,7 +50,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
 
                 ui.add_space(4.0);
 
-                // Scan Parameters Group
                 ui.group(|ui| {
                     ui.horizontal(|ui| {
                         ui.label("Max Depth / Level:");
@@ -66,7 +63,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
 
                 ui.add_space(4.0);
 
-                // Actions Bar
                 ui.horizontal(|ui| {
                     let map_btn_text = if app.ptr_map_nodes > 0 {
                         format!("1. Regenerate Map ({} indexed)", app.ptr_map_nodes)
@@ -127,7 +123,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                 ui.label(RichText::new(&app.ptr_status).color(Color32::from_rgb(200, 200, 100)));
                 ui.separator();
 
-                // Results Grid
                 ui.label(RichText::new(format!("Pointer Results ({})", app.ptr_results.len())).strong());
 
                 let mut add_ptr: Option<PointerPath> = None;
@@ -155,7 +150,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                                     let off_chain = path.offsets.iter().map(|o| format!("+{:X}", o)).collect::<Vec<_>>().join(" -> ");
                                     ui.label(RichText::new(off_chain).monospace());
 
-                                    // Points to
                                     let live_val_str = if let Some(proc) = &app.attached_proc {
                                         if let Ok(resolved) = PointerScanner::evaluate_path(proc, path) {
                                             ui.label(RichText::new(format!("0x{:08X}", resolved)).monospace().color(Color32::GREEN));
@@ -187,3 +181,4 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
         },
     );
 }
+

@@ -1,5 +1,3 @@
-// language: Rust, file: autoassembler.rs, target: Windows 11, MSVC
-// Cheat Engine 7.7 Auto Assembler (AA) 2-Pass Script Parser and Execution Engine
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -13,9 +11,9 @@ use crate::win32::*;
 
 #[derive(Debug, Clone)]
 pub struct AaScriptResult {
-    pub allocated_symbols: HashMap<String, (usize, usize)>, // name -> (address, size)
+    pub allocated_symbols: HashMap<String, (usize, usize)>,
     pub registered_symbols: HashMap<String, usize>,
-    pub patches: Vec<(usize, Vec<u8>)>, // (address, original_bytes)
+    pub patches: Vec<(usize, Vec<u8>)>,
 }
 
 pub struct AutoAssembler {
@@ -37,7 +35,6 @@ impl AutoAssembler {
         }
     }
 
-    /// Executes an Auto Assembler script using a complete 2-pass compilation pipeline
     pub fn execute(
         &mut self,
         proc: &Process,
@@ -48,7 +45,6 @@ impl AutoAssembler {
         let mut in_target_section = false;
         let mut has_sections = false;
 
-        // Check if script contains [ENABLE] or [DISABLE] tags
         for line in &raw_lines {
             let t = line.trim();
             if t.eq_ignore_ascii_case("[enable]") || t.eq_ignore_ascii_case("[disable]") {
@@ -65,7 +61,6 @@ impl AutoAssembler {
         let mut cond_stack: Vec<bool> = Vec::new();
         let mut active_lines: Vec<String> = Vec::new();
 
-        // Step 1: Preprocess sections and conditionals
         for line in &raw_lines {
             let raw_trimmed = line.trim();
             let trimmed = strip_comments(raw_trimmed);
@@ -116,22 +111,17 @@ impl AutoAssembler {
             }
         }
 
-        // =========================================================================
-        // PASS 1: DIRECTIVES, ALLOCATIONS, SYMBOLS, AND LABEL RESOLUTION
-        // =========================================================================
         let mut current_ip: Option<usize> = None;
 
         for line in &active_lines {
             let lower = line.to_lowercase();
 
-            // 1. label(name)
             if lower.starts_with("label(") && line.ends_with(')') {
                 let inner = line[6..line.len() - 1].trim();
                 self.declared_labels.insert(inner.to_string());
                 continue;
             }
 
-            // 2. alloc(symbol, size [, near_addr])
             if lower.starts_with("alloc(") && line.ends_with(')') {
                 let inner = &line[6..line.len() - 1];
                 let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
@@ -158,7 +148,6 @@ impl AutoAssembler {
                 continue;
             }
 
-            // 3. globalalloc(symbol, size)
             if lower.starts_with("globalalloc(") && line.ends_with(')') {
                 let inner = &line[12..line.len() - 1];
                 let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
@@ -176,7 +165,6 @@ impl AutoAssembler {
                 continue;
             }
 
-            // 4. dealloc(symbol)
             if lower.starts_with("dealloc(") && line.ends_with(')') {
                 let name = line[8..line.len() - 1].trim();
                 if let Some((addr, _)) = self.allocations.remove(name) {
@@ -186,7 +174,6 @@ impl AutoAssembler {
                 continue;
             }
 
-            // 5. define(name, value)
             if lower.starts_with("define(") && line.ends_with(')') {
                 let inner = &line[7..line.len() - 1];
                 let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
@@ -199,7 +186,6 @@ impl AutoAssembler {
                 continue;
             }
 
-            // 6. registersymbol / unregistersymbol
             if lower.starts_with("registersymbol(") && line.ends_with(')') {
                 continue;
             }
@@ -209,7 +195,6 @@ impl AutoAssembler {
                 continue;
             }
 
-            // 7. aobscan / aobscanmodule / aobscanfunction
             if lower.starts_with("aobscanmodule(") && line.ends_with(')') {
                 let inner = &line[14..line.len() - 1];
                 let parts: Vec<&str> = inner.splitn(3, ',').map(|s| s.trim()).collect();
@@ -253,7 +238,6 @@ impl AutoAssembler {
                 }
             }
 
-            // 8. assert(addr, bytes)
             if lower.starts_with("assert(") && line.ends_with(')') {
                 let inner = &line[7..line.len() - 1];
                 let parts: Vec<&str> = inner.splitn(2, ',').map(|s| s.trim()).collect();
@@ -269,7 +253,6 @@ impl AutoAssembler {
                 }
             }
 
-            // 9. hook / unhook
             if lower.starts_with("hook(") && line.ends_with(')') {
                 let inner = &line[5..line.len() - 1];
                 let parts: Vec<&str> = inner.splitn(3, ',').map(|s| s.trim()).collect();
@@ -284,19 +267,16 @@ impl AutoAssembler {
                 continue;
             }
 
-            // 10. loadlibrary(path)
             if lower.starts_with("loadlibrary(") && line.ends_with(')') {
                 let path = line[12..line.len() - 1].trim().trim_matches('"');
                 let _ = proc.inject_dll(path)?;
                 continue;
             }
 
-            // 11. createthread(addr) -> processed in Pass 2
             if lower.starts_with("createthread(") && line.ends_with(')') {
                 continue;
             }
 
-            // 12. readmem(addr, size)
             if lower.starts_with("readmem(") && line.ends_with(')') {
                 let inner = &line[8..line.len() - 1];
                 let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
@@ -310,12 +290,10 @@ impl AutoAssembler {
                 continue;
             }
 
-            // 13. Label definition or Target Origin switch: "<name>:"
             if let Some(pos) = line.find(':') {
                 let target_part = line[..pos].trim();
                 let rest = line[pos + 1..].trim();
 
-                // Origin switch or label definition
                 if let Some((addr, _)) = self.allocations.get(target_part) {
                     current_ip = Some(*addr);
                 } else if self.declared_labels.contains(target_part) {
@@ -325,11 +303,10 @@ impl AutoAssembler {
                 } else if let Some(addr) = self.resolve_address(proc, target_part, &mut resolver.borrow_mut()) {
                     current_ip = Some(addr);
                 } else if let Some(ip) = current_ip {
-                    // Undeclared local label
+
                     self.symbols.insert(target_part.to_string(), ip);
                 }
 
-                // If line contains code after the colon, measure its size in Pass 1
                 if !rest.is_empty() {
                     if let Some(ip) = current_ip {
                         let len = self.estimate_code_len(proc, rest, ip, &resolver)?;
@@ -339,22 +316,17 @@ impl AutoAssembler {
                 continue;
             }
 
-            // 14. Plain instruction or data line
             if let Some(ip) = current_ip {
                 let len = self.estimate_code_len(proc, line, ip, &resolver)?;
                 current_ip = Some(ip + len);
             }
         }
 
-        // =========================================================================
-        // PASS 2: CODE ASSEMBLY AND PROCESS MEMORY PATCHING
-        // =========================================================================
         current_ip = None;
 
         for line in &active_lines {
             let lower = line.to_lowercase();
 
-            // Skip directives already handled in Pass 1
             if lower.starts_with("label(")
                 || lower.starts_with("alloc(")
                 || lower.starts_with("globalalloc(")
@@ -373,7 +345,6 @@ impl AutoAssembler {
                 continue;
             }
 
-            // createthread(addr) in Pass 2
             if lower.starts_with("createthread(") && line.ends_with(')') {
                 let addr_str = line[12..line.len() - 1].trim();
                 let target_addr = self.resolve_address(proc, addr_str, &mut resolver.borrow_mut())
@@ -382,7 +353,6 @@ impl AutoAssembler {
                 continue;
             }
 
-            // readmem(addr, size)
             if lower.starts_with("readmem(") && line.ends_with(')') {
                 let inner = &line[8..line.len() - 1];
                 let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
@@ -400,7 +370,6 @@ impl AutoAssembler {
                 continue;
             }
 
-            // Target Origin or Label line: "<name>:"
             if let Some(pos) = line.find(':') {
                 let target_part = line[..pos].trim();
                 let rest = line[pos + 1..].trim();
@@ -422,7 +391,6 @@ impl AutoAssembler {
                 continue;
             }
 
-            // Assembly instruction or data line
             if let Some(ip) = current_ip {
                 let bytes = self.assemble_instruction(proc, line, ip, &resolver)?;
                 self.write_code_bytes(proc, ip, &bytes)?;
@@ -451,7 +419,7 @@ impl AutoAssembler {
             } else if let Some(addr) = self.resolve_address(proc, s, &mut resolver.borrow_mut()) {
                 Some(addr)
             } else {
-                // Return dummy forward address for deterministic sizing
+
                 Some(ip.wrapping_add(0x1000))
             }
         };
@@ -492,7 +460,7 @@ impl AutoAssembler {
         if is_allocated {
             proc.write_raw(address, bytes)?;
         } else {
-            // Memory patch on existing module code -> backup original bytes
+
             if let Ok(orig_bytes) = proc.read_bytes(address, bytes.len()) {
                 self.patches.push((address, orig_bytes));
             }
@@ -644,17 +612,14 @@ impl AutoAssembler {
     ) -> Option<usize> {
         let trimmed = s.trim();
 
-        // 1. Defined or allocated symbol
         if let Some(&addr) = self.symbols.get(trimmed) {
             return Some(addr);
         }
 
-        // 2. Direct hex, CE decimal (#), or decimal number
         if let Some(num) = parse_number(trimmed) {
             return Some(num);
         }
 
-        // 3. CE 7.7: Module or symbol +/- offset: "game.exe+0x1000", "game.exe-0x20", "symbol+4", "symbol-8"
         if let Some(pos) = trimmed.find('+') {
             let mod_part = trimmed[..pos].trim().trim_matches('"');
             let off_part = trimmed[pos + 1..].trim();
@@ -687,7 +652,6 @@ impl AutoAssembler {
             }
         }
 
-        // 4. Dynamic export: "kernel32.dll!VirtualAlloc"
         if let Some(addr) = resolver.resolve(proc, trimmed) {
             return Some(addr);
         }
@@ -695,7 +659,6 @@ impl AutoAssembler {
         None
     }
 
-    /// Rollback all patches applied by this script in reverse order
     pub fn rollback(&mut self, proc: &Process) {
         for (addr, orig_bytes) in self.patches.drain(..).rev() {
             if let Ok(old_protect) = proc.protect(addr, orig_bytes.len(), PAGE_EXECUTE_READWRITE) {
@@ -711,8 +674,6 @@ impl AutoAssembler {
         self.declared_labels.clear();
     }
 
-    /// Returns symbols eligible for saving into Cheat Tables.
-    /// CE 7.7: globalalloc symbols do not save in tables anymore.
     pub fn get_table_saveable_symbols(&self) -> HashMap<String, usize> {
         self.symbols
             .iter()
@@ -862,18 +823,16 @@ mod tests {
         assert_eq!(returnhere_addr, newmem_addr + 0x100);
         assert!(exit_addr > newmem_addr);
 
-        // Read written bytes at newmem
         let bytes = proc.read_bytes(newmem_addr, 7).expect("read newmem");
-        // mov [rax+0x10], 0x3E8 -> C7 40 10 E8 03 00 00
+
         assert_eq!(bytes, vec![0xC7, 0x40, 0x10, 0xE8, 0x03, 0x00, 0x00]);
 
-        // Read jmp at exit
         let jmp_bytes = proc.read_bytes(exit_addr, 5).expect("read jmp");
         assert_eq!(jmp_bytes[0], 0xE9);
 
-        // Test rollback
         aa.rollback(&proc);
         assert!(aa.symbols.is_empty());
         assert!(aa.allocations.is_empty());
     }
 }
+

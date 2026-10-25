@@ -1,5 +1,3 @@
-// language: Rust, file: lua_api.rs, target: Windows 11, MSVC
-// Cheat Engine Lua Scripting Engine and API binding
 
 #![allow(non_snake_case, non_camel_case_types, dead_code, unsafe_op_in_unsafe_fn, static_mut_refs)]
 
@@ -14,7 +12,6 @@ use crate::win32::*;
 type LuaState = *mut c_void;
 type LuaCFunction = unsafe extern "C" fn(LuaState) -> c_int;
 
-// Function pointers from lua53-64.dll
 type FnLuaLNewstate = unsafe extern "C" fn() -> LuaState;
 type FnLuaOpenlibs = unsafe extern "C" fn(LuaState);
 type FnLuaClose = unsafe extern "C" fn(LuaState);
@@ -99,10 +96,8 @@ impl CeLuaEngine {
                 }
             }
 
-            // Register standard Cheat Engine functions
             register_ce_functions(L, lib);
 
-            // CE 7.7: Built-in json library
             let json_bootstrap = CString::new(r#"
 json = {}
 local function encode_val(val)
@@ -364,7 +359,6 @@ unsafe fn register_ce_functions(L: LuaState, lib: &LuaLib) {
     reg_fn!("getProcessIDFromProcessName", ce_lua_getProcessIDFromProcessName);
     reg_fn!("openProcess", ce_lua_openProcess);
 
-    // CE 7.7 additions
     reg_fn!("createMemScan", ce_lua_createMemScan);
     reg_fn!("stacktrace", ce_lua_stacktrace);
     reg_fn!("getThreadList", ce_lua_getThreadList);
@@ -372,7 +366,6 @@ unsafe fn register_ce_functions(L: LuaState, lib: &LuaLib) {
     reg_fn!("executeMethodThread", ce_lua_executeMethodThread);
 }
 
-// Lua C Functions
 unsafe extern "C" fn ce_lua_getCEVersion(L: LuaState) -> c_int {
     if let Some(lib) = LUA_LIB.as_ref() {
         (lib.pushnumber)(L, 7.7);
@@ -686,7 +679,6 @@ unsafe extern "C" fn ce_lua_openProcess(L: LuaState) -> c_int {
     }
 }
 
-// CE 7.7: MemScan object creation and bindings
 unsafe extern "C" fn ce_lua_createMemScan(L: LuaState) -> c_int {
     if let Some(lib) = LUA_LIB.as_ref() {
         let scan_id = NEXT_SCANNER_ID.fetch_add(1, Ordering::SeqCst);
@@ -697,14 +689,11 @@ unsafe extern "C" fn ce_lua_createMemScan(L: LuaState) -> c_int {
             }
         }
 
-        // Create MemScan object table
         (lib.createtable)(L, 0, 8);
 
-        // Store _id
         (lib.pushinteger)(L, scan_id);
         (lib.setfield)(L, -2, b"_id\0".as_ptr() as *const c_char);
 
-        // Methods
         macro_rules! add_method {
             ($name:expr, $f:expr) => {
                 (lib.pushcclosure)(L, $f, 0);
@@ -717,7 +706,6 @@ unsafe extern "C" fn ce_lua_createMemScan(L: LuaState) -> c_int {
         add_method!("getOnlyOneResult", ce_lua_memscan_getOnlyOneResult);
         add_method!("getResults", ce_lua_memscan_getResults);
 
-        // Metatable for property access (CE 7.7: .Results property)
         (lib.createtable)(L, 0, 1);
         (lib.pushcclosure)(L, ce_lua_memscan_index, 0);
         (lib.setfield)(L, -2, b"__index\0".as_ptr() as *const c_char);
@@ -896,7 +884,7 @@ unsafe extern "C" fn ce_lua_memscan_index(L: LuaState) -> c_int {
         if !key_ptr.is_null() {
             let key = CStr::from_ptr(key_ptr).to_string_lossy();
             if key == "Results" {
-                // CE 7.7: ms.Results property returns all found results directly
+
                 return ce_lua_memscan_getResults(L);
             } else if key == "Count" {
                 return ce_lua_memscan_getCount(L);
@@ -909,7 +897,6 @@ unsafe extern "C" fn ce_lua_memscan_index(L: LuaState) -> c_int {
     }
 }
 
-// CE 7.7: stacktrace lua command
 unsafe extern "C" fn ce_lua_stacktrace(L: LuaState) -> c_int {
     if let Some(lib) = LUA_LIB.as_ref() {
         let mut tid = (lib.tointegerx)(L, 1, null_mut()) as u32;
@@ -950,12 +937,10 @@ unsafe extern "C" fn ce_lua_stacktrace(L: LuaState) -> c_int {
             if GetThreadContext(h_thread, &mut ctx) == TRUE {
                 let mut idx = 1i64;
 
-                // Frame 0: Current RIP
                 (lib.pushinteger)(L, ctx.Rip as i64);
                 (lib.rawseti)(L, -2, idx);
                 idx += 1;
 
-                // Walk RSP stack looking for return addresses
                 let rsp = ctx.Rsp as usize;
                 let mut stack_buf = [0usize; 128];
                 let mut read: SIZE_T = 0;
@@ -990,7 +975,6 @@ unsafe extern "C" fn ce_lua_stacktrace(L: LuaState) -> c_int {
     }
 }
 
-// CE 7.7: getThreadList returns a threadlist in lua if no stringlist was provided
 unsafe extern "C" fn ce_lua_getThreadList(L: LuaState) -> c_int {
     if let Some(lib) = LUA_LIB.as_ref() {
         let mut target_pid = (lib.tointegerx)(L, 1, null_mut()) as u32;
@@ -1028,7 +1012,6 @@ unsafe extern "C" fn ce_lua_getThreadList(L: LuaState) -> c_int {
     }
 }
 
-// CE 7.7: executeCodeExThread and executeMethodThread
 unsafe extern "C" fn ce_lua_executeCodeExThread(L: LuaState) -> c_int {
     if let Some(lib) = LUA_LIB.as_ref() {
         let tid = (lib.tointegerx)(L, 1, null_mut()) as u32;
@@ -1093,11 +1076,10 @@ mod tests {
     #[test]
     fn test_ce_lua_engine_77() {
         if let Ok(lua) = CeLuaEngine::init() {
-            // 1. CE Version is 7.7
+
             let ver = lua.execute("return getCEVersion()").unwrap();
             assert_eq!(ver, "7.7");
 
-            // 2. Built-in json library
             let json_enc = lua.execute(r#"return json.encode({name="CheatEngine", version=7.7})"#).unwrap();
             assert!(json_enc.contains("\"name\":\"CheatEngine\""));
             assert!(json_enc.contains("\"version\":7.7"));
@@ -1108,7 +1090,6 @@ mod tests {
             "#).unwrap();
             assert_eq!(json_dec, "1337");
 
-            // 3. MemScan Results property and object
             let ms_test = lua.execute(r#"
                 local ms = createMemScan()
                 if ms and type(ms.Results) == "table" and ms.Count == 0 then

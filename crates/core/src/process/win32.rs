@@ -1,5 +1,3 @@
-// language: Rust, file: win32.rs, target: Windows 11, MSVC
-// Direct Windows API definitions, types, and FFI declarations
 
 #![allow(non_snake_case, non_camel_case_types, non_upper_case_globals, dead_code)]
 
@@ -25,7 +23,6 @@ pub const TRUE: BOOL = 1;
 pub const FALSE: BOOL = 0;
 pub const INVALID_HANDLE_VALUE: HANDLE = -1isize as HANDLE;
 
-// Process Access Rights
 pub const PROCESS_TERMINATE: DWORD = 0x0001;
 pub const PROCESS_CREATE_THREAD: DWORD = 0x0002;
 pub const PROCESS_SET_SESSIONID: DWORD = 0x0004;
@@ -43,7 +40,6 @@ pub const SYNCHRONIZE: DWORD = 0x00100000;
 pub const STANDARD_RIGHTS_REQUIRED: DWORD = 0x000F0000;
 pub const PROCESS_ALL_ACCESS: DWORD = STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF;
 
-// Thread Access Rights
 pub const THREAD_TERMINATE: DWORD = 0x0001;
 pub const THREAD_SUSPEND_RESUME: DWORD = 0x0002;
 pub const THREAD_GET_CONTEXT: DWORD = 0x0008;
@@ -55,7 +51,6 @@ pub const THREAD_IMPERSONATE: DWORD = 0x0100;
 pub const THREAD_DIRECT_IMPERSONATION: DWORD = 0x0200;
 pub const THREAD_ALL_ACCESS: DWORD = STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF;
 
-// Memory Protection Constants
 pub const PAGE_NOACCESS: DWORD = 0x01;
 pub const PAGE_READONLY: DWORD = 0x02;
 pub const PAGE_READWRITE: DWORD = 0x04;
@@ -68,7 +63,6 @@ pub const PAGE_GUARD: DWORD = 0x100;
 pub const PAGE_NOCACHE: DWORD = 0x200;
 pub const PAGE_WRITECOMBINE: DWORD = 0x400;
 
-// Memory State / Type Constants
 pub const MEM_COMMIT: DWORD = 0x1000;
 pub const MEM_RESERVE: DWORD = 0x2000;
 pub const MEM_DECOMMIT: DWORD = 0x4000;
@@ -79,7 +73,6 @@ pub const MEM_MAPPED: DWORD = 0x40000;
 pub const MEM_RESET: DWORD = 0x80000;
 pub const MEM_IMAGE: DWORD = 0x1000000;
 
-// Toolhelp Snapshot Flags
 pub const TH32CS_SNAPHEAPLIST: DWORD = 0x00000001;
 pub const TH32CS_SNAPPROCESS: DWORD = 0x00000002;
 pub const TH32CS_SNAPTHREAD: DWORD = 0x00000004;
@@ -87,12 +80,10 @@ pub const TH32CS_SNAPMODULE: DWORD = 0x00000008;
 pub const TH32CS_SNAPMODULE32: DWORD = 0x00000010;
 pub const TH32CS_SNAPALL: DWORD = TH32CS_SNAPHEAPLIST | TH32CS_SNAPPROCESS | TH32CS_SNAPTHREAD | TH32CS_SNAPMODULE;
 
-// Token Privileges
 pub const TOKEN_ADJUST_PRIVILEGES: DWORD = 0x0020;
 pub const TOKEN_QUERY: DWORD = 0x0008;
 pub const SE_PRIVILEGE_ENABLED: DWORD = 0x00000002;
 
-// File creation & IOCTL
 pub const GENERIC_READ: DWORD = 0x80000000;
 pub const GENERIC_WRITE: DWORD = 0x40000000;
 pub const FILE_SHARE_READ: DWORD = 0x00000001;
@@ -100,7 +91,6 @@ pub const FILE_SHARE_WRITE: DWORD = 0x00000002;
 pub const OPEN_EXISTING: DWORD = 3;
 pub const FILE_ATTRIBUTE_NORMAL: DWORD = 0x00000080;
 
-// Debug events
 pub const EXCEPTION_DEBUG_EVENT: DWORD = 1;
 pub const CREATE_THREAD_DEBUG_EVENT: DWORD = 2;
 pub const CREATE_PROCESS_DEBUG_EVENT: DWORD = 3;
@@ -118,7 +108,6 @@ pub const EXCEPTION_BREAKPOINT: DWORD = 0x80000003;
 pub const EXCEPTION_SINGLE_STEP: DWORD = 0x80000004;
 pub const EXCEPTION_ACCESS_VIOLATION: DWORD = 0xC0000005;
 
-// Structs
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct MEMORY_BASIC_INFORMATION {
@@ -193,7 +182,6 @@ pub struct TOKEN_PRIVILEGES {
     pub Privileges: [LUID_AND_ATTRIBUTES; 1],
 }
 
-// X64 CONTEXT
 #[repr(C, align(16))]
 #[derive(Copy, Clone)]
 pub struct M128A {
@@ -389,7 +377,7 @@ pub struct DEBUG_EVENT {
 
 #[link(name = "kernel32")]
 unsafe extern "system" {
-    // Process & Memory
+
     pub fn OpenProcess(dwDesiredAccess: DWORD, bInheritHandle: BOOL, dwProcessId: DWORD) -> HANDLE;
     pub fn CloseHandle(hObject: HANDLE) -> BOOL;
     pub fn GetCurrentProcess() -> HANDLE;
@@ -400,7 +388,6 @@ unsafe extern "system" {
     pub fn VirtualFreeEx(hProcess: HANDLE, lpAddress: LPVOID, dwSize: SIZE_T, dwFreeType: DWORD) -> BOOL;
     pub fn VirtualProtectEx(hProcess: HANDLE, lpAddress: LPVOID, dwSize: SIZE_T, flNewProtect: DWORD, lpflOldProtect: PDWORD) -> BOOL;
 
-    // Toolhelp32
     pub fn CreateToolhelp32Snapshot(dwFlags: DWORD, th32ProcessID: DWORD) -> HANDLE;
     pub fn Process32FirstW(hSnapshot: HANDLE, lppe: *mut PROCESSENTRY32W) -> BOOL;
     pub fn Process32NextW(hSnapshot: HANDLE, lppe: *mut PROCESSENTRY32W) -> BOOL;
@@ -409,7 +396,6 @@ unsafe extern "system" {
     pub fn Module32FirstW(hSnapshot: HANDLE, lpme: *mut MODULEENTRY32W) -> BOOL;
     pub fn Module32NextW(hSnapshot: HANDLE, lpme: *mut MODULEENTRY32W) -> BOOL;
 
-    // Threads & Context
     pub fn OpenThread(dwDesiredAccess: DWORD, bInheritHandle: BOOL, dwThreadId: DWORD) -> HANDLE;
     pub fn SuspendThread(hThread: HANDLE) -> DWORD;
     pub fn ResumeThread(hThread: HANDLE) -> DWORD;
@@ -419,7 +405,7 @@ unsafe extern "system" {
 
 #[link(name = "advapi32")]
 unsafe extern "system" {
-    // Token privileges (advapi32)
+
     pub fn OpenProcessToken(ProcessHandle: HANDLE, DesiredAccess: DWORD, TokenHandle: *mut HANDLE) -> BOOL;
     pub fn LookupPrivilegeValueW(lpSystemName: LPCWSTR, lpName: LPCWSTR, lpLuid: *mut LUID) -> BOOL;
     pub fn AdjustTokenPrivileges(TokenHandle: HANDLE, DisableAllPrivileges: BOOL, NewState: *const TOKEN_PRIVILEGES, BufferLength: DWORD, PreviousState: *mut TOKEN_PRIVILEGES, ReturnLength: PDWORD) -> BOOL;
@@ -428,7 +414,6 @@ unsafe extern "system" {
 #[link(name = "kernel32")]
 unsafe extern "system" {
 
-    // Driver & DeviceIoControl
     pub fn CreateFileW(
         lpFileName: LPCWSTR,
         dwDesiredAccess: DWORD,
@@ -449,7 +434,6 @@ unsafe extern "system" {
         lpOverlapped: LPVOID,
     ) -> BOOL;
 
-    // Debugging
     pub fn DebugActiveProcess(dwProcessId: DWORD) -> BOOL;
     pub fn DebugActiveProcessStop(dwProcessId: DWORD) -> BOOL;
     pub fn WaitForDebugEvent(lpDebugEvent: *mut DEBUG_EVENT, dwMilliseconds: DWORD) -> BOOL;
@@ -457,7 +441,6 @@ unsafe extern "system" {
     pub fn GetLastError() -> DWORD;
     pub fn GetCurrentProcessId() -> DWORD;
 
-    // Remote thread & injection
     pub fn CreateRemoteThread(
         hProcess: HANDLE,
         lpThreadAttributes: LPVOID,
@@ -475,7 +458,6 @@ unsafe extern "system" {
     pub fn GetProcAddress(hModule: HMODULE, lpProcName: *const u8) -> *mut c_void;
 }
 
-// NT Native Subsystem Types & FFI (ntdll.dll)
 pub type NTSTATUS = i32;
 pub const STATUS_SUCCESS: NTSTATUS = 0;
 pub const STATUS_UNSUCCESSFUL: NTSTATUS = 0xC0000001_u32 as i32;
@@ -565,7 +547,6 @@ unsafe extern "system" {
     ) -> NTSTATUS;
 }
 
-// Shell & Icon Extraction Subsystem
 pub type HICON = HANDLE;
 pub type HBITMAP = HANDLE;
 pub type HDC = HANDLE;

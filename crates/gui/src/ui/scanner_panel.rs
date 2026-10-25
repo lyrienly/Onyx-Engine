@@ -1,18 +1,15 @@
-// Cheat Engine 7.7 Scanner Workspace Panel (MainUnit upper area)
-// Replicates official Found List (TListView) and Scan Controls (TGroupBox)
 
 use eframe::egui::{self, Color32, RichText, Rounding, Stroke, Vec2};
 use crate::app::OnyxEngineApp;
 
 pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, upper_height: f32) {
     ui.allocate_ui_with_layout(Vec2::new(ui.available_width(), upper_height), egui::Layout::left_to_right(egui::Align::TOP), |ui| {
-        // LEFT PANEL: Authentic Cheat Engine Found List
+
         let left_width = (ui.available_width() * 0.44).clamp(280.0, 520.0);
         ui.vertical(|ui| {
             ui.set_width(left_width);
             ui.set_height(upper_height);
 
-            // Label above list: "Found: X"
             ui.horizontal(|ui| {
                 ui.label(RichText::new("Found:").size(12.0).color(Color32::from_rgb(180, 185, 195)));
                 ui.label(RichText::new(format!("{}", app.found_count)).monospace().size(12.0).strong().color(Color32::from_rgb(100, 240, 140)));
@@ -20,7 +17,6 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, upper_height: f32) {
 
             ui.add_space(2.0);
 
-            // Inset Win32 Table Container
             egui::Frame::none()
                 .fill(Color32::from_rgb(20, 22, 28))
                 .stroke(Stroke::new(1.0_f32, Color32::from_rgb(46, 52, 65)))
@@ -30,7 +26,6 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, upper_height: f32) {
                     ui.set_width(left_width);
                     let list_h = upper_height - 24.0;
 
-                    // Table Header Bar (Address | Value | Previous)
                     ui.horizontal(|ui| {
                         let col_btn = |ui: &mut egui::Ui, text: &str, w: f32| {
                             egui::Frame::none()
@@ -135,11 +130,9 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, upper_height: f32) {
 
         ui.add_space(8.0);
 
-        // RIGHT PANEL: Authentic Cheat Engine Scan Controls
         ui.vertical(|ui| {
             ui.set_width(ui.available_width());
 
-            // 1. Scan Action Buttons: First Scan, Next Scan, New Scan, Undo
             ui.horizontal(|ui| {
                 let first_scan_btn = egui::Button::new(RichText::new("First Scan").size(12.0).color(Color32::WHITE).strong())
                     .fill(if !app.has_scanned { Color32::from_rgb(32, 125, 60) } else { Color32::from_rgb(38, 42, 52) })
@@ -190,7 +183,6 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, upper_height: f32) {
 
             ui.add_space(4.0);
 
-            // 2. Value Input Row: Value: [      ] [ ] Hex
             ui.horizontal(|ui| {
                 ui.label(RichText::new("Value:").size(12.0).color(Color32::from_rgb(200, 205, 215)));
                 let val_w = if app.scan_type_idx == 3 { 90.0 } else { 160.0 };
@@ -218,7 +210,6 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, upper_height: f32) {
 
             ui.add_space(4.0);
 
-            // 3. Scan Type & Value Type Dropdowns
             ui.horizontal(|ui| {
                 ui.label(RichText::new("Scan Type:").size(12.0).color(Color32::from_rgb(180, 185, 195)));
                 let scan_types = [
@@ -273,7 +264,6 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, upper_height: f32) {
 
             ui.add_space(6.0);
 
-            // 4. Memory Scan Options (Classic Framed GroupBox)
             ui.label(RichText::new("Memory Scan Options:").size(11.5).strong().color(Color32::from_rgb(140, 180, 240)));
             egui::Frame::none()
                 .fill(Color32::from_rgb(22, 24, 30))
@@ -311,3 +301,4 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, upper_height: f32) {
         });
     });
 }
+

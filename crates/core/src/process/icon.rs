@@ -1,6 +1,3 @@
-// language: Rust, file: icon.rs, target: Windows 11, MSVC
-// Windows Shell Executable Icon Extractor
-// Extracts high-fidelity 16x16 / 32x32 RGBA icons for running processes and executables
 
 use std::path::Path;
 use std::ptr::null_mut;
@@ -14,7 +11,6 @@ impl ProcessIconExtractor {
             return None;
         }
 
-        // 1. Try querying via OpenProcess + QueryFullProcessImageNameW
         let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid) };
         if !handle.is_null() {
             let mut buf = [0u16; 1024];
@@ -30,7 +26,6 @@ impl ProcessIconExtractor {
             }
         }
 
-        // 2. Fallback: check Windows System32 / Windows folders
         let sys32 = format!(r"C:\Windows\System32\{}", name);
         if Path::new(&sys32).exists() {
             return Some(sys32);
@@ -95,7 +90,7 @@ impl ProcessIconExtractor {
         let mut bmi: BITMAPINFO = unsafe { std::mem::zeroed() };
         bmi.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as DWORD;
         bmi.bmiHeader.biWidth = width as i32;
-        bmi.bmiHeader.biHeight = -(height as i32); // Top-down
+        bmi.bmiHeader.biHeight = -(height as i32);
         bmi.bmiHeader.biPlanes = 1;
         bmi.bmiHeader.biBitCount = 32;
         bmi.bmiHeader.biCompression = BI_RGB;
@@ -116,7 +111,6 @@ impl ProcessIconExtractor {
                 );
             }
 
-            // Check if alpha channel exists or is all zero
             let mut has_alpha = false;
             for chunk in pixels.chunks_exact(4) {
                 if chunk[3] > 0 {
@@ -126,7 +120,7 @@ impl ProcessIconExtractor {
             }
 
             if !has_alpha && !icon_info.hbmMask.is_null() {
-                // Extract 1-bit transparency mask
+
                 let mut mask_pixels = vec![0u8; pixel_count * 4];
                 unsafe {
                     GetDIBits(
@@ -141,23 +135,22 @@ impl ProcessIconExtractor {
                 }
 
                 for i in 0..pixel_count {
-                    // Mask bit 0 = opaque, 1 = transparent
+
                     let is_transparent = mask_pixels[i * 4] != 0 || mask_pixels[i * 4 + 1] != 0 || mask_pixels[i * 4 + 2] != 0;
                     pixels[i * 4 + 3] = if is_transparent { 0 } else { 255 };
                 }
             } else if !has_alpha {
-                // Fallback: opaque if any color is present
+
                 for chunk in pixels.chunks_exact_mut(4) {
                     chunk[3] = if chunk[0] == 0 && chunk[1] == 0 && chunk[2] == 0 { 0 } else { 255 };
                 }
             }
 
-            // Convert BGRA -> RGBA
             for chunk in pixels.chunks_exact_mut(4) {
                 chunk.swap(0, 2);
             }
         } else {
-            // Monochrome icon: extract from mask
+
             let mut mask_pixels = vec![0u8; pixel_count * 4];
             unsafe {
                 GetDIBits(
@@ -196,7 +189,6 @@ impl ProcessIconExtractor {
         }
         let wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
 
-        // 1. Try ExtractIconExW for small 16x16 icon
         let mut h_small: HICON = null_mut();
         let count = unsafe { ExtractIconExW(wide.as_ptr(), 0, null_mut(), &mut h_small, 1) };
         if count > 0 && count != u32::MAX && !h_small.is_null() {
@@ -205,7 +197,6 @@ impl ProcessIconExtractor {
             }
         }
 
-        // 2. Try SHGetFileInfoW
         let mut shfi: SHFILEINFOW = unsafe { std::mem::zeroed() };
         let res = unsafe {
             SHGetFileInfoW(
@@ -246,7 +237,6 @@ impl ProcessIconExtractor {
             }
         }
 
-        // User32 fallback: standard application icon
         let sys_icon = unsafe { LoadIconW(null_mut(), IDI_APPLICATION) };
         if !sys_icon.is_null() {
             return Self::extract_rgba_from_hicon(sys_icon);
@@ -262,12 +252,10 @@ impl ProcessIconExtractor {
             }
         }
 
-        // Fallback: try by name if it's a known filename
         if let Some(icon) = Self::extract_icon_for_path(name) {
             return Some(icon);
         }
 
-        // Fallback: standard Windows executable icon
         Self::extract_default_exe_icon()
     }
 }

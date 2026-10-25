@@ -1,5 +1,3 @@
-// Process Selection Modal for Cheat Engine 7.7
-// Authentic 3-tab layout: Applications, Processes, Windows, with native 16x16 icons
 
 use eframe::egui::{self, Color32, RichText, Rounding, Stroke, Vec2};
 use crate::app::OnyxEngineApp;
@@ -28,7 +26,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                 .frame(egui::Frame::none().fill(Color32::from_rgb(26, 29, 36)).inner_margin(egui::Margin::same(8.0)))
                 .show(ctx, |ui| {
 
-            // 1. Cheat Engine 3-Tab Header
             ui.horizontal(|ui| {
                 let tab_btn = |ui: &mut egui::Ui, title: &str, idx: usize, current: usize| -> bool {
                     let is_active = idx == current;
@@ -60,7 +57,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
 
             ui.add_space(4.0);
 
-            // 2. Search Filter & Refresh
             ui.horizontal(|ui| {
                 ui.label(RichText::new("Filter:").size(12.0).color(Color32::from_rgb(200, 205, 215)).strong());
                 let filter_w = (ui.available_width() - 85.0).max(120.0);
@@ -74,7 +70,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
 
             let filter_lower = app.proc_filter.to_lowercase();
 
-            // Filter entries according to active tab
             let filtered: Vec<(u32, String)> = app.proc_list
                 .iter()
                 .filter(|p| {
@@ -82,7 +77,7 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                         return false;
                     }
                     match app.proc_modal_tab {
-                        // Applications tab: prioritize non-svchost user binaries
+
                         0 => {
                             let n = p.name.to_lowercase();
                             !n.starts_with("svchost")
@@ -95,19 +90,17 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                                 && !n.starts_with("lsass")
                                 && !n.starts_with("fontdrvhost")
                         }
-                        // Processes tab: all processes
+
                         _ => true,
                     }
                 })
                 .map(|p| (p.pid, p.name.clone()))
                 .collect();
 
-            // Preload icons for visible items
             for (pid, name) in &filtered {
                 app.ensure_proc_icon(ctx, *pid, name);
             }
 
-            // 3. Process Table (Address List Style)
             let scroll_h = (ui.available_height() - 50.0).max(200.0);
             egui::ScrollArea::vertical()
                 .id_salt("ce_proc_list_scroll")
@@ -119,7 +112,7 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                         .min_col_width(24.0)
                         .spacing(Vec2::new(8.0, 4.0))
                         .show(ui, |ui| {
-                            // Column Headers
+
                             ui.label(RichText::new("PID").monospace().color(Color32::from_rgb(140, 160, 185)).strong());
                             ui.label(RichText::new("").monospace());
                             ui.label(RichText::new("Process Name").color(Color32::from_rgb(140, 160, 185)).strong());
@@ -135,7 +128,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                                     Color32::TRANSPARENT
                                 };
 
-                                // PID button
                                 let pid_btn = ui.add(
                                     egui::Button::new(RichText::new(&pid_text).monospace().color(Color32::from_rgb(120, 205, 255)))
                                         .fill(row_bg)
@@ -143,14 +135,12 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                                         .rounding(Rounding::same(2.0)),
                                 );
 
-                                // Native 16x16 Executable Icon
                                 let icon_resp = if let Some(texture) = app.get_icon(name) {
                                     ui.add(egui::Image::new(texture).fit_to_exact_size(Vec2::splat(16.0)))
                                 } else {
                                     ui.allocate_response(Vec2::splat(16.0), egui::Sense::click())
                                 };
 
-                                // Process Name Label
                                 let name_lbl = ui.add(
                                     egui::SelectableLabel::new(
                                         is_selected,
@@ -159,7 +149,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                                 );
                                 ui.end_row();
 
-                                // Selection & Double-click Handling
                                 if pid_btn.clicked() || icon_resp.clicked() || name_lbl.clicked() {
                                     app.selected_proc_item = Some((*pid, name.clone()));
                                 }
@@ -172,7 +161,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
 
             ui.separator();
 
-            // 4. Bottom Action Bar: Open, Cancel, Attach debugger
             ui.horizontal(|ui| {
                 let can_open = app.selected_proc_item.is_some() || !filtered.is_empty();
 
@@ -211,3 +199,4 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
         app.show_proc_modal = false;
     }
 }
+

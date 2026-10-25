@@ -279,6 +279,17 @@ BOOLEAN WriteProcessMemory(DWORD PID,PEPROCESS PEProcess,PVOID Address,DWORD Siz
 		//DbgPrint("Retrieved peprocess");  
 	}
 
+	// Prioridade 1: Escrita fisica direta via CR3 Page Table Walking (Zero thread attach, bypass de WP/.text, indetectavel)
+	{
+		SIZE_T physBytesWritten = 0;
+		if (WriteProcessMemoryPhysicalCR3(selectedprocess, (ULONG64)Address, Buffer, (SIZE_T)Size, &physBytesWritten) && physBytesWritten == (SIZE_T)Size)
+		{
+			if (PEProcess == NULL && selectedprocess)
+				ObDereferenceObject(selectedprocess);
+			return TRUE;
+		}
+	}
+
 	//selectedprocess now holds a valid peprocess value
 	__try
 	{
@@ -388,7 +399,17 @@ BOOLEAN ReadProcessMemory(DWORD PID,PEPROCESS PEProcess,PVOID Address,DWORD Size
 	{
 		if (!NT_SUCCESS(PsLookupProcessByProcessId((PVOID)(UINT_PTR)PID,&selectedprocess)))
 		   return FALSE; //couldn't get the PID
- 
+	}
+
+	// Prioridade 1: Leitura fisica direta via CR3 Page Table Walking (Zero thread attach, indetectavel)
+	{
+		SIZE_T physBytesRead = 0;
+		if (ReadProcessMemoryPhysicalCR3(selectedprocess, (ULONG64)Address, Buffer, (SIZE_T)Size, &physBytesRead) && physBytesRead == (SIZE_T)Size)
+		{
+			if (PEProcess == NULL && selectedprocess)
+				ObDereferenceObject(selectedprocess);
+			return TRUE;
+		}
 	}
 
 	//selectedprocess now holds a valid peprocess value

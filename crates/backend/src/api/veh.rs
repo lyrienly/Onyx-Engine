@@ -1,5 +1,3 @@
-// OnyxEngine Vectored Exception Handling (VEH) & Hardware Breakpoint Backend API
-// Direct C-ABI bridge for Pascal Cheat Engine front-end
 
 use std::ffi::CStr;
 use std::os::raw::c_char;
@@ -30,7 +28,6 @@ fn map_bp_size(val: i32) -> BreakpointSize {
     }
 }
 
-/// Injects VEH Debugger DLL into target process
 #[no_mangle]
 pub unsafe extern "C" fn onyx_veh_inject(
     process: *mut Process,
@@ -55,7 +52,6 @@ pub unsafe extern "C" fn onyx_veh_inject(
     }
 }
 
-/// Initializes global VEH debugger session for process
 #[no_mangle]
 pub unsafe extern "C" fn onyx_veh_init(process: *mut Process) -> i32 {
     if process.is_null() {
@@ -66,10 +62,6 @@ pub unsafe extern "C" fn onyx_veh_init(process: *mut Process) -> i32 {
     1
 }
 
-/// Sets a stealth hardware breakpoint across all threads without attaching standard DebugActiveProcess
-/// bp_type: 0 = Execute, 1 = Write, 2 = ReadWrite
-/// size: 1 = Byte, 2 = Word, 4 = Dword, 8 = Qword
-/// Returns breakpoint slot index (0..3) or -1 on error
 #[no_mangle]
 pub unsafe extern "C" fn onyx_veh_set_hw_bp(
     process: *mut Process,
@@ -99,7 +91,6 @@ pub unsafe extern "C" fn onyx_veh_set_hw_bp(
     }
 }
 
-/// Clears stealth hardware breakpoint by index (0..3)
 #[no_mangle]
 pub unsafe extern "C" fn onyx_veh_clear_hw_bp(process: *mut Process, index: usize) -> i32 {
     if process.is_null() {
@@ -117,8 +108,6 @@ pub unsafe extern "C" fn onyx_veh_clear_hw_bp(process: *mut Process, index: usiz
     }
 }
 
-/// Polls thread contexts to see if any thread fired a DR6 hardware breakpoint
-/// Returns 1 on hit with out_rip and out_thread_id populated, 0 otherwise
 #[no_mangle]
 pub unsafe extern "C" fn onyx_veh_poll_hit(
     process: *mut Process,
@@ -147,8 +136,6 @@ pub unsafe extern "C" fn onyx_veh_poll_hit(
     }
 }
 
-/// Monitors accesses or writes to target address for specified duration
-/// Populates out_hits with instructions that accessed/wrote the address
 #[no_mangle]
 pub unsafe extern "C" fn onyx_veh_monitor_address(
     process: *mut Process,
@@ -202,8 +189,8 @@ pub unsafe extern "C" fn onyx_veh_monitor_address(
     }
 }
 
-/// Cleans up VEH session
 #[no_mangle]
 pub unsafe extern "C" fn onyx_veh_cleanup() {
     GLOBAL_VEH = None;
 }
+

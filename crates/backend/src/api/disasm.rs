@@ -1,5 +1,3 @@
-// OnyxEngine Disassembler Backend API
-// x86_64 native instruction decoder for Pascal / Lazarus
 
 use onyx_core::process::Process;
 use onyx_core::disasm::Disassembler;
@@ -7,8 +5,6 @@ use onyx_core::debugger::dissect_code::{DissectCodeEngine, BranchKind};
 use onyx_core::debugger::string_referencer::StringReferencer;
 use crate::types::{OnyxDisasmInsn, OnyxDissectBranch, OnyxXRefEntry, OnyxStringReference};
 
-/// Disassemble a single instruction from a raw byte slice
-/// Returns 1 on success, 0 on failure
 #[no_mangle]
 pub unsafe extern "C" fn onyx_disasm_instruction(
     address: usize,
@@ -50,8 +46,6 @@ pub unsafe extern "C" fn onyx_disasm_instruction(
     }
 }
 
-/// Disassemble a block of bytes into an array of OnyxDisasmInsn
-/// Returns number of instructions decoded
 #[no_mangle]
 pub unsafe extern "C" fn onyx_disasm_block(
     address: usize,
@@ -99,7 +93,6 @@ pub unsafe extern "C" fn onyx_disasm_block(
     count as i32
 }
 
-/// Dissects executable memory regions into branches, calls, jumps, returns, and cross-references (XRefs)
 #[no_mangle]
 pub unsafe extern "C" fn onyx_dissect_code(
     handle: *mut Process,
@@ -139,7 +132,6 @@ pub unsafe extern "C" fn onyx_dissect_code(
                 }
             }
 
-            // Flatten XRefs
             let mut flat_xrefs = Vec::new();
             for (callee, callers) in result.xrefs {
                 for caller in callers {
@@ -166,7 +158,6 @@ pub unsafe extern "C" fn onyx_dissect_code(
     }
 }
 
-/// Scans executable code memory for references to ASCII/Unicode strings
 #[no_mangle]
 pub unsafe extern "C" fn onyx_scan_string_references(
     handle: *mut Process,
@@ -218,3 +209,4 @@ pub unsafe extern "C" fn onyx_scan_string_references(
         Err(_) => -1,
     }
 }
+

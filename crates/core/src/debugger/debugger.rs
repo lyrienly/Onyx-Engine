@@ -1,5 +1,3 @@
-// language: Rust, file: debugger.rs, target: Windows 11, MSVC
-// Hardware breakpoint engine and "Find out what accesses/writes to this address"
 
 use std::collections::HashMap;
 use std::mem::zeroed;
@@ -43,8 +41,7 @@ pub struct AccessHit {
 pub struct HardwareBreakpointMonitor;
 
 impl HardwareBreakpointMonitor {
-    /// Monitors accesses or writes to a target address for a given duration or until stopped.
-    /// Returns all instructions that touched the address and their hit counts.
+
     pub fn monitor_address(
         proc: &Process,
         watch_addr: usize,
@@ -59,13 +56,11 @@ impl HardwareBreakpointMonitor {
             return Err("No active threads found in target process".to_string());
         }
 
-        // Attach Windows debug loop
         let attached = unsafe { DebugActiveProcess(pid) };
         if attached != TRUE {
             return Err(format!("DebugActiveProcess failed for PID {}", pid));
         }
 
-        // Set DR0 and DR7 on all target threads
         for &tid in &thread_ids {
             let _ = set_hw_breakpoint_on_thread(tid, 0, watch_addr, bp_type, size);
         }
@@ -91,16 +86,15 @@ impl HardwareBreakpointMonitor {
                     if code == EXCEPTION_SINGLE_STEP {
                         let insn_addr = ex.ExceptionRecord.ExceptionAddress as usize;
 
-                        // Query thread context to read registers and set RF (Resume Flag)
                         let h_thread = unsafe { OpenThread(THREAD_ALL_ACCESS, FALSE, event.dwThreadId) };
                         if !h_thread.is_null() && h_thread != INVALID_HANDLE_VALUE {
                             let mut ctx: CONTEXT = unsafe { zeroed() };
                             ctx.ContextFlags = CONTEXT_ALL;
 
                             if unsafe { GetThreadContext(h_thread, &mut ctx) } == TRUE {
-                                // Record hit
+
                                 let entry = hits.entry(insn_addr).or_insert_with(|| {
-                                    // Disassemble instruction at faulting address
+
                                     let mut insn_bytes = [0u8; 15];
                                     let read = proc.read_raw(insn_addr, &mut insn_bytes).unwrap_or(0);
                                     let decoded = Disassembler::decode_one(insn_addr, &insn_bytes[..read]);
@@ -128,14 +122,13 @@ impl HardwareBreakpointMonitor {
                                 entry.last_rsi = ctx.Rsi;
                                 entry.last_rdi = ctx.Rdi;
 
-                                // Set EFLAGS RF (bit 16) so execution resumes without re-triggering immediately
                                 ctx.EFlags |= 0x00010000;
                                 unsafe { SetThreadContext(h_thread, &ctx) };
                             }
                             unsafe { CloseHandle(h_thread) };
                         }
                     } else if code == EXCEPTION_BREAKPOINT {
-                        // Initial debugger attach breakpoint
+
                         continue_status = DBG_CONTINUE;
                     } else {
                         continue_status = DBG_EXCEPTION_NOT_HANDLED;
@@ -148,12 +141,10 @@ impl HardwareBreakpointMonitor {
             }
         }
 
-        // Clean up: Clear DR0 and DR7 on all threads
         for &tid in &thread_ids {
             let _ = clear_hw_breakpoint_on_thread(tid, 0);
         }
 
-        // Detach debugger
         unsafe {
             DebugActiveProcessStop(pid);
         }
@@ -166,7 +157,7 @@ impl HardwareBreakpointMonitor {
 
 pub fn set_hw_breakpoint_on_thread(
     tid: u32,
-    index: usize, // 0 to 3
+    index: usize,
     address: usize,
     bp_type: BreakpointType,
     size: BreakpointSize,
@@ -187,7 +178,7 @@ pub fn set_hw_breakpoint_on_thread(
         ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
 
         if GetThreadContext(h_thread, &mut ctx) == TRUE {
-            // Set DRn address
+
             match index {
                 0 => ctx.Dr0 = address as u64,
                 1 => ctx.Dr1 = address as u64,
@@ -196,15 +187,14 @@ pub fn set_hw_breakpoint_on_thread(
                 _ => {}
             }
 
-            // Enable local breakpoint in DR7
             let enable_bit = 1 << (index * 2);
             let rw_shift = 16 + (index * 4);
             let len_shift = 18 + (index * 4);
 
             ctx.Dr7 |= enable_bit;
-            // Clear old condition and length
+
             ctx.Dr7 &= !((0b11 << rw_shift) | (0b11 << len_shift));
-            // Set condition and length
+
             ctx.Dr7 |= (bp_type as u64) << rw_shift;
             ctx.Dr7 |= (size as u64) << len_shift;
 
@@ -239,7 +229,6 @@ pub fn clear_hw_breakpoint_on_thread(tid: u32, index: usize) -> Result<(), Strin
                 _ => {}
             }
 
-            // Disable local breakpoint
             let enable_bit = 1 << (index * 2);
             ctx.Dr7 &= !enable_bit;
 
@@ -303,8 +292,7 @@ pub struct CallStackFrame {
 }
 
 impl HardwareBreakpointMonitor {
-    /// Cheat Engine "Break and Trace" engine:
-    /// Halts execution at start_addr and traces sequential instructions via CPU Trap Flag (single-step)
+
     pub fn break_and_trace(
         proc: &Process,
         start_addr: usize,
@@ -322,7 +310,6 @@ impl HardwareBreakpointMonitor {
             return Err(format!("DebugActiveProcess failed for PID {}", pid));
         }
 
-        // Arm DR0 execute breakpoint on all threads
         for &tid in &thread_ids {
             let _ = set_hw_breakpoint_on_thread(tid, 0, start_addr, BreakpointType::Execute, BreakpointSize::Byte1);
         }
@@ -353,20 +340,18 @@ impl HardwareBreakpointMonitor {
                                 let cur_ip = ctx.Rip as usize;
 
                                 if !in_trace_mode {
-                                    // Initial breakpoint hit at start_addr
+
                                     in_trace_mode = true;
                                     active_trace_thread = event.dwThreadId;
 
-                                    // Disarm initial DR0 breakpoint so we don't loop on it
                                     for &tid in &thread_ids {
                                         let _ = clear_hw_breakpoint_on_thread(tid, 0);
                                     }
 
-                                    // Enable Trap Flag (TF = bit 8, 0x100) and Resume Flag (RF = bit 16, 0x10000)
                                     ctx.EFlags |= 0x00010100;
                                     unsafe { SetThreadContext(h_thread, &ctx) };
                                 } else if event.dwThreadId == active_trace_thread {
-                                    // Single-step trace step
+
                                     let mut insn_bytes = [0u8; 15];
                                     let read = proc.read_raw(cur_ip, &mut insn_bytes).unwrap_or(0);
                                     let decoded = Disassembler::decode_one(cur_ip, &insn_bytes[..read]);
@@ -400,15 +385,15 @@ impl HardwareBreakpointMonitor {
                                         || (config.stop_address == Some(cur_ip));
 
                                     if should_stop {
-                                        // Clear TF flag to resume normal execution
+
                                         ctx.EFlags &= !0x00000100;
-                                        ctx.EFlags |= 0x00010000; // RF
+                                        ctx.EFlags |= 0x00010000;
                                         unsafe { SetThreadContext(h_thread, &ctx) };
                                         unsafe { CloseHandle(h_thread) };
                                         unsafe { ContinueDebugEvent(event.dwProcessId, event.dwThreadId, DBG_CONTINUE) };
                                         break;
                                     } else {
-                                        // Re-enable TF and RF for next single step
+
                                         ctx.EFlags |= 0x00010100;
                                         unsafe { SetThreadContext(h_thread, &ctx) };
                                     }
@@ -429,7 +414,6 @@ impl HardwareBreakpointMonitor {
             }
         }
 
-        // Clean up
         for &tid in &thread_ids {
             let _ = clear_hw_breakpoint_on_thread(tid, 0);
         }
@@ -440,7 +424,6 @@ impl HardwareBreakpointMonitor {
         Ok(traces)
     }
 
-    /// Walks the thread stack to extract return addresses and active stack frames
     pub fn walk_call_stack(proc: &Process, thread_id: u32, max_depth: usize) -> Result<Vec<CallStackFrame>, String> {
         let h_thread = unsafe { OpenThread(THREAD_ALL_ACCESS, FALSE, thread_id) };
         if h_thread.is_null() || h_thread == INVALID_HANDLE_VALUE {
@@ -465,7 +448,6 @@ impl HardwareBreakpointMonitor {
         let modules = proc.modules()?;
         let mut frames = Vec::new();
 
-        // Frame 0: Current Instruction Pointer
         let cur_rip = ctx.Rip as usize;
         let (mod_name, offset) = if let Some(m) = modules.iter().find(|m| cur_rip >= m.base && cur_rip < m.base + m.size) {
             (m.name.clone(), cur_rip - m.base)
@@ -479,7 +461,6 @@ impl HardwareBreakpointMonitor {
             offset_in_module: offset,
         });
 
-        // Walk stack from RSP
         const STACK_SCAN_BYTES: usize = 4096;
         let mut stack_buf = vec![0u8; STACK_SCAN_BYTES];
         let bytes_read = proc.read_raw(ctx.Rsp as usize, &mut stack_buf).unwrap_or(0);
@@ -527,3 +508,4 @@ mod tests {
         }
     }
 }
+

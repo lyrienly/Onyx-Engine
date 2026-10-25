@@ -20,7 +20,7 @@ emurpm.hookedOnProcessOpened=false
 function emurpm.OnProcessOpened(processid, processhandle, caption)
   print("emurpm.OnProcessOpened")
   if frmEmuMemory.cbAutoActivate.checked then
-    --print("Doing autoactivate stuff")
+
     emurpm.emuSetAddress()
   end
 
@@ -29,7 +29,6 @@ function emurpm.OnProcessOpened(processid, processhandle, caption)
   end
 end
 
---find the emurpm.frm file
 local ced=getCheatEngineDir()
 local possiblepaths={}
 possiblepaths[1]="emurpm.frm"
@@ -47,13 +46,10 @@ end
 if frmPath==nil then
   print("Failure finding emurpm.frm");
 else
-  --load the form file
+
   createFormFromFile(frmPath)
 end
 
-
-
---allocate memory to store the base address of the emulated memory
 ar1,di1=autoAssemble([[
   alloc(EmuBaseAddress, 8)
   alloc(EmuVirtualBaseAddress,8)
@@ -88,10 +84,10 @@ ar2,di2=autoAssemble([[
   //r8=lpBuffer
   //r9=nSize
   //[rsp+28]=lpNumberOfBytesread
-  
+
   //e.g: EmuBaseAddress=0x00400000
   //reading of address 0 should end up reading 0x00400000
-  mov rax,[EmuVirtualBaseAddress]  
+  mov rax,[EmuVirtualBaseAddress]
   sub rdx,rax
 
   mov rax,[EmuBaseAddress]
@@ -111,7 +107,6 @@ ar2,di2=autoAssemble([[
   add [esp+8], eax //adjust address to read
   [/32-bit]
   jmp kernel32.ReadProcessMemory
-
 
   EmuWPM:
   [64-bit]
@@ -145,29 +140,27 @@ EmuVQE:
   add rax,[EmuSize]
   cmp rdx,rax
   jae invalidlength //actually unreadable, but has the same effect for ce
-  
+
   mov rax,[EmuVirtualBaseAddress]
   cmp rdx,rax
   jae insideregion
-  
+
   //not yet there
 
-  
   and rdx,fffffffffffff000
   mov [r8+0],rdx //baseaddress
   mov [r8+8],rax
   mov [r8+10],1
-  
+
   mov rax,[EmuVirtualBaseAddress]
   sub rax,rdx
   mov [r8+18],rax //region size
   mov dword ptr [r8+20],10000 //MEM_FREE
   mov dword ptr [r8+24],1
-  mov dword ptr [r8+28],0  
-  mov rax,#48 
-  ret  
-    
-  
+  mov dword ptr [r8+28],0
+  mov rax,#48
+  ret
+
 insideregion:
   and rdx,fffffffffffff000
   mov [r8+0],rdx //baseaddress
@@ -176,13 +169,10 @@ insideregion:
   mov [r8+8],rax //allocationbase
   mov [r8+10],0x40 //allocation protect: page execute read write (actually a dword, but store as qword to zero the unused bytes)
 
-
   mov rax,[EmuVirtualBaseAddress]
   sub rdx,rax
   mov rax,[EmuSize]
   sub rax,rdx
-
-
 
   mov [r8+18],rax  //RegionSize seen from base address
   mov dword ptr [r8+20],0x1000 //state : MEM_COMMIT
@@ -224,18 +214,14 @@ insideregion:
   mov [ecx+4],80000000 //allocationbase
   mov [ecx+8],0x40 //allocation protect: page execute read write (actually a dword, but store as qword to zero the unused bytes)
 
-
   sub eax,80000000
   mov edx,[EmuSize]
   sub edx,eax
-
 
   mov [ecx+c],edx  //RegionSize seen from base address
   mov dword ptr [ecx+10],0x1000 //state : MEM_COMMIT
   mov dword ptr [ecx+14],0x40 //protection: Page execute read write
   mov dword ptr [ecx+18],0x20000 //type: mem_private
-
-
 
   mov eax,#28
   invalidlength:
@@ -245,25 +231,22 @@ insideregion:
 
 ]], true)
 
-
 function emurpm.setEmuPointer()
   print("emurpm.setEmuPointer")
-  setAPIPointer(1, getAddress("EmuRPM", true)) --make RPM calls call emurpm
-  setAPIPointer(2, getAddress("EmuWPM", true)) --make WPM calls call emuwpm
-  setAPIPointer(3, getAddress("EmuVQE", true)) --make VQE calls call EmuVQE
+  setAPIPointer(1, getAddress("EmuRPM", true))
+  setAPIPointer(2, getAddress("EmuWPM", true))
+  setAPIPointer(3, getAddress("EmuVQE", true))
 end
 
-function emurpm.emuSetAddress(sender) --called by the (Re)Set address button
-  --first undo the api pointer change since I need to read the actual memory
+function emurpm.emuSetAddress(sender)
 
   print("emurpm.emuSetAddress")
 
   if onAPIPointerChange then
-    onAPIPointerChange(nil) --shouldn't be needed, but in case this ever gets changed so setAPIPointer calls it as well
+    onAPIPointerChange(nil)
   end
 
-
-  setAPIPointer(1, windows_ReadProcessMemory) --make RPM calls call emurpm
+  setAPIPointer(1, windows_ReadProcessMemory)
   setAPIPointer(2, windows_WriteProcessMemory)
   setAPIPointer(3, windows_VirtualQueryEx)
 
@@ -271,41 +254,36 @@ function emurpm.emuSetAddress(sender) --called by the (Re)Set address button
   writeQwordLocal("EmuVirtualBaseAddress", tonumber(frmEmuMemory.edtVirtual0.Text,16))
   writeQwordLocal("EmuSize", loadstring('return '..frmEmuMemory.edtMemsize.Text)())
 
-
-
-  emurpm.setEmuPointer() --hook
+  emurpm.setEmuPointer()
 
   if onAPIPointerChange then
-    onAPIPointerChange(emurpm.setEmuPointer) --rehook when the hook gets lost
+    onAPIPointerChange(emurpm.setEmuPointer)
   end
 end
-
---add a menu option to configure the EmuBaseAddress
 
 local mf=getMainForm()
 local mi=createMenuItem(mf.Menu)
 mi.Caption="Emulator Memory"
-mf.Menu.Items.insert(mf.Menu.Items.Count-1, mi) --add it before the last entry (help)
-
+mf.Menu.Items.insert(mf.Menu.Items.Count-1, mi)
 
 local mi2=createMenuItem(mf.Menu)
 mi2.Caption="Set Base Address"
 mi2.OnClick=function(self)
   if frmEmuMemory.showModal()==mrOK then
     emurpm.settings.Value["baseaddress"]=frmEmuMemory.edtAddress.Text
-    emurpm.settings.Value["virtual0"]=frmEmuMemory.edtVirtual0.Text    
+    emurpm.settings.Value["virtual0"]=frmEmuMemory.edtVirtual0.Text
     emurpm.settings.Value["memorysize"]=frmEmuMemory.edtMemsize.Text
     emurpm.settings.Value["autoactivate"]=frmEmuMemory.cbAutoActivate.Checked
 
     if frmEmuMemory.cbAutoActivate.Checked then
-      if emurpm.hookedOnProcessOpened==false then --hook it
+      if emurpm.hookedOnProcessOpened==false then
         emurpm.OldOnProcessOpened=MainForm.OnProcessOpened
         MainForm.OnProcessOpened=emurpm.OnProcessOpened
 
         emurpm.hookedOnProcessOpened=true
       end
     end
-    
+
     emurpm.emuSetAddress(self)
   end
 end
@@ -325,20 +303,19 @@ end
 
 local virtualbase=emurpm.settings.Value["virtual0"]
 if virtualbase~='' then
-  frmEmuMemory.edtVirtual0.Text=virtualbase 
+  frmEmuMemory.edtVirtual0.Text=virtualbase
 end
-
 
 local autoactivate=emurpm.settings.Value["autoactivate"]
 frmEmuMemory.cbAutoActivate.Checked=autoactivate=='1'
 
 if frmEmuMemory.cbAutoActivate.Checked then
-  --print("emurpm autoactivating")
-  --add openedprocesses event
-  if emurpm.hookedOnProcessOpened==false then --hook it
+
+  if emurpm.hookedOnProcessOpened==false then
     emurpm.OldOnProcessOpened=MainForm.OnProcessOpened
 
     MainForm.OnProcessOpened=emurpm.OnProcessOpened
     emurpm.hookedOnProcessOpened=true
   end
 end
+

@@ -1,53 +1,46 @@
---compiles some handy utilities into the target process you can call using c (or assembler if you so wish)
---add #include <celib.h> to your c-code
---
---functions:
---csEnter/csLeave:  Low level criticial section implementation that does an active wait (more cpu intensive, but safe enough to use in an environment with no other API access)
-
 
 function injectCEHelperLib()
   if getAddressSafe('csenter')==nil then
     local s
-    if targetIsX86() then  
+    if targetIsX86() then
       s=[[
 alloc(cespinlock,32)
-cespinlock:  
+cespinlock:
 ]]
-    
-      --write the code to bit test and set the locked variable
+
       if targetIs64Bit() then
-        if getABI()==0 then --windows uses rcx as first param
+        if getABI()==0 then
           s=s..[[
 lock bts [rcx],0
-]]      
+]]
         else
-          --rdi contains the first param
+
           s=s..[[
 lock bts [rdi],0
-]]        
+]]
         end
       else
-        --both use the push param method
+
         s=s..[[
 mov eax,[esp+4]
 lock bts [eax],0
-]]     
+]]
       end
-    
+
       s=s..[[
 jc cespinlock_wait
 ret
 
 cespinlock_wait:
 pause
-jmp cespinlock 
+jmp cespinlock
 ]]
-    else      
+    else
       error("todo: implement a spinlock for arm (could halfass it and just call and api)")
-    end  
-      
+    end
+
     s=s..[[
-{$c} 
+{$c}
     #include <celib.h>
     extern void cespinlock(int *lock);
 #ifdef _WIN32
@@ -59,7 +52,7 @@ jmp cespinlock
       return gettid();
     }
 #endif
-    
+
     void csenter(cecs *cs)
     {
       if ((cs->locked) && (cs->threadid==getCurrentThreadID()))
@@ -82,7 +75,7 @@ jmp cespinlock
         cs->locked=0;
       }
 
-    }    
+    }
 {$asm}
 ]]
 
@@ -92,8 +85,8 @@ jmp cespinlock
       return r
     else
       return false, r2
-    end    
+    end
   else
-    return true  
+    return true
   end
 end

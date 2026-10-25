@@ -1,5 +1,3 @@
-// Cheat Engine 7.7 Cheat Table Subsystem (MainUnit lower area)
-// Replicates official Address List (TTreeView) with Active [X] cross and Win32 table headers
 
 use eframe::egui::{self, Color32, RichText, Rounding, Stroke, Vec2};
 use onyx_core::ct_parser::CtParser;
@@ -15,7 +13,6 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, lower_height: f32) {
         .show(ui, |ui| {
             ui.set_height(lower_height);
 
-            // Table Action Header
             ui.horizontal(|ui| {
                 ui.label(RichText::new("Address List:").size(12.0).strong().color(Color32::from_rgb(180, 185, 195)));
                 ui.label(RichText::new(format!("{} records", app.cheat_table.len())).size(11.5).color(Color32::GRAY));
@@ -71,7 +68,6 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, lower_height: f32) {
 
             ui.add_space(2.0);
 
-            // Win32 Inset Container
             egui::Frame::none()
                 .fill(Color32::from_rgb(18, 20, 26))
                 .stroke(Stroke::new(1.0_f32, Color32::from_rgb(42, 48, 60)))
@@ -80,7 +76,6 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, lower_height: f32) {
                 .show(ui, |ui| {
                     let table_scroll_h = (lower_height - 38.0).max(100.0);
 
-                    // Table Header Bar (Active | Description | Address | Type | Value)
                     ui.horizontal(|ui| {
                         let th = |ui: &mut egui::Ui, text: &str, w: f32| {
                             egui::Frame::none()
@@ -119,7 +114,7 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, lower_height: f32) {
                                     let mut ptr_scan_click: Option<usize> = None;
 
                                     for (idx, entry) in app.cheat_table.iter_mut().enumerate() {
-                                        // Active Toggle (Classic CE [X] red cross)
+
                                         let (active_text, active_color) = if entry.active {
                                             ("[X]", Color32::from_rgb(255, 50, 50))
                                         } else {
@@ -129,10 +124,8 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, lower_height: f32) {
                                             entry.active = !entry.active;
                                         }
 
-                                        // Description (Editable inline)
                                         ui.add(egui::TextEdit::singleline(&mut entry.description).desired_width(180.0));
 
-                                        // Address / Pointer Chain
                                         let is_ptr = !entry.offsets.is_empty();
                                         let addr_text = if !is_ptr {
                                             format!("{:08X}", entry.address)
@@ -178,10 +171,8 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, lower_height: f32) {
                                             }
                                         });
 
-                                        // Type
                                         ui.label(RichText::new(entry.val_type.as_str()).size(11.5).color(Color32::from_rgb(160, 180, 205)));
 
-                                        // Value (Click to edit)
                                         let val_resp = ui.add(
                                             egui::Button::new(RichText::new(&entry.current_val).monospace().strong().color(Color32::WHITE))
                                                 .fill(Color32::from_rgb(26, 30, 40))
@@ -223,3 +214,4 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, lower_height: f32) {
                 });
         });
 }
+

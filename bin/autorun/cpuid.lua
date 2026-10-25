@@ -17,11 +17,10 @@ autoAssemble([[
   push ecx
   push edx
 
-
   [/32-bit]
 
   [64-bit]
-  
+
   mov r8,rcx //save rcx
   mov r9,rbx //save rbx
   mov eax,[rcx]
@@ -53,15 +52,14 @@ autoAssemble([[
   mov rbx,r9 //restore rbx
   ret
   [/64-bit]
-]], true) 
+]], true)
 
 function CPUID(i,j)
   local s=createMemoryStream()
-  s.Size=20 --allocate 20 bytes (yes, you can do this)
+  s.Size=20
   writeIntegerLocal(s.Memory,i)
   writeIntegerLocal(s.Memory+8,j)
   executeCodeLocal("cpuidcaller", s.Memory)
-
 
   local r={}
   r.eax=readIntegerLocal(s.Memory)
@@ -71,4 +69,4 @@ function CPUID(i,j)
 
   s.destroy()
   return r
-end 
+end

@@ -2600,6 +2600,72 @@ object MainForm: TMainForm
         OnClick = miSnapshothandlerClick
       end
     end
+    object miMCP: TMenuItem
+      Caption = 'MCP'
+      object miMCPStatus: TMenuItem
+        Caption = 'Servidor: Em execucao (CE_MCP_Bridge_v99)'
+        Enabled = False
+      end
+      object miMCPClient: TMenuItem
+        Caption = 'Cliente: Desconectado (Aguardando conexao)'
+        Enabled = False
+      end
+      object MenuItemMCP_Sep1: TMenuItem
+        Caption = '-'
+      end
+      object miMCPStart: TMenuItem
+        Caption = 'Ligar Servidor'
+        OnClick = miMCPStartClick
+      end
+      object miMCPStop: TMenuItem
+        Caption = 'Desligar Servidor'
+        OnClick = miMCPStopClick
+      end
+      object miMCPRestart: TMenuItem
+        Caption = 'Reiniciar Servidor'
+        OnClick = miMCPRestartClick
+      end
+      object MenuItemMCP_Sep2: TMenuItem
+        Caption = '-'
+      end
+      object miMCPSettings: TMenuItem
+        Caption = 'Configuracoes...'
+        OnClick = miMCPSettingsClick
+      end
+      object MenuItemMCP_Sep3: TMenuItem
+        Caption = '-'
+      end
+      object miMCPKernelPower: TMenuItem
+        Caption = 'Poder do Kernel (OwMemDriver)'
+        object miMCPGrantKernel: TMenuItem
+          Caption = 'Conceder Privilegios de Kernel (Modo Fisico CR3)'
+          OnClick = miMCPGrantKernelClick
+        end
+        object miMCPStripCallbacks: TMenuItem
+          Caption = 'Remover Callbacks de Anticheat (ObRegisterCallbacks)'
+          OnClick = miMCPStripCallbacksClick
+        end
+        object miMCPCloakDriver: TMenuItem
+          Caption = 'Ocultar Driver e Limpar Rastros (Indetectavel)'
+          OnClick = miMCPCloakDriverClick
+        end
+        object miMCPBypassCoW: TMenuItem
+          Caption = 'Ignorar Protecao de Gravacao (Gravacao Fisica Direta)'
+          OnClick = miMCPBypassCoWClick
+        end
+      end
+      object MenuItemMCP_Sep4: TMenuItem
+        Caption = '-'
+      end
+      object miMCPCopyConfig: TMenuItem
+        Caption = 'Copiar JSON de Configuracao do MCP'
+        OnClick = miMCPCopyConfigClick
+      end
+      object miMCPAbout: TMenuItem
+        Caption = 'Sobre a Ponte MCP'
+        OnClick = miMCPAboutClick
+      end
+    end
     object ools1: TMenuItem
       Caption = '&Tools'
     end

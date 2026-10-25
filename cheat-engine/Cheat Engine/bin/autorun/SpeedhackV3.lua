@@ -1,5 +1,3 @@
---Copyright Cheat Engine
-
 
 function getOriginalCodeAndFiller(address)
   local original,filler
@@ -36,26 +34,24 @@ function getOriginalCodeAndFiller(address)
   return original,filler
 end
 
-
 function hookSpeedFunctions()
- -- print("hookSpeedFunctions")
+
   if getAddressSafe("new_gettickcount")~=nil and getAddressSafe("speedhack_wantedspeed")~=nil then
-  --  print("already hooked")
+
     return true
   end
-  
+
   local r,r2=injectCEHelperLib()
-  
+
   if not r then
     messageDialog('error in injectCEHelperLib(): '..r2, mtError,mbOK)
     return false
   end
-  
+
   local result, data=autoAssemble([[
     globalalloc(speedhack_wantedspeed,4)
     speedhack_wantedspeed:
     dd (float)1
-
 
 {$asm}
 
@@ -65,8 +61,6 @@ function hookSpeedFunctions()
     messageDialog(data)
     return
   end
-
- -- print("allocated speedhack_wantedspeed")
 
   local gtcaddress=getAddressSafe('kernel32.gettickcount64')
   if gtcaddress==nil then
@@ -83,13 +77,9 @@ function hookSpeedFunctions()
     end
   end
 
-
   local originalcode,filler=getOriginalCodeAndFiller(gtcaddress)
 
   if originalcode then
-
-
-  --speedhack does not disable. Just sets speed to 1 when done
 
     local s=string.format([[
 alloc(gtc_originalcode,64,"kernel32.gettickcount64")
@@ -101,7 +91,6 @@ label(gtchook_exit)
 #include <stddef.h>
 #include <celib.h>
 
-
 __stdcall uint64_t gtc_originalcode(void);
 float gtc_speed=1.0f;
 uint64_t gtc_initialtime=0;
@@ -111,7 +100,6 @@ cecs gtc_cs;
 extern float speedhack_wantedspeed;
 extern void csenter(cecs *cs);
 
-
 __stdcall uint64_t new_gettickcount(void)
 {
   uint64_t newtime;
@@ -119,11 +107,9 @@ __stdcall uint64_t new_gettickcount(void)
   uint64_t currenttime;
   float wantedspeed; //small issue with tcc where you can not compare against extern directly
 
-
-  
   currenttime=gtc_originalcode();
 
-  csenter(&gtc_cs);  
+  csenter(&gtc_cs);
   wantedspeed=speedhack_wantedspeed;
 
   if (gtc_initialtime==0)
@@ -143,16 +129,12 @@ __stdcall uint64_t new_gettickcount(void)
     gtc_speed=speedhack_wantedspeed;
   }
 
-
-
   csleave(&gtc_cs);
-
 
   return newtime;
 
 }
 {$asm}
-
 
 gtc_originalcode:
 %s
@@ -166,7 +148,6 @@ jmp new_gettickcount
 
 gtc_returnhere:
 
-
 kernel32.timeGetTime:
 jmp new_gettickcount
 
@@ -175,7 +156,7 @@ jmp new_gettickcount
 
 ]],originalcode, filler)
 
-    local result, data=autoAssemble(s) 
+    local result, data=autoAssemble(s)
 
     if not result then
       if data==nil then
@@ -185,8 +166,6 @@ jmp new_gettickcount
     end
   end;
 
-
---queryPerformanceCounter
   local qpcaddress=getAddressSafe('ntdll.RtlQueryPerformanceCounter')
   if qpcaddress==nil then
     waitforExports()
@@ -202,13 +181,9 @@ jmp new_gettickcount
     end
   end
 
-
   local originalcode,filler=getOriginalCodeAndFiller(qpcaddress)
 
   if originalcode then
-
-
-  --speedhack does not disable. Just sets speed to 1 when done
 
     local s=string.format([[
 alloc(qpc_originalcode,64,"ntdll.RtlQueryPerformanceCounter")
@@ -231,7 +206,6 @@ uint64_t qpc_lastresult=0;
 extern float speedhack_wantedspeed;
 extern void csenter(cecs *cs);
 
-
 __stdcall int  new_RtlQueryPerformanceCounter(uint64_t *count)
 {
   uint64_t newtime;
@@ -239,15 +213,12 @@ __stdcall int  new_RtlQueryPerformanceCounter(uint64_t *count)
   uint64_t currenttime;
   uint64_t newwantedspeed;
 
-
   float wantedspeed; //small issue with tcc where you can not compare against extern directly
-
-
 
   int result=qpc_originalcode(&currenttime);
 
   csenter(&qpc_cs);
-  
+
   wantedspeed=speedhack_wantedspeed;
 
   if (qpc_initialtime==0)
@@ -266,11 +237,8 @@ __stdcall int  new_RtlQueryPerformanceCounter(uint64_t *count)
     qpc_initialtime=currenttime;
     qpc_speed=speedhack_wantedspeed;
   }
-  
 
-
-  csleave(&qpc_cs); 
-  
+  csleave(&qpc_cs);
 
   *count=newtime;
 
@@ -278,7 +246,6 @@ __stdcall int  new_RtlQueryPerformanceCounter(uint64_t *count)
 
 }
 {$asm}
-
 
 qpc_originalcode:
 %s
@@ -292,43 +259,40 @@ jmp new_RtlQueryPerformanceCounter
 
 qpc_returnhere:
 
-
 ]],originalcode, filler)
 
     local result2, data2=autoAssemble(s)
-    
+
     if not result2 then
       if data==nil then
         data=' (no reason)'
       end
       messageDialog('Failure hooking ntdll.RtlQueryPerformanceCounter:'..data, mtError, mbOK)
     end
-    
+
   end;
 
   return result or result2
 end
 
-
-
-registerSpeedhackCallbacks(function() --OnActivate
+registerSpeedhackCallbacks(function()
   if (not isConnectedToCEServer()) and targetIsX86() then
     local result, errormsg
-    
+
     if getAddressSafe("new_gettickcount")==nil or getAddressSafe("speedhack_wantedspeed")==nil then
-      --still needs hooking
+
       result,errormsg=hookSpeedFunctions()
     else
       result=true
     end
-        
+
     return true, result, errormsg
   else
     return false
   end
 end,
 
-function(speed) --OnSetSpeed(speed)
+function(speed)
   if (not isConnectedToCEServer()) and targetIsX86() then
     local result, errormsg
     if getAddressSafe("new_gettickcount")==nil or getAddressSafe("speedhack_wantedspeed")==nil then
@@ -338,12 +302,11 @@ function(speed) --OnSetSpeed(speed)
     end
 
     writeFloat("speedhack_wantedspeed", speed)
-    result=true      
-    
+    result=true
+
     return true, true
   else
     return false
   end
 end)
-
 

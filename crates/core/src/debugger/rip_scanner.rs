@@ -1,6 +1,3 @@
-// language: Rust, file: rip_scanner.rs, target: Windows 11, MSVC
-// RIP-relative instruction scanner for x64 executable modules and memory regions
-// Mirrors Cheat Engine 7.5 riprelativescanner.pas
 
 use crate::process::Process;
 use crate::debugger::disasm::Disassembler;
@@ -17,8 +14,7 @@ pub struct RipRelativeMatch {
 pub struct RipRelativeScanner;
 
 impl RipRelativeScanner {
-    /// Scans a byte buffer of executable x64 code for RIP-relative instructions.
-    /// If `target_filter` is provided, only matches targeting that exact address are returned.
+
     pub fn scan_buffer(
         code: &[u8],
         base_address: usize,
@@ -28,7 +24,7 @@ impl RipRelativeScanner {
         let mut offset = 0;
 
         while offset < code.len() {
-            // Check for zero padding run (0x00 0x00): align forward to next 8-byte boundary like CE
+
             if offset + 1 < code.len() && code[offset] == 0 && code[offset + 1] == 0 {
                 let current_addr = base_address + offset;
                 let align_skip = 8 - (current_addr % 8);
@@ -63,7 +59,6 @@ impl RipRelativeScanner {
         matches
     }
 
-    /// Scans executable memory regions of target process between start and stop addresses.
     pub fn scan_range(
         proc: &Process,
         start: usize,
@@ -97,7 +92,6 @@ impl RipRelativeScanner {
         Ok(results)
     }
 
-    /// Scans an entire loaded module for instructions referencing target_filter (or all RIP-relative).
     pub fn scan_module(
         proc: &Process,
         module_name: &str,
@@ -116,11 +110,9 @@ mod tests {
 
     #[test]
     fn test_scan_buffer_rip_relative() {
-        // 48 8B 05 0A 00 00 00 -> mov rax, [rip + 0xA]
-        // Instruction at 0x140001000, length 7, RIP after insn is 0x140001007
-        // Target is 0x140001007 + 0xA = 0x140001011
+
         let mut code = vec![0x48, 0x8B, 0x05, 0x0A, 0x00, 0x00, 0x00];
-        // add some NOPs
+
         code.extend(vec![0x90, 0x90, 0x90]);
 
         let matches = RipRelativeScanner::scan_buffer(&code, 0x140001000, None);
@@ -128,12 +120,11 @@ mod tests {
         assert_eq!(matches[0].instruction_address, 0x140001000);
         assert_eq!(matches[0].target_address, 0x140001011);
 
-        // Filter matching target
         let filtered = RipRelativeScanner::scan_buffer(&code, 0x140001000, Some(0x140001011));
         assert_eq!(filtered.len(), 1);
 
-        // Filter non-matching target
         let non_matching = RipRelativeScanner::scan_buffer(&code, 0x140001000, Some(0x140009999));
         assert_eq!(non_matching.len(), 0);
     }
 }
+

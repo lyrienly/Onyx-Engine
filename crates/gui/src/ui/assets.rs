@@ -1,5 +1,3 @@
-// Embedded Authentic Cheat Engine Icons
-// Decoded directly from official CE resources at compile time
 
 use eframe::egui::{self, ColorImage, TextureHandle, TextureOptions};
 
@@ -42,3 +40,4 @@ impl CeIcons {
         }
     }
 }
+

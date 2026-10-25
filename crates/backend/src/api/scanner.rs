@@ -1,5 +1,3 @@
-// OnyxEngine Memory Scanner Backend API
-// Ultra high-speed scanning engine exposed to Pascal / Lazarus
 
 use std::ffi::CStr;
 use std::os::raw::c_char;
@@ -12,17 +10,17 @@ use crate::types::{OnyxScanCandidate, OnyxCodecaveEntry, OnyxRipRelativeMatch, O
 
 fn map_val_type(idx: i32) -> ValType {
     match idx {
-        // Direct CE TVariableType enum ordinals
-        0 => ValType::I8,     // vtByte = 0
-        1 => ValType::I16,    // vtWord = 1
-        2 => ValType::I32,    // vtDword = 2
-        3 => ValType::I64,    // vtQword = 3
-        4 => ValType::Float,  // vtSingle = 4
-        5 => ValType::Double, // vtDouble = 5
-        6 | 7 | 16 => ValType::Str, // vtString = 6, vtUnicodeString = 7, vtCodePageString = 16
-        8 | 15 => ValType::Aob,     // vtByteArray = 8, vtByteArrays = 15
-        10 => ValType::All,         // vtAll = 10
-        14 => ValType::Group,       // vtGrouped = 14
+
+        0 => ValType::I8,
+        1 => ValType::I16,
+        2 => ValType::I32,
+        3 => ValType::I64,
+        4 => ValType::Float,
+        5 => ValType::Double,
+        6 | 7 | 16 => ValType::Str,
+        8 | 15 => ValType::Aob,
+        10 => ValType::All,
+        14 => ValType::Group,
         _ => ValType::I32,
     }
 }
@@ -37,45 +35,42 @@ fn parse_c_str(ptr: *const c_char) -> String {
 
 fn resolve_condition(s: &Scanner, scan_type: i32, v1: &str, v2: &str) -> Option<ScanCondition> {
     match scan_type {
-        // CE TScanOption ordinals:
-        // 0: soUnknownValue
+
         0 => Some(ScanCondition::UnknownInitial),
-        // 1: soExactValue
+
         1 => ScanValue::parse(s.val_type, v1).ok().map(ScanCondition::Exact),
-        // 2: soValueBetween
+
         2 => {
             let p1 = ScanValue::parse(s.val_type, v1).ok()?;
             let p2 = ScanValue::parse(s.val_type, v2).ok()?;
             Some(ScanCondition::Between(p1, p2))
         }
-        // 3: soBiggerThan
+
         3 => ScanValue::parse(s.val_type, v1).ok().map(ScanCondition::BiggerThan),
-        // 4: soSmallerThan
+
         4 => ScanValue::parse(s.val_type, v1).ok().map(ScanCondition::SmallerThan),
-        // 5: soIncreasedValue
+
         5 => Some(ScanCondition::Increased),
-        // 6: soIncreasedValueBy
+
         6 => ScanValue::parse(s.val_type, v1).ok().map(ScanCondition::IncreasedBy),
-        // 7: soDecreasedValue
+
         7 => Some(ScanCondition::Decreased),
-        // 8: soDecreasedValueBy
+
         8 => ScanValue::parse(s.val_type, v1).ok().map(ScanCondition::DecreasedBy),
-        // 9: soChanged
+
         9 => Some(ScanCondition::Changed),
-        // 10: soUnchanged
+
         10 => Some(ScanCondition::Unchanged),
         _ => None,
     }
 }
 
-/// Create a new scanner instance for a specific data type
 #[no_mangle]
 pub unsafe extern "C" fn onyx_scanner_create(val_type_idx: i32) -> *mut Scanner {
     let vt = map_val_type(val_type_idx);
     Box::into_raw(Box::new(Scanner::new(vt)))
 }
 
-/// Destroy a scanner instance
 #[no_mangle]
 pub unsafe extern "C" fn onyx_scanner_destroy(scanner: *mut Scanner) {
     if !scanner.is_null() {
@@ -83,8 +78,6 @@ pub unsafe extern "C" fn onyx_scanner_destroy(scanner: *mut Scanner) {
     }
 }
 
-/// Perform First Scan
-/// Returns the number of found addresses, or -1 on error
 #[no_mangle]
 pub unsafe extern "C" fn onyx_scanner_first_scan(
     scanner: *mut Scanner,
@@ -136,8 +129,6 @@ pub unsafe extern "C" fn onyx_scanner_first_scan(
     }
 }
 
-/// Perform Next Scan
-/// Returns the number of found addresses remaining, or -1 on error
 #[no_mangle]
 pub unsafe extern "C" fn onyx_scanner_next_scan(
     scanner: *mut Scanner,
@@ -174,8 +165,6 @@ pub unsafe extern "C" fn onyx_scanner_next_scan(
     }
 }
 
-/// Undo previous scan
-/// Returns 1 on success, 0 if no undo history available
 #[no_mangle]
 pub unsafe extern "C" fn onyx_scanner_undo(scanner: *mut Scanner) -> i32 {
     if scanner.is_null() {
@@ -185,7 +174,6 @@ pub unsafe extern "C" fn onyx_scanner_undo(scanner: *mut Scanner) -> i32 {
     if s.undo_scan() { 1 } else { 0 }
 }
 
-/// Get total number of candidates found
 #[no_mangle]
 pub unsafe extern "C" fn onyx_scanner_get_count(scanner: *mut Scanner) -> i64 {
     if scanner.is_null() {
@@ -195,8 +183,6 @@ pub unsafe extern "C" fn onyx_scanner_get_count(scanner: *mut Scanner) -> i64 {
     s.candidates.len() as i64
 }
 
-/// Fetch found candidates into buffer
-/// Returns number of items written
 #[no_mangle]
 pub unsafe extern "C" fn onyx_scanner_get_results(
     scanner: *mut Scanner,
@@ -235,8 +221,6 @@ pub unsafe extern "C" fn onyx_scanner_get_results(
     count as i64
 }
 
-/// Save scanner results in Cheat Engine's native ADDRESSES.TMP format
-/// Format: 7 bytes header [6, 'N', 'O', 'R', 'M', 'A', 'L'] followed by raw array of u64 addresses
 #[no_mangle]
 pub unsafe extern "C" fn onyx_scanner_save_results_file(
     scanner: *mut Scanner,
@@ -261,17 +245,13 @@ pub unsafe extern "C" fn onyx_scanner_save_results_file(
     };
     let mut writer = BufWriter::with_capacity(512 * 1024, file);
 
-    // 7-byte Pascal ShortString header: length byte (6) + "NORMAL"
     let header: [u8; 7] = [6, b'N', b'O', b'R', b'M', b'A', b'L'];
     if writer.write_all(&header).is_err() {
         return -1;
     }
 
     if s.val_type == ValType::Group {
-        // CE vtGrouped format:
-        // 7-byte header [6, 'N', 'O', 'R', 'M', 'A', 'L']
-        // 4-byte offsetcount (dword)
-        // Array of (address: u64, offsets: [u32; offsetcount])
+
         let offset_count = s.candidates.first()
             .map(|c| c.group_offsets.len() as u32)
             .unwrap_or(0);
@@ -301,9 +281,6 @@ pub unsafe extern "C" fn onyx_scanner_save_results_file(
 
     let is_bit_address = s.val_type == ValType::All;
 
-    // Write all candidate addresses as raw 64-bit integers
-    // For vtAll (and vtBinary), Cheat Engine expects 16-byte TBitAddress entries:
-    // (address: ptruint, bit/extra: ptruint holding the TVariableType ordinal 0..5)
     for c in &s.candidates {
         let addr_u64 = c.address as u64;
         if writer.write_all(&addr_u64.to_le_bytes()).is_err() {
@@ -324,9 +301,6 @@ pub unsafe extern "C" fn onyx_scanner_save_results_file(
     s.candidates.len() as i64
 }
 
-/// Scans process memory for codecaves (blocks of padding bytes)
-/// byte_type: 0 = Int3 (0xCC), 1 = Nop (0x90), 2 = Zero (0x00), 3 = AnyPadding
-/// exec_only: 1 = executable regions only, 0 = all readable regions
 #[no_mangle]
 pub unsafe extern "C" fn onyx_scan_codecaves(
     handle: *mut Process,
@@ -369,8 +343,6 @@ pub unsafe extern "C" fn onyx_scan_codecaves(
     }
 }
 
-/// Scans executable memory regions of process for RIP-relative instructions referencing a target
-/// target_address: address to filter by (or ignored if has_target_filter is 0)
 #[no_mangle]
 pub unsafe extern "C" fn onyx_scan_rip_relative(
     handle: *mut Process,
@@ -421,7 +393,6 @@ pub unsafe extern "C" fn onyx_scan_rip_relative(
     }
 }
 
-/// Automatically generates a unique AOB signature for an instruction or function address
 #[no_mangle]
 pub unsafe extern "C" fn onyx_generate_aob_signature(
     handle: *mut Process,
@@ -454,3 +425,4 @@ pub unsafe extern "C" fn onyx_generate_aob_signature(
         Err(_) => -1,
     }
 }
+

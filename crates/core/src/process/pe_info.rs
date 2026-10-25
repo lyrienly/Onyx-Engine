@@ -1,11 +1,8 @@
-// language: Rust, file: pe_info.rs, target: Windows 11, MSVC
-// Complete PE Header, Section Table, and Import Address Table (IAT) Parser
-// Mirrors Cheat Engine 7.5 PEInfoFunctions.pas & pedumper.pas
 
 use crate::process::Process;
 
-pub const IMAGE_DOS_SIGNATURE: u16 = 0x5A4D; // "MZ"
-pub const IMAGE_NT_SIGNATURE: u32 = 0x00004550; // "PE\0\0"
+pub const IMAGE_DOS_SIGNATURE: u16 = 0x5A4D;
+pub const IMAGE_NT_SIGNATURE: u32 = 0x00004550;
 
 pub const IMAGE_FILE_MACHINE_I386: u16 = 0x014C;
 pub const IMAGE_FILE_MACHINE_AMD64: u16 = 0x8664;
@@ -54,7 +51,7 @@ pub struct PeInfoParser;
 
 impl PeInfoParser {
     pub fn parse_process_module(proc: &Process, module_base: usize) -> Result<PeInfo, String> {
-        // 1. Read DOS Header
+
         let dos_magic = proc.read::<u16>(module_base)?;
         if dos_magic != IMAGE_DOS_SIGNATURE {
             return Err("Invalid DOS signature (expected MZ)".to_string());
@@ -63,13 +60,11 @@ impl PeInfoParser {
         let e_lfanew = proc.read::<i32>(module_base + 0x3C)? as usize;
         let nt_headers_addr = module_base + e_lfanew;
 
-        // 2. Read PE Signature
         let pe_sig = proc.read::<u32>(nt_headers_addr)?;
         if pe_sig != IMAGE_NT_SIGNATURE {
             return Err("Invalid NT signature (expected PE\\0\\0)".to_string());
         }
 
-        // 3. Read File Header
         let file_header_addr = nt_headers_addr + 4;
         let machine = proc.read::<u16>(file_header_addr)?;
         let num_sections = proc.read::<u16>(file_header_addr + 2)? as usize;
@@ -93,7 +88,6 @@ impl PeInfoParser {
             (ep, ib, si, id_rva)
         };
 
-        // 4. Read Sections
         let section_table_addr = optional_header_addr + size_of_optional_header;
         let mut sections = Vec::with_capacity(num_sections);
 
@@ -124,12 +118,11 @@ impl PeInfoParser {
             });
         }
 
-        // 5. Read Import Directory (IAT)
         let mut imports = Vec::new();
         if import_dir_rva != 0 {
             let mut desc_addr = module_base + import_dir_rva;
             loop {
-                // IMAGE_IMPORT_DESCRIPTOR: 20 bytes
+
                 let original_first_thunk = proc.read::<u32>(desc_addr)? as usize;
                 let name_rva = proc.read::<u32>(desc_addr + 12)? as usize;
                 let first_thunk = proc.read::<u32>(desc_addr + 16)? as usize;
@@ -245,3 +238,4 @@ mod tests {
         assert_eq!(IMAGE_NT_SIGNATURE, 0x00004550);
     }
 }
+

@@ -1,5 +1,3 @@
-// Memory Viewer Native Window for OnyxEngine
-// Faithful recreation of Cheat Engine 7.5 Memory Viewer (Disassembler & Hex Dump)
 
 use eframe::egui::{self, Color32, RichText, Stroke, Vec2};
 use onyx_core::disasm::format_symbol;
@@ -56,7 +54,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                 app.show_memory_view = false;
             }
 
-            // 1. Top Menu Bar (File, Search, View, Debug, Tools, Kernel tools)
             egui::TopBottomPanel::top("mem_view_menu")
                 .frame(egui::Frame::none().fill(Color32::from_rgb(26, 26, 26)).inner_margin(egui::Margin::symmetric(8.0, 3.0)))
                 .show(ctx, |ui| {
@@ -143,7 +140,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                     });
                 });
 
-            // 2. Subheader Bar (Centered Current Address / Symbol)
             egui::TopBottomPanel::top("mem_view_sub_header")
                 .frame(egui::Frame::none().fill(Color32::from_rgb(32, 32, 32)).inner_margin(egui::Margin::symmetric(10.0, 4.0)))
                 .show(ctx, |ui| {
@@ -159,7 +155,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                     });
                 });
 
-            // 3. Bottom Status Bar (Advanced Options / Table Extras)
             egui::TopBottomPanel::bottom("mem_view_status_bar")
                 .frame(egui::Frame::none().fill(Color32::from_rgb(26, 26, 26)).inner_margin(egui::Margin::symmetric(10.0, 4.0)))
                 .show(ctx, |ui| {
@@ -171,7 +166,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                     });
                 });
 
-            // 4. Central Split Workspace: Top = Disassembler, Bottom = Hex Dump
             egui::CentralPanel::default()
                 .frame(egui::Frame::none().fill(Color32::from_rgb(20, 20, 20)))
                 .show(ctx, |ui| {
@@ -181,13 +175,11 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
 
                     let mut selected_op_desc = "instruction";
 
-                    // === TOP PANE: Disassembler View ===
                     egui::Frame::none()
                         .fill(Color32::from_rgb(18, 18, 18))
                         .show(ui, |ui| {
                             ui.set_height(disasm_h);
 
-                            // Disassembler Columns Header
                             ui.horizontal(|ui| {
                                 ui.set_min_height(20.0);
                                 ui.add_space(8.0);
@@ -227,7 +219,7 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                                             }
 
                                             let row_bg = if is_sel {
-                                                Color32::from_rgb(0, 120, 215) // Cheat Engine solid blue selection
+                                                Color32::from_rgb(0, 120, 215)
                                             } else {
                                                 Color32::TRANSPARENT
                                             };
@@ -247,7 +239,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                                                         ui.add_sized([180.0, 18.0], egui::Label::new(RichText::new(&addr_str).monospace().size(12.0).color(if is_sel { Color32::WHITE } else { Color32::from_rgb(120, 190, 255) })));
                                                         ui.add_sized([140.0, 18.0], egui::Label::new(RichText::new(&bytes_str).monospace().size(12.0).color(text_color)));
 
-                                                        // Syntax highlighted opcode
                                                         let op_color = if is_sel {
                                                             Color32::WHITE
                                                         } else if insn.mnemonic.starts_with('j') || insn.mnemonic == "call" {
@@ -307,7 +298,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                             }
                         });
 
-                    // === CENTER SPLITTER: Instruction Mnemonic Description ===
                     egui::Frame::none()
                         .fill(Color32::from_rgb(28, 28, 28))
                         .stroke(Stroke::new(1.0_f32, Color32::from_rgb(45, 45, 45)))
@@ -319,13 +309,11 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                             });
                         });
 
-                    // === BOTTOM PANE: Hex Dump View with Authentic Cheat Engine Framing ===
                     egui::Frame::none()
                         .fill(Color32::from_rgb(18, 18, 18))
                         .show(ui, |ui| {
                             ui.set_height(hex_h);
 
-                            // Region Info Bar (Protect, AllocationBase, Base, Size, Module)
                             let cur_hex = OnyxEngineApp::parse_hex_addr(&app.hex_addr_text, 0);
                             let region_info = if let Some(proc) = &app.attached_proc {
                                 if let Ok(regs) = proc.regions(false) {
@@ -359,7 +347,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                                 ui.label(RichText::new(region_info).size(11.0).monospace().color(Color32::LIGHT_GRAY));
                             });
 
-                            // Hex Column Header
                             ui.horizontal(|ui| {
                                 ui.add_space(8.0);
                                 ui.label(RichText::new("address").monospace().size(11.5).color(Color32::from_rgb(160, 160, 160)));
@@ -391,11 +378,10 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
 
                                             ui.horizontal(|ui| {
                                                 ui.add_space(8.0);
-                                                // Address column
+
                                                 ui.label(RichText::new(format!("{:012X}", row_addr)).monospace().size(12.0).color(Color32::WHITE));
                                                 ui.add_space(12.0);
 
-                                                // First 8 Bytes (00 .. 07)
                                                 ui.horizontal(|ui| {
                                                     ui.spacing_mut().item_spacing = Vec2::new(4.0, 0.0);
                                                     for (b_idx, &b) in chunk.iter().take(8).enumerate() {
@@ -416,7 +402,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
 
                                                 ui.add_space(4.0);
 
-                                                // Second 8 Bytes (08 .. 0F) with Yellow Frame Accent
                                                 egui::Frame::none()
                                                     .stroke(Stroke::new(1.0_f32, Color32::from_rgb(220, 200, 60)))
                                                     .inner_margin(egui::Margin::symmetric(3.0, 0.0))
@@ -442,7 +427,6 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
 
                                                 ui.add_space(10.0);
 
-                                                // ASCII Text Column
                                                 let ascii_text: String = chunk.iter().map(|&b| if b >= 0x20 && b <= 0x7E { b as char } else { '.' }).collect();
                                                 ui.label(RichText::new(ascii_text).monospace().size(12.0).color(Color32::from_rgb(140, 220, 140)));
                                             });
@@ -460,3 +444,4 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
         },
     );
 }
+

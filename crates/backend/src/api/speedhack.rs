@@ -1,11 +1,8 @@
-// OnyxEngine Speedhack Backend API
-// Multiplier injection and IPC frequency scaling
 
 use std::fs::OpenOptions;
 use std::io::Write;
 use onyx_core::process::Process;
 
-/// Injects speedhack DLL into target process and initializes IPC pipe
 #[no_mangle]
 pub unsafe extern "C" fn onyx_speedhack_init(process: *mut Process, initial_speed: f32) -> i32 {
     if process.is_null() {
@@ -14,7 +11,7 @@ pub unsafe extern "C" fn onyx_speedhack_init(process: *mut Process, initial_spee
     let p = &*process;
     match p.inject_dll("speedhack_dll.dll") {
         Ok(_) => {
-            // Give DLL a few milliseconds to start pipe listener
+
             std::thread::sleep(std::time::Duration::from_millis(50));
             let _ = onyx_speedhack_set(process, initial_speed);
             1
@@ -26,7 +23,6 @@ pub unsafe extern "C" fn onyx_speedhack_init(process: *mut Process, initial_spee
     }
 }
 
-/// Sets real-time speedhack multiplier via named pipe
 #[no_mangle]
 pub unsafe extern "C" fn onyx_speedhack_set(process: *mut Process, multiplier: f32) -> i32 {
     if process.is_null() {
@@ -42,7 +38,6 @@ pub unsafe extern "C" fn onyx_speedhack_set(process: *mut Process, multiplier: f
     0
 }
 
-/// Checks if speedhack pipe is active and receptive in target process
 #[no_mangle]
 pub unsafe extern "C" fn onyx_speedhack_is_active(process: *mut Process) -> i32 {
     if process.is_null() {
@@ -57,7 +52,6 @@ pub unsafe extern "C" fn onyx_speedhack_is_active(process: *mut Process) -> i32 
     }
 }
 
-/// Resets target process speed back to normal 1.0x
 #[no_mangle]
 pub unsafe extern "C" fn onyx_speedhack_reset(process: *mut Process) -> i32 {
     onyx_speedhack_set(process, 1.0)

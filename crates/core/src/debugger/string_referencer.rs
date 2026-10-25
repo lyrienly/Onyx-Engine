@@ -1,6 +1,3 @@
-// language: Rust, file: string_referencer.rs, target: Windows 11, MSVC
-// String Referencer Engine: Scans executable code to locate referenced ASCII and UTF-16 strings
-// Mirrors Cheat Engine 7.5 frmStringReferencerUnit.pas & stringreferencestool.pas
 
 use crate::process::Process;
 use crate::debugger::disasm::Disassembler;
@@ -18,7 +15,7 @@ pub struct StringReferenceMatch {
 pub struct StringReferencer;
 
 impl StringReferencer {
-    /// Attempts to extract a printable ASCII string (minimum length 4, terminated by 0x00)
+
     pub fn try_extract_ascii(bytes: &[u8], min_len: usize) -> Option<String> {
         if bytes.len() < min_len {
             return None;
@@ -42,7 +39,6 @@ impl StringReferencer {
         }
     }
 
-    /// Attempts to extract a printable UTF-16LE string (minimum length 4, terminated by 0x0000)
     pub fn try_extract_utf16(bytes: &[u8], min_len: usize) -> Option<String> {
         if bytes.len() < min_len * 2 {
             return None;
@@ -67,7 +63,6 @@ impl StringReferencer {
         }
     }
 
-    /// Scans a byte buffer for instructions that reference strings in data memory.
     pub fn scan_process(
         proc: &Process,
         start: usize,
@@ -104,7 +99,7 @@ impl StringReferencer {
                 let len = insn.length.max(1);
 
                 if let Some(target) = insn.target_addr {
-                    // Read candidate memory at target (up to 128 bytes)
+
                     if let Ok(target_bytes) = proc.read_bytes(target, 128) {
                         if let Some(ascii_str) = Self::try_extract_ascii(&target_bytes, min_string_len) {
                             results.push(StringReferenceMatch {
@@ -159,3 +154,4 @@ mod tests {
         assert_eq!(res, Some("GameOver".to_string()));
     }
 }
+

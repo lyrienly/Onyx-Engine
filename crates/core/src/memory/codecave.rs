@@ -1,15 +1,12 @@
-// language: Rust, file: codecave.rs, target: Windows 11, MSVC
-// Codecave scanner: locates blocks of padding bytes (0x90 NOP, 0xCC INT3, 0x00 ZERO)
-// within executable/committed memory regions for stealth hook injection without VirtualAllocEx
 
 use crate::process::Process;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CaveByteType {
-    Int3,       // 0xCC (standard debugger/compiler alignment fill)
-    Nop,        // 0x90 (NOP alignment fill)
-    Zero,       // 0x00 (Zero padding)
-    AnyPadding, // Any contiguous run of 0xCC, 0x90, or 0x00
+    Int3,
+    Nop,
+    Zero,
+    AnyPadding,
 }
 
 impl CaveByteType {
@@ -33,7 +30,7 @@ pub struct CodecaveEntry {
 pub struct CodecaveScanner;
 
 impl CodecaveScanner {
-    /// Scans a raw byte slice for contiguous runs of padding bytes of at least `min_size`.
+
     pub fn scan_buffer(
         buffer: &[u8],
         base_address: usize,
@@ -94,8 +91,6 @@ impl CodecaveScanner {
         caves
     }
 
-    /// Scans process memory within [start, stop] address range for codecaves.
-    /// If `executable_only` is true, only regions with PAGE_EXECUTE* are searched.
     pub fn scan_process(
         proc: &Process,
         start: usize,
@@ -169,3 +164,4 @@ mod tests {
         assert_eq!(caves[1].byte_value, 0x90);
     }
 }
+

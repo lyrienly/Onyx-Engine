@@ -1,18 +1,10 @@
 require("lfs")
 andtools={}
 
-andtools.path=getAutorunPath()..[[andtools\]]  --todo: if nox is running, use the adb tool from nox instead
-andtools.workpath=andtools.path..[[temp\]] --getTempFolder()
+andtools.path=getAutorunPath()..[[andtools\]]
+andtools.workpath=andtools.path..[[temp\]]
 lfs.mkdir(andtools.workpath)
 andtools.deviceidselectioncommand=''
---apktool d -s apk.apk -o extracted
---apktool b extracted -o apk.apk
-
-
---keytool -genkey -noprompt -v -alias alias_name -dname "L=Goobelywho" -keyalg RSA -keysize 2048 -validity 10000 -storepass password123 -keystore cekeystore -keypass password123
-
---jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore cekeystore my_application.apk alias_name
---zipalign -p -f -v 4 package.apk package-za.apk
 
 function andtools.getDeviceList()
   local list={}
@@ -56,9 +48,8 @@ function andtools.patchAPK(packagename)
 
   local r,c=runCommand(andtools.path..'adb.exe', {andtools.deviceidselectioncommand, 'pull', packagepath, localpath})
 
-
   if fileExists(localpath) and r:find("pulled") then
-    --got it
+
     synchronize(function()
       miAndroid.Caption='Android (Decoding APK)'
     end)
@@ -67,14 +58,12 @@ function andtools.patchAPK(packagename)
 
     r,c=runCommand(andtools.path..[[jre\bin\java.exe]],{'-jar', andtools.path..'apktool.jar','d','-s','-f', localpath, '-o',extractedPath})
 
-
     if (c==0) and fileExists(extractedPath..[[\AndroidManifest.xml]]) then
       synchronize(function()
         miAndroid.Caption='Android (Rebuilding APK)'
       end)
 
-
-      r,c=runCommand(andtools.path..[[jre\bin\java.exe]],{'-jar', andtools.path..'apktool.jar', 'b', extractedPath, '-d', '-o', extractedPath..'_patched.apk'})  -- -d sets debuggable to true .(alternatively, I could have used ce's xml access functions)
+      r,c=runCommand(andtools.path..[[jre\bin\java.exe]],{'-jar', andtools.path..'apktool.jar', 'b', extractedPath, '-d', '-o', extractedPath..'_patched.apk'})
 
       if fileExists(extractedPath..'_patched.apk') then
         if not fileExists(andtools.workpath..'cekey.store') then
@@ -83,7 +72,6 @@ function andtools.patchAPK(packagename)
           end)
 
           r,c=runCommand(andtools.path..[[jre\bin\keytool.exe]], {'-genkey', '-noprompt', '-v', '-alias', 'cheater', '-dname', 'L=MotherFuckingCheater','-keyalg', 'RSA','-keysize','2048','-validity','10000','-storepass','password123', '-keystore', andtools.workpath..[[ce.keystore]],'-keypass', 'password123'})
-
 
           if not fileExists(andtools.workpath..'ce.keystore') then
             synchronize(function()
@@ -105,7 +93,6 @@ function andtools.patchAPK(packagename)
           return
         end
 
-        --zipalign -p -f -v 4 package.apk package-za.apk
         synchronize(function()
           miAndroid.Caption='Android (ZipAlign new APK)'
         end)
@@ -120,11 +107,9 @@ function andtools.patchAPK(packagename)
           if r~=mrYes then return end
         end
 
-
         synchronize(function()
           miAndroid.Caption='Android (Replacing APK)'
         end)
-
 
         r,c=runCommand(andtools.path..'adb.exe',{andtools.deviceidselectioncommand, 'uninstall',packagename})
         if c~=0 then
@@ -146,8 +131,6 @@ continue installing the new package?]],mtWarning, mbYes, mbNo)
 
         messageDialog("APK patch successful",mtInformation)
 
-
-
       else
         synchronize(function()
           messageDialog("Failed finding "..extractedPath..'_patched.apk after rebuilding. Rebuild failure (code '..c..')',mtError)
@@ -160,15 +143,12 @@ continue installing the new package?]],mtWarning, mbYes, mbNo)
       end)
     end
 
-
   else
     synchronize(function()
       messageDialog('Failure pulling the apk from the device ('..c..' : '..r..') Try making sure the usb cable is connected properly, intact, and check that the battery is charged',mtError)
     end)
 
   end
-
-
 
 end
 
@@ -186,16 +166,6 @@ MainForm.Menu.Items.insert(MainForm.miHelp.MenuIndex, miAndroid)
 miPatchAPK=createMenuItem(miAndroid)
 miPatchAPK.Caption='Patch APK to debuggable'
 miAndroid.add(miPatchAPK)
-
---miLaunchCEServer=createMenuItem(miAndroid)
---miLaunchCEServer.Caption='Launch ceserver'
---miAndroid.add(miLaunchCEServer)
---run-as gamepackage
---cp /sdcard/ceserver .
---chmod a+x ceserver
---./ceserver
-
-
 
 miPatchAPK.OnClick=function(s)
   local i,r
@@ -230,7 +200,7 @@ miPatchAPK.OnClick=function(s)
       miAndroid.Caption='Android (Working)'
       miAndroid.Enabled=false
       miPatchAPK.Enabled=false
-      --miLaunchCEServer.Enabled=false
+
       createThread(function(t)
         t.Name='Android APK Patcher Thread'
         andtools.patchAPK(r)
@@ -239,7 +209,7 @@ miPatchAPK.OnClick=function(s)
           miAndroid.Caption='Android'
           miAndroid.Enabled=true
           miPatchAPK.Enabled=true
-          --miLaunchCEServer.Enabled=true
+
         end)
       end)
     end
@@ -247,10 +217,3 @@ miPatchAPK.OnClick=function(s)
 
 end
 
-
---miLaunchCEServer.OnClick=function()
-  --
---end
-
-
---return andtools.getDeviceList()

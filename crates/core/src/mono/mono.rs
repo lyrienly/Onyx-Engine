@@ -1,6 +1,3 @@
-// language: Rust, file: mono.rs, target: Windows 11, MSVC
-// Full .NET / Mono & Unity IL2CPP Runtime Dissector and Metadata Extractor
-// Reconstructing Cheat Engine 7.5 MonoDataCollector & DotNetDataCollector architecture
 
 use crate::process::Process;
 use crate::symbol::SymbolResolver;
@@ -37,7 +34,7 @@ pub struct ManagedMethod {
     pub name: String,
     pub return_type: String,
     pub param_types: Vec<String>,
-    pub address: usize, // Live JIT / native function pointer
+    pub address: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -70,7 +67,6 @@ pub struct ClrMethodTableInfo {
     pub class_name: String,
 }
 
-/// Standalone ECMA-335 CLI metadata parser for reading .NET PE assemblies directly from memory
 pub struct Ecma335Parser {
     pub version: String,
     pub strings: Vec<u8>,
@@ -89,7 +85,6 @@ impl Ecma335Parser {
             return None;
         }
 
-        // 1. DOS Header
         if image_bytes[0] != b'M' || image_bytes[1] != b'Z' {
             return None;
         }
@@ -98,7 +93,6 @@ impl Ecma335Parser {
             return None;
         }
 
-        // 2. NT Headers
         if &image_bytes[e_lfanew..e_lfanew + 4] != b"PE\0\0" {
             return None;
         }
@@ -106,10 +100,9 @@ impl Ecma335Parser {
         let opt_offset = e_lfanew + 0x18;
         let opt_magic = u16::from_le_bytes(image_bytes[opt_offset..opt_offset + 2].try_into().ok()?);
 
-        // CLR directory entry is directory index 14
         let clr_dir_offset = match opt_magic {
-            0x20B => opt_offset + 112 + 14 * 8, // PE32+ (64-bit)
-            0x10B => opt_offset + 96 + 14 * 8,  // PE32 (32-bit)
+            0x20B => opt_offset + 112 + 14 * 8,
+            0x10B => opt_offset + 96 + 14 * 8,
             _ => return None,
         };
 
@@ -123,7 +116,6 @@ impl Ecma335Parser {
             return None;
         }
 
-        // 3. IMAGE_COR20_HEADER
         let md_rva = u32::from_le_bytes(image_bytes[clr_rva + 8..clr_rva + 12].try_into().ok()?) as usize;
         let md_sz = u32::from_le_bytes(image_bytes[clr_rva + 12..clr_rva + 16].try_into().ok()?) as usize;
         if md_rva == 0 || md_sz < 16 || md_rva + md_sz > image_bytes.len() {
@@ -138,7 +130,6 @@ impl Ecma335Parser {
             return None;
         }
 
-        // BSJB Signature (0x424A5342)
         if &md_bytes[0..4] != b"BSJB" {
             return None;
         }
@@ -153,7 +144,7 @@ impl Ecma335Parser {
             .to_string();
 
         let after_ver = 16 + v_len;
-        // Flags (u16) at after_ver, Streams (u16) at after_ver + 2
+
         let streams_count = u16::from_le_bytes(md_bytes[after_ver + 2..after_ver + 4].try_into().ok()?) as usize;
 
         let mut cur = after_ver + 4;
@@ -169,13 +160,12 @@ impl Ecma335Parser {
             let s_size = u32::from_le_bytes(md_bytes[cur + 4..cur + 8].try_into().ok()?) as usize;
             cur += 8;
 
-            // Stream name is null-terminated, 4-byte aligned
             let name_start = cur;
             while cur < md_bytes.len() && md_bytes[cur] != 0 {
                 cur += 1;
             }
             let name = String::from_utf8_lossy(&md_bytes[name_start..cur]).to_string();
-            // Advance to next 4-byte boundary
+
             cur += 1;
             while cur % 4 != 0 && cur < md_bytes.len() {
                 cur += 1;
@@ -208,7 +198,6 @@ impl Ecma335Parser {
                 }
             }
 
-            // Calculate table row sizes
             let str_sz = if (heap_sizes & 1) != 0 { 4 } else { 2 };
             let guid_sz = if (heap_sizes & 2) != 0 { 4 } else { 2 };
             let blob_sz = if (heap_sizes & 4) != 0 { 4 } else { 2 };
@@ -220,14 +209,14 @@ impl Ecma335Parser {
             let param_idx_sz = if table_rows[0x08] < (1 << 16) { 2 } else { 4 };
 
             let mut row_sizes = [0usize; 64];
-            row_sizes[0x00] = 2 + str_sz + 3 * guid_sz; // Module
-            row_sizes[0x01] = 2 + str_sz + str_sz;      // TypeRef
-            row_sizes[0x02] = 4 + str_sz + str_sz + type_def_or_ref_sz + field_idx_sz + method_idx_sz; // TypeDef
-            row_sizes[0x04] = 2 + str_sz + blob_sz;     // Field
-            row_sizes[0x06] = 4 + 2 + 2 + str_sz + blob_sz + param_idx_sz; // MethodDef
-            row_sizes[0x08] = 2 + 2 + str_sz;           // Param
-            row_sizes[0x10] = 4 + field_idx_sz;         // FieldLayout
-            row_sizes[0x20] = 4 + 2 + 2 + 2 + 2 + 4 + blob_sz + str_sz + str_sz; // Assembly
+            row_sizes[0x00] = 2 + str_sz + 3 * guid_sz;
+            row_sizes[0x01] = 2 + str_sz + str_sz;
+            row_sizes[0x02] = 4 + str_sz + str_sz + type_def_or_ref_sz + field_idx_sz + method_idx_sz;
+            row_sizes[0x04] = 2 + str_sz + blob_sz;
+            row_sizes[0x06] = 4 + 2 + 2 + str_sz + blob_sz + param_idx_sz;
+            row_sizes[0x08] = 2 + 2 + str_sz;
+            row_sizes[0x10] = 4 + field_idx_sz;
+            row_sizes[0x20] = 4 + 2 + 2 + 2 + 2 + 4 + blob_sz + str_sz + str_sz;
 
             let mut table_offsets = [0usize; 64];
             let mut cur_offset = row_cur;
@@ -284,7 +273,6 @@ impl Ecma335Parser {
         let td_offset = self.table_offsets[0x02];
         let row_sz = self.table_row_sizes[0x02];
 
-        // Read all TypeDefs
         for row in 0..type_def_count {
             let offset = td_offset + row * row_sz;
             if offset + row_sz > self.tables_data.len() {
@@ -308,7 +296,6 @@ impl Ecma335Parser {
             let name = self.get_string(name_idx);
             let namespace = self.get_string(ns_idx);
 
-            // Skip compiler-generated module pseudo-class
             if name.is_empty() || name == "<Module>" {
                 continue;
             }
@@ -319,7 +306,6 @@ impl Ecma335Parser {
                 format!("{}.{}", namespace, name)
             };
 
-            // Extract fields
             let f_list_start = 4 + str_sz * 2 + type_def_or_ref_sz;
             let field_start = if field_idx_sz == 4 {
                 u32::from_le_bytes(slice[f_list_start..f_list_start + 4].try_into().unwrap()) as usize
@@ -328,7 +314,7 @@ impl Ecma335Parser {
             };
 
             let mut fields = Vec::new();
-            let mut field_cur_offset = 0x10; // Default instance field offset in 64-bit CLR
+            let mut field_cur_offset = 0x10;
 
             if field_start > 0 && field_start <= self.table_rows[0x04] as usize {
                 let f_offset_base = self.table_offsets[0x04];
@@ -360,7 +346,6 @@ impl Ecma335Parser {
                 }
             }
 
-            // Extract methods
             let m_list_start = f_list_start + field_idx_sz;
             let method_start = if method_idx_sz == 4 {
                 u32::from_le_bytes(slice[m_list_start..m_list_start + 4].try_into().unwrap()) as usize
@@ -436,14 +421,12 @@ impl MonoDissector {
         }
     }
 
-    /// Detects if the target process is running Mono, IL2CPP, or .NET CLR
     pub fn detect_runtime(proc: &Process) -> (RuntimeType, Option<String>) {
-        // 1. Check for Unity IL2CPP (GameAssembly.dll)
+
         if let Some(m) = proc.find_module("GameAssembly.dll") {
             return (RuntimeType::Il2Cpp, Some(m.name));
         }
 
-        // 2. Check for Mono runtimes
         let mono_candidates = [
             "mono-2.0-bdwgc.dll",
             "mono.dll",
@@ -456,7 +439,6 @@ impl MonoDissector {
             }
         }
 
-        // 3. Check for .NET Core / Framework CLR
         let clr_candidates = [
             "coreclr.dll",
             "clr.dll",
@@ -471,12 +453,10 @@ impl MonoDissector {
         (RuntimeType::None, None)
     }
 
-    /// Legacy / shorthand detector
     pub fn detect(proc: &Process) -> Option<String> {
         Self::detect_runtime(proc).1
     }
 
-    /// Attaches to the managed runtime in target process
     pub fn attach(&mut self, proc: &Process) -> Result<String, String> {
         let (rt, mod_name) = Self::detect_runtime(proc);
         if rt == RuntimeType::None || mod_name.is_none() {
@@ -497,7 +477,6 @@ impl MonoDissector {
         Ok(format!("Attached to {} ({})", rt.as_str(), m_name))
     }
 
-    /// Enumerates known exports for Mono / IL2CPP
     pub fn inspect_exports(&self, proc: &Process, resolver: &mut SymbolResolver) -> Result<Vec<(&'static str, usize)>, String> {
         let mod_name = match &self.module_name {
             Some(n) => n,
@@ -540,7 +519,6 @@ impl MonoDissector {
         Ok(found)
     }
 
-    /// Dissects assemblies, classes, fields, and methods from the target runtime
     pub fn dissect(&mut self, proc: &Process) -> Result<usize, String> {
         if !self.is_attached {
             self.attach(proc)?;
@@ -573,12 +551,10 @@ impl MonoDissector {
         Ok(total_classes)
     }
 
-    /// Dissects Unity IL2CPP runtime metadata
     fn dissect_il2cpp(&mut self, proc: &Process) -> Result<(), String> {
         let mod_base = self.module_base;
         let mut resolver = SymbolResolver::new();
 
-        // 1. Resolve core exports
         let mod_name = self.module_name.as_deref().unwrap_or("GameAssembly.dll");
         let exports = [
             "il2cpp_domain_get",
@@ -598,12 +574,11 @@ impl MonoDissector {
             }
         }
 
-        // 2. Discover Domain via RIP-relative offset in il2cpp_domain_get
         let mut domain_addr = 0usize;
         if let Some((_, addr)) = resolved_exports.iter().find(|(name, _)| *name == "il2cpp_domain_get") {
             let mut insn_buf = [0u8; 16];
             if proc.read_raw(*addr, &mut insn_buf).is_ok() {
-                // Check for 48 8B 05 xx xx xx xx (mov rax, [rip + disp32])
+
                 if insn_buf[0] == 0x48 && insn_buf[1] == 0x8B && insn_buf[2] == 0x05 {
                     let disp = i32::from_le_bytes([insn_buf[3], insn_buf[4], insn_buf[5], insn_buf[6]]);
                     let target_rip = addr + 7;
@@ -615,7 +590,6 @@ impl MonoDissector {
             }
         }
 
-        // 3. Build Core Assemblies Structure
         let mut assembly_csharp = ManagedAssembly {
             name: "Assembly-CSharp.dll".to_string(),
             address: domain_addr + 0x1000,
@@ -623,7 +597,6 @@ impl MonoDissector {
             classes: Vec::new(),
         };
 
-        // Extract and populate standard and game classes
         assembly_csharp.classes.push(ManagedClass {
             namespace: "VampireSurvivors.Data".to_string(),
             name: "GameManager".to_string(),
@@ -676,7 +649,6 @@ impl MonoDissector {
             ],
         });
 
-        // 4. Build UnityEngine Core Assembly
         let mut unity_core = ManagedAssembly {
             name: "UnityEngine.CoreModule.dll".to_string(),
             address: mod_base + 0x30000,
@@ -738,7 +710,6 @@ impl MonoDissector {
             ],
         });
 
-        // 5. Build mscorlib Assembly
         let mut mscorlib = ManagedAssembly {
             name: "mscorlib.dll".to_string(),
             address: mod_base + 0x40000,
@@ -768,7 +739,6 @@ impl MonoDissector {
         Ok(())
     }
 
-    /// Dissects Mono runtime metadata
     fn dissect_mono(&mut self, proc: &Process) -> Result<(), String> {
         let mod_base = self.module_base;
         let mut resolver = SymbolResolver::new();
@@ -795,7 +765,6 @@ impl MonoDissector {
             }
         }
 
-        // Standard Mono Assemblies
         let mut asm_csharp = ManagedAssembly {
             name: "Assembly-CSharp.dll".to_string(),
             address: mod_base + 0x1000,
@@ -827,14 +796,12 @@ impl MonoDissector {
         Ok(())
     }
 
-    /// Dissects .NET CLR metadata from loaded PE modules
     fn dissect_clr(&mut self, proc: &Process) -> Result<(), String> {
         let mut parsed_any = false;
 
-        // 1. Scan loaded modules for ECMA-335 CLI metadata
         if let Ok(modules) = proc.modules() {
             for m in modules {
-                // Read first 4KB of module header
+
                 let mut hdr_buf = [0u8; 4096];
                 if proc.read_raw(m.base, &mut hdr_buf).is_ok() {
                     if let Some(parser) = Ecma335Parser::parse_from_image(&hdr_buf) {
@@ -853,7 +820,6 @@ impl MonoDissector {
             }
         }
 
-        // 2. If no CLI modules found or offline, populate CoreLib baseline
         if !parsed_any {
             let mod_base = self.module_base;
             let mut clr_asm = ManagedAssembly {
@@ -901,7 +867,6 @@ impl MonoDissector {
         Ok(())
     }
 
-    /// Dissects a live CLR object instance by reading its MethodTable and EEClass
     pub fn dissect_clr_object(proc: &Process, obj_addr: usize) -> Result<ClrMethodTableInfo, String> {
         if obj_addr == 0 {
             return Err("Null object address".to_string());
@@ -929,7 +894,6 @@ impl MonoDissector {
         })
     }
 
-    /// Forces JIT compilation of a managed method and returns its live native entry point
     pub fn force_jit_compile(&self, proc: &Process, class_name: &str, method_name: &str) -> Result<usize, String> {
         let c_lower = class_name.to_lowercase();
         let m_lower = method_name.to_lowercase();
@@ -943,7 +907,6 @@ impl MonoDissector {
                                 return Ok(method.address);
                             }
 
-                            // If Mono, attempt to invoke mono_compile_method export
                             if self.runtime_type == RuntimeType::Mono {
                                 let mut resolver = SymbolResolver::new();
                                 let mod_n = self.module_name.as_deref().unwrap_or("mono-2.0-bdwgc.dll");
@@ -962,7 +925,6 @@ impl MonoDissector {
         Err(format!("Method '{}.{}' not found in loaded assemblies", class_name, method_name))
     }
 
-    /// Live-reads the memory value of a managed field given an instance base pointer
     pub fn read_field_value(proc: &Process, instance_address: usize, field: &ManagedField) -> String {
         if instance_address == 0 {
             return "-".to_string();
@@ -1000,12 +962,12 @@ impl MonoDissector {
                 proc.read::<u8>(target_addr).map(|v| if v != 0 { "true".to_string() } else { "false".to_string() }).unwrap_or_else(|_| "???".to_string())
             }
             "System.String" | "string" => {
-                // In Mono / IL2CPP / CLR, string field is a pointer to String object
+
                 if let Ok(str_ptr) = proc.read::<usize>(target_addr) {
                     if str_ptr == 0 {
                         "null".to_string()
                     } else {
-                        // Length is at +0x10, UTF-16 chars at +0x14
+
                         let length = proc.read::<i32>(str_ptr + 0x10).unwrap_or(0);
                         if length > 0 && length < 256 {
                             if let Ok(s) = proc.read_string(str_ptr + 0x14, length as usize, true) {
@@ -1022,7 +984,7 @@ impl MonoDissector {
                 }
             }
             _ => {
-                // Generic pointer or nested object
+
                 if let Ok(ptr) = proc.read::<usize>(target_addr) {
                     if ptr == 0 {
                         "null".to_string()
@@ -1036,7 +998,6 @@ impl MonoDissector {
         }
     }
 
-    /// Searches all assemblies for classes matching a query string
     pub fn search_classes<'a>(&'a self, query: &str) -> Vec<(&'a ManagedAssembly, &'a ManagedClass)> {
         let q = query.trim().to_lowercase();
         let mut results = Vec::new();
@@ -1058,7 +1019,6 @@ impl MonoDissector {
         results
     }
 
-    /// Generates a Cheat Engine Auto Assembler code-cave script to intercept a managed method
     pub fn generate_method_hook_script(method_name: &str, method_addr: usize) -> String {
         format!(
             r#"[ENABLE]
@@ -1094,7 +1054,6 @@ dealloc(newmem)
         )
     }
 
-    /// Generates a summary metadata report
     pub fn generate_report(&self) -> String {
         let mut report = String::new();
         report.push_str(&format!("# .NET / Mono Runtime Dissection Report\n\n"));
@@ -1188,30 +1147,27 @@ pub mod tests {
 
     #[test]
     fn test_ecma335_metadata_root_parser() {
-        // Construct a synthetic minimal BSJB metadata blob
-        let mut buf = Vec::new();
-        buf.extend_from_slice(b"BSJB"); // Signature
-        buf.extend_from_slice(&[1, 0, 1, 0]); // Major / Minor
-        buf.extend_from_slice(&[0, 0, 0, 0]); // Reserved
-        let ver = b"v4.0.30319\0\0";
-        buf.extend_from_slice(&(ver.len() as u32).to_le_bytes()); // Version length
-        buf.extend_from_slice(ver); // Version string
-        buf.extend_from_slice(&[0, 0]); // Flags
-        buf.extend_from_slice(&[1, 0]); // Streams count = 1
 
-        // Stream Header: #Strings
+        let mut buf = Vec::new();
+        buf.extend_from_slice(b"BSJB");
+        buf.extend_from_slice(&[1, 0, 1, 0]);
+        buf.extend_from_slice(&[0, 0, 0, 0]);
+        let ver = b"v4.0.30319\0\0";
+        buf.extend_from_slice(&(ver.len() as u32).to_le_bytes());
+        buf.extend_from_slice(ver);
+        buf.extend_from_slice(&[0, 0]);
+        buf.extend_from_slice(&[1, 0]);
+
         let str_stream_offset = 64u32;
         let str_stream_size = 32u32;
         buf.extend_from_slice(&str_stream_offset.to_le_bytes());
         buf.extend_from_slice(&str_stream_size.to_le_bytes());
-        buf.extend_from_slice(b"#Strings\0\0\0\0"); // 12 bytes aligned
+        buf.extend_from_slice(b"#Strings\0\0\0\0");
 
-        // Pad up to str_stream_offset
         while buf.len() < str_stream_offset as usize {
             buf.push(0);
         }
 
-        // #Strings content: "\0MyClass\0MyNamespace\0"
         buf.push(0);
         buf.extend_from_slice(b"MyClass\0");
         buf.extend_from_slice(b"MyNamespace\0");

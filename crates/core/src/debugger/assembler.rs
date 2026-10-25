@@ -1,6 +1,3 @@
-// language: Rust, file: assembler.rs, target: Windows 11, MSVC
-// Native x86 / x64 Instruction JIT Assembler and Code Cave Encoder for Cheat Engine 7.7
-// Supports instructions, register operands, ModR/M, SIB, RIP-relative addressing, and pseudo-ops.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegSize {
@@ -12,15 +9,15 @@ pub enum RegSize {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RegInfo {
-    pub id: u8, // 0..15
+    pub id: u8,
     pub size: RegSize,
-    pub is_high_byte: bool, // ah, ch, dh, bh
+    pub is_high_byte: bool,
 }
 
 pub fn parse_reg(s: &str) -> Option<RegInfo> {
     let lower = s.trim().to_lowercase();
     match lower.as_str() {
-        // 64-bit
+
         "rax" => Some(RegInfo { id: 0, size: RegSize::Qword, is_high_byte: false }),
         "rcx" => Some(RegInfo { id: 1, size: RegSize::Qword, is_high_byte: false }),
         "rdx" => Some(RegInfo { id: 2, size: RegSize::Qword, is_high_byte: false }),
@@ -38,7 +35,6 @@ pub fn parse_reg(s: &str) -> Option<RegInfo> {
         "r14" => Some(RegInfo { id: 14, size: RegSize::Qword, is_high_byte: false }),
         "r15" => Some(RegInfo { id: 15, size: RegSize::Qword, is_high_byte: false }),
 
-        // 32-bit
         "eax" => Some(RegInfo { id: 0, size: RegSize::Dword, is_high_byte: false }),
         "ecx" => Some(RegInfo { id: 1, size: RegSize::Dword, is_high_byte: false }),
         "edx" => Some(RegInfo { id: 2, size: RegSize::Dword, is_high_byte: false }),
@@ -56,7 +52,6 @@ pub fn parse_reg(s: &str) -> Option<RegInfo> {
         "r14d" => Some(RegInfo { id: 14, size: RegSize::Dword, is_high_byte: false }),
         "r15d" => Some(RegInfo { id: 15, size: RegSize::Dword, is_high_byte: false }),
 
-        // 16-bit
         "ax"  => Some(RegInfo { id: 0, size: RegSize::Word, is_high_byte: false }),
         "cx"  => Some(RegInfo { id: 1, size: RegSize::Word, is_high_byte: false }),
         "dx"  => Some(RegInfo { id: 2, size: RegSize::Word, is_high_byte: false }),
@@ -74,7 +69,6 @@ pub fn parse_reg(s: &str) -> Option<RegInfo> {
         "r14w" => Some(RegInfo { id: 14, size: RegSize::Word, is_high_byte: false }),
         "r15w" => Some(RegInfo { id: 15, size: RegSize::Word, is_high_byte: false }),
 
-        // 8-bit
         "al"  => Some(RegInfo { id: 0, size: RegSize::Byte, is_high_byte: false }),
         "cl"  => Some(RegInfo { id: 1, size: RegSize::Byte, is_high_byte: false }),
         "dl"  => Some(RegInfo { id: 2, size: RegSize::Byte, is_high_byte: false }),
@@ -105,7 +99,7 @@ pub fn parse_reg(s: &str) -> Option<RegInfo> {
 pub struct MemOperand {
     pub base: Option<RegInfo>,
     pub index: Option<RegInfo>,
-    pub scale: u8, // 1, 2, 4, 8
+    pub scale: u8,
     pub disp: i64,
     pub is_rip_relative: bool,
     pub explicit_size: Option<RegSize>,
@@ -150,14 +144,12 @@ pub fn parse_mem_operand(s: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> O
         });
     }
 
-    // Parse tokens split by '+' or '-'
     let mut base = None;
     let mut index = None;
     let mut scale = 1;
     let mut disp: i64 = 0;
     let mut is_rip = false;
 
-    // Normalizing signs: replace '-' with '+-'
     let mut tokens: Vec<(bool, String)> = Vec::new();
     let mut cur = String::new();
     let mut positive = true;
@@ -190,7 +182,6 @@ pub fn parse_mem_operand(s: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> O
             continue;
         }
 
-        // Check if token has scale: reg*scale or scale*reg
         if let Some(star_pos) = t.find('*') {
             let p1 = t[..star_pos].trim();
             let p2 = t[star_pos + 1..].trim();
@@ -206,7 +197,6 @@ pub fn parse_mem_operand(s: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> O
             }
         }
 
-        // Check if single register
         if let Some(r) = parse_reg(t) {
             if base.is_none() {
                 base = Some(r);
@@ -217,7 +207,6 @@ pub fn parse_mem_operand(s: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> O
             continue;
         }
 
-        // Try number or symbol
         let num_val = if let Some(n) = parse_int_or_hex(t) {
             Some(n)
         } else if let Some(sym_addr) = resolver(t) {
@@ -272,7 +261,7 @@ pub fn parse_int_or_hex(s: &str) -> Option<i64> {
 pub struct Assembler;
 
 impl Assembler {
-    /// Assembles a single line of x86/x64 instruction or data pseudo-op into machine bytes
+
     pub fn assemble_line(
         line: &str,
         current_ip: usize,
@@ -285,7 +274,6 @@ impl Assembler {
 
         let lower = trimmed.to_lowercase();
 
-        // 1. Data pseudo-ops
         if lower.starts_with("db ") {
             return parse_db_directive(&trimmed[3..], resolver);
         } else if lower.starts_with("dw ") {
@@ -302,7 +290,6 @@ impl Assembler {
             return Ok(d.to_ne_bytes().to_vec());
         }
 
-        // 2. Simple 1-byte opcodes
         match lower.as_str() {
             "nop" => return Ok(vec![0x90]),
             "ret" => return Ok(vec![0xC3]),
@@ -314,7 +301,6 @@ impl Assembler {
             _ => {}
         }
 
-        // Extract mnemonic and operands
         let (mnemonic, ops_str) = match trimmed.find(|c: char| c.is_whitespace()) {
             Some(idx) => (trimmed[..idx].trim().to_lowercase(), trimmed[idx..].trim()),
             None => (lower.clone(), ""),
@@ -394,15 +380,14 @@ impl Assembler {
                     b.extend_from_slice(&(rel as i32).to_le_bytes());
                     return Ok(b);
                 } else {
-                    // 64-bit indirect call via rax or code cave
-                    let mut b = vec![0x48, 0xB8]; // mov rax, target
+
+                    let mut b = vec![0x48, 0xB8];
                     b.extend_from_slice(&(target as u64).to_le_bytes());
-                    b.extend_from_slice(&[0xFF, 0xD0]); // call rax
+                    b.extend_from_slice(&[0xFF, 0xD0]);
                     return Ok(b);
                 }
             }
 
-            // Conditional jumps
             "je" | "jz"   => return assemble_cond_jump(0x84, 0x74, ops_str, current_ip, resolver),
             "jne" | "jnz" => return assemble_cond_jump(0x85, 0x75, ops_str, current_ip, resolver),
             "jb" | "jc"   => return assemble_cond_jump(0x82, 0x72, ops_str, current_ip, resolver),
@@ -454,7 +439,6 @@ fn assemble_branch(
 ) -> Result<Vec<u8>, String> {
     let trimmed = target_str.trim();
 
-    // 1. Direct register target: jmp rax
     if let Some(reg) = parse_reg(trimmed) {
         if reg.id >= 8 {
             return Ok(vec![0x41, 0xFF, 0xE0 + (reg.id - 8)]);
@@ -463,12 +447,10 @@ fn assemble_branch(
         }
     }
 
-    // 2. Memory indirect target: jmp [rax], jmp [rip+disp]
     if let Some(mem) = parse_mem_operand(trimmed, resolver) {
         return encode_modrm_insn(0xFF, 0xFF, RegInfo { id: 4, size: RegSize::Qword, is_high_byte: false }, &mem, false);
     }
 
-    // 3. Explicit short jump: jmp short target
     let (is_explicit_short, clean_target) = if let Some(stripped) = trimmed.strip_prefix("short ") {
         (true, stripped.trim())
     } else {
@@ -495,7 +477,6 @@ fn assemble_branch(
         return Ok(b);
     }
 
-    // 14-byte 64-bit absolute jmp
     let mut b = vec![0xFF, 0x25, 0x00, 0x00, 0x00, 0x00];
     b.extend_from_slice(&(target as u64).to_le_bytes());
     Ok(b)
@@ -549,7 +530,6 @@ fn assemble_mov(ops_str: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> Resu
     let dst_reg = parse_reg(dst_str);
     let src_reg = parse_reg(src_str);
 
-    // 1. mov reg, reg
     if let (Some(dst), Some(src)) = (dst_reg, src_reg) {
         let mut bytes = Vec::new();
         let rex = make_rex(dst.size == RegSize::Qword, src.id >= 8, false, dst.id >= 8);
@@ -566,7 +546,6 @@ fn assemble_mov(ops_str: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> Resu
         return Ok(bytes);
     }
 
-    // 2. mov reg, imm
     if let (Some(dst), None) = (dst_reg, src_reg) {
         if let Some(imm) = parse_int_or_hex(src_str).or_else(|| resolver(src_str).map(|a| a as i64)) {
             let mut bytes = Vec::new();
@@ -604,21 +583,18 @@ fn assemble_mov(ops_str: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> Resu
         }
     }
 
-    // 3. mov reg, [mem]
     if let (Some(dst), None) = (dst_reg, src_reg) {
         if let Some(mem) = parse_mem_operand(src_str, resolver) {
             return encode_modrm_insn(0x8B, 0x8A, dst, &mem, false);
         }
     }
 
-    // 4. mov [mem], reg
     if let (None, Some(src)) = (dst_reg, src_reg) {
         if let Some(mem) = parse_mem_operand(dst_str, resolver) {
             return encode_modrm_insn(0x89, 0x88, src, &mem, true);
         }
     }
 
-    // 5. mov [mem], imm
     if dst_reg.is_none() && src_reg.is_none() {
         if let Some(mem) = parse_mem_operand(dst_str, resolver) {
             if let Some(imm) = parse_int_or_hex(src_str).or_else(|| resolver(src_str).map(|a| a as i64)) {
@@ -651,7 +627,6 @@ fn assemble_alu(base_opcode: u8, reg_op: u8, ops_str: &str, resolver: &dyn Fn(&s
     let dst_reg = parse_reg(dst_str);
     let src_reg = parse_reg(src_str);
 
-    // op reg, reg
     if let (Some(dst), Some(src)) = (dst_reg, src_reg) {
         let mut bytes = Vec::new();
         let rex = make_rex(dst.size == RegSize::Qword, src.id >= 8, false, dst.id >= 8);
@@ -668,21 +643,18 @@ fn assemble_alu(base_opcode: u8, reg_op: u8, ops_str: &str, resolver: &dyn Fn(&s
         return Ok(bytes);
     }
 
-    // op reg, [mem]
     if let (Some(dst), None) = (dst_reg, src_reg) {
         if let Some(mem) = parse_mem_operand(src_str, resolver) {
             return encode_modrm_insn(base_opcode + 3, base_opcode + 2, dst, &mem, false);
         }
     }
 
-    // op [mem], reg
     if let (None, Some(src)) = (dst_reg, src_reg) {
         if let Some(mem) = parse_mem_operand(dst_str, resolver) {
             return encode_modrm_insn(base_opcode + 1, base_opcode, src, &mem, true);
         }
     }
 
-    // op reg, imm
     if let (Some(dst), None) = (dst_reg, src_reg) {
         if let Some(imm) = parse_int_or_hex(src_str).or_else(|| resolver(src_str).map(|a| a as i64)) {
             let mut bytes = Vec::new();
@@ -711,7 +683,6 @@ fn assemble_alu(base_opcode: u8, reg_op: u8, ops_str: &str, resolver: &dyn Fn(&s
         }
     }
 
-    // op [mem], imm
     if dst_reg.is_none() && src_reg.is_none() {
         if let Some(mem) = parse_mem_operand(dst_str, resolver) {
             if let Some(imm) = parse_int_or_hex(src_str).or_else(|| resolver(src_str).map(|a| a as i64)) {
@@ -822,7 +793,6 @@ fn encode_modrm_insn(
 
     let reg_bits = reg.id & 7;
 
-    // RIP relative: [rip + disp32]
     if mem.is_rip_relative {
         bytes.push(0x05 | (reg_bits << 3));
         bytes.extend_from_slice(&(mem.disp as i32).to_le_bytes());
@@ -832,9 +802,9 @@ fn encode_modrm_insn(
     let base_reg = match &mem.base {
         Some(b) => b,
         None => {
-            // Absolute 32-bit displacement without base register
+
             bytes.push(0x04 | (reg_bits << 3));
-            bytes.push(0x25); // SIB [disp32]
+            bytes.push(0x25);
             bytes.extend_from_slice(&(mem.disp as i32).to_le_bytes());
             return Ok(bytes);
         }
@@ -842,10 +812,8 @@ fn encode_modrm_insn(
 
     let base_id = base_reg.id & 7;
 
-    // SIB needed if base is rsp/r12 or index is present
     let needs_sib = base_id == 4 || mem.index.is_some();
 
-    // Determine mod
     let (mod_bits, disp_size) = if mem.disp == 0 && base_id != 5 {
         (0x00, 0)
     } else if mem.disp >= -128 && mem.disp <= 127 {
@@ -1051,31 +1019,23 @@ mod tests {
     fn test_assemble_simple_instructions() {
         let resolver = |_s: &str| None;
 
-        // nop
         assert_eq!(Assembler::assemble_line("nop", 0x1000, &resolver).unwrap(), vec![0x90]);
 
-        // ret
         assert_eq!(Assembler::assemble_line("ret", 0x1000, &resolver).unwrap(), vec![0xC3]);
 
-        // push rax
         assert_eq!(Assembler::assemble_line("push rax", 0x1000, &resolver).unwrap(), vec![0x50]);
 
-        // push r8
         assert_eq!(Assembler::assemble_line("push r8", 0x1000, &resolver).unwrap(), vec![0x41, 0x50]);
 
-        // pop rbx
         assert_eq!(Assembler::assemble_line("pop rbx", 0x1000, &resolver).unwrap(), vec![0x5B]);
 
-        // mov rax, 0x1234567890ABCDEF
         let mov_imm64 = Assembler::assemble_line("mov rax, 0x1234567890ABCDEF", 0x1000, &resolver).unwrap();
         assert_eq!(mov_imm64[0..2], [0x48, 0xB8]);
         assert_eq!(mov_imm64[2..], 0x1234567890ABCDEFu64.to_le_bytes());
 
-        // mov [rax+0x10], 0
         let mov_mem_imm = Assembler::assemble_line("mov [rax+0x10], 0", 0x1000, &resolver).unwrap();
         assert_eq!(mov_mem_imm, vec![0xC7, 0x40, 0x10, 0x00, 0x00, 0x00, 0x00]);
 
-        // add [rbx], 5
         let add_mem_imm = Assembler::assemble_line("add [rbx], 5", 0x1000, &resolver).unwrap();
         assert_eq!(add_mem_imm, vec![0x83, 0x03, 0x05]);
     }
@@ -1090,24 +1050,21 @@ mod tests {
             }
         };
 
-        // jmp short target_label from 0x1FFD (rel2 = +1) -> short jmp EB 01
         let short_jmp = Assembler::assemble_line("jmp short target_label", 0x1FFD, &sym_table).unwrap();
         assert_eq!(short_jmp, vec![0xEB, 0x01]);
 
-        // jmp target_label (default deterministic 5-byte near jmp)
         let near_jmp = Assembler::assemble_line("jmp target_label", 0x1000, &sym_table).unwrap();
         assert_eq!(near_jmp[0], 0xE9);
         assert_eq!(near_jmp.len(), 5);
 
-        // jmp rax & call r8
         let jmp_rax = Assembler::assemble_line("jmp rax", 0x1000, &sym_table).unwrap();
         assert_eq!(jmp_rax, vec![0xFF, 0xE0]);
 
         let call_r8 = Assembler::assemble_line("call r8", 0x1000, &sym_table).unwrap();
         assert_eq!(call_r8, vec![0x41, 0xFF, 0xD0]);
 
-        // db directive
         let db = Assembler::assemble_line("db 0x90, 0x90, 'OK', 0", 0x1000, &sym_table).unwrap();
         assert_eq!(db, vec![0x90, 0x90, b'O', b'K', 0]);
     }
 }
+
