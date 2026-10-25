@@ -4093,19 +4093,19 @@ end;
 procedure TMainForm.miMCPStartClick(Sender: TObject);
 begin
   if LuaVM <> nil then
-    lua_dostring(LuaVM, 'if StartMCPBridge then StartMCPBridge() end');
+    lua_dostring(LuaVM, 'if StartMCPBridge then StartMCPBridge() showMessage("[MCP] Servidor MCP ligado com sucesso!" .. string.char(10) .. "Escutando requisicoes no pipe local.") else showMessage("[MCP] Erro: Ponte MCP nao carregada.") end');
 end;
 
 procedure TMainForm.miMCPStopClick(Sender: TObject);
 begin
   if LuaVM <> nil then
-    lua_dostring(LuaVM, 'if StopMCPBridge then StopMCPBridge() end');
+    lua_dostring(LuaVM, 'if StopMCPBridge then StopMCPBridge() showMessage("[MCP] Servidor MCP desligado.") else showMessage("[MCP] Erro: Ponte MCP nao encontrada.") end');
 end;
 
 procedure TMainForm.miMCPRestartClick(Sender: TObject);
 begin
   if LuaVM <> nil then
-    lua_dostring(LuaVM, 'if StopMCPBridge and StartMCPBridge then StopMCPBridge(); StartMCPBridge(); end');
+    lua_dostring(LuaVM, 'if StopMCPBridge and StartMCPBridge then StopMCPBridge(); StartMCPBridge(); showMessage("[MCP] Servidor MCP reiniciado com sucesso!") else showMessage("[MCP] Erro ao reiniciar.") end');
 end;
 
 procedure TMainForm.miMCPSettingsClick(Sender: TObject);
@@ -5768,6 +5768,8 @@ begin
     addresslist.selectedRecord.Extra.stringData.ZeroTerminate := not
       addresslist.selectedRecord.Extra.stringData.ZeroTerminate;
 end;
+
+
 
 procedure TMainForm.Panel5Resize(Sender: TObject);
 var
@@ -11691,5 +11693,3 @@ initialization
   {$i MainUnit.lrs}
 
 end.
-
-open

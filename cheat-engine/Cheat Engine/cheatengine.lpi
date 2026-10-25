@@ -9,12 +9,12 @@
       </Flags>
       <SessionStorage Value="InProjectDir"/>
       <AutoCreateForms Value="False"/>
-      <Title Value="Cheat Engine 7.5"/>
+      <Title Value="OnyxEngine"/>
       <UseXPManifest Value="True"/>
       <XPManifest>
         <DpiAware Value="True"/>
-        <TextName Value="Cheat Engine"/>
-        <TextDesc Value="Scripting language and tools"/>
+        <TextName Value="OnyxEngine"/>
+        <TextDesc Value="Advanced Memory Analysis Platform"/>
       </XPManifest>
       <Icon Value="0"/>
     </General>
@@ -27,10 +27,10 @@
       <AutoIncrementBuild Value="True"/>
       <MajorVersionNr Value="7"/>
       <MinorVersionNr Value="5"/>
-      <BuildNr Value="7734"/>
+      <BuildNr Value="7736"/>
       <Language Value="041C"/>
       <CharSet Value="04B0"/>
-      <StringTable CompanyName="Cheat Engine" FileDescription="Cheat Engine" ProductVersion="7.5"/>
+      <StringTable CompanyName="OnyxEngine" FileDescription="OnyxEngine Platform" ProductVersion="1.0"/>
     </VersionInfo>
     <BuildModes Count="11">
       <Item1 Name="Release 32-Bit" Default="True"/>
@@ -39,7 +39,7 @@
           <Version Value="11"/>
           <PathDelim Value="\"/>
           <Target>
-            <Filename Value="bin\cheatengine-$(TargetCPU)"/>
+            <Filename Value="bin\OnyxEngine-$(TargetCPU)"/>
           </Target>
           <SearchPaths>
             <IncludeFiles Value="$(ProjOutDir);$(LazarusDir)\ide\include\$(TargetOS);$(LazarusDir)\images;$(LazarusDir)\ideintf\images"/>

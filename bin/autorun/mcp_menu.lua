@@ -317,6 +317,7 @@ local function initializeMCPMenu()
         if StartMCPBridge then
             StartMCPBridge()
             safeLog("Servidor MCP iniciado via menu.")
+            showMessage("[MCP] Servidor MCP ligado com sucesso!\nEscutando requisicoes no pipe local.")
         else
             showMessage("Erro: Funcao StartMCPBridge nao encontrada.")
         end
@@ -330,6 +331,7 @@ local function initializeMCPMenu()
         if StopMCPBridge then
             StopMCPBridge()
             safeLog("Servidor MCP parado via menu.")
+            showMessage("[MCP] Servidor MCP desligado.")
         else
             showMessage("Erro: Funcao StopMCPBridge nao encontrada.")
         end
@@ -348,6 +350,7 @@ local function initializeMCPMenu()
                 timerObj.destroy()
                 StartMCPBridge()
                 safeLog("Servidor MCP reiniciado via menu.")
+                showMessage("[MCP] Servidor MCP reiniciado com sucesso!")
             end
         end
     end
