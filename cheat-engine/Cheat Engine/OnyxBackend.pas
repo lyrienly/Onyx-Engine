@@ -73,6 +73,15 @@ type
   end;
   POnyxVehHit = ^TOnyxVehHit;
 
+  TOnyxVehSlot = packed record
+    index: DWORD;
+    address: PtrUInt;
+    bp_type: integer;
+    size: integer;
+  end;
+  POnyxVehSlot = ^TOnyxVehSlot;
+  TOnyxVehSlotArray = array[0..3] of TOnyxVehSlot;
+
   TOnyxCodecaveEntry = packed record
     address: PtrUInt;
     size: PtrUInt;
@@ -319,6 +328,7 @@ function onyx_veh_set_hw_bp(process: Pointer; address: PtrUInt; bp_type: integer
 function onyx_veh_clear_hw_bp(process: Pointer; index: PtrUInt): integer; stdcall; external OnyxBackendDLL;
 function onyx_veh_poll_hit(process: Pointer; out_rip: PPtrUInt; out_thread_id: PDWORD): integer; stdcall; external OnyxBackendDLL;
 function onyx_veh_monitor_address(process: Pointer; address: PtrUInt; bp_type: integer; size: integer; duration_secs: UInt64; out_hits: Pointer; max_hits: DWORD; out_count: PDWORD): integer; stdcall; external OnyxBackendDLL;
+function onyx_veh_slot_status(process: Pointer; out_slots: Pointer; max_slots: DWORD; out_count: PDWORD): integer; stdcall; external OnyxBackendDLL;
 procedure onyx_veh_cleanup; stdcall; external OnyxBackendDLL;
 
 var
@@ -384,6 +394,9 @@ function OnyxVehInject(dllPath: string = ''): Boolean;
 function OnyxVehSetHardwareBreakpoint(address: PtrUInt; bpType: integer = 1; size: integer = 4): integer;
 function OnyxVehClearHardwareBreakpoint(index: PtrUInt): Boolean;
 function OnyxVehPollHit(var hitRip: PtrUInt; var threadId: DWORD): Boolean;
+function OnyxVehSlotStatus(var slots: TOnyxVehSlotArray): integer;
+function OnyxVehHasActiveBreakpoints: Boolean;
+function OnyxVehErrorText(code: integer): string;
 
 function OnyxMonoDetect: integer;
 function OnyxMonoDissect: integer;
@@ -1031,6 +1044,57 @@ begin
   end
   else
     Result := False;
+end;
+
+function OnyxVehSlotStatus(var slots: TOnyxVehSlotArray): integer;
+var
+  pProc: Pointer;
+  used: integer;
+begin
+  FillChar(slots, SizeOf(slots), 0);
+  Result := 0;
+
+  pProc := OnyxEnsureAttachedProcess;
+  if pProc = nil then Exit;
+
+  used := onyx_veh_slot_status(pProc, @slots[0], Length(slots), nil);
+  if used < 0 then
+    Exit;
+
+  if used > Length(slots) then
+    used := Length(slots);
+
+  Result := used;
+end;
+
+function OnyxVehHasActiveBreakpoints: Boolean;
+begin
+  Result := False;
+
+  // Deliberately avoid OnyxEnsureAttachedProcess: this probe must not attach,
+  // it only reports whether the current session already owns DR slots.
+  if CurrentOnyxProcessHandle = nil then
+    Exit;
+
+  if CurrentOnyxPID <> ProcessHandlerUnit.ProcessID then
+    Exit;
+
+  Result := onyx_veh_slot_status(CurrentOnyxProcessHandle, nil, 0, nil) > 0;
+end;
+
+function OnyxVehErrorText(code: integer): string;
+begin
+  case code of
+    -2: Result := 'All 4 hardware breakpoint slots are in use';
+    -3: Result := 'Invalid hardware breakpoint slot (must be 0..3)';
+    -4: Result := 'Target process has no active threads';
+    -5: Result := 'Failed to update thread debug registers';
+  else
+    if code < 0 then
+      Result := 'Unknown hardware breakpoint error (' + IntToStr(code) + ')'
+    else
+      Result := '';
+  end;
 end;
 
 function OnyxMonoDetect: integer;

@@ -44,12 +44,20 @@ impl HardwareBreakpointMonitor {
 
     pub fn monitor_address(
         proc: &Process,
+        slot: usize,
         watch_addr: usize,
         bp_type: BreakpointType,
         size: BreakpointSize,
         duration_secs: u64,
         stop_signal: Arc<AtomicBool>,
     ) -> Result<Vec<AccessHit>, String> {
+        if slot >= HW_BREAKPOINT_SLOTS {
+            return Err(format!(
+                "hardware breakpoint slot {} out of range (0..{})",
+                slot,
+                HW_BREAKPOINT_SLOTS - 1
+            ));
+        }
         let pid = proc.pid;
         let thread_ids = proc.threads()?;
         if thread_ids.is_empty() {
@@ -61,9 +69,7 @@ impl HardwareBreakpointMonitor {
             return Err(format!("DebugActiveProcess failed for PID {}", pid));
         }
 
-        for &tid in &thread_ids {
-            let _ = set_hw_breakpoint_on_thread(tid, 0, watch_addr, bp_type, size);
-        }
+        set_hw_breakpoint_for_threads(&thread_ids, slot, watch_addr, bp_type, size)?;
 
         let mut hits: HashMap<usize, AccessHit> = HashMap::new();
         let start_time = std::time::Instant::now();
@@ -141,9 +147,7 @@ impl HardwareBreakpointMonitor {
             }
         }
 
-        for &tid in &thread_ids {
-            let _ = clear_hw_breakpoint_on_thread(tid, 0);
-        }
+        let _ = clear_hw_breakpoint_from_threads(&thread_ids, slot);
 
         unsafe {
             DebugActiveProcessStop(pid);
@@ -155,6 +159,148 @@ impl HardwareBreakpointMonitor {
     }
 }
 
+pub const HW_BREAKPOINT_SLOTS: usize = 4;
+
+const DR7_ENABLE_SHIFT_STEP: usize = 2;
+const DR7_RW_SHIFT_BASE: usize = 16;
+const DR7_LEN_SHIFT_BASE: usize = 18;
+const DR7_FIELD_MASK: u64 = 0b11;
+
+fn check_slot(index: usize) -> Result<(), String> {
+    if index >= HW_BREAKPOINT_SLOTS {
+        return Err(format!(
+            "Hardware breakpoint index must be 0..{}",
+            HW_BREAKPOINT_SLOTS - 1
+        ));
+    }
+    Ok(())
+}
+
+fn dr_slot_value(ctx: &CONTEXT, index: usize) -> u64 {
+    match index {
+        0 => ctx.Dr0,
+        1 => ctx.Dr1,
+        2 => ctx.Dr2,
+        3 => ctx.Dr3,
+        _ => 0,
+    }
+}
+
+fn set_dr_slot_value(ctx: &mut CONTEXT, index: usize, value: u64) {
+    match index {
+        0 => ctx.Dr0 = value,
+        1 => ctx.Dr1 = value,
+        2 => ctx.Dr2 = value,
+        3 => ctx.Dr3 = value,
+        _ => {}
+    }
+}
+
+fn dr_slot_enabled(ctx: &CONTEXT, index: usize) -> bool {
+    ctx.Dr7 & (1u64 << (index * DR7_ENABLE_SHIFT_STEP)) != 0
+}
+
+fn dr_slot_matches(
+    ctx: &CONTEXT,
+    index: usize,
+    address: usize,
+    bp_type: BreakpointType,
+    size: BreakpointSize,
+) -> bool {
+    if !dr_slot_enabled(ctx, index) {
+        return false;
+    }
+    if dr_slot_value(ctx, index) != address as u64 {
+        return false;
+    }
+    let rw = (ctx.Dr7 >> (DR7_RW_SHIFT_BASE + index * 4)) & DR7_FIELD_MASK;
+    let len = (ctx.Dr7 >> (DR7_LEN_SHIFT_BASE + index * 4)) & DR7_FIELD_MASK;
+    rw == bp_type as u64 && len == size as u64
+}
+
+fn apply_dr_slot(
+    ctx: &mut CONTEXT,
+    index: usize,
+    address: usize,
+    bp_type: BreakpointType,
+    size: BreakpointSize,
+) {
+    set_dr_slot_value(ctx, index, address as u64);
+
+    let enable_bit = 1u64 << (index * DR7_ENABLE_SHIFT_STEP);
+    let rw_shift = DR7_RW_SHIFT_BASE + index * 4;
+    let len_shift = DR7_LEN_SHIFT_BASE + index * 4;
+
+    ctx.Dr7 |= enable_bit;
+    ctx.Dr7 &= !((DR7_FIELD_MASK << rw_shift) | (DR7_FIELD_MASK << len_shift));
+    ctx.Dr7 |= (bp_type as u64) << rw_shift;
+    ctx.Dr7 |= (size as u64) << len_shift;
+}
+
+fn open_thread_handle(tid: u32) -> Result<HANDLE, String> {
+    let handle = unsafe { OpenThread(THREAD_ALL_ACCESS, FALSE, tid) };
+    if handle.is_null() || handle == INVALID_HANDLE_VALUE {
+        return Err(format!(
+            "Failed to open thread ID {} (error {})",
+            tid,
+            unsafe { GetLastError() }
+        ));
+    }
+    Ok(handle)
+}
+
+fn read_debug_context(handle: HANDLE, tid: u32) -> Result<CONTEXT, String> {
+    let mut ctx: CONTEXT = unsafe { zeroed() };
+    ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+    if unsafe { GetThreadContext(handle, &mut ctx) } != TRUE {
+        return Err(format!(
+            "GetThreadContext failed for thread {} (error {})",
+            tid,
+            unsafe { GetLastError() }
+        ));
+    }
+    Ok(ctx)
+}
+
+fn write_debug_context(handle: HANDLE, tid: u32, ctx: &CONTEXT) -> Result<(), String> {
+    if unsafe { SetThreadContext(handle, ctx) } != TRUE {
+        return Err(format!(
+            "SetThreadContext failed for thread {} (error {})",
+            tid,
+            unsafe { GetLastError() }
+        ));
+    }
+    Ok(())
+}
+
+/// Suspends `tid` for the duration of `op`, then always resumes it exactly once.
+/// A thread that was already suspended is left at its previous suspend count.
+fn with_suspended_thread<T, F>(tid: u32, op: F) -> Result<T, String>
+where
+    F: FnOnce(HANDLE) -> Result<T, String>,
+{
+    let handle = open_thread_handle(tid)?;
+
+    let previous_count = unsafe { SuspendThread(handle) };
+    if previous_count == u32::MAX {
+        let error = unsafe { GetLastError() };
+        unsafe { CloseHandle(handle) };
+        return Err(format!(
+            "SuspendThread failed for thread {} (error {})",
+            tid, error
+        ));
+    }
+
+    let result = op(handle);
+
+    unsafe {
+        ResumeThread(handle);
+        CloseHandle(handle);
+    }
+
+    result
+}
+
 pub fn set_hw_breakpoint_on_thread(
     tid: u32,
     index: usize,
@@ -162,84 +308,83 @@ pub fn set_hw_breakpoint_on_thread(
     bp_type: BreakpointType,
     size: BreakpointSize,
 ) -> Result<(), String> {
-    if index > 3 {
-        return Err("Hardware breakpoint index must be 0, 1, 2, or 3".to_string());
-    }
+    check_slot(index)?;
 
-    let h_thread = unsafe { OpenThread(THREAD_ALL_ACCESS, FALSE, tid) };
-    if h_thread.is_null() || h_thread == INVALID_HANDLE_VALUE {
-        return Err(format!("Failed to open thread ID {}", tid));
-    }
+    with_suspended_thread(tid, |handle| {
+        let mut ctx = read_debug_context(handle, tid)?;
+        apply_dr_slot(&mut ctx, index, address, bp_type, size);
+        write_debug_context(handle, tid, &ctx)
+    })
+}
 
-    unsafe {
-        SuspendThread(h_thread);
+/// Applies one hardware breakpoint slot to every thread, skipping threads that
+/// already have the identical slot configured. Returns how many threads changed.
+///
+/// If a thread fails, the threads already updated by this call are rolled back,
+/// so the caller never observes a half-applied breakpoint.
+pub fn set_hw_breakpoint_for_threads(
+    threads: &[u32],
+    index: usize,
+    address: usize,
+    bp_type: BreakpointType,
+    size: BreakpointSize,
+) -> Result<usize, String> {
+    check_slot(index)?;
 
-        let mut ctx: CONTEXT = zeroed();
-        ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+    let mut applied: Vec<u32> = Vec::with_capacity(threads.len());
 
-        if GetThreadContext(h_thread, &mut ctx) == TRUE {
+    for &tid in threads {
+        let outcome = with_suspended_thread(tid, |handle| {
+            let mut ctx = read_debug_context(handle, tid)?;
 
-            match index {
-                0 => ctx.Dr0 = address as u64,
-                1 => ctx.Dr1 = address as u64,
-                2 => ctx.Dr2 = address as u64,
-                3 => ctx.Dr3 = address as u64,
-                _ => {}
+            if dr_slot_matches(&ctx, index, address, bp_type, size) {
+                return Ok(false);
             }
 
-            let enable_bit = 1 << (index * 2);
-            let rw_shift = 16 + (index * 4);
-            let len_shift = 18 + (index * 4);
+            apply_dr_slot(&mut ctx, index, address, bp_type, size);
+            write_debug_context(handle, tid, &ctx)?;
+            Ok(true)
+        });
 
-            ctx.Dr7 |= enable_bit;
-
-            ctx.Dr7 &= !((0b11 << rw_shift) | (0b11 << len_shift));
-
-            ctx.Dr7 |= (bp_type as u64) << rw_shift;
-            ctx.Dr7 |= (size as u64) << len_shift;
-
-            SetThreadContext(h_thread, &ctx);
+        match outcome {
+            Ok(true) => applied.push(tid),
+            Ok(false) => {}
+            Err(error) => {
+                for &done in &applied {
+                    let _ = clear_hw_breakpoint_on_thread(done, index);
+                }
+                return Err(error);
+            }
         }
-
-        ResumeThread(h_thread);
-        CloseHandle(h_thread);
     }
 
-    Ok(())
+    Ok(applied.len())
 }
 
 pub fn clear_hw_breakpoint_on_thread(tid: u32, index: usize) -> Result<(), String> {
-    let h_thread = unsafe { OpenThread(THREAD_ALL_ACCESS, FALSE, tid) };
-    if h_thread.is_null() || h_thread == INVALID_HANDLE_VALUE {
-        return Err(format!("Failed to open thread ID {}", tid));
-    }
+    check_slot(index)?;
 
-    unsafe {
-        SuspendThread(h_thread);
+    with_suspended_thread(tid, |handle| {
+        let mut ctx = read_debug_context(handle, tid)?;
+        set_dr_slot_value(&mut ctx, index, 0);
+        ctx.Dr7 &= !(1u64 << (index * DR7_ENABLE_SHIFT_STEP));
+        write_debug_context(handle, tid, &ctx)
+    })
+}
 
-        let mut ctx: CONTEXT = zeroed();
-        ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+/// Clears one hardware breakpoint slot from every thread. Threads that cannot be
+/// updated are skipped, so an exited thread does not block cleanup.
+/// Returns how many threads were updated.
+pub fn clear_hw_breakpoint_from_threads(threads: &[u32], index: usize) -> Result<usize, String> {
+    check_slot(index)?;
 
-        if GetThreadContext(h_thread, &mut ctx) == TRUE {
-            match index {
-                0 => ctx.Dr0 = 0,
-                1 => ctx.Dr1 = 0,
-                2 => ctx.Dr2 = 0,
-                3 => ctx.Dr3 = 0,
-                _ => {}
-            }
-
-            let enable_bit = 1 << (index * 2);
-            ctx.Dr7 &= !enable_bit;
-
-            SetThreadContext(h_thread, &ctx);
+    let mut cleared = 0usize;
+    for &tid in threads {
+        if clear_hw_breakpoint_on_thread(tid, index).is_ok() {
+            cleared += 1;
         }
-
-        ResumeThread(h_thread);
-        CloseHandle(h_thread);
     }
-
-    Ok(())
+    Ok(cleared)
 }
 
 #[derive(Debug, Clone)]

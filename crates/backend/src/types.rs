@@ -107,6 +107,15 @@ impl OnyxVehHit {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
+pub struct OnyxVehSlot {
+    pub index: u32,
+    pub address: usize,
+    pub bp_type: i32,
+    pub size: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
 pub struct OnyxCodecaveEntry {
     pub address: usize,
     pub size: usize,
