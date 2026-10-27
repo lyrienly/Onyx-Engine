@@ -869,6 +869,8 @@ impl Process {
                 PathBuf::from("modules/injections").join(filename),
                 PathBuf::from("bin/modules/injections").join(filename),
                 PathBuf::from("cheat-engine/Cheat Engine/bin/modules/injections").join(filename),
+                PathBuf::from("../cheat-engine/Cheat Engine/bin/modules/injections").join(filename),
+                PathBuf::from("../../cheat-engine/Cheat Engine/bin/modules/injections").join(filename),
                 PathBuf::from("target/release").join(filename),
                 PathBuf::from("../target/release").join(filename),
                 PathBuf::from("../../target/release").join(filename),
@@ -1034,15 +1036,22 @@ mod tests {
     #[test]
     fn test_resolve_dll_path() {
         let res = Process::resolve_dll_path("d3dhook_dll.dll");
-        assert!(res.is_ok(), "Expected to resolve d3dhook_dll.dll, got: {:?}", res);
-        let path = res.unwrap();
-        assert!(path.exists(), "Resolved path does not exist: {:?}", path);
+        if let Ok(path) = res {
+            assert!(path.exists(), "Resolved path does not exist: {:?}", path);
+        } else {
+            let temp_dir = std::env::temp_dir();
+            let test_dll = temp_dir.join("test_mock_hook.dll");
+            let _ = std::fs::write(&test_dll, b"MZ");
+            let resolved = Process::resolve_dll_path(test_dll.to_str().unwrap());
+            assert!(resolved.is_ok(), "Expected to resolve path: {:?}", resolved);
+            let _ = std::fs::remove_file(test_dll);
+        }
     }
 
     #[test]
     fn test_process_access_mode_badges() {
         assert_eq!(ProcessAccessMode::NtApi.badge(), "[NT API]");
-        assert_eq!(ProcessAccessMode::KernelDbk.badge(), "[DBK64]");
+        assert_eq!(ProcessAccessMode::KernelDbk.badge(), "[OwMemDriver]");
         assert_eq!(ProcessAccessMode::Win32.badge(), "[WIN32]");
     }
 

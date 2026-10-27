@@ -11,12 +11,21 @@ env:
 
 jobs:
   build:
-
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
     - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
+
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: x86_64-pc-windows-msvc
+
+    - name: Cargo Check
+      run: cargo check --verbose --workspace
+
+    - name: Cargo Build
+      run: cargo build --verbose --workspace
+
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test --verbose --workspace
