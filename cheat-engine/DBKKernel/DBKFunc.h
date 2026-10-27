@@ -9,6 +9,14 @@
 #include <windef.h>
 #include <ntimage.h>
 
+#ifndef NonPagedPoolNx
+#define NonPagedPoolNx 512
+#endif
+
+#ifndef DBK_POOL_NX
+#define DBK_POOL_NX NonPagedPoolNx
+#endif
+
 #pragma pack(1)
 typedef struct tagINT_VECTOR
 {

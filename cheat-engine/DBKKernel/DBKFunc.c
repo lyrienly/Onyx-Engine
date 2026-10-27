@@ -1457,7 +1457,7 @@ ULONG PatternScanProcessCR3(
 		return 0;
 
 	const SIZE_T CHUNK_SIZE = 64 * 1024;
-	PUCHAR chunk = (PUCHAR)ExAllocatePoolWithTag(NonPagedPool, CHUNK_SIZE, 'kbaS');
+	PUCHAR chunk = (PUCHAR)ExAllocatePoolWithTag(DBK_POOL_NX, CHUNK_SIZE, 'kbaS');
 	if (!chunk)
 		return 0;
 
@@ -1749,7 +1749,7 @@ NTSTATUS WriteCloakedPageMemory(PEPROCESS Process, ULONG64 VirtualAddress, PVOID
 	if ((pageOffset + Size) > 0x1000)
 		return STATUS_BUFFER_TOO_SMALL;
 
-	PUCHAR pageBuf = (PUCHAR)ExAllocatePoolWithTag(NonPagedPool, 0x1000, 'KOLC');
+	PUCHAR pageBuf = (PUCHAR)ExAllocatePoolWithTag(DBK_POOL_NX, 0x1000, 'KOLC');
 	if (!pageBuf)
 		return STATUS_INSUFFICIENT_RESOURCES;
 
@@ -2034,7 +2034,7 @@ static PVOID GetNtoskrnlBase(VOID)
 	if (size == 0)
 		return NULL;
 
-	PSYSTEM_MODULE_INFORMATION pMods = (PSYSTEM_MODULE_INFORMATION)ExAllocatePoolWithTag(NonPagedPool, size, 'sDoM');
+	PSYSTEM_MODULE_INFORMATION pMods = (PSYSTEM_MODULE_INFORMATION)ExAllocatePoolWithTag(DBK_POOL_NX, size, 'sDoM');
 	if (!pMods)
 		return NULL;
 
@@ -2348,7 +2348,7 @@ ULONG PhysicalRamScavenge(
 
 	// Aloca buffer de varredura seguro de 64 KB
 	const SIZE_T CHUNK_SIZE = 64 * 1024;
-	PUCHAR chunk = (PUCHAR)ExAllocatePoolWithTag(NonPagedPool, CHUNK_SIZE, 'vaCS');
+	PUCHAR chunk = (PUCHAR)ExAllocatePoolWithTag(DBK_POOL_NX, CHUNK_SIZE, 'vaCS');
 	if (!chunk)
 		return 0;
 

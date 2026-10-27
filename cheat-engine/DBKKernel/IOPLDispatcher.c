@@ -323,8 +323,10 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 	
 
 	
-    switch(IoControlCode)
+    __try
     {
+        switch(IoControlCode)
+        {
 		
         case IOCTL_CE_READMEMORY:			
 			__try
@@ -2294,6 +2296,12 @@ static PVOID g_TraceStoreBuffer = NULL;
         default:
 			DbgPrint("Unhandled IO request: %x\n", IoControlCode);			
             break;
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        DbgPrint("[OwMemDriver] DispatchIoctl: Unhandled kernel exception on IoControlCode 0x%X\n", IoControlCode);
+        ntStatus = STATUS_UNSUCCESSFUL;
     }
 
 	

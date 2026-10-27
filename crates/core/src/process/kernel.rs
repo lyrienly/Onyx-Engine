@@ -668,6 +668,24 @@ impl DbkDriver {
             Err(format!("DBK IOCTL_CE_GETCR3 failed for PID {}", pid))
         }
     }
+
+
+    pub fn is_secure_boot_active() -> bool {
+        #[cfg(target_os = "windows")]
+        {
+            use std::process::Command;
+            if let Ok(output) = Command::new("powershell")
+                .args(["-NoProfile", "-Command", "Confirm-SecureBootUEFI 2>$null"])
+                .output()
+            {
+                let text = String::from_utf8_lossy(&output.stdout).trim().to_lowercase();
+                if text == "true" {
+                    return true;
+                }
+            }
+        }
+        false
+    }
 }
 
 impl Drop for DbkDriver {
