@@ -1321,6 +1321,52 @@ begin
   end;
 end;
 
+function lua_onyx_veh_slot_status(L: PLua_State): integer; cdecl;
+var
+  slots: TOnyxVehSlotArray;
+  used, i: integer;
+begin
+  used := OnyxVehSlotStatus(slots);
+
+  lua_newtable(L);
+  for i := 0 to used - 1 do
+  begin
+    lua_pushinteger(L, i + 1);
+    lua_createtable(L, 0, 4);
+    lua_pushinteger(L, slots[i].index);
+    lua_setfield(L, -2, PChar('index'));
+    lua_pushinteger(L, Int64(slots[i].address));
+    lua_setfield(L, -2, PChar('address'));
+    lua_pushinteger(L, slots[i].bp_type);
+    lua_setfield(L, -2, PChar('bp_type'));
+    lua_pushinteger(L, slots[i].size);
+    lua_setfield(L, -2, PChar('size'));
+    lua_settable(L, -3);
+  end;
+
+  Result := 1;
+end;
+
+function lua_onyx_veh_error_text(L: PLua_State): integer; cdecl;
+var
+  code: integer;
+  text: string;
+begin
+  code := 0;
+  if lua_gettop(L) >= 1 then
+    code := lua_tointeger(L, 1);
+
+  text := OnyxVehErrorText(code);
+  lua_pushstring(L, PChar(text));
+  Result := 1;
+end;
+
+function lua_onyx_veh_has_active_bp(L: PLua_State): integer; cdecl;
+begin
+  lua_pushboolean(L, OnyxVehHasActiveBreakpoints);
+  Result := 1;
+end;
+
 function lua_onyx_mono_detect(L: PLua_State): integer; cdecl;
 begin
   lua_pushinteger(L, OnyxMonoDetect);
@@ -1398,6 +1444,9 @@ begin
   lua.lua_register(state, 'onyx_veh_set_hw_bp', @lua_onyx_veh_set_hw_bp);
   lua.lua_register(state, 'onyx_veh_clear_hw_bp', @lua_onyx_veh_clear_hw_bp);
   lua.lua_register(state, 'onyx_veh_poll_hit', @lua_onyx_veh_poll_hit);
+lua.lua_register(state, 'onyx_veh_slot_status', @lua_onyx_veh_slot_status);
+lua.lua_register(state, 'onyx_veh_error_text', @lua_onyx_veh_error_text);
+lua.lua_register(state, 'onyx_veh_has_active_bp', @lua_onyx_veh_has_active_bp);
 
   lua.lua_register(state, 'onyx_mono_detect', @lua_onyx_mono_detect);
   lua.lua_register(state, 'onyx_mono_dissect', @lua_onyx_mono_dissect);
