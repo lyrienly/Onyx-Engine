@@ -9217,6 +9217,28 @@ begin
     else
       DontUseDBKOpenProcess;
   end;
+
+  if formsettings.cbKernelAutoLoadDriver.Checked then
+  begin
+    if not DBKLoaded then
+      LoadDBK32;
+
+    if DBKLoaded then
+    begin
+      UseDBKQueryMemoryRegion;
+      UseDBKReadWriteMemory;
+      UseDBKOpenProcess;
+      if LuaVM <> nil then
+        lua_dostring(LuaVM, 'pcall(function() if dbk_usePhysicalMemoryAccess then dbk_usePhysicalMemoryAccess() end if dbk_writesIgnoreWriteProtection then dbk_writesIgnoreWriteProtection(true) end if fullAccess then fullAccess() end end)');
+      MessageDlg('OwMemDriver Ring-0 carregado com sucesso!' + sLineBreak +
+                 '- Traducao Fisica CR3: ATIVADA' + sLineBreak +
+                 '- Leitura e Gravacao em Kernel: ATIVADA' + sLineBreak +
+                 '- Bypasses de Permissao: ATIVADOS', mtInformation, [mbOK], 0);
+    end
+    else
+      MessageDlg('Falha ao subir o OwMemDriver automaticamente.' + sLineBreak +
+                 'Certifique-se de que o driver OwMemDriver.sys esta na pasta bin ou com suporte a carregamento assinado.', mtWarning, [mbOK], 0);
+  end;
   {$endif}
 
   adjustbringtofronttext;

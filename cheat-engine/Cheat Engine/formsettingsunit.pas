@@ -224,6 +224,7 @@ type
     cbKernelQueryMemoryRegion: TCheckBox;
     cbKernelReadWriteProcessMemory: TCheckBox;
     cbKernelOpenProcess: TCheckBox;
+    cbKernelAutoLoadDriver: TCheckBox;
     cbProcessWatcher: TCheckBox;
     cbInjectDLLWithAPC: TCheckBox;
     CheckBox4: TCheckBox;
@@ -926,6 +927,7 @@ begin
         reg.WriteBool('Use dbk32 QueryMemoryRegionEx',cbKernelQueryMemoryRegion.checked);
         reg.WriteBool('Use dbk32 ReadWriteProcessMemory',cbKernelReadWriteProcessMemory.checked);
         reg.WriteBool('Use dbk32 OpenProcess',cbKernelOpenProcess.checked);
+        reg.WriteBool('AutoLoadOwMemDriver',cbKernelAutoLoadDriver.checked);
 
         reg.WriteBool('Use Processwatcher',cbProcessWatcher.checked);
         reg.WriteBool('Use VEH Debugger',cbUseVEHDebugger.checked);

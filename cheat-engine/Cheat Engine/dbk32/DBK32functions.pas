@@ -440,23 +440,23 @@ resourcestring
   rsInvalidMsrAddress = 'Invalid MSR address:';
   rsMsrsAreUnavailable = 'msrs are unavailable';
   rsCouldNotLaunchDbvm = 'Could not launch DBVM: The Intel-VT feature has been disabled in your BIOS';
-  rsYouAreMissingTheDriver = 'You are missing the driver. Try reinstalling '+strCheatEngine+', and try to disable your anti-virus before doing so.';
+  rsYouAreMissingTheDriver = 'You are missing the driver OwMemDriver.sys. Try reinstalling '+strCheatEngine+', and check if anti-virus blocked it.';
   rsDriverError = 'Driver error';
   rsFailureToConfigureTheDriver = 'Failure to configure the driver';
   rsFailureToConfigureTheUltimapDriver = 'Failure to configure the ultimap driver';
-  rsPleaseRebootAndPressF8DuringBoot = 'The driver failed to load due to signing issues. If you have secure boot enabled in your BIOS, set it to "Other OS" or disable it. Alternatively, boot with driver signing policy disabled, or sign the driver yourself';
-  rsDbk32Error = 'DBK32 error';
+  rsPleaseRebootAndPressF8DuringBoot = 'The driver failed to load due to Windows Driver Signature Enforcement (Error 577). If you have Secure Boot enabled in BIOS, please disable it to allow test-signed drivers in Test Mode (bcdedit /set testsigning on).';
+  rsDbk32Error = 'OwMemDriver error';
   rsTheServiceCouldntGetOpenedUltimap = 'The ultimap service couldn''t get opened and also couldn''t get created.  (No admin rights?)';
-  rsTheServiceCouldntGetOpened = 'The service couldn''t get opened and also couldn''t get created.'+' Check if you have the needed rights to create a service, or call your system admin (Who''ll probably beat you up for even trying this). Until this is fixed you won''t be able to make use of the enhancements the driver gives you';
-  rsTheDriverCouldntBeOpened = 'The driver couldn''t be opened! It''s not loaded or not responding. Luckely you are running dbvm so it''s not a total waste. Do you wish to force load the driver?';
-  rsTheDriverCouldntBeOpenedTryAgain = 'The driver couldn''t be opened! It''s not loaded or not responding. I recommend to reboot your system and try again';
+  rsTheServiceCouldntGetOpened = 'The service couldn''t get opened and also couldn''t get created.'+' Check if you have administrator rights.';
+  rsTheDriverCouldntBeOpened = 'The driver couldn''t be opened! It''s not loaded or not responding.';
+  rsTheDriverCouldntBeOpenedTryAgain = 'The driver couldn''t be opened! It''s not loaded or not responding. Check if Secure Boot is disabled.';
   rsTheDriverThatIsCurrentlyLoaded = 'The driver that is currently loaded belongs to a different version of '+strCheatEngine+'. Please unload this driver or reboot.';
   rsTheDriverFailedToSuccessfullyInitialize = 'The driver failed to successfully initialize. Some functions may not completely work';
   rsAPCRules = 'APC rules';
   rsPleaseRunThe64BitVersionOfCE = 'Please run the 64-bit version of '+strCheatEngine;
-  rsDBKError = 'DBK Error';
-  rsDBKBlockedDueToVulnerableDriverBlocklist = 'Failure starting dbk because '
-    +'the vulnerable driver blocklist is enabled and dbk has been added to it.'
+  rsDBKError = 'OwMemDriver Error';
+  rsDBKBlockedDueToVulnerableDriverBlocklist = 'Failure starting driver because '
+    +'the vulnerable driver blocklist is enabled.'
     +' Want to know how to disable this?';
 
 var dataloc: widestring;

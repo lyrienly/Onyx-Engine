@@ -27,7 +27,7 @@
       <AutoIncrementBuild Value="True"/>
       <MajorVersionNr Value="7"/>
       <MinorVersionNr Value="5"/>
-      <BuildNr Value="7736"/>
+      <BuildNr Value="7738"/>
       <Language Value="041C"/>
       <CharSet Value="04B0"/>
       <StringTable CompanyName="OnyxEngine" FileDescription="OnyxEngine Platform" ProductVersion="1.0"/>

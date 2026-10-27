@@ -5,7 +5,7 @@ object formSettings: TformSettings
   Width = 902
   AutoSize = True
   BorderIcons = [biSystemMenu]
-  Caption = 'Cheat Engine settings'
+  Caption = 'OnyxEngine settings'
   ClientHeight = 817
   ClientWidth = 902
   OnChangeBounds = FormChangeBounds
@@ -2427,8 +2427,8 @@ object formSettings: TformSettings
           AutoSize = True
           BorderSpacing.Left = 5
           BorderSpacing.Right = 5
-          Caption = 'Use the following CE Kernel routines instead of the original windows version'
-          ClientHeight = 57
+          Caption = 'Use the following OnyxEngine Kernel routines (OwMemDriver)'
+          ClientHeight = 76
           ClientWidth = 725
           TabOrder = 0
           object cbKernelQueryMemoryRegion: TCheckBox
@@ -2481,6 +2481,17 @@ object formSettings: TformSettings
             Enabled = False
             TabOrder = 3
             Visible = False
+          end
+          object cbKernelAutoLoadDriver: TCheckBox
+            AnchorSideLeft.Control = cbKernelOpenProcess
+            AnchorSideTop.Control = cbKernelOpenProcess
+            AnchorSideTop.Side = asrBottom
+            Left = 8
+            Height = 19
+            Top = 57
+            Width = 360
+            Caption = 'Subir driver automaticamente (OwMemDriver Ring-0)'
+            TabOrder = 4
           end
         end
         object cbProcessWatcher: TCheckBox
