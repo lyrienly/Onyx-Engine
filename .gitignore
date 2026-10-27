@@ -36,3 +36,6 @@ cheat-engine/Cheat Engine/VEHDebug/backup/
 **/*.tlog/
 **/MonoData.*/
 
+# Binary build and distribution artifacts (releases only)
+/bin/
+bin/

@@ -1,95 +1,66 @@
-# Diretrizes de Contribuição e Fluxo de Trabalho (Git Workflow)
+# Diretrizes de Contribuicao e Engenharia de Software
 
-Bem-vindo ao time de desenvolvimento do **OnyxEngine**. 
-
-Para manter a estabilidade do motor em produção e evitar conflitos em uma stack híbrida complexa (Kernel C, Rust e Free Pascal/Lazarus), todos os colaboradores devem seguir estritamente o fluxo descrito abaixo.
+OnyxEngine adota um modelo de engenharia rigoroso para garantir a estabilidade de sua arquitetura hibrida (Kernel C, Rust nativo e Free Pascal/Lazarus). Todos os colaboradores devem observar estritamente as diretrizes contidas neste documento.
 
 ---
 
-## 1. Regra de Ouro: Sempre Siga as Issues
+## 1. Rastreamento e Escopo via Issues
 
-* **Nenhum código sobe sem uma Issue correspondente.**
-* Antes de iniciar qualquer tarefa, verifique a aba de **Issues** no repositório.
-* Caso identifique um bug ou queira sugerir uma melhoria que ainda não está documentada, **abra uma Issue primeiro** descrevendo o problema ou proposta antes de codificar.
-* Marque a issue como sua ou comente que está trabalhando nela para evitar duplicação de esforço.
-
----
-
-## 2. Política de Branches
-
-A branch `main` é **protegida** e representa o código pronto e testado em produção.
-
-1. **Nunca faça commits diretos na `main`:** Push direto para a branch `main` será bloqueado ou revertido.
-2. **Crie uma branch específica para cada Issue:**
-   * Padrão de nomenclatura:
-     * `feat/issue-ID-descricao-curta` (para novas funcionalidades)
-     * `fix/issue-ID-descricao-curta` (para correções de bugs)
-     * `refactor/issue-ID-descricao-curta` (para refatorações de arquitetura)
-     * `docs/issue-ID-descricao-curta` (para melhorias de documentação)
-   * Exemplo: `git checkout -b fix/12-driver-secureboot-dse`
+1. **Politica de Zero Codigo sem Issue:** Nenhuma alteracao, correcao ou nova funcionalidade deve ser codificada ou submetida sem uma Issue formal aberta previamente.
+2. **Atribuicao de Tarefas:** Antes de iniciar a implementacao, comente na issue correspondente indicando o inicio dos trabalhos para evitar esforco redundante.
+3. **Novas Propostas:** Identificou um bug ou oportunidade de melhoria? Abra uma issue detalhando o comportamento observado, a analise tecnica e o plano de resolucao antes de submeter qualquer codigo.
 
 ---
 
-## 3. Passo a Passo do Fluxo de Trabalho
+## 2. Obrigacao de Manutencao de Workflows e Builds
 
-```text
-[ Issue no GitHub ] 
-        ↓
-[ git checkout -b feat/xyz ] 
-        ↓
-[ Desenvolvimento + Testes Locais ]
-        ↓
-[ git push origin feat/xyz ] 
-        ↓
-[ Abrir Pull Request apontando para main ] 
-        ↓
-[ Code Review do Mantenedor (ErlonLy) ] 
-        ↓
-[ Aprovação e Merge para main ]
+1. **Workflows e Integracao:** E dever de todo desenvolvedor garantir que todas as automacoes, pipelines de CI e rotinas de compilacao permaneçam plenamente operacionais.
+2. **Verificacao Local Obrigatoria:** Antes de enviar commits ou abrir Pull Requests:
+   * **Backend Rust:** `cargo check --workspace` e `cargo test --workspace` devem passar sem erros ou advertencias.
+   * **Frontend Pascal:** A compilacao via `lazbuild` deve concluir com codigo de saida 0.
+3. **Isolamento de Artefatos Binarios:** A pasta `bin/` e mantida fora do controle de versao Git (`.gitignore`). Nenhum binario compilado localmente deve ser adicionado ao repositorio. Distribuicoes executaveis sao publicadas exclusivamente atraves de releases estaveis.
+4. **Criterio de Rejeicao:** PRs que quebrem fluxos de integracao, falhem na compilacao ou violem o escopo da issue serao rejeitados.
+
+---
+
+## 3. Topologia e Convencao de Branches
+
+A branch `main` e protegida e contem exclusivamente codigo estavel e homologado.
+
+1. Commits diretos na `main` sao estritamente bloqueados.
+2. Cada demanda deve ser desenvolvida em uma branch dedicada a partir da `main` atualizada:
+   * `feat/issue-ID-descricao` para implementacao de funcionalidades.
+   * `fix/issue-ID-descricao` para correcoes de bugs.
+   * `refactor/issue-ID-descricao` para reestruturacoes de codigo.
+   * `docs/issue-ID-descricao` para manutencao documental.
+
+Exemplo:
+```bash
+git checkout main
+git pull origin main
+git checkout -b fix/issue-2-driver-secureboot
 ```
 
-### Comandos Práticos:
+---
 
-1. **Atualize sua main local:**
+## 4. Ciclo de Desenvolvimento e Submissao
+
+1. **Desenvolvimento e Testes:** Itere no codigo e valide localmente os componentes afetados.
+2. **Envio da Branch Remota:**
    ```bash
-   git checkout main
-   git pull origin main
+   git add <arquivos-alterados>
+   git commit -m "tipo: descricao sucinta da modificacao (#ID)"
+   git push origin fix/issue-2-driver-secureboot
    ```
-
-2. **Crie e alterne para sua branch de trabalho:**
-   ```bash
-   git checkout -b fix/issue-15-scanner-simd
-   ```
-
-3. **Desenvolva e valide localmente:**
-   * Se alterou código em Rust: `cargo check --workspace` e `cargo test --workspace`
-   * Se alterou código em Pascal: Compile via `lazbuild -B --build-mode=Release "cheat-engine/Cheat Engine/cheatengine.lpi"`
-   * Garanta que todos os binários gerados residam em `bin/`.
-
-4. **Envie sua branch para o repositório remoto:**
-   ```bash
-   git add .
-   git commit -m "fix: resolve problema de alinhamento de memoria no scanner (#15)"
-   git push origin fix/issue-15-scanner-simd
-   ```
+3. **Abertura do Pull Request:**
+   * Configure o destino do PR para a branch `main`.
+   * Referencie a issue no corpo do PR utilizando a sintaxe de fechamento automatico (ex: `Closes #2` ou `Fixes #2`).
+   * Descreva de forma objetiva o que foi alterado e como os testes foram conduzidos.
 
 ---
 
-## 4. Como Abrir e Estruturar o Pull Request (PR)
+## 5. Revisao de Codigo e Aprovacao
 
-1. Vá até o repositório no GitHub: `https://github.com/ErlonLy/OnyxEngine`.
-2. O GitHub exibirá o botão **Compare & pull request** para sua branch recém-enviada.
-3. No título do PR, use o padrão: `[Tipo]: Descrição curta (Fecha #ID)`.
-   * Exemplo: `fix: resolver falha de carregamento do driver no Windows 10 (#4)`
-4. Na descrição do PR, preencha:
-   * **O que foi feito:** Resumo das alterações.
-   * **Qual issue é resolvida:** Use palavras-chave automáticas como `Fixes #12` ou `Closes #12`.
-   * **Como testar:** Passos detalhados para o mantenedor reproduzir e validar.
-
----
-
-## 5. Processo de Revisão e Análise
-
-* Todos os Pull Requests passarão por análise de código (Code Review) realizada pelo mantenedor principal (**ErlonLy**).
-* Durante a revisão, podem ser solicitados ajustes de performance, formatação ou adequação de arquitetura.
-* Uma vez aprovado nos testes e revisado, o PR será mergeado para a branch `main`.
+* Todos os Pull Requests passam por revisao obrigatoria de codigo (Code Review) conduzida pelo mantenedor principal (**ErlonLy**).
+* Ajustes arquiteturais, estaticos ou de desempenho podem ser solicitados durante a revisao.
+* Apenas apos a aprovacao expressa do mantenedor e validacao de testes, o merge sera efetuado na branch `main`.
