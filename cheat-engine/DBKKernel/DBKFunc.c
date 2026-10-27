@@ -2115,16 +2115,18 @@ static NTSTATUS CleanPiDDBCache(PVOID NtosBase)
 		return STATUS_NOT_SUPPORTED;
 
 	// Drivers para higienizar do cache
-	UNICODE_STRING targets[2];
+	UNICODE_STRING targets[4];
 	RtlInitUnicodeString(&targets[0], L"lydumen.sys");
 	RtlInitUnicodeString(&targets[1], L"dbk64.sys");
+	RtlInitUnicodeString(&targets[2], L"OwMemDriver.sys");
+	RtlInitUnicodeString(&targets[3], L"owmemdriver.sys");
 
 	KeEnterCriticalRegion();
 	ExAcquireResourceExclusiveLite(pLock, TRUE);
 
 	__try
 	{
-		for (int t = 0; t < 2; t++)
+		for (int t = 0; t < 4; t++)
 		{
 			PIDDB_CACHE_ENTRY lookupEntry;
 			RtlZeroMemory(&lookupEntry, sizeof(PIDDB_CACHE_ENTRY));
@@ -2205,9 +2207,11 @@ static NTSTATUS CleanMmUnloadedDrivers(PVOID NtosBase)
 	if (!MmIsAddressValid(driverArray))
 		return STATUS_INVALID_ADDRESS;
 
-	UNICODE_STRING targets[2];
+	UNICODE_STRING targets[4];
 	RtlInitUnicodeString(&targets[0], L"lydumen.sys");
 	RtlInitUnicodeString(&targets[1], L"dbk64.sys");
+	RtlInitUnicodeString(&targets[2], L"OwMemDriver.sys");
+	RtlInitUnicodeString(&targets[3], L"owmemdriver.sys");
 
 	__try
 	{
@@ -2217,7 +2221,7 @@ static NTSTATUS CleanMmUnloadedDrivers(PVOID NtosBase)
 			if (!MmIsAddressValid(entry) || !entry->Name.Buffer || entry->Name.Length == 0)
 				continue;
 
-			for (int t = 0; t < 2; t++)
+			for (int t = 0; t < 4; t++)
 			{
 				if (RtlCompareUnicodeString(&entry->Name, &targets[t], TRUE) == 0)
 				{

@@ -338,11 +338,19 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 					WORD bytestoread;
 				} *pinp;
 
+				ULONG inLen = irpStack->Parameters.DeviceIoControl.InputBufferLength;
+				ULONG outLen = irpStack->Parameters.DeviceIoControl.OutputBufferLength;
+				if (inLen < sizeof(struct input) || outLen < sizeof(struct input))
+				{
+					ntStatus = STATUS_INFO_LENGTH_MISMATCH;
+					break;
+				}
+
 				pinp=Irp->AssociatedIrp.SystemBuffer;
 
 				ntStatus=ReadProcessMemory((DWORD)pinp->processid,NULL,(PVOID)(UINT_PTR)pinp->startaddress,pinp->bytestoread,pinp) ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
 			}
-			__except(1)
+			__except(EXCEPTION_EXECUTE_HANDLER)
 			{
 				ntStatus = STATUS_UNSUCCESSFUL;
 			};
@@ -360,32 +368,49 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 					WORD bytestowrite;
 				} *pinp,inp;
 
-				DbgPrint("sizeof(inp)=%d\n",sizeof(inp));
+				ULONG inLen = irpStack->Parameters.DeviceIoControl.InputBufferLength;
+				if (inLen < sizeof(inp))
+				{
+					ntStatus = STATUS_INFO_LENGTH_MISMATCH;
+					break;
+				}
+
 				pinp=Irp->AssociatedIrp.SystemBuffer;
+				if (inLen < (sizeof(inp) + pinp->bytestowrite))
+				{
+					ntStatus = STATUS_BUFFER_TOO_SMALL;
+					break;
+				}
+
 				ntStatus=WriteProcessMemory((DWORD)pinp->processid,NULL,(PVOID)(UINT_PTR)pinp->startaddress,pinp->bytestowrite,(PVOID)((UINT_PTR)pinp+sizeof(inp))) ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
 			}
-			__except(1)
+			__except(EXCEPTION_EXECUTE_HANDLER)
 			{
-				//something went wrong and I don't know what
 				ntStatus = STATUS_UNSUCCESSFUL;
 			};
 
-
-				
             break;
 
 
 		case IOCTL_CE_OPENPROCESS:
 			{					
 				PEPROCESS selectedprocess = NULL;
-				ULONG processid=*(PULONG)Irp->AssociatedIrp.SystemBuffer;
-				HANDLE ProcessHandle = 0;
 				struct out
 				{
 					UINT64 h;
 					BYTE   Special;
 				} *POutput = Irp->AssociatedIrp.SystemBuffer;
 
+				ULONG inLen = irpStack->Parameters.DeviceIoControl.InputBufferLength;
+				ULONG outLen = irpStack->Parameters.DeviceIoControl.OutputBufferLength;
+				if (inLen < sizeof(ULONG) || outLen < sizeof(struct out))
+				{
+					ntStatus = STATUS_INFO_LENGTH_MISMATCH;
+					break;
+				}
+
+				ULONG processid=*(PULONG)Irp->AssociatedIrp.SystemBuffer;
+				HANDLE ProcessHandle = 0;
 
 				ntStatus = STATUS_SUCCESS;
 				if (ProcessHandle == 0)
@@ -397,8 +422,9 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 
 						if (PsLookupProcessByProcessId((PVOID)(UINT_PTR)(processid), &selectedprocess) == STATUS_SUCCESS)
 						{
+							// Gestao Furtiva: Neutraliza temporariamente ObRegisterCallbacks (EAC/BattlEye)
+							ULONG strippedCount = StripProcessCallbacks(FALSE);
 
-							//DbgPrint("Calling ObOpenObjectByPointer\n");
 							ntStatus = ObOpenObjectByPointer(
 								selectedprocess,
 								0,
@@ -408,17 +434,19 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 								KernelMode, //UserMode,
 								&ProcessHandle);
 
-							//DbgPrint("ntStatus=%x",ntStatus);
+							if (strippedCount > 0)
+							{
+								StripProcessCallbacks(TRUE);
+							}
 						}
 					}
-					__except (1)
+					__except (EXCEPTION_EXECUTE_HANDLER)
 					{
 						ntStatus = STATUS_UNSUCCESSFUL;
 					}
 				}
 				else
 				{
-					//DbgPrint("ProcessHandle=%x", (int)ProcessHandle);
 					POutput->Special = 1;					
 				}
 

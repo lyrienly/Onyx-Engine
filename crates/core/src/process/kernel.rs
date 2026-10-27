@@ -670,6 +670,11 @@ impl DbkDriver {
     }
 
 
+    /// Leitura direta de memoria do alvo via page-walking de CR3 (Zero thread attach, indetectavel por anti-cheats).
+    pub fn read_memory_cr3(&self, pid: u32, address: u64, len: usize) -> Result<Vec<u8>, String> {
+        self.bulk_dump_cr3(pid, address, len)
+    }
+
     pub fn is_secure_boot_active() -> bool {
         #[cfg(target_os = "windows")]
         {
@@ -680,6 +685,24 @@ impl DbkDriver {
             {
                 let text = String::from_utf8_lossy(&output.stdout).trim().to_lowercase();
                 if text == "true" {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Verifica se o Test Signing (Modo de Teste) esta ativo no Windows.
+    pub fn is_test_signing_enabled() -> bool {
+        #[cfg(target_os = "windows")]
+        {
+            use std::process::Command;
+            if let Ok(output) = Command::new("bcdedit")
+                .args(["/enum", "{current}"])
+                .output()
+            {
+                let text = String::from_utf8_lossy(&output.stdout).to_lowercase();
+                if text.contains("testsigning") && text.contains("yes") {
                     return true;
                 }
             }
