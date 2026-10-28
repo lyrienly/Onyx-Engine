@@ -95,9 +95,30 @@ impl AobByte {
         (b & self.mask) == (self.value & self.mask)
     }
 
+    pub fn is_exact(&self) -> bool {
+        self.mask == 0xFF
+    }
+
+    pub fn is_wildcard(&self) -> bool {
+        self.mask == 0x00
+    }
+
+    fn nibble_hex(c: u8) -> Option<u8> {
+        match c {
+            b'0'..=b'9' => Some(c - b'0'),
+            b'a'..=b'f' => Some(c - b'a' + 10),
+            b'A'..=b'F' => Some(c - b'A' + 10),
+            _ => None,
+        }
+    }
+
+    fn is_wild_char(c: u8) -> bool {
+        c == b'?' || c == b'*'
+    }
+
     pub fn parse(token: &str) -> Result<Self, String> {
         let t = token.trim();
-        if t == "?" || t == "??" {
+        if t == "?" || t == "??" || t == "*" {
             return Ok(Self::wildcard());
         }
 
@@ -128,6 +149,24 @@ impl AobByte {
             return Ok(AobByte { value, mask });
         }
 
+        if t.len() == 2 {
+            let b = t.as_bytes();
+            match (Self::is_wild_char(b[0]), Self::is_wild_char(b[1])) {
+                (true, true) => return Ok(Self::wildcard()),
+                (true, false) => {
+                    let low = Self::nibble_hex(b[1])
+                        .ok_or_else(|| format!("Invalid nibble wildcard: {}", t))?;
+                    return Ok(AobByte { value: low, mask: 0x0F });
+                }
+                (false, true) => {
+                    let high = Self::nibble_hex(b[0])
+                        .ok_or_else(|| format!("Invalid nibble wildcard: {}", t))?;
+                    return Ok(AobByte { value: high << 4, mask: 0xF0 });
+                }
+                (false, false) => {}
+            }
+        }
+
         let hex_str = if t.starts_with("0x") || t.starts_with("0X") {
             &t[2..]
         } else {
@@ -136,6 +175,29 @@ impl AobByte {
         let b = u8::from_str_radix(hex_str, 16)
             .map_err(|_| format!("Invalid hex byte: {}", token))?;
         Ok(Self::exact(b))
+    }
+
+    pub fn to_pattern_token(&self) -> String {
+        match self.mask {
+            0xFF => format!("{:02X}", self.value),
+            0x00 => "??".to_string(),
+            0xF0 => format!("{:X}?", self.value >> 4),
+            0x0F => format!("?{:X}", self.value & 0x0F),
+            _ => {
+                let mut bits = String::from("|");
+                for i in (0..8).rev() {
+                    if (self.mask >> i) & 1 == 0 {
+                        bits.push('?');
+                    } else if (self.value >> i) & 1 == 1 {
+                        bits.push('1');
+                    } else {
+                        bits.push('0');
+                    }
+                }
+                bits.push('|');
+                bits
+            }
+        }
     }
 }
 
@@ -1450,11 +1512,37 @@ fn value_cmp(a: &ScanValue, b: &ScanValue) -> i32 {
 
 fn matches_diff(old: &ScanValue, cur: &ScanValue, diff: &ScanValue, is_increase: bool) -> bool {
     match (old, cur, diff) {
+        (ScanValue::I8(o), ScanValue::I8(c), ScanValue::I8(d)) => {
+            let actual = if is_increase { c.wrapping_sub(*o) } else { o.wrapping_sub(*c) };
+            actual == *d
+        }
+        (ScanValue::U8(o), ScanValue::U8(c), ScanValue::U8(d)) => {
+            let actual = if is_increase { c.wrapping_sub(*o) } else { o.wrapping_sub(*c) };
+            actual == *d
+        }
+        (ScanValue::I16(o), ScanValue::I16(c), ScanValue::I16(d)) => {
+            let actual = if is_increase { c.wrapping_sub(*o) } else { o.wrapping_sub(*c) };
+            actual == *d
+        }
+        (ScanValue::U16(o), ScanValue::U16(c), ScanValue::U16(d)) => {
+            let actual = if is_increase { c.wrapping_sub(*o) } else { o.wrapping_sub(*c) };
+            actual == *d
+        }
         (ScanValue::I32(o), ScanValue::I32(c), ScanValue::I32(d)) => {
-            if is_increase { c - o == *d } else { o - c == *d }
+            let actual = if is_increase { c.wrapping_sub(*o) } else { o.wrapping_sub(*c) };
+            actual == *d
         }
         (ScanValue::U32(o), ScanValue::U32(c), ScanValue::U32(d)) => {
-            if is_increase { c.wrapping_sub(*o) == *d } else { o.wrapping_sub(*c) == *d }
+            let actual = if is_increase { c.wrapping_sub(*o) } else { o.wrapping_sub(*c) };
+            actual == *d
+        }
+        (ScanValue::I64(o), ScanValue::I64(c), ScanValue::I64(d)) => {
+            let actual = if is_increase { c.wrapping_sub(*o) } else { o.wrapping_sub(*c) };
+            actual == *d
+        }
+        (ScanValue::U64(o), ScanValue::U64(c), ScanValue::U64(d)) => {
+            let actual = if is_increase { c.wrapping_sub(*o) } else { o.wrapping_sub(*c) };
+            actual == *d
         }
         (ScanValue::Float(o), ScanValue::Float(c), ScanValue::Float(d)) => {
             let actual = if is_increase { c - o } else { o - c };
@@ -1471,6 +1559,54 @@ fn matches_diff(old: &ScanValue, cur: &ScanValue, diff: &ScanValue, is_increase:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_aob_nibble_wildcards() {
+        let high = AobByte::parse("A?").expect("A? should parse");
+        assert_eq!(high.mask, 0xF0);
+        assert_eq!(high.value, 0xA0);
+        assert!(high.matches(0xA5));
+        assert!(!high.matches(0x5A));
+        assert!(!high.matches(0xB5));
+
+        let low = AobByte::parse("?3").expect("?3 should parse");
+        assert_eq!(low.mask, 0x0F);
+        assert_eq!(low.value, 0x03);
+        assert!(low.matches(0x13));
+        assert!(!low.matches(0x31));
+
+        assert!(AobByte::parse("?").unwrap().is_wildcard());
+        assert!(AobByte::parse("??").unwrap().is_wildcard());
+        assert!(AobByte::parse("*").unwrap().is_wildcard());
+        assert!(AobByte::parse("FF").unwrap().is_exact());
+    }
+
+    #[test]
+    fn test_aob_pattern_token_roundtrip() {
+        let cases = vec![
+            "FF", "00", "??", "A?", "?A", "|1?0?1?0?|", "|11110000|",
+        ];
+        for case in cases {
+            let byte = AobByte::parse(case).unwrap_or_else(|e| panic!("failed {}: {}", case, e));
+            let token = byte.to_pattern_token();
+            let reparsed = AobByte::parse(&token).expect("roundtrip parse failed");
+            assert_eq!(byte.value, reparsed.value, "value mismatch for {}", case);
+            assert_eq!(byte.mask, reparsed.mask, "mask mismatch for {}", case);
+        }
+    }
+
+    #[test]
+    fn test_aob_pattern_matches_in_scan() {
+        let pattern = ScanValue::parse(ValType::Aob, "A? ?3 FF").expect("pattern");
+        if let ScanValue::Aob(bytes) = &pattern {
+            assert_eq!(bytes.len(), 3);
+            assert!(bytes[0].matches(0xAB));
+            assert!(bytes[1].matches(0x53));
+            assert!(bytes[2].matches(0xFF));
+        } else {
+            panic!("expected AOB value");
+        }
+    }
 
     #[test]
     fn test_val_type_all_parse() {
@@ -1526,6 +1662,64 @@ mod tests {
         assert_eq!(candidates[0].address, 0x5000 + 8);
         assert_eq!(candidates[0].extra_type, 14);
         assert_eq!(candidates[0].group_offsets, vec![0, 4, 8]);
+    }
+
+    #[test]
+    fn test_matches_diff_i32_extreme_values_do_not_overflow() {
+        let old = ScanValue::I32(i32::MIN);
+        let cur = ScanValue::I32(i32::MAX);
+        assert!(!matches_diff(&old, &cur, &ScanValue::I32(1), true));
+        assert!(!matches_diff(&cur, &old, &ScanValue::I32(1), false));
+
+        assert!(matches_diff(
+            &ScanValue::I32(10),
+            &ScanValue::I32(12),
+            &ScanValue::I32(2),
+            true
+        ));
+        assert!(matches_diff(
+            &ScanValue::I32(12),
+            &ScanValue::I32(10),
+            &ScanValue::I32(2),
+            false
+        ));
+    }
+
+    #[test]
+    fn test_matches_diff_supports_all_integer_widths() {
+        macro_rules! assert_diff {
+            ($variant:ident, $v:expr) => {{
+                let base = $v;
+                let next = base + 5;
+                assert!(matches_diff(
+                    &ScanValue::$variant(base),
+                    &ScanValue::$variant(next),
+                    &ScanValue::$variant(5),
+                    true
+                ));
+                assert!(matches_diff(
+                    &ScanValue::$variant(next),
+                    &ScanValue::$variant(base),
+                    &ScanValue::$variant(5),
+                    false
+                ));
+                assert!(!matches_diff(
+                    &ScanValue::$variant(base),
+                    &ScanValue::$variant(next),
+                    &ScanValue::$variant(6),
+                    true
+                ));
+            }};
+        }
+
+        assert_diff!(I8, 10i8);
+        assert_diff!(U8, 10u8);
+        assert_diff!(I16, 10i16);
+        assert_diff!(U16, 10u16);
+        assert_diff!(I32, 10i32);
+        assert_diff!(U32, 10u32);
+        assert_diff!(I64, 10i64);
+        assert_diff!(U64, 10u64);
     }
 }
 

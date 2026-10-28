@@ -39,14 +39,16 @@ impl ProcessIconExtractor {
         None
     }
 
-    pub fn extract_rgba_from_hicon(h_icon: HICON) -> Option<(u32, u32, Vec<u8>)> {
+    fn extract_rgba_from_hicon(h_icon: HICON, owns_handle: bool) -> Option<(u32, u32, Vec<u8>)> {
         if h_icon.is_null() {
             return None;
         }
 
         let mut icon_info: ICONINFO = unsafe { std::mem::zeroed() };
         if unsafe { GetIconInfo(h_icon, &mut icon_info) } == FALSE {
-            unsafe { DestroyIcon(h_icon) };
+            if owns_handle {
+                unsafe { DestroyIcon(h_icon) };
+            }
             return None;
         }
 
@@ -58,7 +60,9 @@ impl ProcessIconExtractor {
             if !icon_info.hbmMask.is_null() {
                 unsafe { DeleteObject(icon_info.hbmMask) };
             }
-            unsafe { DestroyIcon(h_icon) };
+            if owns_handle {
+                unsafe { DestroyIcon(h_icon) };
+            }
             return None;
         }
 
@@ -79,7 +83,7 @@ impl ProcessIconExtractor {
                 ReleaseDC(null_mut(), hdc);
                 if !icon_info.hbmColor.is_null() { DeleteObject(icon_info.hbmColor); }
                 if !icon_info.hbmMask.is_null() { DeleteObject(icon_info.hbmMask); }
-                DestroyIcon(h_icon);
+                if owns_handle { DestroyIcon(h_icon); }
             }
             return None;
         }
@@ -177,7 +181,7 @@ impl ProcessIconExtractor {
             ReleaseDC(null_mut(), hdc);
             if !icon_info.hbmColor.is_null() { DeleteObject(icon_info.hbmColor); }
             if !icon_info.hbmMask.is_null() { DeleteObject(icon_info.hbmMask); }
-            DestroyIcon(h_icon);
+            if owns_handle { DestroyIcon(h_icon); }
         }
 
         Some((width, height, pixels))
@@ -192,7 +196,7 @@ impl ProcessIconExtractor {
         let mut h_small: HICON = null_mut();
         let count = unsafe { ExtractIconExW(wide.as_ptr(), 0, null_mut(), &mut h_small, 1) };
         if count > 0 && count != u32::MAX && !h_small.is_null() {
-            if let Some(rgba) = Self::extract_rgba_from_hicon(h_small) {
+            if let Some(rgba) = Self::extract_rgba_from_hicon(h_small, true) {
                 return Some(rgba);
             }
         }
@@ -209,7 +213,7 @@ impl ProcessIconExtractor {
         };
 
         if res != 0 && !shfi.hIcon.is_null() {
-            return Self::extract_rgba_from_hicon(shfi.hIcon);
+            return Self::extract_rgba_from_hicon(shfi.hIcon, true);
         }
 
         None
@@ -232,14 +236,14 @@ impl ProcessIconExtractor {
         };
 
         if res != 0 && !shfi.hIcon.is_null() {
-            if let Some(icon) = Self::extract_rgba_from_hicon(shfi.hIcon) {
+            if let Some(icon) = Self::extract_rgba_from_hicon(shfi.hIcon, true) {
                 return Some(icon);
             }
         }
 
         let sys_icon = unsafe { LoadIconW(null_mut(), IDI_APPLICATION) };
         if !sys_icon.is_null() {
-            return Self::extract_rgba_from_hicon(sys_icon);
+            return Self::extract_rgba_from_hicon(sys_icon, false);
         }
 
         None
@@ -277,6 +281,21 @@ mod tests {
     fn test_extract_current_process_icon() {
         let icon = ProcessIconExtractor::get_process_icon(std::process::id(), "cargo.exe");
         assert!(icon.is_some(), "Failed to extract current process or fallback icon");
+    }
+
+    #[test]
+    fn test_default_exe_icon_is_repeatable() {
+        let first = ProcessIconExtractor::extract_default_exe_icon();
+        let second = ProcessIconExtractor::extract_default_exe_icon();
+        assert!(first.is_some(), "First default icon extraction failed");
+        assert!(second.is_some(), "Second default icon extraction failed");
+        assert_eq!(first.unwrap().2, second.unwrap().2, "Default icon pixels must be stable");
+    }
+
+    #[test]
+    fn test_get_process_path_ignores_system_pids() {
+        assert!(ProcessIconExtractor::get_process_path(0, "System").is_none());
+        assert!(ProcessIconExtractor::get_process_path(4, "System").is_none());
     }
 }
 
