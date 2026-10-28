@@ -3,8 +3,8 @@
   <ProjectSession>
     <PathDelim Value="\"/>
     <Version Value="12"/>
-    <BuildModes Active="Release 64-Bit"/>
-    <Units Count="424">
+    <BuildModes Active="release"/>
+    <Units Count="425">
       <Unit0>
         <Filename Value="cheatengine.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -2669,6 +2669,14 @@
         <ResourceBaseClass Value="Form"/>
         <UsageCount Value="20"/>
       </Unit423>
+      <Unit424>
+        <Filename Value="frmAobValidatorUnit.pas"/>
+        <IsPartOfProject Value="True"/>
+        <ComponentName Value="frmAobValidator"/>
+        <HasResources Value="True"/>
+        <ResourceBaseClass Value="Form"/>
+        <UsageCount Value="20"/>
+      </Unit424>
     </Units>
     <JumpHistory HistoryIndex="-1"/>
     <RunParams>

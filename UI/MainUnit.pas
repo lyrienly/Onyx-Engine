@@ -591,6 +591,10 @@ type
     N8: TMenuItem;
     Helpindex1: TMenuItem;
     Plugins2: TMenuItem;
+    miAobValidator: TMenuItem;
+    N99PluginSep: TMenuItem;
+    miPluginManager: TMenuItem;
+    miReloadPlugins: TMenuItem;
     actMemoryView: TAction;
     actOpenProcesslist: TAction;
     procedure actOpenDissectStructureExecute(Sender: TObject);
@@ -627,6 +631,9 @@ type
     procedure miFoundListPreferencesClick(Sender: TObject);
     procedure miAutoAssembleErrorMessageClick(Sender: TObject);
     procedure miHelpClick(Sender: TObject);
+    procedure miAobValidatorClick(Sender: TObject);
+    procedure miPluginManagerClick(Sender: TObject);
+    procedure miReloadPluginsClick(Sender: TObject);
     procedure miLuaDocumentationClick(Sender: TObject);
     procedure miForgotScanClick(Sender: TObject);
     procedure miGetDotNetObjectListClick(Sender: TObject);
@@ -1140,7 +1147,7 @@ resourcestring
 implementation
 
 
-uses cefuncproc, MainUnit2, ProcessWindowUnit, MemoryBrowserFormUnit, TypePopup, HotKeys,
+uses frmAobValidatorUnit, OnyxBackend, cefuncproc, MainUnit2, ProcessWindowUnit, MemoryBrowserFormUnit, TypePopup, HotKeys,
   aboutunit, formhotkeyunit, formDifferentBitSizeUnit,
   CommentsUnit, formsettingsunit, formAddressChangeUnit, Changeoffsetunit,
   FoundCodeUnit, AdvancedOptionsUnit, frmProcessWatcherUnit,
@@ -3973,6 +3980,28 @@ begin
   miEnableLCLDebug.visible:=miEnableLCLDebug.checked or (ssCtrl in GetKeyShiftState);
 end;
 
+procedure TMainForm.miAobValidatorClick(Sender: TObject);
+begin
+  if frmAobValidator = nil then
+    frmAobValidator := TfrmAobValidator.Create(Self);
+  frmAobValidator.Show;
+  frmAobValidator.BringToFront;
+end;
+
+procedure TMainForm.miPluginManagerClick(Sender: TObject);
+begin
+  ShowMessage('Onyx Plugin System' + sLineBreak +
+              'SDK: C-ABI / Rust cdylib compatible' + sLineBreak +
+              'Diretório de plugins: bin\plugins\' + sLineBreak +
+              'Plugin ativo: Onyx SigMaker & AOB Auto-Generator (onyx_aob_tool.dll)');
+end;
+
+procedure TMainForm.miReloadPluginsClick(Sender: TObject);
+begin
+  OnyxUnloadAOBPlugin;
+  ShowMessage('Plugins descarregados com sucesso. O próximo acesso recarregará a DLL atualizada.');
+end;
+
 procedure TMainForm.miLuaDocumentationClick(Sender: TObject);
 begin
   {$ifdef darwin}
@@ -6073,7 +6102,13 @@ begin
   lastAdded.vartype:=vtDword;
 
   miSignTable.visible:={$ifdef windows}canSignTables{$else}false{$endif};
+  Plugins2.Visible := True;
   miHelp.Visible := False;
+  miHelp.Enabled := False;
+  try
+    MainMenu1.Items.Remove(miHelp);
+  except
+  end;
 
 
   vartype.Items.Clear;

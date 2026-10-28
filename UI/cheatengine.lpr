@@ -39,7 +39,7 @@ uses
   circularBuffer, PEInfoFunctions, PEInfounit, FileMapping, frmFindstaticsUnit,
   frmModifyRegistersUnit, frmHeapsUnit, savedisassemblyfrm,
   frmSaveMemoryRegionUnit, frmLoadMemoryunit, formAddToCodeList,
-  frmFillMemoryUnit, frmCodecaveScannerUnit, frmSelectionlistunit,
+  frmFillMemoryUnit, frmCodecaveScannerUnit, frmSelectionlistunit, frmAobValidatorUnit,
   symbolconfigunit, frmFloatingPointPanelUnit, frmTracerUnit, DriverList,
   frmRegistersunit, formChangedAddresses, frmGDTunit, frmIDTunit,
   frmDisassemblyscanunit, frmReferencedStringsUnit, StructuresAddElementfrm,

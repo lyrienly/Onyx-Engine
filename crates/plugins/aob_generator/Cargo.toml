@@ -1,0 +1,11 @@
+[package]
+name = "onyx_aob_tool"
+version = "1.0.0"
+edition = "2021"
+
+[lib]
+name = "onyx_aob_tool"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+onyx_core = { path = "../../core" }

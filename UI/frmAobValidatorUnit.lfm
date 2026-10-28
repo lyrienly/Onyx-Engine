@@ -1,0 +1,307 @@
+object frmAobValidator: TfrmAobValidator
+  Left = 720
+  Height = 620
+  Top = 180
+  Width = 640
+  BorderIcons = [biSystemMenu, biMinimize]
+  BorderStyle = bsSingle
+  Caption = 'Onyx SigMaker & AOB Validator'
+  ClientHeight = 620
+  ClientWidth = 640
+  Color = 2105376
+  OnCreate = FormCreate
+  OnShow = FormShow
+  Position = poScreenCenter
+  LCLVersion = '2.2.2.0'
+  object pnlHeader: TPanel
+    Left = 0
+    Height = 52
+    Top = 0
+    Width = 640
+    Align = alTop
+    BevelOuter = bvNone
+    ClientHeight = 52
+    ClientWidth = 640
+    Color = 2631720
+    ParentColor = False
+    TabOrder = 0
+    object lblTitle: TLabel
+      Left = 14
+      Height = 20
+      Top = 8
+      Width = 265
+      Caption = 'Onyx SigMaker && AOB Validator'
+      Font.Color = 58998
+      Font.Height = -15
+      Font.Style = [fsBold]
+      ParentColor = False
+      ParentFont = False
+    end
+    object lblSubtitle: TLabel
+      Left = 14
+      Height = 15
+      Top = 29
+      Width = 445
+      Caption = 'Validação de assinaturas, identificação de funções e geração de AOB nativa'
+      Font.Color = 10526880
+      ParentColor = False
+      ParentFont = False
+    end
+  end
+  object gbInput: TGroupBox
+    Left = 12
+    Height = 148
+    Top = 58
+    Width = 616
+    Caption = ' Configuração da Assinatura / Busca '
+    ClientHeight = 128
+    ClientWidth = 612
+    Font.Color = 15592941
+    ParentFont = False
+    TabOrder = 1
+    object lblAob: TLabel
+      Left = 12
+      Height = 15
+      Top = 8
+      Width = 280
+      Caption = 'AOB / Assinatura (Bytes hexadecimais com ??):'
+      ParentColor = False
+    end
+    object edtAob: TEdit
+      Left = 12
+      Height = 23
+      Top = 26
+      Width = 588
+      Color = 1973790
+      Font.Color = 15592941
+      Font.Name = 'Courier New'
+      ParentFont = False
+      TabOrder = 0
+    end
+    object lblModule: TLabel
+      Left = 12
+      Height = 15
+      Top = 56
+      Width = 145
+      Caption = 'Filtro de Módulo (opcional):'
+      ParentColor = False
+    end
+    object edtModule: TEdit
+      Left = 12
+      Height = 23
+      Top = 74
+      Width = 260
+      Color = 1973790
+      Font.Color = 15592941
+      ParentFont = False
+      TabOrder = 1
+    end
+    object btnValidate: TButton
+      Left = 286
+      Height = 26
+      Top = 72
+      Width = 160
+      Caption = 'Validar AOB'
+      Font.Style = [fsBold]
+      OnClick = btnValidateClick
+      ParentFont = False
+      TabOrder = 2
+    end
+    object btnGenerate: TButton
+      Left = 454
+      Height = 26
+      Top = 72
+      Width = 146
+      Caption = 'Gerar AOB de Endereço'
+      OnClick = btnGenerateClick
+      TabOrder = 3
+    end
+  end
+  object gbResults: TGroupBox
+    Left = 12
+    Height = 350
+    Top = 212
+    Width = 616
+    Caption = ' Resultado da Análise && Resolução '
+    ClientHeight = 330
+    ClientWidth = 612
+    Font.Color = 15592941
+    ParentFont = False
+    TabOrder = 2
+    object pnlStatusBadge: TPanel
+      Left = 12
+      Height = 28
+      Top = 6
+      Width = 588
+      BevelOuter = bvNone
+      BorderStyle = bsNone
+      ClientHeight = 28
+      ClientWidth = 588
+      Color = 2631720
+      ParentColor = False
+      TabOrder = 0
+      object lblStatus: TLabel
+        Left = 0
+        Height = 28
+        Top = 0
+        Width = 588
+        Align = alClient
+        Alignment = taCenter
+        Caption = 'Aguardando validação...'
+        Font.Color = 11184810
+        Font.Style = [fsBold]
+        Layout = tlCenter
+        ParentColor = False
+        ParentFont = False
+      end
+    end
+    object lblAddress: TLabel
+      Left = 12
+      Height = 15
+      Top = 42
+      Width = 117
+      Caption = 'Endereço Encontrado:'
+      ParentColor = False
+    end
+    object edtAddress: TEdit
+      Left = 12
+      Height = 23
+      Top = 60
+      Width = 280
+      Color = 1973790
+      Font.Color = 58998
+      Font.Name = 'Courier New'
+      Font.Style = [fsBold]
+      ParentFont = False
+      ReadOnly = True
+      TabOrder = 1
+    end
+    object lblModuleOffset: TLabel
+      Left = 308
+      Height = 15
+      Top = 42
+      Width = 87
+      Caption = 'Módulo + Offset:'
+      ParentColor = False
+    end
+    object edtModuleOffset: TEdit
+      Left = 308
+      Height = 23
+      Top = 60
+      Width = 292
+      Color = 1973790
+      Font.Color = 15592941
+      ParentFont = False
+      ReadOnly = True
+      TabOrder = 2
+    end
+    object lblFunction: TLabel
+      Left = 12
+      Height = 15
+      Top = 90
+      Width = 141
+      Caption = 'Função / Símbolo Resolvido:'
+      ParentColor = False
+    end
+    object edtFunction: TEdit
+      Left = 12
+      Height = 23
+      Top = 108
+      Width = 280
+      Color = 1973790
+      Font.Color = 15592941
+      ParentFont = False
+      ReadOnly = True
+      TabOrder = 3
+    end
+    object lblFuncOffset: TLabel
+      Left = 308
+      Height = 15
+      Top = 90
+      Width = 131
+      Caption = 'Deslocamento na Função:'
+      ParentColor = False
+    end
+    object edtFuncOffset: TEdit
+      Left = 308
+      Height = 23
+      Top = 108
+      Width = 292
+      Color = 1973790
+      Font.Color = 15592941
+      ParentFont = False
+      ReadOnly = True
+      TabOrder = 4
+    end
+    object lblDisasm: TLabel
+      Left = 12
+      Height = 15
+      Top = 138
+      Width = 168
+      Caption = 'Instruções Desmontadas (Preview):'
+      ParentColor = False
+    end
+    object mmoDisasm: TMemo
+      Left = 12
+      Height = 144
+      Top = 156
+      Width = 588
+      Color = 1710618
+      Font.Color = 14474460
+      Font.Name = 'Courier New'
+      ParentFont = False
+      ReadOnly = True
+      ScrollBars = ssAutoBoth
+      TabOrder = 5
+    end
+  end
+  object pnlBottom: TPanel
+    Left = 0
+    Height = 48
+    Top = 572
+    Width = 640
+    Align = alBottom
+    BevelOuter = bvNone
+    ClientHeight = 48
+    ClientWidth = 640
+    Color = 2368548
+    ParentColor = False
+    TabOrder = 3
+    object btnCopyAob: TButton
+      Left = 14
+      Height = 28
+      Top = 10
+      Width = 100
+      Caption = 'Copiar AOB'
+      OnClick = btnCopyAobClick
+      TabOrder = 0
+    end
+    object btnCopyAA: TButton
+      Left = 122
+      Height = 28
+      Top = 10
+      Width = 140
+      Caption = 'Copiar Template AA'
+      OnClick = btnCopyAAClick
+      TabOrder = 1
+    end
+    object btnOpenMemView: TButton
+      Left = 270
+      Height = 28
+      Top = 10
+      Width = 130
+      Caption = 'Ir para Memory View'
+      OnClick = btnOpenMemViewClick
+      TabOrder = 2
+    end
+    object btnClose: TButton
+      Left = 538
+      Height = 28
+      Top = 10
+      Width = 88
+      Caption = 'Fechar'
+      OnClick = btnCloseClick
+      TabOrder = 3
+    end
+  end
+end

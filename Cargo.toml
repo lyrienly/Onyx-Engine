@@ -13,5 +13,6 @@ members = [
     "crates/dlls/speedhack",
     "crates/dlls/vehdebug",
     "crates/dlls/taskmgr_cloak",
+    "crates/plugins/aob_generator",
 ]
 resolver = "2"
