@@ -22,7 +22,8 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use onyx_core::debugger::{
-    BreakpointSize, BreakpointType, HardwareBreakpointMonitor, HwBpError, VehDebugger,
+    read_thread_debug_registers, BreakpointSize, BreakpointType, HardwareBreakpointMonitor,
+    HwBpError, VehDebugger,
 };
 use onyx_core::process::Process;
 
@@ -136,6 +137,31 @@ fn run() -> Result<(), String> {
         return Err(format!("slots inesperados: {indices:?}"));
     }
     println!("1/6 quatro slots ocupados: {indices:?}");
+
+    // 1b. Confere fisicamente DR0..DR3 na primeira thread.
+    let dr = read_thread_debug_registers(threads[0])
+        .map_err(|error| format!("leitura dos DRs falhou: {error}"))?;
+    let expected = [
+        target.address as u64,
+        (target.address + 8) as u64,
+        (target.address + 16) as u64,
+        (target.address + 24) as u64,
+    ];
+    let actual = [dr.dr0, dr.dr1, dr.dr2, dr.dr3];
+    for index in 0..4 {
+        if actual[index] != expected[index] || !dr.slot_enabled(index) {
+            return Err(format!(
+                "DR{index} divergente: esperado {:#x}, obtido {:#x} (habilitado={})",
+                expected[index],
+                actual[index],
+                dr.slot_enabled(index)
+            ));
+        }
+    }
+    println!(
+        "1b/6 DRs fisicos conferem: {:#x} {:#x} {:#x} {:#x} dr7={:#x}",
+        dr.dr0, dr.dr1, dr.dr2, dr.dr3, dr.dr7
+    );
 
     // 2. Quinto breakpoint deve ser recusado.
     match veh.set_stealth_breakpoint(
