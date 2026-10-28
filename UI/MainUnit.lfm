@@ -2742,7 +2742,22 @@ object MainForm: TMainForm
     end
     object Plugins2: TMenuItem
       Caption = 'P&lugins'
-      Visible = False
+      object miAobValidator: TMenuItem
+        Caption = 'AOB Auto-Generator && Validator'
+        ShortCut = 24641
+        OnClick = miAobValidatorClick
+      end
+      object N99PluginSep: TMenuItem
+        Caption = '-'
+      end
+      object miPluginManager: TMenuItem
+        Caption = 'Gerenciador de Plugins...'
+        OnClick = miPluginManagerClick
+      end
+      object miReloadPlugins: TMenuItem
+        Caption = 'Recarregar Plugins (Hot-Reload)'
+        OnClick = miReloadPluginsClick
+      end
     end
     object miLanguages: TMenuItem
       Caption = 'Languages'

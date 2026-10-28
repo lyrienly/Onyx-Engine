@@ -1,4 +1,4 @@
-unit OnyxBackend;
+﻿unit OnyxBackend;
 
 {$MODE Delphi}
 
@@ -194,6 +194,20 @@ type
     is_unique: integer;
   end;
   POnyxSignatureResult = ^TOnyxSignatureResult;
+
+  TOnyxAobMatchResult = packed record
+    address: UInt64;
+    match_count: DWORD;
+    is_unique: DWORD;
+    module_name: array[0..127] of AnsiChar;
+    module_base: UInt64;
+    module_offset: UInt64;
+    function_name: array[0..255] of AnsiChar;
+    function_start: UInt64;
+    function_offset: Int64;
+    disasm_preview: array[0..511] of AnsiChar;
+  end;
+  POnyxAobMatchResult = ^TOnyxAobMatchResult;
 
 const
   ONYX_PTR_PHASE_IDLE = 0;
@@ -417,6 +431,10 @@ function OnyxMonoGetAssemblyCount: integer;
 function OnyxMonoGetAssemblyName(index: integer): string;
 function OnyxMonoDissectClrObject(objectAddress: PtrUInt; var outMt, outEeClass: PtrUInt; var outSize: DWORD): Boolean;
 procedure RegisterOnyxLua(L: Pointer);
+
+function OnyxValidateAOBPlugin(pid: DWORD; pattern: PAnsiChar; module_filter: PAnsiChar; out_result: POnyxAobMatchResult): integer;
+function OnyxGenerateAOBPlugin(pid: DWORD; target_address: UInt64; max_len: DWORD; out_pattern: PAnsiChar; buf_size: DWORD): integer;
+procedure OnyxUnloadAOBPlugin;
 
 implementation
 
@@ -1514,10 +1532,91 @@ begin
   end;
 end;
 
+type
+  TOnyxPluginValidateAOBFn = function(pid: DWORD; pattern: PAnsiChar; module_filter: PAnsiChar; out_result: POnyxAobMatchResult): integer; stdcall;
+  TOnyxPluginGenerateAOBFn = function(pid: DWORD; target_address: UInt64; max_len: DWORD; out_pattern_buf: PAnsiChar; buf_size: DWORD): integer; stdcall;
+
+var
+  hAobToolPlugin: THandle = 0;
+  fnAobValidate: TOnyxPluginValidateAOBFn = nil;
+  fnAobGenerate: TOnyxPluginGenerateAOBFn = nil;
+
+function EnsureAobToolPlugin: Boolean;
+var
+  candidates: array[0..4] of string;
+  i: integer;
+  baseDir: string;
+begin
+  if (hAobToolPlugin <> 0) and Assigned(fnAobValidate) then
+    Exit(True);
+
+  baseDir := ExtractFilePath(ParamStr(0));
+  candidates[0] := baseDir + 'plugins\onyx_aob_tool.dll';
+  candidates[1] := baseDir + 'bin\plugins\onyx_aob_tool.dll';
+  candidates[2] := 'plugins\onyx_aob_tool.dll';
+  candidates[3] := 'bin\plugins\onyx_aob_tool.dll';
+  candidates[4] := 'onyx_aob_tool.dll';
+
+  for i := 0 to 4 do
+  begin
+    if FileExists(candidates[i]) then
+    begin
+      hAobToolPlugin := LoadLibraryA(PAnsiChar(AnsiString(candidates[i])));
+      if hAobToolPlugin <> 0 then Break;
+    end;
+  end;
+
+  if hAobToolPlugin = 0 then
+    hAobToolPlugin := LoadLibraryA('onyx_aob_tool.dll');
+
+  if hAobToolPlugin <> 0 then
+  begin
+    fnAobValidate := TOnyxPluginValidateAOBFn(GetProcAddress(hAobToolPlugin, 'OnyxPlugin_ValidateAOB'));
+    fnAobGenerate := TOnyxPluginGenerateAOBFn(GetProcAddress(hAobToolPlugin, 'OnyxPlugin_GenerateAOB'));
+    Result := Assigned(fnAobValidate);
+  end
+  else
+    Result := False;
+end;
+
+function OnyxValidateAOBPlugin(pid: DWORD; pattern: PAnsiChar; module_filter: PAnsiChar; out_result: POnyxAobMatchResult): integer;
+begin
+  if not EnsureAobToolPlugin then Exit(-2);
+  if Assigned(fnAobValidate) then
+    Result := fnAobValidate(pid, pattern, module_filter, out_result)
+  else
+    Result := -5;
+end;
+
+function OnyxGenerateAOBPlugin(pid: DWORD; target_address: UInt64; max_len: DWORD; out_pattern: PAnsiChar; buf_size: DWORD): integer;
+begin
+  if not EnsureAobToolPlugin then Exit(-2);
+  if Assigned(fnAobGenerate) then
+    Result := fnAobGenerate(pid, target_address, max_len, out_pattern, buf_size)
+  else
+    Result := -5;
+end;
+
+procedure OnyxUnloadAOBPlugin;
+begin
+  if hAobToolPlugin <> 0 then
+  begin
+    FreeLibrary(hAobToolPlugin);
+    hAobToolPlugin := 0;
+  end;
+  fnAobValidate := nil;
+  fnAobGenerate := nil;
+end;
+
 initialization
   InitOnyxBackend;
 
 finalization
+  if hAobToolPlugin <> 0 then
+  begin
+    FreeLibrary(hAobToolPlugin);
+    hAobToolPlugin := 0;
+  end;
   if GlobalOnyxFreezer <> nil then
   begin
     onyx_freezer_destroy(GlobalOnyxFreezer);
