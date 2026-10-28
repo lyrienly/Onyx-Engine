@@ -119,7 +119,8 @@ impl DbgHelpSymbolEngine {
 
             let init_res = (fn_sym_initialize)(target_handle, path_wide.as_ptr(), FALSE);
             if init_res != TRUE {
-
+                FreeLibrary(h_mod);
+                return Err("SymInitializeW failed to initialize the symbol handler".to_string());
             }
 
             Ok(Self {

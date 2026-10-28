@@ -6,6 +6,8 @@ pub mod structure;
 pub mod custom_type;
 pub mod codecave;
 pub mod signature_maker;
+pub mod entropy;
+pub mod snapshot;
 
 pub use scanner::*;
 pub use group_scan::*;
@@ -15,4 +17,6 @@ pub use structure::*;
 pub use custom_type::*;
 pub use codecave::*;
 pub use signature_maker::*;
+pub use entropy::*;
+pub use snapshot::*;
 
