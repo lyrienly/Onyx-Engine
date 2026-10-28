@@ -27,7 +27,7 @@ if %errorlevel% neq 0 (
 
 if not exist "bin" mkdir "bin"
 copy /y "target\release\onyx_backend.dll" "bin\onyx_backend.dll" >nul
-copy /y "target\release\onyx_backend.dll" "cheat-engine\Cheat Engine\bin\onyx_backend.dll" >nul
+copy /y "target\release\onyx_backend.dll" "UI\bin\onyx_backend.dll" >nul
 echo [OK] onyx_backend.dll generated and deployed.
 echo.
 
@@ -46,24 +46,29 @@ if %errorlevel% neq 0 (
 
 :: 4. Compile Pascal Frontend (Cheat Engine)
 echo [*] Step 2/3: Compiling Pascal/Lazarus Frontend with OnyxBackend bridge...
-"%LAZBUILD_EXE%" -B --build-mode=Release "cheat-engine\Cheat Engine\cheatengine.lpi"
+"%LAZBUILD_EXE%" --build-mode="Release 64-Bit" "UI\cheatengine.lpi"
 if %errorlevel% neq 0 (
     echo.
     echo [ERROR] Pascal frontend compilation failed!
     pause
     exit /b 1
 )
-echo [OK] cheatengine-x86_64.exe compiled successfully.
+echo [OK] OnyxEngine-x86_64.exe compiled successfully.
 echo.
 
 :: 5. Copy release artifacts to bin\
 echo [*] Step 3/3: Synchronizing distribution bin directory...
-copy /y "cheat-engine\Cheat Engine\bin\cheatengine-x86_64.exe" "bin\OnyxEngine-CE.exe" >nul
-if exist "cheat-engine\Cheat Engine\bin\lua53-64.dll" (
-    copy /y "cheat-engine\Cheat Engine\bin\lua53-64.dll" "bin\lua53-64.dll" >nul
+if exist "UI\bin\OnyxEngine-x86_64.exe" (
+    copy /y "UI\bin\OnyxEngine-x86_64.exe" "bin\OnyxEngine-CE.exe" >nul
 )
-if exist "cheat-engine\Cheat Engine\bin\*.dll" (
-    copy /y "cheat-engine\Cheat Engine\bin\*.dll" "bin\" >nul
+if exist "UI\bin\cheatengine-x86_64.exe" (
+    copy /y "UI\bin\cheatengine-x86_64.exe" "bin\OnyxEngine-CE.exe" >nul
+)
+if exist "UI\bin\lua53-64.dll" (
+    copy /y "UI\bin\lua53-64.dll" "bin\lua53-64.dll" >nul
+)
+if exist "UI\bin\*.dll" (
+    copy /y "UI\bin\*.dll" "bin\" >nul
 )
 
 :finish

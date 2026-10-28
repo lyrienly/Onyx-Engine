@@ -22,10 +22,10 @@ rustc-ice-*.txt
 *.rsj
 *.or
 *.obj
-cheat-engine/Cheat Engine/lib/
-cheat-engine/Cheat Engine/backup/
-cheat-engine/Cheat Engine/VEHDebug/lib/
-cheat-engine/Cheat Engine/VEHDebug/backup/
+UI/lib/
+UI/backup/
+UI/VEHDebug/lib/
+UI/VEHDebug/backup/
 
 # MSBuild / C++ build output
 *.exp

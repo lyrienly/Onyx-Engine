@@ -30,7 +30,7 @@ O projeto e estruturado em quatro camadas operacionais:
 +-------------------------------------------------------------------+
 ```
 
-### 1. Frontend em Free Pascal / Lazarus (`cheat-engine/Cheat Engine`)
+### 1. Frontend em Free Pascal / Lazarus (`UI/`)
 Responsavel pela apresentacao grafica, gerenciamento de tabelas de enderecos, visualizacao de desassemblagem e depuracao visual. As chamadas criticas de memoria e varredura sao interceptadas por bridges que redirecionam o fluxo para a DLL nativa em Rust.
 
 ### 2. Backend Nativo em Rust (`crates/`)
@@ -43,7 +43,7 @@ Substitui os mecanismos legados de varredura e manipulacao de processos por impl
 ### 3. Driver de Modo Kernel (`cheat-engine/DBKKernel`)
 Modulo em nivel de ring-0 (`OwMemDriver.sys`) voltado para operacoes de memoria fisica (`\Device\PhysicalMemory`), leitura de registradores de controle (`CR3`, `CR0`, `CR4`) e contorno de filtros de protecao baseados em `ObRegisterCallbacks`.
 
-### 4. Bridge de Automacao MCP (`cheat-engine/Cheat Engine/bin/mcp`)
+### 4. Bridge de Automacao MCP (`UI/bin/mcp`)
 Interface de integracao compativel com a especificacao Model Context Protocol (MCP), viabilizando o controle remoto de sessoes de depuracao, escaneamento e injecao de memoria por agentes de inteligencia artificial e ferramentas automatizadas.
 
 ---
@@ -56,10 +56,11 @@ OnyxEngine/
 |-- CONTRIBUTING.md                     # Diretrizes de contribuicao e engenharia
 |-- README.md                           # Documentacao tecnica do projeto
 |-- BUILD.bat                           # Script de compilacao unificada
-|-- cheat-engine/                       # Fontes do frontend e do driver
-|   |-- Cheat Engine/                   # Projeto Lazarus (.lpi, .pas, .lfm)
-|   |   `-- bin/                        # Recursos, bibliotecas auxiliares e scripts autorun
-|   `-- DBKKernel/                      # Codigo-fonte do driver de kernel C
+|-- UI/                                 # Frontend Pascal/Lazarus (.lpi, .pas, .lfm)
+|   `-- bin/                            # Recursos, bibliotecas auxiliares e scripts autorun
+|-- cheat-engine/                       # Fontes auxiliares e driver de kernel
+|   |-- DBKKernel/                      # Codigo-fonte do driver de kernel C
+|   `-- dbvm/                           # Codigo-fonte do DBVM
 `-- crates/                             # Codigo-fonte do motor em Rust
     |-- backend/                        # DLL C-ABI (onyx_backend)
     |-- core/                           # Subsistemas de processo, memoria e scanners
@@ -96,9 +97,9 @@ O artefato compilado sera gerado em `target\release\onyx_backend.dll`.
 
 ### 2. Compilacao do Frontend em Free Pascal
 ```cmd
-lazbuild -B --build-mode=Release "cheat-engine\Cheat Engine\cheatengine.lpi"
+lazbuild --build-mode="Release 64-Bit" "UI\cheatengine.lpi"
 ```
-O executavel principal sera gerado em `cheat-engine\Cheat Engine\bin\cheatengine-x86_64.exe`.
+O executavel principal sera gerado em `UI\bin\OnyxEngine-x86_64.exe`.
 
 ### 3. Compilacao Unificada via Script
 Para compilar simultaneamente o motor em Rust, sincronizar os artefatos e compilar a interface Pascal, execute na raiz do repositorio:

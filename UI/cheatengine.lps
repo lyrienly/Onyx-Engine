@@ -3,7 +3,7 @@
   <ProjectSession>
     <PathDelim Value="\"/>
     <Version Value="12"/>
-    <BuildModes Active="release"/>
+    <BuildModes Active="Release 64-Bit"/>
     <Units Count="424">
       <Unit0>
         <Filename Value="cheatengine.lpr"/>

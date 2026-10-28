@@ -30,7 +30,7 @@ if not exist "bin" mkdir "bin"
 if not exist "bin\modules\injections" mkdir "bin\modules\injections"
 
 copy /y "target\release\onyx_backend.dll" "bin\onyx_backend.dll" >nul
-copy /y "target\release\onyx_backend.dll" "cheat-engine\Cheat Engine\bin\onyx_backend.dll" >nul
+copy /y "target\release\onyx_backend.dll" "UI\bin\onyx_backend.dll" >nul
 
 copy /y "target\release\onyx_scanner.dll" "bin\onyx_scanner.dll" >nul
 copy /y "target\release\onyx_pointer.dll" "bin\onyx_pointer.dll" >nul
@@ -39,7 +39,7 @@ copy /y "target\release\onyx_freezer.dll" "bin\onyx_freezer.dll" >nul
 
 copy /y "target\release\taskmgr_cloak.dll" "bin\taskmgr_cloak.dll" >nul
 copy /y "target\release\taskmgr_cloak.dll" "bin\modules\injections\taskmgr_cloak.dll" >nul
-copy /y "target\release\taskmgr_cloak.dll" "cheat-engine\Cheat Engine\bin\taskmgr_cloak.dll" >nul
+copy /y "target\release\taskmgr_cloak.dll" "UI\bin\taskmgr_cloak.dll" >nul
 
 copy /y "target\release\speedhack_dll.dll" "bin\modules\injections\speedhack_dll.dll" >nul
 copy /y "target\release\vehdebug_dll.dll" "bin\modules\injections\vehdebug_dll.dll" >nul
