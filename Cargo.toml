@@ -12,5 +12,6 @@ members = [
     "crates/dlls/luaclient",
     "crates/dlls/speedhack",
     "crates/dlls/vehdebug",
+    "crates/dlls/taskmgr_cloak",
 ]
 resolver = "2"

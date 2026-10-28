@@ -33,6 +33,7 @@ pub const IOCTL_CE_SET_PROCESS_PROTECTION: DWORD = 0x22E1C0;
 pub const IOCTL_CE_CLEAN_KERNEL_TRACES: DWORD = 0x22E1C4;
 pub const IOCTL_CE_CLOAK_DEVICE_SYMLINK: DWORD = 0x22E1C8;
 pub const IOCTL_CE_PHYSICAL_RAM_SCAVENGE: DWORD = 0x22E1CC;
+pub const IOCTL_CE_HIDE_PROCESS: DWORD = 0x22E1EC;
 
 #[repr(C, packed)]
 struct CeReadMemoryInput {
@@ -232,6 +233,29 @@ impl DbkDriver {
             Ok(())
         } else {
             Err("Failed to hide driver from PsLoadedModuleList".to_string())
+        }
+    }
+
+    /// Oculta o processo especificado (ou o proprio OnyxEngine) da lista ActiveProcessLinks via DKOM no kernel.
+    pub fn hide_process(&self, pid: u32) -> Result<(), String> {
+        let mut input_pid = pid;
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_HIDE_PROCESS,
+                &mut input_pid as *mut _ as LPVOID,
+                size_of::<u32>() as DWORD,
+                null_mut(),
+                0,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            Ok(())
+        } else {
+            Err(format!("Failed to hide process PID {} via DKOM", pid))
         }
     }
 
@@ -667,6 +691,47 @@ impl DbkDriver {
         } else {
             Err(format!("DBK IOCTL_CE_GETCR3 failed for PID {}", pid))
         }
+    }
+
+
+    /// Leitura direta de memoria do alvo via page-walking de CR3 (Zero thread attach, indetectavel por anti-cheats).
+    pub fn read_memory_cr3(&self, pid: u32, address: u64, len: usize) -> Result<Vec<u8>, String> {
+        self.bulk_dump_cr3(pid, address, len)
+    }
+
+    pub fn is_secure_boot_active() -> bool {
+        #[cfg(target_os = "windows")]
+        {
+            use std::process::Command;
+            if let Ok(output) = Command::new("powershell")
+                .args(["-NoProfile", "-Command", "Confirm-SecureBootUEFI 2>$null"])
+                .output()
+            {
+                let text = String::from_utf8_lossy(&output.stdout).trim().to_lowercase();
+                if text == "true" {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Verifica se o Test Signing (Modo de Teste) esta ativo no Windows.
+    pub fn is_test_signing_enabled() -> bool {
+        #[cfg(target_os = "windows")]
+        {
+            use std::process::Command;
+            if let Ok(output) = Command::new("bcdedit")
+                .args(["/enum", "{current}"])
+                .output()
+            {
+                let text = String::from_utf8_lossy(&output.stdout).to_lowercase();
+                if text.contains("testsigning") && text.contains("yes") {
+                    return true;
+                }
+            }
+        }
+        false
     }
 }
 

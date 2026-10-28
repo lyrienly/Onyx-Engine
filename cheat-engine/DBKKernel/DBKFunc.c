@@ -1457,7 +1457,7 @@ ULONG PatternScanProcessCR3(
 		return 0;
 
 	const SIZE_T CHUNK_SIZE = 64 * 1024;
-	PUCHAR chunk = (PUCHAR)ExAllocatePoolWithTag(NonPagedPool, CHUNK_SIZE, 'kbaS');
+	PUCHAR chunk = (PUCHAR)ExAllocatePoolWithTag(DBK_POOL_NX, CHUNK_SIZE, 'kbaS');
 	if (!chunk)
 		return 0;
 
@@ -1749,7 +1749,7 @@ NTSTATUS WriteCloakedPageMemory(PEPROCESS Process, ULONG64 VirtualAddress, PVOID
 	if ((pageOffset + Size) > 0x1000)
 		return STATUS_BUFFER_TOO_SMALL;
 
-	PUCHAR pageBuf = (PUCHAR)ExAllocatePoolWithTag(NonPagedPool, 0x1000, 'KOLC');
+	PUCHAR pageBuf = (PUCHAR)ExAllocatePoolWithTag(DBK_POOL_NX, 0x1000, 'KOLC');
 	if (!pageBuf)
 		return STATUS_INSUFFICIENT_RESOURCES;
 
@@ -2034,7 +2034,7 @@ static PVOID GetNtoskrnlBase(VOID)
 	if (size == 0)
 		return NULL;
 
-	PSYSTEM_MODULE_INFORMATION pMods = (PSYSTEM_MODULE_INFORMATION)ExAllocatePoolWithTag(NonPagedPool, size, 'sDoM');
+	PSYSTEM_MODULE_INFORMATION pMods = (PSYSTEM_MODULE_INFORMATION)ExAllocatePoolWithTag(DBK_POOL_NX, size, 'sDoM');
 	if (!pMods)
 		return NULL;
 
@@ -2115,16 +2115,18 @@ static NTSTATUS CleanPiDDBCache(PVOID NtosBase)
 		return STATUS_NOT_SUPPORTED;
 
 	// Drivers para higienizar do cache
-	UNICODE_STRING targets[2];
+	UNICODE_STRING targets[4];
 	RtlInitUnicodeString(&targets[0], L"lydumen.sys");
 	RtlInitUnicodeString(&targets[1], L"dbk64.sys");
+	RtlInitUnicodeString(&targets[2], L"OwMemDriver.sys");
+	RtlInitUnicodeString(&targets[3], L"owmemdriver.sys");
 
 	KeEnterCriticalRegion();
 	ExAcquireResourceExclusiveLite(pLock, TRUE);
 
 	__try
 	{
-		for (int t = 0; t < 2; t++)
+		for (int t = 0; t < 4; t++)
 		{
 			PIDDB_CACHE_ENTRY lookupEntry;
 			RtlZeroMemory(&lookupEntry, sizeof(PIDDB_CACHE_ENTRY));
@@ -2205,9 +2207,11 @@ static NTSTATUS CleanMmUnloadedDrivers(PVOID NtosBase)
 	if (!MmIsAddressValid(driverArray))
 		return STATUS_INVALID_ADDRESS;
 
-	UNICODE_STRING targets[2];
+	UNICODE_STRING targets[4];
 	RtlInitUnicodeString(&targets[0], L"lydumen.sys");
 	RtlInitUnicodeString(&targets[1], L"dbk64.sys");
+	RtlInitUnicodeString(&targets[2], L"OwMemDriver.sys");
+	RtlInitUnicodeString(&targets[3], L"owmemdriver.sys");
 
 	__try
 	{
@@ -2217,7 +2221,7 @@ static NTSTATUS CleanMmUnloadedDrivers(PVOID NtosBase)
 			if (!MmIsAddressValid(entry) || !entry->Name.Buffer || entry->Name.Length == 0)
 				continue;
 
-			for (int t = 0; t < 2; t++)
+			for (int t = 0; t < 4; t++)
 			{
 				if (RtlCompareUnicodeString(&entry->Name, &targets[t], TRUE) == 0)
 				{
@@ -2348,7 +2352,7 @@ ULONG PhysicalRamScavenge(
 
 	// Aloca buffer de varredura seguro de 64 KB
 	const SIZE_T CHUNK_SIZE = 64 * 1024;
-	PUCHAR chunk = (PUCHAR)ExAllocatePoolWithTag(NonPagedPool, CHUNK_SIZE, 'vaCS');
+	PUCHAR chunk = (PUCHAR)ExAllocatePoolWithTag(DBK_POOL_NX, CHUNK_SIZE, 'vaCS');
 	if (!chunk)
 		return 0;
 
@@ -2509,4 +2513,67 @@ NTSTATUS CloakRegionMemory(PEPROCESS Process, ULONG64 VirtualAddress, PVOID Buff
 	}
 
 	return (written == Size) ? STATUS_SUCCESS : STATUS_PARTIAL_COPY;
+}
+
+ULONG ResolveActiveProcessLinksOffset(void)
+{
+	static ULONG g_ActiveProcessLinksOffset = 0;
+	if (g_ActiveProcessLinksOffset != 0)
+		return g_ActiveProcessLinksOffset;
+
+	PEPROCESS currentProc = IoGetCurrentProcess();
+	HANDLE currentPid = PsGetCurrentProcessId();
+
+	if (currentProc && currentPid)
+	{
+		PUCHAR p = (PUCHAR)currentProc;
+		for (ULONG off = 0x200; off <= 0x600; off += sizeof(ULONG_PTR))
+		{
+			if (*(PHANDLE)(p + off) == currentPid)
+			{
+				ULONG linksOff = off + sizeof(HANDLE);
+				PLIST_ENTRY list = (PLIST_ENTRY)(p + linksOff);
+				if (MmIsAddressValid(list->Flink) && MmIsAddressValid(list->Blink))
+				{
+					g_ActiveProcessLinksOffset = linksOff;
+					return linksOff;
+				}
+			}
+		}
+	}
+
+	g_ActiveProcessLinksOffset = 0x448; // Default Win10/Win11 x64
+	return 0x448;
+}
+
+NTSTATUS HideProcessByPid(ULONG ProcessId)
+{
+	if (KeGetCurrentIrql() > APC_LEVEL)
+		return STATUS_UNSUCCESSFUL;
+
+	PEPROCESS proc = NULL;
+	if (!NT_SUCCESS(PsLookupProcessByProcessId((HANDLE)(UINT_PTR)ProcessId, &proc)) || !proc)
+		return STATUS_NOT_FOUND;
+
+	ULONG linksOffset = ResolveActiveProcessLinksOffset();
+	PLIST_ENTRY links = (PLIST_ENTRY)((PUCHAR)proc + linksOffset);
+
+	__try
+	{
+		if (links->Flink && links->Blink && links->Flink != links)
+		{
+			links->Blink->Flink = links->Flink;
+			links->Flink->Blink = links->Blink;
+			links->Flink = links;
+			links->Blink = links;
+		}
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		ObDereferenceObject(proc);
+		return STATUS_UNHANDLED_EXCEPTION;
+	}
+
+	ObDereferenceObject(proc);
+	return STATUS_SUCCESS;
 }

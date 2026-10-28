@@ -888,7 +888,9 @@ begin
             cbKernelOpenProcess.checked:=reg.ReadBool('Use dbk32 OpenProcess');
 
           if reg.ValueExists('AutoLoadOwMemDriver') then
-            cbKernelAutoLoadDriver.checked:=reg.ReadBool('AutoLoadOwMemDriver');
+            cbKernelAutoLoadDriver.checked:=reg.ReadBool('AutoLoadOwMemDriver')
+          else
+            cbKernelAutoLoadDriver.checked:=true;
 
           if reg.ValueExists('ModuleList as Denylist') then
             DenyList:=reg.ReadBool('ModuleList as Denylist')
