@@ -6,7 +6,8 @@ use dashmap::DashMap;
 
 use crate::process::Process;
 
-pub const DEFAULT_CHUNK_SIZE: usize = 512 * 1024;
+pub const DEFAULT_CACHE_CHUNK_SIZE: usize = 512 * 1024;
+pub const DEFAULT_CHUNK_SIZE: usize = DEFAULT_CACHE_CHUNK_SIZE;
 pub const MIN_CHUNK_SIZE: usize = 4 * 1024;
 pub const MAX_CHUNK_SIZE: usize = 2 * 1024 * 1024;
 

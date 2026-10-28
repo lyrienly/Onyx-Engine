@@ -26,4 +26,4 @@ pub use snapshot::*;
 pub use aob_validator::*;
 pub use struct_spider::*;
 pub use transaction::*;
-pub use cache::*;
+pub use cache::{CachedChunk, CacheStats, MemoryCache, DEFAULT_CACHE_CHUNK_SIZE};
