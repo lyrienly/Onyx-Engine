@@ -238,20 +238,30 @@ local function initializeMCPMenu()
         return false
     end
 
-    -- Issue #5: resolve human-readable connection state based on heartbeat
-    -- freshness. "Connected" requires an inbound frame (any frame including
-    -- heartbeat) within the last 15s; "Reconnecting" means the server is
-    -- running but we haven't heard from a client recently.
+    -- Issue #5: resolve human-readable connection state. The ground truth
+    -- of liveness is last_rx (updated on every inbound frame, including
+    -- heartbeats every ~5s), NOT the ephemeral `connected` boolean. CE's
+    -- TPipeConnection flips `connected` to false on any transient ReadFile
+    -- hiccup, the Lua worker then re-accepts the pipe within one tick and
+    -- the Python relay reopens on its next heartbeat; during that brief
+    -- gap, the TCP client never sees an error. Driving the label off
+    -- last_rx makes those transparent cycles invisible to the user.
+    --
+    -- Thresholds (seconds): 12 = up to 2 missed heartbeats still counts as
+    -- Connected (heartbeat interval is 5s); 45 = extended grace while we
+    -- try to re-establish; beyond that we show Idle.
     local function resolveMcpStatus(state)
         if not state or not state.running then
             return "Offline", "[MCP Engine] - Offline"
         end
         local now = os.time()
         local lastRx = state.last_rx or 0
-        if state.connected and (now - lastRx) <= 15 then
+        local sinceRx = (lastRx > 0) and (now - lastRx) or math.huge
+
+        if sinceRx <= 12 then
             return "Connected", "[MCP Engine] - Connected"
         end
-        if state.connected or (lastRx > 0 and (now - lastRx) <= 30) then
+        if sinceRx <= 45 then
             return "Reconnecting", "[MCP Engine] - Reconnecting..."
         end
         return "Idle", "[MCP Engine] - Aguardando conexao"

@@ -5596,9 +5596,23 @@ local function PipeWorker(thread)
         end)
 
         if pipe.Connected and not thread.Terminated then
-            log("Client Connected")
+            -- Issue #5: CE's TPipeConnection (luapipe.pas) latches
+            -- fconnected=false on the first ReadFile hiccup, so the inner
+            -- loop below can exit even though the TCP relay still has an
+            -- open socket. The outer loop re-accepts within one tick, but
+            -- for the UI to not flap we distinguish a "fresh" client
+            -- (first-ever accept, or no traffic for a while) from a
+            -- "transparent re-accept" (we got data in the last 10s).
+            local now = os.time()
+            local wasRecentlyActive = (serverState.last_rx or 0) > 0
+                                      and (now - (serverState.last_rx or 0)) <= 10
+            if wasRecentlyActive then
+                log("Client Re-accepted (transparent pipe cycle)")
+            else
+                log("Client Connected")
+            end
             serverState.connected = true
-            serverState.last_rx = os.time()
+            serverState.last_rx = now
             serverState.reconnect_count = (serverState.reconnect_count or 0) + 1
 
             while not thread.Terminated and pipe.Connected do
@@ -5655,8 +5669,24 @@ local function PipeWorker(thread)
                 end
             end
 
+            -- Issue #5: always clear the connected flag when the inner
+            -- loop exits (so Stop/Start and real disconnects are honest),
+            -- but let the menu label ride on serverState.last_rx instead.
+            -- When the pipe cycles mid-session the TCP relay re-opens
+            -- within one heartbeat interval and last_rx stays fresh, so
+            -- the menu stays "Connected" and the user never sees the
+            -- cycle. We still log the two cases distinctly for the Lua
+            -- Engine window.
             serverState.connected = false
-            log("Client Disconnected")
+            local sinceLastRx = os.time() - (serverState.last_rx or 0)
+            if sinceLastRx > 10 then
+                log("Client Disconnected")
+            else
+                log(string.format(
+                    "Pipe cycle (sinceLastRx=%ds). Expecting transparent "
+                    .. "re-accept; menu stays Connected on last_rx freshness.",
+                    sinceLastRx))
+            end
         else
 
             if not thread.Terminated then
