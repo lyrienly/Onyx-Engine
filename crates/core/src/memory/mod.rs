@@ -11,6 +11,7 @@ pub mod snapshot;
 pub mod aob_validator;
 pub mod struct_spider;
 pub mod transaction;
+pub mod cache;
 
 pub use scanner::*;
 pub use group_scan::*;
@@ -25,3 +26,4 @@ pub use snapshot::*;
 pub use aob_validator::*;
 pub use struct_spider::*;
 pub use transaction::*;
+pub use cache::*;
