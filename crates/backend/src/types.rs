@@ -107,6 +107,32 @@ impl OnyxVehHit {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
+pub struct OnyxVehSlot {
+    pub index: u32,
+    pub address: usize,
+    pub bp_type: i32,
+    pub size: i32,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::OnyxVehSlot;
+    use std::mem::{offset_of, size_of};
+
+    /// O record equivalente em Object Pascal (`TOnyxVehSlot`, sem "packed")
+    /// precisa manter exatamente estes offsets.
+    #[test]
+    fn onyx_veh_slot_layout_matches_pascal() {
+        assert_eq!(size_of::<OnyxVehSlot>(), 24);
+        assert_eq!(offset_of!(OnyxVehSlot, index), 0);
+        assert_eq!(offset_of!(OnyxVehSlot, address), 8);
+        assert_eq!(offset_of!(OnyxVehSlot, bp_type), 16);
+        assert_eq!(offset_of!(OnyxVehSlot, size), 20);
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
 pub struct OnyxCodecaveEntry {
     pub address: usize,
     pub size: usize,

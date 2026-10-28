@@ -12,7 +12,7 @@ uses
   jwawindows, Windows, win32proc,
   {$endif}
   Classes, SysUtils, syncobjs, GuiSafeCriticalSection,
-  disassembler, CEFuncProc, newkernelhandler,debuggertypedefinitions, frmTracerUnit,
+  disassembler, CEFuncProc, newkernelhandler, OnyxBackend, debuggertypedefinitions, frmTracerUnit,
   DebuggerInterfaceAPIWrapper, lua, lauxlib, lualib,
   tracerIgnore, BreakpointTypeDef, LCLProc, contexthandler {$ifdef darwin}
   ,macport, macportdefines
@@ -624,6 +624,12 @@ begin
   OutputDebugString('clearDebugRegisters');
   if CurrentDebuggerInterface.usesDebugRegisters then
   begin
+    if OnyxVehHasActiveBreakpoints then
+    begin
+      OutputDebugString('clearDebugRegisters: skipped, Onyx-managed hardware breakpoints are active');
+      Exit;
+    end;
+
     debuggerCS.enter;
     suspend;
     fillContext;

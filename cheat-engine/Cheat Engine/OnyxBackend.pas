@@ -73,6 +73,17 @@ type
   end;
   POnyxVehHit = ^TOnyxVehHit;
 
+  { Layout must match onyx_backend::types::OnyxVehSlot (#[repr(C)], 24 bytes).
+    Não usar "packed": o Rust alinha address em 8 bytes. }
+  TOnyxVehSlot = record
+    index: DWORD;
+    address: PtrUInt;
+    bp_type: integer;
+    size: integer;
+  end;
+  POnyxVehSlot = ^TOnyxVehSlot;
+  TOnyxVehSlotArray = array[0..3] of TOnyxVehSlot;
+
   TOnyxCodecaveEntry = packed record
     address: PtrUInt;
     size: PtrUInt;
@@ -320,6 +331,8 @@ function onyx_veh_set_hw_bp(process: Pointer; address: PtrUInt; bp_type: integer
 function onyx_veh_clear_hw_bp(process: Pointer; index: PtrUInt): integer; stdcall; external OnyxBackendDLL;
 function onyx_veh_poll_hit(process: Pointer; out_rip: PPtrUInt; out_thread_id: PDWORD): integer; stdcall; external OnyxBackendDLL;
 function onyx_veh_monitor_address(process: Pointer; address: PtrUInt; bp_type: integer; size: integer; duration_secs: UInt64; out_hits: Pointer; max_hits: DWORD; out_count: PDWORD): integer; stdcall; external OnyxBackendDLL;
+function onyx_veh_slot_status(process: Pointer; out_slots: Pointer; max_slots: DWORD; out_count: PDWORD): integer; stdcall; external OnyxBackendDLL;
+function onyx_veh_verify_slots(process: Pointer): integer; stdcall; external OnyxBackendDLL;
 procedure onyx_veh_cleanup; stdcall; external OnyxBackendDLL;
 
 var
@@ -384,7 +397,12 @@ function OnyxGetProcessList(ProcessList: TStrings; NoPID: boolean = false; noPro
 function OnyxVehInject(dllPath: string = ''): Boolean;
 function OnyxVehSetHardwareBreakpoint(address: PtrUInt; bpType: integer = 1; size: integer = 4): integer;
 function OnyxVehClearHardwareBreakpoint(index: PtrUInt): Boolean;
+function OnyxVehClearHardwareBreakpointCode(index: PtrUInt): integer;
 function OnyxVehPollHit(var hitRip: PtrUInt; var threadId: DWORD): Boolean;
+function OnyxVehSlotStatus(var slots: TOnyxVehSlotArray): integer;
+function OnyxVehVerifySlots: integer;
+function OnyxVehHasActiveBreakpoints: Boolean;
+function OnyxVehErrorText(code: integer): string;
 
 function OnyxMonoDetect: integer;
 function OnyxMonoDissect: integer;
@@ -1003,13 +1021,18 @@ begin
   Result := onyx_veh_set_hw_bp(pProc, address, bpType, size);
 end;
 
-function OnyxVehClearHardwareBreakpoint(index: PtrUInt): Boolean;
+function OnyxVehClearHardwareBreakpointCode(index: PtrUInt): integer;
 var
   pProc: Pointer;
 begin
   pProc := OnyxEnsureAttachedProcess;
-  if pProc = nil then Exit(False);
-  Result := onyx_veh_clear_hw_bp(pProc, index) = 1;
+  if pProc = nil then Exit(-5);
+  Result := onyx_veh_clear_hw_bp(pProc, index);
+end;
+
+function OnyxVehClearHardwareBreakpoint(index: PtrUInt): Boolean;
+begin
+  Result := OnyxVehClearHardwareBreakpointCode(index) = 1;
 end;
 
 function OnyxVehPollHit(var hitRip: PtrUInt; var threadId: DWORD): Boolean;
@@ -1032,6 +1055,66 @@ begin
   end
   else
     Result := False;
+end;
+
+function OnyxVehSlotStatus(var slots: TOnyxVehSlotArray): integer;
+var
+  pProc: Pointer;
+  used: integer;
+begin
+  FillChar(slots, SizeOf(slots), 0);
+  Result := 0;
+
+  pProc := OnyxEnsureAttachedProcess;
+  if pProc = nil then Exit;
+
+  used := onyx_veh_slot_status(pProc, @slots[0], Length(slots), nil);
+  if used < 0 then
+    Exit;
+
+  if used > Length(slots) then
+    used := Length(slots);
+
+  Result := used;
+end;
+
+function OnyxVehVerifySlots: integer;
+var
+  pProc: Pointer;
+begin
+  pProc := OnyxEnsureAttachedProcess;
+  if pProc = nil then Exit(-5);
+  Result := onyx_veh_verify_slots(pProc);
+end;
+
+function OnyxVehHasActiveBreakpoints: Boolean;
+begin
+  Result := False;
+
+  // Deliberately avoid OnyxEnsureAttachedProcess: this probe must not attach,
+  // it only reports whether the current session already owns DR slots.
+  if CurrentOnyxProcessHandle = nil then
+    Exit;
+
+  if CurrentOnyxPID <> ProcessHandlerUnit.ProcessID then
+    Exit;
+
+  Result := onyx_veh_slot_status(CurrentOnyxProcessHandle, nil, 0, nil) > 0;
+end;
+
+function OnyxVehErrorText(code: integer): string;
+begin
+  case code of
+    -2: Result := 'All 4 hardware breakpoint slots are in use';
+    -3: Result := 'Invalid hardware breakpoint slot (must be 0..3)';
+    -4: Result := 'Target process has no active threads';
+    -5: Result := 'Failed to update thread debug registers';
+  else
+    if code < 0 then
+      Result := 'Unknown hardware breakpoint error (' + IntToStr(code) + ')'
+    else
+      Result := '';
+  end;
 end;
 
 function OnyxMonoDetect: integer;
@@ -1222,18 +1305,17 @@ end;
 function lua_onyx_veh_clear_hw_bp(L: PLua_State): integer; cdecl;
 var
   idx: PtrUInt;
-  ok: Boolean;
 begin
   if lua_gettop(L) >= 1 then
   begin
     idx := lua_tointeger(L, 1);
-    ok := OnyxVehClearHardwareBreakpoint(idx);
-    lua_pushboolean(L, ok);
+    // Código cru: 1 = sucesso, negativo = erro (mesma convenção de onyx_veh_set_hw_bp).
+    lua_pushinteger(L, OnyxVehClearHardwareBreakpointCode(idx));
     Result := 1;
   end
   else
   begin
-    lua_pushboolean(L, False);
+    lua_pushinteger(L, -3);
     Result := 1;
   end;
 end;
@@ -1256,6 +1338,59 @@ begin
     lua_pushnil(L);
     Result := 1;
   end;
+end;
+
+function lua_onyx_veh_slot_status(L: PLua_State): integer; cdecl;
+var
+  slots: TOnyxVehSlotArray;
+  used, i: integer;
+begin
+  used := OnyxVehSlotStatus(slots);
+
+  lua_newtable(L);
+  for i := 0 to used - 1 do
+  begin
+    lua_pushinteger(L, i + 1);
+    lua_createtable(L, 0, 4);
+    lua_pushinteger(L, slots[i].index);
+    lua_setfield(L, -2, PChar('index'));
+    lua_pushinteger(L, Int64(slots[i].address));
+    lua_setfield(L, -2, PChar('address'));
+    lua_pushinteger(L, slots[i].bp_type);
+    lua_setfield(L, -2, PChar('bp_type'));
+    lua_pushinteger(L, slots[i].size);
+    lua_setfield(L, -2, PChar('size'));
+    lua_settable(L, -3);
+  end;
+
+  Result := 1;
+end;
+
+function lua_onyx_veh_error_text(L: PLua_State): integer; cdecl;
+var
+  code: integer;
+  text: string;
+begin
+  code := 0;
+  if lua_gettop(L) >= 1 then
+    code := lua_tointeger(L, 1);
+
+  text := OnyxVehErrorText(code);
+  lua_pushstring(L, PChar(text));
+  Result := 1;
+end;
+
+function lua_onyx_veh_has_active_bp(L: PLua_State): integer; cdecl;
+begin
+  lua_pushboolean(L, OnyxVehHasActiveBreakpoints);
+  Result := 1;
+end;
+
+function lua_onyx_veh_verify_slots(L: PLua_State): integer; cdecl;
+begin
+  // 1 = registro confere com o hardware, 0 = divergente, negativo = erro.
+  lua_pushinteger(L, OnyxVehVerifySlots);
+  Result := 1;
 end;
 
 function lua_onyx_mono_detect(L: PLua_State): integer; cdecl;
@@ -1335,6 +1470,10 @@ begin
   lua.lua_register(state, 'onyx_veh_set_hw_bp', @lua_onyx_veh_set_hw_bp);
   lua.lua_register(state, 'onyx_veh_clear_hw_bp', @lua_onyx_veh_clear_hw_bp);
   lua.lua_register(state, 'onyx_veh_poll_hit', @lua_onyx_veh_poll_hit);
+lua.lua_register(state, 'onyx_veh_slot_status', @lua_onyx_veh_slot_status);
+lua.lua_register(state, 'onyx_veh_error_text', @lua_onyx_veh_error_text);
+lua.lua_register(state, 'onyx_veh_has_active_bp', @lua_onyx_veh_has_active_bp);
+lua.lua_register(state, 'onyx_veh_verify_slots', @lua_onyx_veh_verify_slots);
 
   lua.lua_register(state, 'onyx_mono_detect', @lua_onyx_mono_detect);
   lua.lua_register(state, 'onyx_mono_dissect', @lua_onyx_mono_dissect);
