@@ -39,3 +39,5 @@ cheat-engine/Cheat Engine/VEHDebug/backup/
 # Binary build and distribution artifacts (releases only)
 /bin/
 bin/
+/extras/
+extras/

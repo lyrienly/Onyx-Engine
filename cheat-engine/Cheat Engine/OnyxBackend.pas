@@ -196,6 +196,7 @@ const
 // Native Rust Backend Export Declarations
 function onyx_backend_version: DWORD; stdcall; external OnyxBackendDLL;
 function onyx_backend_ping: integer; stdcall; external OnyxBackendDLL;
+function onyx_security_cloak_self: integer; stdcall; external OnyxBackendDLL;
 
 function onyx_process_list(out_entries: Pointer; max_count: DWORD; out_total: PDWORD): integer; stdcall; external OnyxBackendDLL;
 function onyx_process_attach(pid: DWORD): Pointer; stdcall; external OnyxBackendDLL;
@@ -1352,6 +1353,10 @@ begin
     Result := (v >= 100) and (onyx_backend_ping = 1);
     if Result then
     begin
+      try
+        onyx_security_cloak_self;
+      except
+      end;
       HookKernelHandlerWithOnyx;
       if OnyxBridgeInstance = nil then
       begin

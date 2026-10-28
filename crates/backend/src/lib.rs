@@ -25,6 +25,16 @@ pub extern "C" fn onyx_backend_ping() -> i32 {
     1
 }
 
+#[no_mangle]
+pub extern "C" fn onyx_security_cloak_self() -> i32 {
+    let pid = std::process::id();
+    let _ = onyx_core::security::activate_process_shield();
+    if let Ok(driver) = onyx_core::process::kernel::DbkDriver::connect() {
+        let _ = driver.hide_process(pid);
+    }
+    1
+}
+
 #[cfg(target_os = "windows")]
 #[no_mangle]
 pub extern "system" fn DllMain(

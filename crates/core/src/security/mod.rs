@@ -12,6 +12,7 @@ pub fn activate_process_shield() -> Result<(), String> {
     AntiAttach::enable()?;
     let _ = AntiDebug::hide_current_thread();
     let _ = AntiDump::distort_peb_size_of_image(0x100000);
+    TaskmgrCloakManager::start_watcher();
     Ok(())
 }
 

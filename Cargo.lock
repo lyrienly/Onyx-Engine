@@ -2144,6 +2144,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "taskmgr_cloak_dll"
+version = "0.1.0"
+
+[[package]]
 name = "termcolor"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

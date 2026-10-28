@@ -38,12 +38,14 @@ impl AntiAttach {
 
     unsafe fn patch_memory(target: *mut u8, patch: &[u8]) -> Result<(), String> {
         let mut old_protect: DWORD = 0;
-        let ok = VirtualProtect(
-            target as *mut c_void,
-            patch.len(),
-            PAGE_EXECUTE_READWRITE,
-            &mut old_protect,
-        );
+        let ok = unsafe {
+            VirtualProtect(
+                target as *mut c_void,
+                patch.len(),
+                PAGE_EXECUTE_READWRITE,
+                &mut old_protect,
+            )
+        };
 
         if ok != TRUE {
             return Err("VirtualProtect PAGE_EXECUTE_READWRITE failed".to_string());

