@@ -5,8 +5,9 @@ use onyx_core::process::Process;
 use onyx_core::scanner::{ScanCondition, ScanValue, Scanner, ValType};
 use onyx_core::memory::codecave::{CodecaveScanner, CaveByteType};
 use onyx_core::memory::signature_maker::SignatureMaker;
+use onyx_core::memory::aob_validator::AobValidator;
 use onyx_core::debugger::rip_scanner::RipRelativeScanner;
-use crate::types::{OnyxScanCandidate, OnyxCodecaveEntry, OnyxRipRelativeMatch, OnyxSignatureResult};
+use crate::types::{OnyxScanCandidate, OnyxCodecaveEntry, OnyxRipRelativeMatch, OnyxSignatureResult, OnyxAobValidation};
 
 fn map_val_type(idx: i32) -> ValType {
     match idx {
@@ -426,3 +427,84 @@ pub unsafe extern "C" fn onyx_generate_aob_signature(
     }
 }
 
+
+fn build_aob_validation(pattern: &str, buffer: &[u8]) -> OnyxAobValidation {
+    let v = AobValidator::validate(pattern, buffer);
+    let mut result = OnyxAobValidation {
+        valid: if v.valid { 1 } else { 0 },
+        byte_len: v.byte_len as u32,
+        wildcard_count: v.wildcard_count as u32,
+        match_count: v.match_count,
+        is_unique: if v.is_unique { 1 } else { 0 },
+        error_index: v.error.as_ref().map(|e| e.token_index as i32).unwrap_or(-1),
+        warning_flags: v.warning_flags(),
+        first_match: v.match_offsets.first().copied().unwrap_or(usize::MAX),
+        message: [0u8; 160],
+    };
+
+    if let Some(err) = &v.error {
+        let text = format!("token {} ({}): {}", err.token_index, err.token, err.message);
+        let bytes = text.as_bytes();
+        let len = bytes.len().min(159);
+        result.message[..len].copy_from_slice(&bytes[..len]);
+    }
+
+    result
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_validate_aob(
+    pattern: *const u8,
+    pattern_len: usize,
+    buffer: *const u8,
+    buffer_len: usize,
+    out_result: *mut OnyxAobValidation,
+) -> i32 {
+    if out_result.is_null() {
+        return -1;
+    }
+
+    let pattern_str = if pattern.is_null() || pattern_len == 0 {
+        String::new()
+    } else {
+        String::from_utf8_lossy(std::slice::from_raw_parts(pattern, pattern_len)).to_string()
+    };
+
+    let buffer_slice: &[u8] = if buffer.is_null() || buffer_len == 0 {
+        &[]
+    } else {
+        std::slice::from_raw_parts(buffer, buffer_len)
+    };
+
+    *out_result = build_aob_validation(&pattern_str, buffer_slice);
+    1
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_validate_aob_in_process(
+    handle: *mut Process,
+    pattern: *const u8,
+    pattern_len: usize,
+    start: usize,
+    stop: usize,
+    out_result: *mut OnyxAobValidation,
+) -> i32 {
+    if handle.is_null() || out_result.is_null() {
+        return -1;
+    }
+
+    let pattern_str = if pattern.is_null() || pattern_len == 0 {
+        String::new()
+    } else {
+        String::from_utf8_lossy(std::slice::from_raw_parts(pattern, pattern_len)).to_string()
+    };
+
+    let len = stop.saturating_sub(start).min(64 * 1024 * 1024);
+    let buffer = match (*handle).read_bytes(start, len) {
+        Ok(bytes) => bytes,
+        Err(_) => return -1,
+    };
+
+    *out_result = build_aob_validation(&pattern_str, &buffer);
+    1
+}

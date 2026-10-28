@@ -9,8 +9,8 @@ use std::time::Duration;
 use onyx_core::memory::transaction::MemoryTransaction;
 use onyx_core::process::Process;
 use onyx_core::win32::{
-    CreateRemoteThread, MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_READWRITE,
-    PROCESS_ALL_ACCESS, OpenProcess, VirtualAllocEx, VirtualFreeEx, CloseHandle, HANDLE, LPVOID,
+    MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_READWRITE,
+    VirtualAllocEx, VirtualFreeEx, CloseHandle, HANDLE, LPVOID,
 };
 
 #[link(name = "kernel32")]

@@ -8,6 +8,7 @@ pub mod codecave;
 pub mod signature_maker;
 pub mod entropy;
 pub mod snapshot;
+pub mod aob_validator;
 pub mod struct_spider;
 pub mod transaction;
 
@@ -21,5 +22,6 @@ pub use codecave::*;
 pub use signature_maker::*;
 pub use entropy::*;
 pub use snapshot::*;
+pub use aob_validator::*;
 pub use struct_spider::*;
 pub use transaction::*;

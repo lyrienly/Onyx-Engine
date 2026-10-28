@@ -404,7 +404,7 @@ mod tests {
         //  +0x00 i64 = 0x1122334455667788
         //  +0x08 i32 = 42
         //  +0x0C pad (4 zero bytes)
-        //  +0x10 f32 = 3.1415
+        //  +0x10 f32 = 2.5
         //  +0x14 pad (4 zero bytes)
         //  +0x18 i64 = -9999
         //  +0x20 i32 = 1337
@@ -414,7 +414,7 @@ mod tests {
         let mut b = [0u8; 48];
         b[0..8].copy_from_slice(&0x1122334455667788i64.to_le_bytes());
         b[8..12].copy_from_slice(&42i32.to_le_bytes());
-        b[16..20].copy_from_slice(&3.1415f32.to_le_bytes());
+        b[16..20].copy_from_slice(&2.5f32.to_le_bytes());
         b[24..32].copy_from_slice(&(-9999i64).to_le_bytes());
         b[32..36].copy_from_slice(&1337i32.to_le_bytes());
         b[40..44].copy_from_slice(&7i32.to_le_bytes());
@@ -433,7 +433,7 @@ mod tests {
         //  field @ 0x00 size 8 (i64 at high magnitude)
         //  field @ 0x08 size 4 i32=42
         //  pad   @ 0x0C size 4
-        //  field @ 0x10 size 4 f32=3.1415
+        //  field @ 0x10 size 4 f32=2.5
         //  pad   @ 0x14 size 4
         //  field @ 0x18 size 8 i64=-9999
         //  field @ 0x20 size 4 i32=1337
@@ -456,7 +456,7 @@ mod tests {
         let f_f32 = layout.fields.iter().find(|f| f.offset == 0x10).expect("field @ 0x10");
         assert_eq!(f_f32.size, 4);
         if let InferredKind::F32(v) = f_f32.kind {
-            assert!((v - 3.1415f32).abs() < 1e-4);
+            assert!((v - 2.5f32).abs() < 1e-6);
         } else {
             panic!("expected F32 at +0x10, got {:?}", f_f32.kind);
         }
