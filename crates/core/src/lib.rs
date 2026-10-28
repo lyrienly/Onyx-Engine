@@ -6,6 +6,7 @@ pub mod scripting;
 pub mod mono;
 pub mod injection;
 pub mod security;
+pub mod symbols;
 
 pub use memory::{scanner, pointer_scanner, freeze, structure};
 pub use process::{win32, symbol, kernel};
