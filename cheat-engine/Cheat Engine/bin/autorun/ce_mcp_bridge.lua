@@ -24,7 +24,11 @@ local serverState = {
     breakpoints = {},
     breakpoint_hits = {},
     hw_bp_slots = {},
-    active_watches = {}
+    active_watches = {},
+    -- MCP heartbeat / reconnect telemetry (issue #5)
+    last_rx = 0,        -- os.time() of last inbound frame
+    last_hb_rx = 0,     -- os.time() of last inbound __heartbeat__
+    reconnect_count = 0 -- number of client (re)connects since server start
 }
 
 local function toHex(num)
@@ -1676,6 +1680,18 @@ function cmd_ping(params)
         timestamp = os.time(),
         process_id = getOpenedProcessID() or 0,
         message = "CE MCP Bridge v" .. VERSION .. " alive"
+    }
+end
+
+-- Issue #5: lightweight transport-level heartbeat. Must stay side-effect free
+-- (no CE API calls) so that the worker thread can respond without going
+-- through thread.synchronize and blocking the LCL GUI thread.
+function cmd_heartbeat(params)
+    return {
+        success = true,
+        version = VERSION,
+        ts = os.time(),
+        kind = "heartbeat"
     }
 end
 
@@ -5403,6 +5419,7 @@ local commandHandlers = {
     get_watch_results = cmd_stop_dbvm_watch,
 
     ping = cmd_ping,
+    ["__heartbeat__"] = cmd_heartbeat,
 
     output_debug_string = cmd_output_debug_string,
     speak_text = cmd_speak_text,
@@ -5581,6 +5598,8 @@ local function PipeWorker(thread)
         if pipe.Connected and not thread.Terminated then
             log("Client Connected")
             serverState.connected = true
+            serverState.last_rx = os.time()
+            serverState.reconnect_count = (serverState.reconnect_count or 0) + 1
 
             while not thread.Terminated and pipe.Connected do
 
@@ -5593,11 +5612,26 @@ local function PipeWorker(thread)
                         local payload = pipe.readString(len)
 
                         if payload then
+                            serverState.last_rx = os.time()
 
+                            -- Issue #5: fast-path heartbeat so it never has to
+                            -- hop onto the LCL main thread. We match the raw
+                            -- method name without a full JSON parse to keep
+                            -- the hot loop cheap.
                             local response = nil
-                            thread.synchronize(function()
-                                response = executeCommand(payload)
-                            end)
+                            if payload:match('"method"%s*:%s*"__heartbeat__"') then
+                                serverState.last_hb_rx = os.time()
+                                local idPart = payload:match('"id"%s*:%s*(%-?%d+)')
+                                               or ('"' .. (payload:match('"id"%s*:%s*"([^"]*)"') or "") .. '"')
+                                response = '{"jsonrpc":"2.0","result":{"success":true,"ts":'
+                                        .. tostring(os.time())
+                                        .. ',"kind":"heartbeat","version":"' .. VERSION .. '"},"id":'
+                                        .. idPart .. '}'
+                            else
+                                thread.synchronize(function()
+                                    response = executeCommand(payload)
+                                end)
+                            end
 
                             if response then
                                 local rLen = #response
