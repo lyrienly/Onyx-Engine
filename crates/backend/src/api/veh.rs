@@ -282,7 +282,7 @@ pub unsafe extern "C" fn onyx_veh_slot_status(
                 index: index as u32,
                 address: slot.address,
                 bp_type: slot.bp_type as i32,
-                size: slot.size as i32,
+                size: slot.size.byte_size() as i32,
             };
         }
         used += 1;

@@ -73,7 +73,9 @@ type
   end;
   POnyxVehHit = ^TOnyxVehHit;
 
-  TOnyxVehSlot = packed record
+  { Layout must match onyx_backend::types::OnyxVehSlot (#[repr(C)], 24 bytes).
+    Não usar "packed": o Rust alinha address em 8 bytes. }
+  TOnyxVehSlot = record
     index: DWORD;
     address: PtrUInt;
     bp_type: integer;
@@ -393,6 +395,7 @@ function OnyxGetProcessList(ProcessList: TStrings; NoPID: boolean = false; noPro
 function OnyxVehInject(dllPath: string = ''): Boolean;
 function OnyxVehSetHardwareBreakpoint(address: PtrUInt; bpType: integer = 1; size: integer = 4): integer;
 function OnyxVehClearHardwareBreakpoint(index: PtrUInt): Boolean;
+function OnyxVehClearHardwareBreakpointCode(index: PtrUInt): integer;
 function OnyxVehPollHit(var hitRip: PtrUInt; var threadId: DWORD): Boolean;
 function OnyxVehSlotStatus(var slots: TOnyxVehSlotArray): integer;
 function OnyxVehHasActiveBreakpoints: Boolean;
@@ -1015,13 +1018,18 @@ begin
   Result := onyx_veh_set_hw_bp(pProc, address, bpType, size);
 end;
 
-function OnyxVehClearHardwareBreakpoint(index: PtrUInt): Boolean;
+function OnyxVehClearHardwareBreakpointCode(index: PtrUInt): integer;
 var
   pProc: Pointer;
 begin
   pProc := OnyxEnsureAttachedProcess;
-  if pProc = nil then Exit(False);
-  Result := onyx_veh_clear_hw_bp(pProc, index) = 1;
+  if pProc = nil then Exit(-5);
+  Result := onyx_veh_clear_hw_bp(pProc, index);
+end;
+
+function OnyxVehClearHardwareBreakpoint(index: PtrUInt): Boolean;
+begin
+  Result := OnyxVehClearHardwareBreakpointCode(index) = 1;
 end;
 
 function OnyxVehPollHit(var hitRip: PtrUInt; var threadId: DWORD): Boolean;
@@ -1285,18 +1293,17 @@ end;
 function lua_onyx_veh_clear_hw_bp(L: PLua_State): integer; cdecl;
 var
   idx: PtrUInt;
-  ok: Boolean;
 begin
   if lua_gettop(L) >= 1 then
   begin
     idx := lua_tointeger(L, 1);
-    ok := OnyxVehClearHardwareBreakpoint(idx);
-    lua_pushboolean(L, ok);
+    // Código cru: 1 = sucesso, negativo = erro (mesma convenção de onyx_veh_set_hw_bp).
+    lua_pushinteger(L, OnyxVehClearHardwareBreakpointCode(idx));
     Result := 1;
   end
   else
   begin
-    lua_pushboolean(L, False);
+    lua_pushinteger(L, -3);
     Result := 1;
   end;
 end;

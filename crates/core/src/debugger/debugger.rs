@@ -23,6 +23,19 @@ pub enum BreakpointSize {
     Byte4 = 0b11,
 }
 
+impl BreakpointSize {
+    /// Tamanho em bytes observado (1, 2, 4 ou 8), ao contrário do encoding de 2 bits
+    /// usado em DR7.
+    pub fn byte_size(self) -> usize {
+        match self {
+            BreakpointSize::Byte1 => 1,
+            BreakpointSize::Byte2 => 2,
+            BreakpointSize::Byte4 => 4,
+            BreakpointSize::Byte8 => 8,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct AccessHit {
     pub instruction_address: usize,
@@ -639,6 +652,14 @@ impl HardwareBreakpointMonitor {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn breakpoint_size_reports_bytes() {
+        assert_eq!(BreakpointSize::Byte1.byte_size(), 1);
+        assert_eq!(BreakpointSize::Byte2.byte_size(), 2);
+        assert_eq!(BreakpointSize::Byte4.byte_size(), 4);
+        assert_eq!(BreakpointSize::Byte8.byte_size(), 8);
+    }
 
     #[test]
     fn test_call_stack_walk_current_thread() {
