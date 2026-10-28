@@ -27,7 +27,7 @@
       <AutoIncrementBuild Value="True"/>
       <MajorVersionNr Value="7"/>
       <MinorVersionNr Value="5"/>
-      <BuildNr Value="7738"/>
+      <BuildNr Value="7741"/>
       <Language Value="041C"/>
       <CharSet Value="04B0"/>
       <StringTable CompanyName="OnyxEngine" FileDescription="OnyxEngine Platform" ProductVersion="1.0"/>
@@ -825,7 +825,7 @@
         <PackageName Value="LCL"/>
       </Item9>
     </RequiredPackages>
-    <Units Count="424">
+    <Units Count="425">
       <Unit0>
         <Filename Value="cheatengine.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -3064,6 +3064,13 @@
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
       </Unit423>
+      <Unit424>
+        <Filename Value="frmAobValidatorUnit.pas"/>
+        <IsPartOfProject Value="True"/>
+        <ComponentName Value="frmAobValidator"/>
+        <HasResources Value="True"/>
+        <ResourceBaseClass Value="Form"/>
+      </Unit424>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
