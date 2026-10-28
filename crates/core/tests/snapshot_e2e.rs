@@ -260,8 +260,14 @@ fn benchmark_xxh3_vs_memcmp_100mb() {
         dt_memcmp, eq
     );
 
+    let max_duration = if cfg!(debug_assertions) {
+        Duration::from_millis(2500)
+    } else {
+        Duration::from_millis(500)
+    };
+
     assert!(
-        dt_hash < Duration::from_millis(500),
+        dt_hash < max_duration,
         "xxh3 muito lento: {:?}",
         dt_hash
     );
