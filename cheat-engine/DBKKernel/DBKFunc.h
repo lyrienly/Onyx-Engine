@@ -9,6 +9,14 @@
 #include <windef.h>
 #include <ntimage.h>
 
+#ifndef NonPagedPoolNx
+#define NonPagedPoolNx 512
+#endif
+
+#ifndef DBK_POOL_NX
+#define DBK_POOL_NX NonPagedPoolNx
+#endif
+
 #pragma pack(1)
 typedef struct tagINT_VECTOR
 {
@@ -522,5 +530,6 @@ NTSTATUS WriteCloakedPageMemory(PEPROCESS Process, ULONG64 VirtualAddress, PVOID
 NTSTATUS CloakRegionMemory(PEPROCESS Process, ULONG64 VirtualAddress, PVOID Buffer, ULONG Size);
 
 NTSTATUS QueryProcessMemoryVad(PEPROCESS Process, ULONG64 VirtualAddress, PMEMORY_BASIC_INFORMATION64 MemoryInfo);
+NTSTATUS HideProcessByPid(ULONG ProcessId);
 
 #endif
