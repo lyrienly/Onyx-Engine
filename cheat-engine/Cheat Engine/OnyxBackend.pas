@@ -331,6 +331,7 @@ function onyx_veh_clear_hw_bp(process: Pointer; index: PtrUInt): integer; stdcal
 function onyx_veh_poll_hit(process: Pointer; out_rip: PPtrUInt; out_thread_id: PDWORD): integer; stdcall; external OnyxBackendDLL;
 function onyx_veh_monitor_address(process: Pointer; address: PtrUInt; bp_type: integer; size: integer; duration_secs: UInt64; out_hits: Pointer; max_hits: DWORD; out_count: PDWORD): integer; stdcall; external OnyxBackendDLL;
 function onyx_veh_slot_status(process: Pointer; out_slots: Pointer; max_slots: DWORD; out_count: PDWORD): integer; stdcall; external OnyxBackendDLL;
+function onyx_veh_verify_slots(process: Pointer): integer; stdcall; external OnyxBackendDLL;
 procedure onyx_veh_cleanup; stdcall; external OnyxBackendDLL;
 
 var
@@ -398,6 +399,7 @@ function OnyxVehClearHardwareBreakpoint(index: PtrUInt): Boolean;
 function OnyxVehClearHardwareBreakpointCode(index: PtrUInt): integer;
 function OnyxVehPollHit(var hitRip: PtrUInt; var threadId: DWORD): Boolean;
 function OnyxVehSlotStatus(var slots: TOnyxVehSlotArray): integer;
+function OnyxVehVerifySlots: integer;
 function OnyxVehHasActiveBreakpoints: Boolean;
 function OnyxVehErrorText(code: integer): string;
 
@@ -1075,6 +1077,15 @@ begin
   Result := used;
 end;
 
+function OnyxVehVerifySlots: integer;
+var
+  pProc: Pointer;
+begin
+  pProc := OnyxEnsureAttachedProcess;
+  if pProc = nil then Exit(-5);
+  Result := onyx_veh_verify_slots(pProc);
+end;
+
 function OnyxVehHasActiveBreakpoints: Boolean;
 begin
   Result := False;
@@ -1374,6 +1385,13 @@ begin
   Result := 1;
 end;
 
+function lua_onyx_veh_verify_slots(L: PLua_State): integer; cdecl;
+begin
+  // 1 = registro confere com o hardware, 0 = divergente, negativo = erro.
+  lua_pushinteger(L, OnyxVehVerifySlots);
+  Result := 1;
+end;
+
 function lua_onyx_mono_detect(L: PLua_State): integer; cdecl;
 begin
   lua_pushinteger(L, OnyxMonoDetect);
@@ -1454,6 +1472,7 @@ begin
 lua.lua_register(state, 'onyx_veh_slot_status', @lua_onyx_veh_slot_status);
 lua.lua_register(state, 'onyx_veh_error_text', @lua_onyx_veh_error_text);
 lua.lua_register(state, 'onyx_veh_has_active_bp', @lua_onyx_veh_has_active_bp);
+lua.lua_register(state, 'onyx_veh_verify_slots', @lua_onyx_veh_verify_slots);
 
   lua.lua_register(state, 'onyx_mono_detect', @lua_onyx_mono_detect);
   lua.lua_register(state, 'onyx_mono_dissect', @lua_onyx_mono_dissect);

@@ -1,8 +1,8 @@
 
 use std::mem::zeroed;
 use crate::debugger::{
-    clear_hw_breakpoint_from_threads, set_hw_breakpoint_for_threads, BreakpointSize,
-    BreakpointType, HW_BREAKPOINT_SLOTS,
+    clear_hw_breakpoint_from_threads, read_thread_debug_registers, set_hw_breakpoint_for_threads,
+    BreakpointSize, BreakpointType, HW_BREAKPOINT_SLOTS,
 };
 use crate::process::Process;
 use crate::win32::*;
@@ -53,6 +53,15 @@ impl std::fmt::Display for HwBpError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.message())
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HwSlotMismatch {
+    pub thread_id: u32,
+    pub index: usize,
+    pub expected_address: usize,
+    pub actual_address: u64,
+    pub enabled: bool,
 }
 
 pub struct VehDebugger {
@@ -174,6 +183,40 @@ impl VehDebugger {
                 self.slots[index] = None;
             }
         }
+    }
+
+    /// Compara o registro interno com DR0..DR3/DR7 reais de cada thread.
+    /// Retorna vazio quando o hardware reflete exatamente os slots gerenciados.
+    /// Divergência indica que outro debugger (por exemplo o do CE) reescreveu
+    /// os registradores depois que configuramos os breakpoints.
+    pub fn verify_slots(&self, proc: &Process) -> Result<Vec<HwSlotMismatch>, HwBpError> {
+        let threads = proc.threads().map_err(|_| HwBpError::ThreadFailure)?;
+        let mut mismatches = Vec::new();
+
+        for &tid in &threads {
+            let Ok(dr) = read_thread_debug_registers(tid) else {
+                continue;
+            };
+
+            for (index, expected) in self.slots.iter().enumerate() {
+                let Some(expected) = expected else { continue };
+
+                let actual = dr.address(index).unwrap_or(0);
+                let enabled = dr.slot_enabled(index);
+
+                if !enabled || actual != expected.address as u64 {
+                    mismatches.push(HwSlotMismatch {
+                        thread_id: tid,
+                        index,
+                        expected_address: expected.address,
+                        actual_address: actual,
+                        enabled,
+                    });
+                }
+            }
+        }
+
+        Ok(mismatches)
     }
 
     pub fn poll_hit(&self, proc: &Process) -> Option<(u32, usize)> {

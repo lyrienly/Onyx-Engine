@@ -295,6 +295,28 @@ pub unsafe extern "C" fn onyx_veh_slot_status(
     used as i32
 }
 
+/// 1 = registro e hardware conferem, 0 = divergência, negativo = erro.
+#[no_mangle]
+pub unsafe extern "C" fn onyx_veh_verify_slots(process: *mut Process) -> i32 {
+    if process.is_null() {
+        return HwBpError::ThreadFailure.code();
+    }
+    let p = &*process;
+
+    let guard = lock_veh();
+    let veh = match guard.as_ref() {
+        Some(veh) if veh.target_pid == p.pid => veh,
+        // Sem sessão gerenciada não há nada para divergir.
+        _ => return 1,
+    };
+
+    match veh.verify_slots(p) {
+        Ok(mismatches) if mismatches.is_empty() => 1,
+        Ok(_) => 0,
+        Err(error) => error.code(),
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn onyx_veh_cleanup() {
     *lock_veh() = None;

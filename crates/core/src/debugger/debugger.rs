@@ -172,6 +172,66 @@ impl HardwareBreakpointMonitor {
     }
 }
 
+/// Estado dos registradores de depuração de uma thread (DR0..DR3, DR6, DR7).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ThreadDebugRegisters {
+    pub dr0: u64,
+    pub dr1: u64,
+    pub dr2: u64,
+    pub dr3: u64,
+    pub dr6: u64,
+    pub dr7: u64,
+}
+
+impl ThreadDebugRegisters {
+    pub fn address(&self, index: usize) -> Option<u64> {
+        match index {
+            0 => Some(self.dr0),
+            1 => Some(self.dr1),
+            2 => Some(self.dr2),
+            3 => Some(self.dr3),
+            _ => None,
+        }
+    }
+
+    pub fn slot_enabled(&self, index: usize) -> bool {
+        index < HW_BREAKPOINT_SLOTS && (self.dr7 & (1u64 << (index * DR7_ENABLE_SHIFT_STEP))) != 0
+    }
+}
+
+/// Lê DR0..DR3/DR6/DR7 de uma thread do alvo sem alterar nada.
+/// Usado por diagnóstico (`examples/dr_dump.rs`) e pelos testes em VM.
+pub fn read_thread_debug_registers(tid: u32) -> Result<ThreadDebugRegisters, String> {
+    let handle = open_thread_handle(tid)?;
+
+    let previous_count = unsafe { SuspendThread(handle) };
+    if previous_count == u32::MAX {
+        let error = unsafe { GetLastError() };
+        unsafe { CloseHandle(handle) };
+        return Err(format!(
+            "SuspendThread failed for thread {} (error {})",
+            tid, error
+        ));
+    }
+
+    let context = read_debug_context(handle, tid);
+
+    unsafe {
+        ResumeThread(handle);
+        CloseHandle(handle);
+    }
+
+    let ctx = context?;
+    Ok(ThreadDebugRegisters {
+        dr0: ctx.Dr0,
+        dr1: ctx.Dr1,
+        dr2: ctx.Dr2,
+        dr3: ctx.Dr3,
+        dr6: ctx.Dr6,
+        dr7: ctx.Dr7,
+    })
+}
+
 pub const HW_BREAKPOINT_SLOTS: usize = 4;
 
 const DR7_ENABLE_SHIFT_STEP: usize = 2;
@@ -659,6 +719,27 @@ mod tests {
         assert_eq!(BreakpointSize::Byte2.byte_size(), 2);
         assert_eq!(BreakpointSize::Byte4.byte_size(), 4);
         assert_eq!(BreakpointSize::Byte8.byte_size(), 8);
+    }
+
+    #[test]
+    fn thread_debug_registers_read_slots_from_dr7() {
+        let dr = ThreadDebugRegisters {
+            dr0: 0x1000,
+            dr1: 0x2000,
+            dr2: 0x3000,
+            dr3: 0x4000,
+            dr6: 0,
+            // habilita DR0 (bit 0) e DR2 (bit 4)
+            dr7: 0b010001,
+        };
+
+        assert_eq!(dr.address(0), Some(0x1000));
+        assert_eq!(dr.address(3), Some(0x4000));
+        assert_eq!(dr.address(4), None);
+        assert!(dr.slot_enabled(0));
+        assert!(!dr.slot_enabled(1));
+        assert!(dr.slot_enabled(2));
+        assert!(!dr.slot_enabled(3));
     }
 
     #[test]
