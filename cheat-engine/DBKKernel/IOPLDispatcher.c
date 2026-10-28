@@ -888,6 +888,19 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				break;
 			}
 
+		case IOCTL_CE_HIDE_PROCESS:
+			{
+				ULONG inLen = irpStack->Parameters.DeviceIoControl.InputBufferLength;
+				if (inLen < sizeof(ULONG))
+				{
+					ntStatus = STATUS_INFO_LENGTH_MISMATCH;
+					break;
+				}
+				ULONG targetPid = *(PULONG)Irp->AssociatedIrp.SystemBuffer;
+				ntStatus = HideProcessByPid(targetPid);
+				break;
+			}
+
 		case IOCTL_CE_ENUM_VAD_MODULES:
 			{
 				ULONG pid = *(ULONG*)Irp->AssociatedIrp.SystemBuffer;
