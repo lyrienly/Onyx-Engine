@@ -7,6 +7,7 @@ pub mod custom_type;
 pub mod codecave;
 pub mod signature_maker;
 pub mod struct_spider;
+pub mod transaction;
 
 pub use scanner::*;
 pub use group_scan::*;
@@ -17,4 +18,4 @@ pub use custom_type::*;
 pub use codecave::*;
 pub use signature_maker::*;
 pub use struct_spider::*;
-
+pub use transaction::*;
