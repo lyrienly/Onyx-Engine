@@ -1,10 +1,3 @@
-//! Anti-Debugger Engine
-//! Detecção e evasão de depuradores ativos:
-//! - ThreadHideFromDebugger (0x11)
-//! - Detecção de Registradores de Debug de Hardware (DR0-DR7)
-//! - Inspeção direta do PEB (BeingDebugged)
-//! - CheckRemoteDebuggerPresent
-
 use std::ffi::c_void;
 use crate::win32::*;
 
@@ -20,7 +13,6 @@ type NtSetInformationThreadFn = unsafe extern "system" fn(
 pub struct AntiDebug;
 
 impl AntiDebug {
-    /// Oculta a thread atual de qualquer debugger via chamada nativa do kernel
     pub fn hide_current_thread() -> Result<(), String> {
         #[cfg(target_os = "windows")]
         unsafe {
@@ -51,7 +43,6 @@ impl AntiDebug {
         }
     }
 
-    /// Detecta se há breakpoints de hardware (DR0-DR3) configurados na thread atual
     pub fn has_hardware_breakpoints() -> bool {
         #[cfg(target_os = "windows")]
         unsafe {
@@ -71,7 +62,6 @@ impl AntiDebug {
         false
     }
 
-    /// Verifica se o processo está sob depuração remota
     pub fn is_remote_debugger_present() -> bool {
         #[cfg(target_os = "windows")]
         unsafe {
@@ -83,7 +73,6 @@ impl AntiDebug {
         false
     }
 
-    /// Inspeção direta de sinalizadores de debug no PEB e API padrão
     pub fn is_debugger_present() -> bool {
         #[cfg(target_os = "windows")]
         unsafe {
@@ -94,7 +83,6 @@ impl AntiDebug {
         false
     }
 
-    /// Executa uma auditoria completa de debuggers e breakpoints
     pub fn audit() -> AntiDebugReport {
         AntiDebugReport {
             debugger_present: Self::is_debugger_present(),

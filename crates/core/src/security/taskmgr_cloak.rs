@@ -1,7 +1,3 @@
-//! Task Manager & Process Monitor Cloaking Engine
-//! Intercepta e filtra a lista de processos retornada por NtQuerySystemInformation (SystemProcessInformation)
-//! para ocultar o processo alvo (OnyxEngine ou jogo) do Gerenciador de Tarefas e Process Hacker.
-
 use std::ffi::c_void;
 use crate::win32::*;
 
@@ -27,7 +23,6 @@ impl UnicodeString {
     }
 }
 
-/// Cabeçalho da estrutura nativa SYSTEM_PROCESS_INFORMATION (x64)
 #[repr(C)]
 pub struct SystemProcessInformation {
     pub next_entry_offset: u32,
@@ -48,10 +43,6 @@ pub struct SystemProcessInformation {
     pub unique_process_key: usize,
 }
 
-/// Filtra e desvincula entradas correspondentes a um PID ou nome de executável
-/// dentro de um buffer bruto de SYSTEM_PROCESS_INFORMATION retornado por NtQuerySystemInformation.
-///
-/// Retorna `true` se pelo menos uma entrada foi ocultada com sucesso.
 pub unsafe fn filter_system_process_information(
     buffer: *mut u8,
     target_pid: Option<usize>,
@@ -129,11 +120,9 @@ pub unsafe fn filter_system_process_information(
     modified
 }
 
-/// Gerenciador de Cloaking para o Gerenciador de Tarefas do Windows
 pub struct TaskmgrCloakManager;
 
 impl TaskmgrCloakManager {
-    /// Localiza todos os PIDs ativos de instâncias de `Taskmgr.exe` e `ProcessHacker.exe`
     pub fn find_task_managers() -> Vec<u32> {
         let mut pids = Vec::new();
         unsafe {
@@ -165,7 +154,6 @@ impl TaskmgrCloakManager {
         pids
     }
 
-    /// Oculta o processo atual ou alvo nos monitores de processos locais
     pub fn cloak_process(target_pid: usize, target_name: Option<&str>) -> bool {
         let taskmgr_pids = Self::find_task_managers();
         !taskmgr_pids.is_empty() || target_pid > 0 || target_name.is_some()
