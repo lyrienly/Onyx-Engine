@@ -6,6 +6,7 @@ pub mod pe_remap;
 pub mod sk_crypt;
 pub mod analysis_hunter;
 pub mod hook_detection;
+pub mod anomaly_scanner;
 
 pub use taskmgr_cloak::{TaskmgrCloakManager, filter_system_process_information};
 pub use anti_attach::AntiAttach;
@@ -17,6 +18,7 @@ pub use analysis_hunter::AnalysisHunter;
 pub use hook_detection::{
     detect_patches, find_embedded_pe, scan_module_hooks, classify_hook, HookKind, HookReport, PatchRange,
 };
+pub use anomaly_scanner::{AnomalyKind, MemoryAnomalyScanner, RegionAnomaly};
 
 pub fn activate_process_shield() -> Result<(), String> {
     AntiAttach::enable()?;

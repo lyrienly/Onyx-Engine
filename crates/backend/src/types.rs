@@ -253,3 +253,17 @@ pub struct OnyxSignatureResult {
     pub is_unique: i32,
 }
 
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct OnyxAobValidation {
+    pub valid: i32,
+    pub byte_len: u32,
+    pub wildcard_count: u32,
+    pub match_count: u64,
+    pub is_unique: i32,
+    pub error_index: i32,
+    pub warning_flags: u32,
+    pub first_match: usize,
+    pub message: [u8; 160],
+}
