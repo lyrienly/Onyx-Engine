@@ -13,6 +13,7 @@ pub use api::pointer::*;
 pub use api::speedhack::*;
 pub use api::mono::*;
 pub use api::veh::*;
+pub use api::tx::*;
 pub use loader::*;
 
 #[no_mangle]
