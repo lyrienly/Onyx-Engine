@@ -1675,6 +1675,7 @@ dependencies = [
 name = "onyx_freezer"
 version = "0.1.0"
 dependencies = [
+ "dashmap",
  "onyx_core",
 ]
 
