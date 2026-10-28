@@ -1,4 +1,6 @@
 
+pub mod pattern;
+
 use std::ffi::CStr;
 use std::os::raw::c_char;
 use onyx_core::process::Process;
