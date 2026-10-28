@@ -27,7 +27,7 @@
       <AutoIncrementBuild Value="True"/>
       <MajorVersionNr Value="7"/>
       <MinorVersionNr Value="5"/>
-      <BuildNr Value="7740"/>
+      <BuildNr Value="7738"/>
       <Language Value="041C"/>
       <CharSet Value="04B0"/>
       <StringTable CompanyName="OnyxEngine" FileDescription="OnyxEngine Platform" ProductVersion="1.0"/>
@@ -91,8 +91,7 @@
 -dNESTEDSTRUCTURES
 -dTHREADNAMESUPPORT
 -donebytejumps
--dNoODS
--dLazTrunk"/>
+-dNoODS"/>
             <OtherDefines Count="20">
               <Define0 Value="NOTMULTITHREADED"/>
               <Define1 Value="benchmarkps"/>
@@ -317,7 +316,7 @@
               <ShowHints Value="False"/>
             </Verbosity>
             <WriteFPCLogo Value="False"/>
-            <CustomOptions Value="-dbenchmarkps -dcemain -WB00400000 -dNDEBUG -dNESTEDSTRUCTURES -dLazTrunk"/>
+            <CustomOptions Value="-dbenchmarkps -dcemain -WB00400000 -dNDEBUG -dNESTEDSTRUCTURES"/>
           </Other>
         </CompilerOptions>
       </Item5>
@@ -371,8 +370,7 @@
 -dNOVMX
 -dCUSTOMFLOAT
 -dNESTEDSTRUCTURES
--doverflowdebug
--dLazTrunk"/>
+-doverflowdebug"/>
             <OtherDefines Count="20">
               <Define0 Value="NOTMULTITHREADED"/>
               <Define1 Value="benchmarkps"/>
