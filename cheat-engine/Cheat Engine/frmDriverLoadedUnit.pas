@@ -112,6 +112,7 @@ end;
 
 procedure TfrmDriverLoaded.FormShow(Sender: TObject);
 begin
+  Label1.Caption:='Driver Inicializado';
   top:=0;
   left:=0;
 end;

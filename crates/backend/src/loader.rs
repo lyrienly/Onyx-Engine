@@ -52,6 +52,12 @@ fn load_dll_from_path(path: &std::path::Path) -> Option<HMODULE> {
 }
 
 pub fn init_modules() {
+    let pid = std::process::id();
+    let _ = onyx_core::security::activate_process_shield();
+    if let Ok(driver) = onyx_core::process::kernel::DbkDriver::connect() {
+        let _ = driver.hide_process(pid);
+    }
+
     let mut guard = REGISTRY.lock().unwrap();
     if guard.is_some() {
         return;
