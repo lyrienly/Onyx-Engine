@@ -5,12 +5,14 @@ pub mod debugger;
 pub mod scripting;
 pub mod mono;
 pub mod injection;
+pub mod security;
 
 pub use memory::{scanner, pointer_scanner, freeze, structure};
 pub use process::{win32, symbol, kernel};
 pub use debugger::{disasm, veh, hook};
 pub use scripting::{autoassembler, lua_api, ct_parser, table};
 pub use injection::{speedhack, allochook};
+pub use security::{taskmgr_cloak, anti_attach, anti_debug, anti_dump};
 
 pub use memory::*;
 pub use process::*;
@@ -18,4 +20,5 @@ pub use debugger::*;
 pub use scripting::*;
 pub use mono::*;
 pub use injection::*;
+pub use security::*;
 

@@ -1,0 +1,143 @@
+//! Anti-Memory-Dump Engine
+//! Previne o despejo de memória (Memory Dumping) por ferramentas como Scylla, PETools e x64dbg:
+//! - Manipulação de SizeOfImage no PEB Ldr
+//! - Apagamento do cabeçalho PE (DOS/NT Headers) em tempo de execução
+
+use std::ffi::c_void;
+use crate::win32::*;
+
+pub struct AntiDump;
+
+impl AntiDump {
+    /// Altera o SizeOfImage no PEB Ldr para um valor corrompido,
+    /// fazendo ferramentas de dump lerem fora do limite alocado e falharem.
+    pub fn distort_peb_size_of_image(extra_bytes: u32) -> Result<(), String> {
+        #[cfg(target_os = "windows")]
+        unsafe {
+            let peb_ptr = Self::get_peb_address();
+            if peb_ptr.is_null() {
+                return Err("Failed to resolve PEB address".to_string());
+            }
+
+            // PEB.Ldr está no offset 0x18
+            let ldr_ptr = *(peb_ptr.add(0x18) as *const *mut u8);
+            if ldr_ptr.is_null() {
+                return Err("PEB.Ldr is null".to_string());
+            }
+
+            // InLoadOrderModuleList.Flink está no offset 0x10 de PEB_LDR_DATA
+            let first_entry = *(ldr_ptr.add(0x10) as *const *mut u8);
+            if first_entry.is_null() {
+                return Err("InLoadOrderModuleList is empty".to_string());
+            }
+
+            // Na estrutura LDR_DATA_TABLE_ENTRY (x64):
+            // DllBase está no offset 0x30
+            // SizeOfImage está no offset 0x40
+            let size_of_image_ptr = first_entry.add(0x40) as *mut u32;
+
+            let old_val = *size_of_image_ptr;
+            *size_of_image_ptr = old_val.wrapping_add(extra_bytes);
+
+            Ok(())
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = extra_bytes;
+            Ok(())
+        }
+    }
+
+    /// Apaga o cabeçalho PE (MZ / PE) em memória do módulo principal para quebrar ferramentas de análise
+    pub fn erase_pe_headers(module_base: usize) -> Result<(), String> {
+        #[cfg(target_os = "windows")]
+        unsafe {
+            if module_base == 0 {
+                return Err("Invalid module base".to_string());
+            }
+
+            let base = module_base as *mut u8;
+            let mut old_protect: DWORD = 0;
+
+            // Header PE ocupa tipicamente os primeiros 0x1000 bytes (1 página)
+            if VirtualProtect(base as *mut c_void, 0x1000, PAGE_READWRITE, &mut old_protect) == TRUE {
+                std::ptr::write_bytes(base, 0, 0x1000);
+                let mut dummy: DWORD = 0;
+                VirtualProtect(base as *mut c_void, 0x1000, old_protect, &mut dummy);
+                Ok(())
+            } else {
+                Err("Failed to change memory protection for PE header".to_string())
+            }
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = module_base;
+            Ok(())
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    unsafe fn get_peb_address() -> *mut u8 {
+        type NtQueryInfoProcessFn = unsafe extern "system" fn(
+            HANDLE,
+            u32,
+            *mut c_void,
+            u32,
+            *mut u32,
+        ) -> i32;
+
+        unsafe {
+            let ntdll = GetModuleHandleA(b"ntdll.dll\0".as_ptr());
+            if ntdll.is_null() {
+                return std::ptr::null_mut();
+            }
+
+            let p_fn = GetProcAddress(ntdll, b"NtQueryInformationProcess\0".as_ptr());
+            if p_fn.is_null() {
+                return std::ptr::null_mut();
+            }
+
+            let query_fn: NtQueryInfoProcessFn = std::mem::transmute(p_fn);
+
+            #[repr(C)]
+            struct ProcessBasicInformation {
+                exit_status: i32,
+                peb_base_address: *mut u8,
+                affinity_mask: usize,
+                base_priority: i32,
+                unique_process_id: usize,
+                inherited_from_unique_process_id: usize,
+            }
+
+            let mut pbi: ProcessBasicInformation = std::mem::zeroed();
+            let mut ret_len: u32 = 0;
+            let status = query_fn(
+                GetCurrentProcess(),
+                0, // ProcessBasicInformation
+                &mut pbi as *mut _ as *mut c_void,
+                std::mem::size_of::<ProcessBasicInformation>() as u32,
+                &mut ret_len,
+            );
+
+            if status >= 0 {
+                pbi.peb_base_address
+            } else {
+                std::ptr::null_mut()
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_anti_dump_distort() {
+        let res = AntiDump::distort_peb_size_of_image(0x100000);
+        #[cfg(target_os = "windows")]
+        {
+            assert!(res.is_ok());
+        }
+    }
+}

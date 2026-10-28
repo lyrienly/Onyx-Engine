@@ -387,6 +387,10 @@ unsafe extern "system" {
     pub fn VirtualAllocEx(hProcess: HANDLE, lpAddress: LPVOID, dwSize: SIZE_T, flAllocationType: DWORD, flProtect: DWORD) -> LPVOID;
     pub fn VirtualFreeEx(hProcess: HANDLE, lpAddress: LPVOID, dwSize: SIZE_T, dwFreeType: DWORD) -> BOOL;
     pub fn VirtualProtectEx(hProcess: HANDLE, lpAddress: LPVOID, dwSize: SIZE_T, flNewProtect: DWORD, lpflOldProtect: PDWORD) -> BOOL;
+    pub fn VirtualProtect(lpAddress: LPVOID, dwSize: SIZE_T, flNewProtect: DWORD, lpflOldProtect: PDWORD) -> BOOL;
+    pub fn GetCurrentThread() -> HANDLE;
+    pub fn CheckRemoteDebuggerPresent(hProcess: HANDLE, pbDebuggerPresent: *mut BOOL) -> BOOL;
+    pub fn IsDebuggerPresent() -> BOOL;
 
     pub fn CreateToolhelp32Snapshot(dwFlags: DWORD, th32ProcessID: DWORD) -> HANDLE;
     pub fn Process32FirstW(hSnapshot: HANDLE, lppe: *mut PROCESSENTRY32W) -> BOOL;
@@ -453,6 +457,7 @@ unsafe extern "system" {
     pub fn WaitForSingleObject(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD;
     pub fn GetExitCodeThread(hThread: HANDLE, lpExitCode: LPDWORD) -> BOOL;
     pub fn GetModuleHandleW(lpModuleName: LPCWSTR) -> HMODULE;
+    pub fn GetModuleHandleA(lpModuleName: *const u8) -> HMODULE;
     pub fn LoadLibraryW(lpLibFileName: LPCWSTR) -> HMODULE;
     pub fn FreeLibrary(hLibModule: HMODULE) -> BOOL;
     pub fn GetProcAddress(hModule: HMODULE, lpProcName: *const u8) -> *mut c_void;
