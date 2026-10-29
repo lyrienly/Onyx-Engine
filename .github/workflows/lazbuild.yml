@@ -30,4 +30,4 @@ jobs:
 
       - name: lazbuild cecore.lpi
         shell: cmd
-        run: lazbuild --build-mode=Release "UI\cecore.lpi"
+        run: lazbuild "UI\cecore.lpi"
