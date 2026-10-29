@@ -11,6 +11,7 @@ members = [
     "crates/modules/freezer",
     "crates/modules/dotnet",
     "crates/modules/hook",
+    "crates/modules/mono",
     "crates/dlls/allochook",
     "crates/dlls/d3dhook",
     "crates/dlls/luaclient",
