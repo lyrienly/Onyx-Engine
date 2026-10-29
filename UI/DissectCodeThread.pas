@@ -12,7 +12,7 @@ uses
   windows,
   {$endif}
   LCLIntf,sysutils,syncobjs,Classes,disassembler, NewKernelHandler, math,
-  MemoryQuery, CEFuncProc, maps, LastDisassembleData, commonTypeDefs, AvgLvlTree;
+  MemoryQuery, CEFuncProc, maps, LastDisassembleData, commonTypeDefs, AvgLvlTree, {$ifdef laztrunk}AVL_Tree{$else}laz_avl_Tree{$endif};
 
 
 type
