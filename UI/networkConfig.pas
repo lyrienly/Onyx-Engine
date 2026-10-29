@@ -24,6 +24,7 @@ type
   TfrmNetworkConfig = class(TForm)
     btnConnect: TButton;
     Button2: TButton;
+    cbTLS: TCheckBox;
     edtFriendlyName: TEdit;
     edtHost: TEdit;
     edtPort: TEdit;
@@ -39,6 +40,7 @@ type
     Panel2: TPanel;
     PopupMenu1: TPopupMenu;
     procedure btnConnectClick(Sender: TObject);
+    procedure cbTLSChange(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure FormShow(Sender: TObject);
@@ -64,6 +66,8 @@ var
   port: integer;
 
   networkcompression: integer;
+  networkUseTLS: boolean = false;
+  networkTLSFingerprint: string = '';
 
 procedure CEConnect(hostname: string; p: integer);
 
@@ -72,6 +76,43 @@ implementation
 {$R *.lfm}
 
 uses networkInterfaceApi, mainunit2;
+
+function TLSPinKey(const hostname: string): string;
+begin
+  Result := '\Software\OnyxEngine\TLS\' + StringReplace(hostname, '\', '_', [rfReplaceAll]);
+end;
+
+procedure LoadTLSPin(const hostname: string);
+var
+  reg: TRegistry;
+begin
+  networkTLSFingerprint := '';
+  reg := TRegistry.Create;
+  try
+    reg.RootKey := HKEY_CURRENT_USER;
+    if reg.OpenKey(TLSPinKey(hostname), false) then
+      networkTLSFingerprint := reg.ReadString('Pin');
+  finally
+    reg.Free;
+  end;
+end;
+
+procedure SaveTLSPin(const hostname: string);
+var
+  reg: TRegistry;
+begin
+  if networkTLSFingerprint = '' then
+    Exit;
+
+  reg := TRegistry.Create;
+  try
+    reg.RootKey := HKEY_CURRENT_USER;
+    if reg.OpenKey(TLSPinKey(hostname), true) then
+      reg.WriteString('Pin', networkTLSFingerprint);
+  finally
+    reg.Free;
+  end;
+end;
 
 resourcestring
   rsHost = 'host:';
@@ -252,6 +293,9 @@ begin
 
   port:=ShortHostToNet(p);
 
+  if networkUseTLS then
+    LoadTLSPin(hostname);
+
   if getConnection=nil then
   begin
     if host.s_addr<>0 then //it's 0 when it terminated earlier
@@ -266,6 +310,9 @@ begin
 
 
   InitializeNetworkInterface;
+
+  if networkUseTLS then
+    SaveTLSPin(hostname);
 end;
 
 { TfrmNetworkConfig }
@@ -294,8 +341,14 @@ begin
 end;
 
 
+procedure TfrmNetworkConfig.cbTLSChange(Sender: TObject);
+begin
+  networkUseTLS := cbTLS.Checked;
+end;
+
 procedure TfrmNetworkConfig.FormShow(Sender: TObject);
 begin
+  cbTLS.Checked := networkUseTLS;
   requestlist;
 
   edtHost.Width:=canvas.GetTextWidth('1234.1234.1234.1234');

@@ -102,6 +102,18 @@ object frmNetworkConfig: TfrmNetworkConfig
       Caption = 'Port'
       ParentColor = False
     end
+    object cbTLS: TCheckBox
+      AnchorSideLeft.Control = Panel1
+      AnchorSideTop.Control = edtHost
+      AnchorSideTop.Side = asrBottom
+      Left = 8
+      Height = 19
+      Top = 46
+      Width = 90
+      Caption = 'Use TLS'
+      TabOrder = 2
+      OnChange = cbTLSChange
+    end
     object Panel2: TPanel
       AnchorSideLeft.Control = Panel1
       AnchorSideLeft.Side = asrCenter
