@@ -9,6 +9,10 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 onyx_core = { path = "../core" }
+onyx_aa = { path = "../modules/aa" }
+onyx_hook = { path = "../modules/hook" }
+onyx_gdb_server = { path = "../modules/gdb_server" }
+serde_json = "1"
 
 [lints]
 workspace = true

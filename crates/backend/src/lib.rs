@@ -13,6 +13,11 @@ pub use api::speedhack::*;
 pub use api::mono::*;
 pub use api::veh::*;
 pub use api::tx::*;
+pub use api::abi_util::*;
+pub use api::aa::*;
+pub use api::hook::*;
+pub use api::gdb::*;
+pub use api::manual_map::*;
 pub use loader::*;
 
 #[no_mangle]
