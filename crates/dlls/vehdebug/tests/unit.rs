@@ -1,12 +1,12 @@
 #![cfg(windows)]
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use vehdebug_dll::ffi::*;
 use vehdebug_dll::veh::{
-    BreakpointId, VehDisposition, VehHandler, VehRegistration, allocate_id,
-    register_handler, unregister_handler,
+    BreakpointId, VehDisposition, VehHandler, VehRegistration, allocate_id, register_handler,
+    unregister_handler,
 };
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 
 struct CountingHandler {
     id: BreakpointId,
@@ -48,11 +48,16 @@ fn registration_drop_removes_handler() {
     let raw = reg.raw();
     assert!(!raw.is_null());
     drop(reg);
-
 }
 
 #[test]
 fn disposition_mapping() {
-    assert_eq!(VehDisposition::Continue.as_ntstatus(), EXCEPTION_CONTINUE_EXECUTION);
-    assert_eq!(VehDisposition::Search.as_ntstatus(), EXCEPTION_CONTINUE_SEARCH);
+    assert_eq!(
+        VehDisposition::Continue.as_ntstatus(),
+        EXCEPTION_CONTINUE_EXECUTION
+    );
+    assert_eq!(
+        VehDisposition::Search.as_ntstatus(),
+        EXCEPTION_CONTINUE_SEARCH
+    );
 }

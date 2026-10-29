@@ -1,8 +1,14 @@
-#![allow(non_snake_case, non_camel_case_types, dead_code, unsafe_op_in_unsafe_fn, static_mut_refs)]
+#![allow(
+    non_snake_case,
+    non_camel_case_types,
+    dead_code,
+    unsafe_op_in_unsafe_fn,
+    static_mut_refs
+)]
 
 use std::ffi::c_void;
-use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU32, Ordering};
 use std::ptr::null_mut;
+use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU32, Ordering};
 
 type HANDLE = *mut c_void;
 type HMODULE = *mut c_void;
@@ -49,8 +55,18 @@ static PIPE_HANDLE: AtomicIsize = AtomicIsize::new(-1);
 unsafe extern "system" {
     fn GetModuleHandleA(lpModuleName: *const u8) -> HMODULE;
     fn GetProcAddress(hModule: HMODULE, lpProcName: *const u8) -> *mut c_void;
-    fn VirtualProtect(lpAddress: *mut c_void, dwSize: usize, flNewProtect: DWORD, lpflOldProtect: *mut DWORD) -> BOOL;
-    fn VirtualAlloc(lpAddress: *mut c_void, dwSize: usize, flAllocationType: DWORD, flProtect: DWORD) -> *mut c_void;
+    fn VirtualProtect(
+        lpAddress: *mut c_void,
+        dwSize: usize,
+        flNewProtect: DWORD,
+        lpflOldProtect: *mut DWORD,
+    ) -> BOOL;
+    fn VirtualAlloc(
+        lpAddress: *mut c_void,
+        dwSize: usize,
+        flAllocationType: DWORD,
+        flProtect: DWORD,
+    ) -> *mut c_void;
     fn GetCurrentProcessId() -> DWORD;
     fn CreateThread(
         lpThreadAttributes: *mut c_void,
@@ -90,10 +106,7 @@ unsafe extern "system" fn hook_present(
     sync_interval: u32,
     flags: u32,
 ) -> HRESULT {
-    let count = COMMAND_COUNT.load(Ordering::Relaxed);
-    if count > 0 {
-
-    }
+    let _count = COMMAND_COUNT.load(Ordering::Relaxed);
 
     if let Some(orig) = ORIG_PRESENT {
         orig(p_swap_chain, sync_interval, flags)
@@ -105,9 +118,19 @@ unsafe extern "system" fn hook_present(
 unsafe fn hook_vtable_function(vtable_slot: *mut *mut c_void, detour: *mut c_void) -> *mut c_void {
     let orig = *vtable_slot;
     let mut old_protect: DWORD = 0;
-    VirtualProtect(vtable_slot as *mut c_void, std::mem::size_of::<*mut c_void>(), PAGE_EXECUTE_READWRITE, &mut old_protect);
+    VirtualProtect(
+        vtable_slot as *mut c_void,
+        std::mem::size_of::<*mut c_void>(),
+        PAGE_EXECUTE_READWRITE,
+        &mut old_protect,
+    );
     *vtable_slot = detour;
-    VirtualProtect(vtable_slot as *mut c_void, std::mem::size_of::<*mut c_void>(), old_protect, &mut old_protect);
+    VirtualProtect(
+        vtable_slot as *mut c_void,
+        std::mem::size_of::<*mut c_void>(),
+        old_protect,
+        &mut old_protect,
+    );
     orig
 }
 
@@ -133,16 +156,20 @@ unsafe extern "system" fn pipe_server_worker(_param: *mut c_void) -> DWORD {
 
         PIPE_HANDLE.store(pipe as isize, Ordering::SeqCst);
 
-        let connected = ConnectNamedPipe(pipe, null_mut()) != 0 || {
-
-            true
-        };
+        let connected = ConnectNamedPipe(pipe, null_mut()) != 0 || { true };
 
         if connected {
             let mut buf = [0u8; std::mem::size_of::<RenderCommand>()];
             let mut read_bytes: DWORD = 0;
 
-            while ReadFile(pipe, buf.as_mut_ptr() as *mut c_void, buf.len() as DWORD, &mut read_bytes, null_mut()) != 0 {
+            while ReadFile(
+                pipe,
+                buf.as_mut_ptr() as *mut c_void,
+                buf.len() as DWORD,
+                &mut read_bytes,
+                null_mut(),
+            ) != 0
+            {
                 if read_bytes as usize == std::mem::size_of::<RenderCommand>() {
                     let cmd = std::ptr::read_unaligned(buf.as_ptr() as *const RenderCommand);
                     let current = COMMAND_COUNT.load(Ordering::Relaxed) as usize;

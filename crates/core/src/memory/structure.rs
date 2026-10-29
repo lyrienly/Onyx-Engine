@@ -1,5 +1,5 @@
-use std::mem::size_of;
 use crate::process::Process;
+use std::mem::size_of;
 
 #[derive(Debug, Clone)]
 pub enum GuessedType {
@@ -16,9 +16,20 @@ pub enum GuessedType {
     Binary(u8),
     Bytes([u8; 8]),
 
-    UnrealTArray { data_ptr: usize, count: i32, max: i32 },
-    UnrealFString { data_ptr: usize, len: i32, text: Option<String> },
-    UnrealFName { index: u32, number: u32 },
+    UnrealTArray {
+        data_ptr: usize,
+        count: i32,
+        max: i32,
+    },
+    UnrealFString {
+        data_ptr: usize,
+        len: i32,
+        text: Option<String>,
+    },
+    UnrealFName {
+        index: u32,
+        number: u32,
+    },
 }
 
 impl GuessedType {
@@ -55,13 +66,26 @@ impl GuessedType {
             GuessedType::Int32(i) => format!("{} (0x{:08X})", i, i),
             GuessedType::Int64(i) => format!("{} (0x{:016X})", i, i),
             GuessedType::Binary(b) => format!("0b{:08b} (0x{:02X})", b, b),
-            GuessedType::Bytes(b) => {
-                b.iter().map(|x| format!("{:02X}", x)).collect::<Vec<_>>().join(" ")
+            GuessedType::Bytes(b) => b
+                .iter()
+                .map(|x| format!("{:02X}", x))
+                .collect::<Vec<_>>()
+                .join(" "),
+            GuessedType::UnrealTArray {
+                data_ptr,
+                count,
+                max,
+            } => {
+                format!(
+                    "TArray [Count: {}, Max: {}] -> 0x{:016X}",
+                    count, max, data_ptr
+                )
             }
-            GuessedType::UnrealTArray { data_ptr, count, max } => {
-                format!("TArray [Count: {}, Max: {}] -> 0x{:016X}", count, max, data_ptr)
-            }
-            GuessedType::UnrealFString { data_ptr, len, text } => {
+            GuessedType::UnrealFString {
+                data_ptr,
+                len,
+                text,
+            } => {
                 if let Some(t) = text {
                     format!("FString [len: {}] -> \"{}\"", len, t)
                 } else {
@@ -89,7 +113,11 @@ pub struct StructField {
 pub struct StructureDissector;
 
 impl StructureDissector {
-    pub fn dissect(proc: &Process, address: usize, total_size: usize) -> Result<Vec<StructField>, String> {
+    pub fn dissect(
+        proc: &Process,
+        address: usize,
+        total_size: usize,
+    ) -> Result<Vec<StructField>, String> {
         let total = total_size.max(size_of::<usize>());
         let buf = proc.read_bytes(address, total)?;
         let regions = proc.regions(false).unwrap_or_default();
@@ -107,25 +135,71 @@ impl StructureDissector {
             let ptr_val = u64_val as usize;
 
             let is_unreal_container = if offset + 16 <= buf.len() {
-                let count_bytes = [buf[offset + 8], buf[offset + 9], buf[offset + 10], buf[offset + 11]];
-                let max_bytes = [buf[offset + 12], buf[offset + 13], buf[offset + 14], buf[offset + 15]];
+                let count_bytes = [
+                    buf[offset + 8],
+                    buf[offset + 9],
+                    buf[offset + 10],
+                    buf[offset + 11],
+                ];
+                let max_bytes = [
+                    buf[offset + 12],
+                    buf[offset + 13],
+                    buf[offset + 14],
+                    buf[offset + 15],
+                ];
                 let count = i32::from_le_bytes(count_bytes);
                 let max = i32::from_le_bytes(max_bytes);
 
                 if count >= 0 && max >= count && max < 1_000_000 && (count > 0 || max > 0) {
-                    if let Some(_target_reg) = regions.iter().find(|r| ptr_val >= r.base && ptr_val < r.base + r.size) {
-
+                    if let Some(_target_reg) = regions
+                        .iter()
+                        .find(|r| ptr_val >= r.base && ptr_val < r.base + r.size)
+                    {
                         let mut wide_buf = [0u16; 32];
                         let read_chars = (count as usize).min(32);
-                        if proc.read_raw(ptr_val, unsafe { std::slice::from_raw_parts_mut(wide_buf.as_mut_ptr() as *mut u8, read_chars * 2) }).is_ok() {
-                            let text: String = String::from_utf16_lossy(&wide_buf[..read_chars]).trim_matches('\0').to_string();
+                        if proc
+                            .read_raw(ptr_val, unsafe {
+                                std::slice::from_raw_parts_mut(
+                                    wide_buf.as_mut_ptr() as *mut u8,
+                                    read_chars * 2,
+                                )
+                            })
+                            .is_ok()
+                        {
+                            let text: String = String::from_utf16_lossy(&wide_buf[..read_chars])
+                                .trim_matches('\0')
+                                .to_string();
                             if is_printable_ascii(&text) && text.len() >= 2 {
-                                Some((GuessedType::UnrealFString { data_ptr: ptr_val, len: count, text: Some(text.clone()) }, Some(text), 1))
+                                Some((
+                                    GuessedType::UnrealFString {
+                                        data_ptr: ptr_val,
+                                        len: count,
+                                        text: Some(text.clone()),
+                                    },
+                                    Some(text),
+                                    1,
+                                ))
                             } else {
-                                Some((GuessedType::UnrealTArray { data_ptr: ptr_val, count, max }, Some(format!("Count: {} / Max: {}", count, max)), 1))
+                                Some((
+                                    GuessedType::UnrealTArray {
+                                        data_ptr: ptr_val,
+                                        count,
+                                        max,
+                                    },
+                                    Some(format!("Count: {} / Max: {}", count, max)),
+                                    1,
+                                ))
                             }
                         } else {
-                            Some((GuessedType::UnrealTArray { data_ptr: ptr_val, count, max }, Some(format!("Count: {} / Max: {}", count, max)), 1))
+                            Some((
+                                GuessedType::UnrealTArray {
+                                    data_ptr: ptr_val,
+                                    count,
+                                    max,
+                                },
+                                Some(format!("Count: {} / Max: {}", count, max)),
+                                1,
+                            ))
                         }
                     } else {
                         None
@@ -141,23 +215,44 @@ impl StructureDissector {
                 (g, p, pr)
             } else if u64_val == 0 {
                 (GuessedType::Null, None, 9)
-            } else if let Some(target_reg) = regions.iter().find(|r| ptr_val >= r.base && ptr_val < r.base + r.size) {
-
+            } else if let Some(target_reg) = regions
+                .iter()
+                .find(|r| ptr_val >= r.base && ptr_val < r.base + r.size)
+            {
                 if target_reg.is_executable() {
-                    (GuessedType::FunctionPointer(ptr_val), Some(format!("Exec at 0x{:X}", ptr_val)), 2)
+                    (
+                        GuessedType::FunctionPointer(ptr_val),
+                        Some(format!("Exec at 0x{:X}", ptr_val)),
+                        2,
+                    )
                 } else if let Ok(str_val) = proc.read_string(ptr_val, 64, false) {
                     if is_printable_ascii(&str_val) && str_val.len() >= 2 {
                         let prev = Some(format!("\"{}\"", str_val));
                         (GuessedType::StringPointer(ptr_val, str_val), prev, 1)
                     } else if let Ok(first_qword) = proc.read::<usize>(ptr_val) {
-                        if let Some(first_target) = regions.iter().find(|r| first_qword >= r.base && first_qword < r.base + r.size) {
+                        if let Some(first_target) = regions
+                            .iter()
+                            .find(|r| first_qword >= r.base && first_qword < r.base + r.size)
+                        {
                             if first_target.is_executable() {
-                                (GuessedType::VTable(ptr_val), Some(format!("VTable [1st method: 0x{:X}]", first_qword)), 1)
+                                (
+                                    GuessedType::VTable(ptr_val),
+                                    Some(format!("VTable [1st method: 0x{:X}]", first_qword)),
+                                    1,
+                                )
                             } else {
-                                (GuessedType::DataPointer(ptr_val), Some(format!("-> 0x{:X}", first_qword)), 3)
+                                (
+                                    GuessedType::DataPointer(ptr_val),
+                                    Some(format!("-> 0x{:X}", first_qword)),
+                                    3,
+                                )
                             }
                         } else {
-                            (GuessedType::DataPointer(ptr_val), Some(format!("-> 0x{:X}", first_qword)), 3)
+                            (
+                                GuessedType::DataPointer(ptr_val),
+                                Some(format!("-> 0x{:X}", first_qword)),
+                                3,
+                            )
                         }
                     } else {
                         (GuessedType::DataPointer(ptr_val), None, 3)
@@ -167,18 +262,39 @@ impl StructureDissector {
                 }
             } else {
                 let inline_str = String::from_utf8_lossy(&raw_bytes).to_string();
-                let f32_val = f32::from_le_bytes([raw_bytes[0], raw_bytes[1], raw_bytes[2], raw_bytes[3]]);
+                let f32_val =
+                    f32::from_le_bytes([raw_bytes[0], raw_bytes[1], raw_bytes[2], raw_bytes[3]]);
                 let f64_val = f64::from_le_bytes(raw_bytes);
 
                 if is_printable_ascii(&inline_str) && inline_str.trim().len() >= 3 {
                     let s = inline_str.trim().to_string();
-                    (GuessedType::InlineString(s.clone()), Some(format!("\"{}\"", s)), 2)
+                    (
+                        GuessedType::InlineString(s.clone()),
+                        Some(format!("\"{}\"", s)),
+                        2,
+                    )
                 } else if f32_val.is_finite() && f32_val.abs() > 0.001 && f32_val.abs() < 100000.0 {
-                    (GuessedType::Float(f32_val), Some(format!("{:.4}f", f32_val)), 4)
+                    (
+                        GuessedType::Float(f32_val),
+                        Some(format!("{:.4}f", f32_val)),
+                        4,
+                    )
                 } else if f64_val.is_finite() && f64_val.abs() > 0.001 && f64_val.abs() < 100000.0 {
-                    (GuessedType::Double(f64_val), Some(format!("{:.6}", f64_val)), 4)
-                } else if (u64_val as i64) >= -2147483648 && (u64_val as i64) <= 2147483647 && raw_bytes[4..] == [0, 0, 0, 0] {
-                    let i = i32::from_le_bytes([raw_bytes[0], raw_bytes[1], raw_bytes[2], raw_bytes[3]]);
+                    (
+                        GuessedType::Double(f64_val),
+                        Some(format!("{:.6}", f64_val)),
+                        4,
+                    )
+                } else if (u64_val as i64) >= -2147483648
+                    && (u64_val as i64) <= 2147483647
+                    && raw_bytes[4..] == [0, 0, 0, 0]
+                {
+                    let i = i32::from_le_bytes([
+                        raw_bytes[0],
+                        raw_bytes[1],
+                        raw_bytes[2],
+                        raw_bytes[3],
+                    ]);
                     (GuessedType::Int32(i), Some(format!("{} (0x{:X})", i, i)), 5)
                 } else {
                     let i = u64_val as i64;
@@ -225,7 +341,10 @@ impl StructureDissector {
         for f in fields {
             let rust_type = match &f.guessed {
                 GuessedType::Null => "usize",
-                GuessedType::FunctionPointer(_) | GuessedType::VTable(_) | GuessedType::DataPointer(_) | GuessedType::StringPointer(_, _) => "usize",
+                GuessedType::FunctionPointer(_)
+                | GuessedType::VTable(_)
+                | GuessedType::DataPointer(_)
+                | GuessedType::StringPointer(_, _) => "usize",
                 GuessedType::InlineString(_) => "[u8; 8]",
                 GuessedType::Float(_) => "f32",
                 GuessedType::Double(_) => "f64",
@@ -286,7 +405,9 @@ impl StructureDissector {
                     all_bytes_identical = false;
                 }
                 match f.guessed {
-                    GuessedType::DataPointer(_) | GuessedType::VTable(_) | GuessedType::FunctionPointer(_) => {}
+                    GuessedType::DataPointer(_)
+                    | GuessedType::VTable(_)
+                    | GuessedType::FunctionPointer(_) => {}
                     _ => all_are_pointers = false,
                 }
             }
@@ -351,13 +472,14 @@ impl StructureDissector {
                         _ => None,
                     };
 
-                    if let Some(target) = child_addr {
-                        if target > 0x10000 && !visited.contains(&target) {
-                            child_pointers.push((f.offset, target));
-                            if depth + 1 < max_depth {
-                                visited.insert(target);
-                                queue.push_back((target, depth + 1));
-                            }
+                    if let Some(target) = child_addr
+                        && target > 0x10000
+                        && !visited.contains(&target)
+                    {
+                        child_pointers.push((f.offset, target));
+                        if depth + 1 < max_depth {
+                            visited.insert(target);
+                            queue.push_back((target, depth + 1));
                         }
                     }
                 }

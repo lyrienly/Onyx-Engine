@@ -1,10 +1,9 @@
 use onyx_scanner::pattern::{
-    find_all, find_all_scalar, find_all_with, find_pattern, find_pattern_scalar,
-    find_pattern_with, Pattern,
+    find_all, find_all_scalar, find_all_with, find_pattern, find_pattern_scalar, find_pattern_with,
+    Pattern,
 };
 
 fn seeded_rand(seed: u64, len: usize) -> Vec<u8> {
-
     let mut s = seed;
     let mut out = Vec::with_capacity(len);
     for _ in 0..len {
@@ -30,7 +29,9 @@ fn known_offset_no_wildcards() {
 #[test]
 fn known_offset_with_wildcards() {
     let mut hay = seeded_rand(0xCAFEBABE, 2_000_000);
-    let needle = [0x48u8, 0x8B, 0x05, 0xAA, 0xBB, 0xCC, 0xDD, 0xE8, 0x11, 0x22, 0x33, 0x44];
+    let needle = [
+        0x48u8, 0x8B, 0x05, 0xAA, 0xBB, 0xCC, 0xDD, 0xE8, 0x11, 0x22, 0x33, 0x44,
+    ];
     let off = 1_234_567;
     hay[off..off + needle.len()].copy_from_slice(&needle);
 
@@ -76,7 +77,9 @@ fn benchmark_avx2_vs_scalar_100mb() {
     const SIZE: usize = 100 * 1024 * 1024;
     let mut hay = seeded_rand(0x9876_5432_10AB_CDEF, SIZE);
 
-    let needle = [0x48u8, 0x8B, 0x15, 0xDE, 0xAD, 0xBE, 0xEF, 0xE8, 0x11, 0x22, 0x33, 0x44];
+    let needle = [
+        0x48u8, 0x8B, 0x15, 0xDE, 0xAD, 0xBE, 0xEF, 0xE8, 0x11, 0x22, 0x33, 0x44,
+    ];
     let off = SIZE - needle.len() - 1024;
     hay[off..off + needle.len()].copy_from_slice(&needle);
 

@@ -29,7 +29,6 @@ pub struct CodecaveEntry {
 pub struct CodecaveScanner;
 
 impl CodecaveScanner {
-
     pub fn scan_buffer(
         buffer: &[u8],
         base_address: usize,

@@ -1,8 +1,8 @@
-use onyx_core::process::Process;
-use onyx_core::disasm::Disassembler;
-use onyx_core::debugger::dissect_code::{DissectCodeEngine, BranchKind};
+use crate::types::{OnyxDisasmInsn, OnyxDissectBranch, OnyxStringReference, OnyxXRefEntry};
+use onyx_core::debugger::dissect_code::{BranchKind, DissectCodeEngine};
 use onyx_core::debugger::string_referencer::StringReferencer;
-use crate::types::{OnyxDisasmInsn, OnyxDissectBranch, OnyxXRefEntry, OnyxStringReference};
+use onyx_core::disasm::Disassembler;
+use onyx_core::process::Process;
 
 #[no_mangle]
 pub unsafe extern "C" fn onyx_disasm_instruction(

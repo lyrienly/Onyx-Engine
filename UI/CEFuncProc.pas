@@ -6,7 +6,7 @@ unit CEFuncProc;
 {$MODE Delphi}
 
 //This version of CEFuncProc has been COPIED to the server dir
-//Cheat Engine regular WONT look at this
+//OnyxEngine regular WONT look at this
 
 interface
 
@@ -2262,7 +2262,7 @@ end;   }
 
 function GetUserNameFromPID(ProcessId: DWORD): string;
 //credits to Alice0725
-//http://forum.cheatengine.org/viewtopic.php?t=564382
+//https://github.com/ErlonLy/OnyxEngine/issuesviewtopic.php?t=564382
 {$IFDEF windows}
 type
   PTOKEN_USER = ^TOKEN_USER;

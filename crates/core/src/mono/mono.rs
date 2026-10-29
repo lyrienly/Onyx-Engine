@@ -97,7 +97,8 @@ impl Ecma335Parser {
         }
 
         let opt_offset = e_lfanew + 0x18;
-        let opt_magic = u16::from_le_bytes(image_bytes[opt_offset..opt_offset + 2].try_into().ok()?);
+        let opt_magic =
+            u16::from_le_bytes(image_bytes[opt_offset..opt_offset + 2].try_into().ok()?);
 
         let clr_dir_offset = match opt_magic {
             0x20B => opt_offset + 112 + 14 * 8,
@@ -109,14 +110,24 @@ impl Ecma335Parser {
             return None;
         }
 
-        let clr_rva = u32::from_le_bytes(image_bytes[clr_dir_offset..clr_dir_offset + 4].try_into().ok()?) as usize;
-        let clr_sz = u32::from_le_bytes(image_bytes[clr_dir_offset + 4..clr_dir_offset + 8].try_into().ok()?) as usize;
+        let clr_rva = u32::from_le_bytes(
+            image_bytes[clr_dir_offset..clr_dir_offset + 4]
+                .try_into()
+                .ok()?,
+        ) as usize;
+        let clr_sz = u32::from_le_bytes(
+            image_bytes[clr_dir_offset + 4..clr_dir_offset + 8]
+                .try_into()
+                .ok()?,
+        ) as usize;
         if clr_rva == 0 || clr_sz < 0x48 || clr_rva + clr_sz > image_bytes.len() {
             return None;
         }
 
-        let md_rva = u32::from_le_bytes(image_bytes[clr_rva + 8..clr_rva + 12].try_into().ok()?) as usize;
-        let md_sz = u32::from_le_bytes(image_bytes[clr_rva + 12..clr_rva + 16].try_into().ok()?) as usize;
+        let md_rva =
+            u32::from_le_bytes(image_bytes[clr_rva + 8..clr_rva + 12].try_into().ok()?) as usize;
+        let md_sz =
+            u32::from_le_bytes(image_bytes[clr_rva + 12..clr_rva + 16].try_into().ok()?) as usize;
         if md_rva == 0 || md_sz < 16 || md_rva + md_sz > image_bytes.len() {
             return None;
         }
@@ -144,7 +155,8 @@ impl Ecma335Parser {
 
         let after_ver = 16 + v_len;
 
-        let streams_count = u16::from_le_bytes(md_bytes[after_ver + 2..after_ver + 4].try_into().ok()?) as usize;
+        let streams_count =
+            u16::from_le_bytes(md_bytes[after_ver + 2..after_ver + 4].try_into().ok()?) as usize;
 
         let mut cur = after_ver + 4;
         let mut strings_buf = Vec::new();
@@ -166,7 +178,7 @@ impl Ecma335Parser {
             let name = String::from_utf8_lossy(&md_bytes[name_start..cur]).to_string();
 
             cur += 1;
-            while cur % 4 != 0 && cur < md_bytes.len() {
+            while !cur.is_multiple_of(4) && cur < md_bytes.len() {
                 cur += 1;
             }
 
@@ -182,18 +194,19 @@ impl Ecma335Parser {
             }
         }
 
-        let (heap_sizes, valid_mask, table_rows, row_sizes, table_offsets) = if tables_buf.len() >= 24 {
+        let (heap_sizes, valid_mask, table_rows, row_sizes, table_offsets) = if tables_buf.len()
+            >= 24
+        {
             let heap_sizes = tables_buf[6];
             let valid_mask = u64::from_le_bytes(tables_buf[8..16].try_into().unwrap_or([0; 8]));
 
             let mut table_rows = [0u32; 64];
             let mut row_cur = 24;
             for i in 0..64 {
-                if (valid_mask & (1u64 << i)) != 0 {
-                    if row_cur + 4 <= tables_buf.len() {
-                        table_rows[i] = u32::from_le_bytes(tables_buf[row_cur..row_cur + 4].try_into().unwrap());
-                        row_cur += 4;
-                    }
+                if (valid_mask & (1u64 << i)) != 0 && row_cur + 4 <= tables_buf.len() {
+                    table_rows[i] =
+                        u32::from_le_bytes(tables_buf[row_cur..row_cur + 4].try_into().unwrap());
+                    row_cur += 4;
                 }
             }
 
@@ -210,7 +223,8 @@ impl Ecma335Parser {
             let mut row_sizes = [0usize; 64];
             row_sizes[0x00] = 2 + str_sz + 3 * guid_sz;
             row_sizes[0x01] = 2 + str_sz + str_sz;
-            row_sizes[0x02] = 4 + str_sz + str_sz + type_def_or_ref_sz + field_idx_sz + method_idx_sz;
+            row_sizes[0x02] =
+                4 + str_sz + str_sz + type_def_or_ref_sz + field_idx_sz + method_idx_sz;
             row_sizes[0x04] = 2 + str_sz + blob_sz;
             row_sizes[0x06] = 4 + 2 + 2 + str_sz + blob_sz + param_idx_sz;
             row_sizes[0x08] = 2 + 2 + str_sz;
@@ -265,9 +279,25 @@ impl Ecma335Parser {
         }
 
         let str_sz = if (self.heap_sizes & 1) != 0 { 4 } else { 2 };
-        let type_def_or_ref_sz = if self.table_rows[0x02].max(self.table_rows[0x01]).max(self.table_rows[0x1B]) < (1 << 14) { 2 } else { 4 };
-        let field_idx_sz = if self.table_rows[0x04] < (1 << 16) { 2 } else { 4 };
-        let method_idx_sz = if self.table_rows[0x06] < (1 << 16) { 2 } else { 4 };
+        let type_def_or_ref_sz = if self.table_rows[0x02]
+            .max(self.table_rows[0x01])
+            .max(self.table_rows[0x1B])
+            < (1 << 14)
+        {
+            2
+        } else {
+            4
+        };
+        let field_idx_sz = if self.table_rows[0x04] < (1 << 16) {
+            2
+        } else {
+            4
+        };
+        let method_idx_sz = if self.table_rows[0x06] < (1 << 16) {
+            2
+        } else {
+            4
+        };
 
         let td_offset = self.table_offsets[0x02];
         let row_sz = self.table_row_sizes[0x02];
@@ -287,9 +317,11 @@ impl Ecma335Parser {
 
             let ns_idx_start = 4 + str_sz;
             let ns_idx = if str_sz == 4 {
-                u32::from_le_bytes(slice[ns_idx_start..ns_idx_start + 4].try_into().unwrap()) as usize
+                u32::from_le_bytes(slice[ns_idx_start..ns_idx_start + 4].try_into().unwrap())
+                    as usize
             } else {
-                u16::from_le_bytes(slice[ns_idx_start..ns_idx_start + 2].try_into().unwrap()) as usize
+                u16::from_le_bytes(slice[ns_idx_start..ns_idx_start + 2].try_into().unwrap())
+                    as usize
             };
 
             let name = self.get_string(name_idx);
@@ -307,9 +339,11 @@ impl Ecma335Parser {
 
             let f_list_start = 4 + str_sz * 2 + type_def_or_ref_sz;
             let field_start = if field_idx_sz == 4 {
-                u32::from_le_bytes(slice[f_list_start..f_list_start + 4].try_into().unwrap()) as usize
+                u32::from_le_bytes(slice[f_list_start..f_list_start + 4].try_into().unwrap())
+                    as usize
             } else {
-                u16::from_le_bytes(slice[f_list_start..f_list_start + 2].try_into().unwrap()) as usize
+                u16::from_le_bytes(slice[f_list_start..f_list_start + 2].try_into().unwrap())
+                    as usize
             };
 
             let mut fields = Vec::new();
@@ -347,9 +381,11 @@ impl Ecma335Parser {
 
             let m_list_start = f_list_start + field_idx_sz;
             let method_start = if method_idx_sz == 4 {
-                u32::from_le_bytes(slice[m_list_start..m_list_start + 4].try_into().unwrap()) as usize
+                u32::from_le_bytes(slice[m_list_start..m_list_start + 4].try_into().unwrap())
+                    as usize
             } else {
-                u16::from_le_bytes(slice[m_list_start..m_list_start + 2].try_into().unwrap()) as usize
+                u16::from_le_bytes(slice[m_list_start..m_list_start + 2].try_into().unwrap())
+                    as usize
             };
 
             let mut methods = Vec::new();
@@ -421,7 +457,6 @@ impl MonoDissector {
     }
 
     pub fn detect_runtime(proc: &Process) -> (RuntimeType, Option<String>) {
-
         if let Some(m) = proc.find_module("GameAssembly.dll") {
             return (RuntimeType::Il2Cpp, Some(m.name));
         }
@@ -438,11 +473,7 @@ impl MonoDissector {
             }
         }
 
-        let clr_candidates = [
-            "coreclr.dll",
-            "clr.dll",
-            "mscorlib.dll",
-        ];
+        let clr_candidates = ["coreclr.dll", "clr.dll", "mscorlib.dll"];
         for &cand in &clr_candidates {
             if let Some(m) = proc.find_module(cand) {
                 return (RuntimeType::DotNetClr, Some(m.name));
@@ -459,11 +490,16 @@ impl MonoDissector {
     pub fn attach(&mut self, proc: &Process) -> Result<String, String> {
         let (rt, mod_name) = Self::detect_runtime(proc);
         if rt == RuntimeType::None || mod_name.is_none() {
-            return Err("No supported managed runtime (Mono, IL2CPP, or CLR) detected in target process.".to_string());
+            return Err(
+                "No supported managed runtime (Mono, IL2CPP, or CLR) detected in target process."
+                    .to_string(),
+            );
         }
 
         let m_name = mod_name.unwrap();
-        let m = proc.find_module(&m_name).ok_or_else(|| "Module not found in process".to_string())?;
+        let m = proc
+            .find_module(&m_name)
+            .ok_or_else(|| "Module not found in process".to_string())?;
 
         self.runtime_type = rt;
         self.module_name = Some(m_name.clone());
@@ -476,7 +512,11 @@ impl MonoDissector {
         Ok(format!("Attached to {} ({})", rt.as_str(), m_name))
     }
 
-    pub fn inspect_exports(&self, proc: &Process, resolver: &mut SymbolResolver) -> Result<Vec<(&'static str, usize)>, String> {
+    pub fn inspect_exports(
+        &self,
+        proc: &Process,
+        resolver: &mut SymbolResolver,
+    ) -> Result<Vec<(&'static str, usize)>, String> {
         let mod_name = match &self.module_name {
             Some(n) => n,
             None => return Err("Not attached to Mono".to_string()),
@@ -574,17 +614,21 @@ impl MonoDissector {
         }
 
         let mut domain_addr = 0usize;
-        if let Some((_, addr)) = resolved_exports.iter().find(|(name, _)| *name == "il2cpp_domain_get") {
+        if let Some((_, addr)) = resolved_exports
+            .iter()
+            .find(|(name, _)| *name == "il2cpp_domain_get")
+        {
             let mut insn_buf = [0u8; 16];
-            if proc.read_raw(*addr, &mut insn_buf).is_ok() {
-
-                if insn_buf[0] == 0x48 && insn_buf[1] == 0x8B && insn_buf[2] == 0x05 {
-                    let disp = i32::from_le_bytes([insn_buf[3], insn_buf[4], insn_buf[5], insn_buf[6]]);
-                    let target_rip = addr + 7;
-                    let target_addr = (target_rip as i64 + disp as i64) as usize;
-                    if let Ok(ptr) = proc.read::<usize>(target_addr) {
-                        domain_addr = ptr;
-                    }
+            if proc.read_raw(*addr, &mut insn_buf).is_ok()
+                && insn_buf[0] == 0x48
+                && insn_buf[1] == 0x8B
+                && insn_buf[2] == 0x05
+            {
+                let disp = i32::from_le_bytes([insn_buf[3], insn_buf[4], insn_buf[5], insn_buf[6]]);
+                let target_rip = addr + 7;
+                let target_addr = (target_rip as i64 + disp as i64) as usize;
+                if let Ok(ptr) = proc.read::<usize>(target_addr) {
+                    domain_addr = ptr;
                 }
             }
         }
@@ -603,19 +647,74 @@ impl MonoDissector {
             class_address: mod_base + 0x24000,
             parent_class: Some("UnityEngine.MonoBehaviour".to_string()),
             fields: vec![
-                ManagedField { name: "Instance".to_string(), type_name: "GameManager".to_string(), offset: 0x0, is_static: true },
-                ManagedField { name: "_playerStats".to_string(), type_name: "PlayerStats".to_string(), offset: 0x18, is_static: false },
-                ManagedField { name: "_currentCoins".to_string(), type_name: "System.Single".to_string(), offset: 0x20, is_static: false },
-                ManagedField { name: "_sessionCoins".to_string(), type_name: "System.Single".to_string(), offset: 0x24, is_static: false },
-                ManagedField { name: "_enemiesKilled".to_string(), type_name: "System.Int32".to_string(), offset: 0x28, is_static: false },
-                ManagedField { name: "_isGameOver".to_string(), type_name: "System.Boolean".to_string(), offset: 0x2C, is_static: false },
-                ManagedField { name: "_isPaused".to_string(), type_name: "System.Boolean".to_string(), offset: 0x2D, is_static: false },
+                ManagedField {
+                    name: "Instance".to_string(),
+                    type_name: "GameManager".to_string(),
+                    offset: 0x0,
+                    is_static: true,
+                },
+                ManagedField {
+                    name: "_playerStats".to_string(),
+                    type_name: "PlayerStats".to_string(),
+                    offset: 0x18,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "_currentCoins".to_string(),
+                    type_name: "System.Single".to_string(),
+                    offset: 0x20,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "_sessionCoins".to_string(),
+                    type_name: "System.Single".to_string(),
+                    offset: 0x24,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "_enemiesKilled".to_string(),
+                    type_name: "System.Int32".to_string(),
+                    offset: 0x28,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "_isGameOver".to_string(),
+                    type_name: "System.Boolean".to_string(),
+                    offset: 0x2C,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "_isPaused".to_string(),
+                    type_name: "System.Boolean".to_string(),
+                    offset: 0x2D,
+                    is_static: false,
+                },
             ],
             methods: vec![
-                ManagedMethod { name: "get_Instance".to_string(), return_type: "GameManager".to_string(), param_types: Vec::new(), address: mod_base + 0x152A0 },
-                ManagedMethod { name: "AddCoins".to_string(), return_type: "System.Void".to_string(), param_types: vec!["System.Single".to_string()], address: mod_base + 0x15340 },
-                ManagedMethod { name: "SaveGameData".to_string(), return_type: "System.Void".to_string(), param_types: Vec::new(), address: mod_base + 0x15580 },
-                ManagedMethod { name: "GameOver".to_string(), return_type: "System.Void".to_string(), param_types: Vec::new(), address: mod_base + 0x157B0 },
+                ManagedMethod {
+                    name: "get_Instance".to_string(),
+                    return_type: "GameManager".to_string(),
+                    param_types: Vec::new(),
+                    address: mod_base + 0x152A0,
+                },
+                ManagedMethod {
+                    name: "AddCoins".to_string(),
+                    return_type: "System.Void".to_string(),
+                    param_types: vec!["System.Single".to_string()],
+                    address: mod_base + 0x15340,
+                },
+                ManagedMethod {
+                    name: "SaveGameData".to_string(),
+                    return_type: "System.Void".to_string(),
+                    param_types: Vec::new(),
+                    address: mod_base + 0x15580,
+                },
+                ManagedMethod {
+                    name: "GameOver".to_string(),
+                    return_type: "System.Void".to_string(),
+                    param_types: Vec::new(),
+                    address: mod_base + 0x157B0,
+                },
             ],
         });
 
@@ -626,25 +725,110 @@ impl MonoDissector {
             class_address: mod_base + 0x25000,
             parent_class: Some("UnityEngine.ScriptableObject".to_string()),
             fields: vec![
-                ManagedField { name: "charName".to_string(), type_name: "System.String".to_string(), offset: 0x18, is_static: false },
-                ManagedField { name: "maxHp".to_string(), type_name: "System.Single".to_string(), offset: 0x20, is_static: false },
-                ManagedField { name: "currentHp".to_string(), type_name: "System.Single".to_string(), offset: 0x24, is_static: false },
-                ManagedField { name: "armor".to_string(), type_name: "System.Single".to_string(), offset: 0x28, is_static: false },
-                ManagedField { name: "moveSpeed".to_string(), type_name: "System.Single".to_string(), offset: 0x2C, is_static: false },
-                ManagedField { name: "power".to_string(), type_name: "System.Single".to_string(), offset: 0x30, is_static: false },
-                ManagedField { name: "cooldown".to_string(), type_name: "System.Single".to_string(), offset: 0x34, is_static: false },
-                ManagedField { name: "luck".to_string(), type_name: "System.Single".to_string(), offset: 0x38, is_static: false },
-                ManagedField { name: "growth".to_string(), type_name: "System.Single".to_string(), offset: 0x3C, is_static: false },
-                ManagedField { name: "greed".to_string(), type_name: "System.Single".to_string(), offset: 0x40, is_static: false },
-                ManagedField { name: "curse".to_string(), type_name: "System.Single".to_string(), offset: 0x44, is_static: false },
-                ManagedField { name: "magnet".to_string(), type_name: "System.Single".to_string(), offset: 0x48, is_static: false },
-                ManagedField { name: "revivals".to_string(), type_name: "System.Int32".to_string(), offset: 0x4C, is_static: false },
-                ManagedField { name: "isInvincible".to_string(), type_name: "System.Boolean".to_string(), offset: 0x50, is_static: false },
+                ManagedField {
+                    name: "charName".to_string(),
+                    type_name: "System.String".to_string(),
+                    offset: 0x18,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "maxHp".to_string(),
+                    type_name: "System.Single".to_string(),
+                    offset: 0x20,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "currentHp".to_string(),
+                    type_name: "System.Single".to_string(),
+                    offset: 0x24,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "armor".to_string(),
+                    type_name: "System.Single".to_string(),
+                    offset: 0x28,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "moveSpeed".to_string(),
+                    type_name: "System.Single".to_string(),
+                    offset: 0x2C,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "power".to_string(),
+                    type_name: "System.Single".to_string(),
+                    offset: 0x30,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "cooldown".to_string(),
+                    type_name: "System.Single".to_string(),
+                    offset: 0x34,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "luck".to_string(),
+                    type_name: "System.Single".to_string(),
+                    offset: 0x38,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "growth".to_string(),
+                    type_name: "System.Single".to_string(),
+                    offset: 0x3C,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "greed".to_string(),
+                    type_name: "System.Single".to_string(),
+                    offset: 0x40,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "curse".to_string(),
+                    type_name: "System.Single".to_string(),
+                    offset: 0x44,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "magnet".to_string(),
+                    type_name: "System.Single".to_string(),
+                    offset: 0x48,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "revivals".to_string(),
+                    type_name: "System.Int32".to_string(),
+                    offset: 0x4C,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "isInvincible".to_string(),
+                    type_name: "System.Boolean".to_string(),
+                    offset: 0x50,
+                    is_static: false,
+                },
             ],
             methods: vec![
-                ManagedMethod { name: "TakeDamage".to_string(), return_type: "System.Void".to_string(), param_types: vec!["System.Single".to_string()], address: mod_base + 0x16100 },
-                ManagedMethod { name: "Heal".to_string(), return_type: "System.Void".to_string(), param_types: vec!["System.Single".to_string()], address: mod_base + 0x16220 },
-                ManagedMethod { name: "LevelUp".to_string(), return_type: "System.Void".to_string(), param_types: Vec::new(), address: mod_base + 0x16340 },
+                ManagedMethod {
+                    name: "TakeDamage".to_string(),
+                    return_type: "System.Void".to_string(),
+                    param_types: vec!["System.Single".to_string()],
+                    address: mod_base + 0x16100,
+                },
+                ManagedMethod {
+                    name: "Heal".to_string(),
+                    return_type: "System.Void".to_string(),
+                    param_types: vec!["System.Single".to_string()],
+                    address: mod_base + 0x16220,
+                },
+                ManagedMethod {
+                    name: "LevelUp".to_string(),
+                    return_type: "System.Void".to_string(),
+                    param_types: Vec::new(),
+                    address: mod_base + 0x16340,
+                },
             ],
         });
 
@@ -662,14 +846,44 @@ impl MonoDissector {
             class_address: mod_base + 0x32000,
             parent_class: Some("System.Object".to_string()),
             fields: vec![
-                ManagedField { name: "timeScale".to_string(), type_name: "System.Single".to_string(), offset: 0x0, is_static: true },
-                ManagedField { name: "fixedDeltaTime".to_string(), type_name: "System.Single".to_string(), offset: 0x4, is_static: true },
-                ManagedField { name: "maximumDeltaTime".to_string(), type_name: "System.Single".to_string(), offset: 0x8, is_static: true },
+                ManagedField {
+                    name: "timeScale".to_string(),
+                    type_name: "System.Single".to_string(),
+                    offset: 0x0,
+                    is_static: true,
+                },
+                ManagedField {
+                    name: "fixedDeltaTime".to_string(),
+                    type_name: "System.Single".to_string(),
+                    offset: 0x4,
+                    is_static: true,
+                },
+                ManagedField {
+                    name: "maximumDeltaTime".to_string(),
+                    type_name: "System.Single".to_string(),
+                    offset: 0x8,
+                    is_static: true,
+                },
             ],
             methods: vec![
-                ManagedMethod { name: "get_timeScale".to_string(), return_type: "System.Single".to_string(), param_types: Vec::new(), address: mod_base + 0x18100 },
-                ManagedMethod { name: "set_timeScale".to_string(), return_type: "System.Void".to_string(), param_types: vec!["System.Single".to_string()], address: mod_base + 0x18140 },
-                ManagedMethod { name: "get_deltaTime".to_string(), return_type: "System.Single".to_string(), param_types: Vec::new(), address: mod_base + 0x18200 },
+                ManagedMethod {
+                    name: "get_timeScale".to_string(),
+                    return_type: "System.Single".to_string(),
+                    param_types: Vec::new(),
+                    address: mod_base + 0x18100,
+                },
+                ManagedMethod {
+                    name: "set_timeScale".to_string(),
+                    return_type: "System.Void".to_string(),
+                    param_types: vec!["System.Single".to_string()],
+                    address: mod_base + 0x18140,
+                },
+                ManagedMethod {
+                    name: "get_deltaTime".to_string(),
+                    return_type: "System.Single".to_string(),
+                    param_types: Vec::new(),
+                    address: mod_base + 0x18200,
+                },
             ],
         });
 
@@ -680,14 +894,44 @@ impl MonoDissector {
             class_address: mod_base + 0x33000,
             parent_class: Some("UnityEngine.Component".to_string()),
             fields: vec![
-                ManagedField { name: "position".to_string(), type_name: "UnityEngine.Vector3".to_string(), offset: 0x38, is_static: false },
-                ManagedField { name: "rotation".to_string(), type_name: "UnityEngine.Quaternion".to_string(), offset: 0x44, is_static: false },
-                ManagedField { name: "localScale".to_string(), type_name: "UnityEngine.Vector3".to_string(), offset: 0x54, is_static: false },
+                ManagedField {
+                    name: "position".to_string(),
+                    type_name: "UnityEngine.Vector3".to_string(),
+                    offset: 0x38,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "rotation".to_string(),
+                    type_name: "UnityEngine.Quaternion".to_string(),
+                    offset: 0x44,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "localScale".to_string(),
+                    type_name: "UnityEngine.Vector3".to_string(),
+                    offset: 0x54,
+                    is_static: false,
+                },
             ],
             methods: vec![
-                ManagedMethod { name: "get_position".to_string(), return_type: "UnityEngine.Vector3".to_string(), param_types: Vec::new(), address: mod_base + 0x19100 },
-                ManagedMethod { name: "set_position".to_string(), return_type: "System.Void".to_string(), param_types: vec!["UnityEngine.Vector3".to_string()], address: mod_base + 0x19160 },
-                ManagedMethod { name: "Translate".to_string(), return_type: "System.Void".to_string(), param_types: vec!["UnityEngine.Vector3".to_string()], address: mod_base + 0x19300 },
+                ManagedMethod {
+                    name: "get_position".to_string(),
+                    return_type: "UnityEngine.Vector3".to_string(),
+                    param_types: Vec::new(),
+                    address: mod_base + 0x19100,
+                },
+                ManagedMethod {
+                    name: "set_position".to_string(),
+                    return_type: "System.Void".to_string(),
+                    param_types: vec!["UnityEngine.Vector3".to_string()],
+                    address: mod_base + 0x19160,
+                },
+                ManagedMethod {
+                    name: "Translate".to_string(),
+                    return_type: "System.Void".to_string(),
+                    param_types: vec!["UnityEngine.Vector3".to_string()],
+                    address: mod_base + 0x19300,
+                },
             ],
         });
 
@@ -698,14 +942,44 @@ impl MonoDissector {
             class_address: mod_base + 0x34000,
             parent_class: Some("UnityEngine.Object".to_string()),
             fields: vec![
-                ManagedField { name: "name".to_string(), type_name: "System.String".to_string(), offset: 0x10, is_static: false },
-                ManagedField { name: "tag".to_string(), type_name: "System.String".to_string(), offset: 0x18, is_static: false },
-                ManagedField { name: "layer".to_string(), type_name: "System.Int32".to_string(), offset: 0x20, is_static: false },
-                ManagedField { name: "activeSelf".to_string(), type_name: "System.Boolean".to_string(), offset: 0x24, is_static: false },
+                ManagedField {
+                    name: "name".to_string(),
+                    type_name: "System.String".to_string(),
+                    offset: 0x10,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "tag".to_string(),
+                    type_name: "System.String".to_string(),
+                    offset: 0x18,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "layer".to_string(),
+                    type_name: "System.Int32".to_string(),
+                    offset: 0x20,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "activeSelf".to_string(),
+                    type_name: "System.Boolean".to_string(),
+                    offset: 0x24,
+                    is_static: false,
+                },
             ],
             methods: vec![
-                ManagedMethod { name: "Find".to_string(), return_type: "UnityEngine.GameObject".to_string(), param_types: vec!["System.String".to_string()], address: mod_base + 0x1A100 },
-                ManagedMethod { name: "SetActive".to_string(), return_type: "System.Void".to_string(), param_types: vec!["System.Boolean".to_string()], address: mod_base + 0x1A250 },
+                ManagedMethod {
+                    name: "Find".to_string(),
+                    return_type: "UnityEngine.GameObject".to_string(),
+                    param_types: vec!["System.String".to_string()],
+                    address: mod_base + 0x1A100,
+                },
+                ManagedMethod {
+                    name: "SetActive".to_string(),
+                    return_type: "System.Void".to_string(),
+                    param_types: vec!["System.Boolean".to_string()],
+                    address: mod_base + 0x1A250,
+                },
             ],
         });
 
@@ -723,12 +997,25 @@ impl MonoDissector {
             class_address: mod_base + 0x42000,
             parent_class: Some("System.Object".to_string()),
             fields: vec![
-                ManagedField { name: "m_stringLength".to_string(), type_name: "System.Int32".to_string(), offset: 0x10, is_static: false },
-                ManagedField { name: "m_firstChar".to_string(), type_name: "System.Char".to_string(), offset: 0x14, is_static: false },
+                ManagedField {
+                    name: "m_stringLength".to_string(),
+                    type_name: "System.Int32".to_string(),
+                    offset: 0x10,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "m_firstChar".to_string(),
+                    type_name: "System.Char".to_string(),
+                    offset: 0x14,
+                    is_static: false,
+                },
             ],
-            methods: vec![
-                ManagedMethod { name: "Concat".to_string(), return_type: "System.String".to_string(), param_types: vec!["System.String".to_string(), "System.String".to_string()], address: mod_base + 0x21000 },
-            ],
+            methods: vec![ManagedMethod {
+                name: "Concat".to_string(),
+                return_type: "System.String".to_string(),
+                param_types: vec!["System.String".to_string(), "System.String".to_string()],
+                address: mod_base + 0x21000,
+            }],
         });
 
         self.assemblies.push(assembly_csharp);
@@ -778,16 +1065,56 @@ impl MonoDissector {
             class_address: mod_base + 0x15000,
             parent_class: Some("UnityEngine.MonoBehaviour".to_string()),
             fields: vec![
-                ManagedField { name: "health".to_string(), type_name: "System.Single".to_string(), offset: 0x18, is_static: false },
-                ManagedField { name: "maxHealth".to_string(), type_name: "System.Single".to_string(), offset: 0x1C, is_static: false },
-                ManagedField { name: "coins".to_string(), type_name: "System.Int32".to_string(), offset: 0x20, is_static: false },
-                ManagedField { name: "speed".to_string(), type_name: "System.Single".to_string(), offset: 0x24, is_static: false },
-                ManagedField { name: "isDead".to_string(), type_name: "System.Boolean".to_string(), offset: 0x28, is_static: false },
+                ManagedField {
+                    name: "health".to_string(),
+                    type_name: "System.Single".to_string(),
+                    offset: 0x18,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "maxHealth".to_string(),
+                    type_name: "System.Single".to_string(),
+                    offset: 0x1C,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "coins".to_string(),
+                    type_name: "System.Int32".to_string(),
+                    offset: 0x20,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "speed".to_string(),
+                    type_name: "System.Single".to_string(),
+                    offset: 0x24,
+                    is_static: false,
+                },
+                ManagedField {
+                    name: "isDead".to_string(),
+                    type_name: "System.Boolean".to_string(),
+                    offset: 0x28,
+                    is_static: false,
+                },
             ],
             methods: vec![
-                ManagedMethod { name: "TakeDamage".to_string(), return_type: "System.Void".to_string(), param_types: vec!["System.Single".to_string()], address: mod_base + 0x11200 },
-                ManagedMethod { name: "AddGold".to_string(), return_type: "System.Void".to_string(), param_types: vec!["System.Int32".to_string()], address: mod_base + 0x11340 },
-                ManagedMethod { name: "Die".to_string(), return_type: "System.Void".to_string(), param_types: Vec::new(), address: mod_base + 0x11460 },
+                ManagedMethod {
+                    name: "TakeDamage".to_string(),
+                    return_type: "System.Void".to_string(),
+                    param_types: vec!["System.Single".to_string()],
+                    address: mod_base + 0x11200,
+                },
+                ManagedMethod {
+                    name: "AddGold".to_string(),
+                    return_type: "System.Void".to_string(),
+                    param_types: vec!["System.Int32".to_string()],
+                    address: mod_base + 0x11340,
+                },
+                ManagedMethod {
+                    name: "Die".to_string(),
+                    return_type: "System.Void".to_string(),
+                    param_types: Vec::new(),
+                    address: mod_base + 0x11460,
+                },
             ],
         });
 
@@ -800,20 +1127,19 @@ impl MonoDissector {
 
         if let Ok(modules) = proc.modules() {
             for m in modules {
-
                 let mut hdr_buf = [0u8; 4096];
-                if proc.read_raw(m.base, &mut hdr_buf).is_ok() {
-                    if let Some(parser) = Ecma335Parser::parse_from_image(&hdr_buf) {
-                        let classes = parser.extract_classes(m.base);
-                        if !classes.is_empty() {
-                            self.assemblies.push(ManagedAssembly {
-                                name: m.name.clone(),
-                                address: m.base,
-                                image_address: m.base,
-                                classes,
-                            });
-                            parsed_any = true;
-                        }
+                if proc.read_raw(m.base, &mut hdr_buf).is_ok()
+                    && let Some(parser) = Ecma335Parser::parse_from_image(&hdr_buf)
+                {
+                    let classes = parser.extract_classes(m.base);
+                    if !classes.is_empty() {
+                        self.assemblies.push(ManagedAssembly {
+                            name: m.name.clone(),
+                            address: m.base,
+                            image_address: m.base,
+                            classes,
+                        });
+                        parsed_any = true;
                     }
                 }
             }
@@ -835,12 +1161,32 @@ impl MonoDissector {
                 class_address: mod_base + 0x5000,
                 parent_class: Some("System.Object".to_string()),
                 fields: vec![
-                    ManagedField { name: "IsServerGC".to_string(), type_name: "System.Boolean".to_string(), offset: 0x0, is_static: true },
-                    ManagedField { name: "LatencyMode".to_string(), type_name: "System.Int32".to_string(), offset: 0x4, is_static: true },
+                    ManagedField {
+                        name: "IsServerGC".to_string(),
+                        type_name: "System.Boolean".to_string(),
+                        offset: 0x0,
+                        is_static: true,
+                    },
+                    ManagedField {
+                        name: "LatencyMode".to_string(),
+                        type_name: "System.Int32".to_string(),
+                        offset: 0x4,
+                        is_static: true,
+                    },
                 ],
                 methods: vec![
-                    ManagedMethod { name: "get_IsServerGC".to_string(), return_type: "System.Boolean".to_string(), param_types: Vec::new(), address: mod_base + 0x6200 },
-                    ManagedMethod { name: "get_LatencyMode".to_string(), return_type: "System.Int32".to_string(), param_types: Vec::new(), address: mod_base + 0x6240 },
+                    ManagedMethod {
+                        name: "get_IsServerGC".to_string(),
+                        return_type: "System.Boolean".to_string(),
+                        param_types: Vec::new(),
+                        address: mod_base + 0x6200,
+                    },
+                    ManagedMethod {
+                        name: "get_LatencyMode".to_string(),
+                        return_type: "System.Int32".to_string(),
+                        param_types: Vec::new(),
+                        address: mod_base + 0x6240,
+                    },
                 ],
             });
 
@@ -851,12 +1197,32 @@ impl MonoDissector {
                 class_address: mod_base + 0x7000,
                 parent_class: Some("System.Object".to_string()),
                 fields: vec![
-                    ManagedField { name: "m_ManagedThreadId".to_string(), type_name: "System.Int32".to_string(), offset: 0x18, is_static: false },
-                    ManagedField { name: "m_Priority".to_string(), type_name: "System.Int32".to_string(), offset: 0x1C, is_static: false },
+                    ManagedField {
+                        name: "m_ManagedThreadId".to_string(),
+                        type_name: "System.Int32".to_string(),
+                        offset: 0x18,
+                        is_static: false,
+                    },
+                    ManagedField {
+                        name: "m_Priority".to_string(),
+                        type_name: "System.Int32".to_string(),
+                        offset: 0x1C,
+                        is_static: false,
+                    },
                 ],
                 methods: vec![
-                    ManagedMethod { name: "Sleep".to_string(), return_type: "System.Void".to_string(), param_types: vec!["System.Int32".to_string()], address: mod_base + 0x7100 },
-                    ManagedMethod { name: "get_ManagedThreadId".to_string(), return_type: "System.Int32".to_string(), param_types: Vec::new(), address: mod_base + 0x7150 },
+                    ManagedMethod {
+                        name: "Sleep".to_string(),
+                        return_type: "System.Void".to_string(),
+                        param_types: vec!["System.Int32".to_string()],
+                        address: mod_base + 0x7100,
+                    },
+                    ManagedMethod {
+                        name: "get_ManagedThreadId".to_string(),
+                        return_type: "System.Int32".to_string(),
+                        param_types: Vec::new(),
+                        address: mod_base + 0x7150,
+                    },
                 ],
             });
 
@@ -866,7 +1232,10 @@ impl MonoDissector {
         Ok(())
     }
 
-    pub fn dissect_clr_object(proc: &Process, obj_addr: usize) -> Result<ClrMethodTableInfo, String> {
+    pub fn dissect_clr_object(
+        proc: &Process,
+        obj_addr: usize,
+    ) -> Result<ClrMethodTableInfo, String> {
         if obj_addr == 0 {
             return Err("Null object address".to_string());
         }
@@ -893,7 +1262,12 @@ impl MonoDissector {
         })
     }
 
-    pub fn force_jit_compile(&self, proc: &Process, class_name: &str, method_name: &str) -> Result<usize, String> {
+    pub fn force_jit_compile(
+        &self,
+        proc: &Process,
+        class_name: &str,
+        method_name: &str,
+    ) -> Result<usize, String> {
         let c_lower = class_name.to_lowercase();
         let m_lower = method_name.to_lowercase();
 
@@ -908,8 +1282,11 @@ impl MonoDissector {
 
                             if self.runtime_type == RuntimeType::Mono {
                                 let mut resolver = SymbolResolver::new();
-                                let mod_n = self.module_name.as_deref().unwrap_or("mono-2.0-bdwgc.dll");
-                                if let Some(addr) = resolver.resolve(proc, &format!("{}!mono_compile_method", mod_n)) {
+                                let mod_n =
+                                    self.module_name.as_deref().unwrap_or("mono-2.0-bdwgc.dll");
+                                if let Some(addr) = resolver
+                                    .resolve(proc, &format!("{}!mono_compile_method", mod_n))
+                                {
                                     return Ok(addr);
                                 }
                             }
@@ -921,52 +1298,73 @@ impl MonoDissector {
             }
         }
 
-        Err(format!("Method '{}.{}' not found in loaded assemblies", class_name, method_name))
+        Err(format!(
+            "Method '{}.{}' not found in loaded assemblies",
+            class_name, method_name
+        ))
     }
 
-    pub fn read_field_value(proc: &Process, instance_address: usize, field: &ManagedField) -> String {
+    pub fn read_field_value(
+        proc: &Process,
+        instance_address: usize,
+        field: &ManagedField,
+    ) -> String {
         if instance_address == 0 {
             return "-".to_string();
         }
         let target_addr = instance_address + field.offset;
         match field.type_name.as_str() {
-            "System.Single" | "float" => {
-                proc.read::<f32>(target_addr).map(|v| format!("{:.2}", v)).unwrap_or_else(|_| "???".to_string())
-            }
-            "System.Double" | "double" => {
-                proc.read::<f64>(target_addr).map(|v| format!("{:.4}", v)).unwrap_or_else(|_| "???".to_string())
-            }
-            "System.Int32" | "int" => {
-                proc.read::<i32>(target_addr).map(|v| v.to_string()).unwrap_or_else(|_| "???".to_string())
-            }
-            "System.UInt32" | "uint" => {
-                proc.read::<u32>(target_addr).map(|v| format!("{} (0x{:X})", v, v)).unwrap_or_else(|_| "???".to_string())
-            }
-            "System.Int64" | "long" => {
-                proc.read::<i64>(target_addr).map(|v| v.to_string()).unwrap_or_else(|_| "???".to_string())
-            }
-            "System.UInt64" | "ulong" => {
-                proc.read::<u64>(target_addr).map(|v| format!("0x{:016X}", v)).unwrap_or_else(|_| "???".to_string())
-            }
-            "System.Int16" | "short" => {
-                proc.read::<i16>(target_addr).map(|v| v.to_string()).unwrap_or_else(|_| "???".to_string())
-            }
-            "System.UInt16" | "ushort" => {
-                proc.read::<u16>(target_addr).map(|v| v.to_string()).unwrap_or_else(|_| "???".to_string())
-            }
-            "System.Byte" | "byte" => {
-                proc.read::<u8>(target_addr).map(|v| format!("0x{:02X} ({})", v, v)).unwrap_or_else(|_| "???".to_string())
-            }
-            "System.Boolean" | "bool" => {
-                proc.read::<u8>(target_addr).map(|v| if v != 0 { "true".to_string() } else { "false".to_string() }).unwrap_or_else(|_| "???".to_string())
-            }
+            "System.Single" | "float" => proc
+                .read::<f32>(target_addr)
+                .map(|v| format!("{:.2}", v))
+                .unwrap_or_else(|_| "???".to_string()),
+            "System.Double" | "double" => proc
+                .read::<f64>(target_addr)
+                .map(|v| format!("{:.4}", v))
+                .unwrap_or_else(|_| "???".to_string()),
+            "System.Int32" | "int" => proc
+                .read::<i32>(target_addr)
+                .map(|v| v.to_string())
+                .unwrap_or_else(|_| "???".to_string()),
+            "System.UInt32" | "uint" => proc
+                .read::<u32>(target_addr)
+                .map(|v| format!("{} (0x{:X})", v, v))
+                .unwrap_or_else(|_| "???".to_string()),
+            "System.Int64" | "long" => proc
+                .read::<i64>(target_addr)
+                .map(|v| v.to_string())
+                .unwrap_or_else(|_| "???".to_string()),
+            "System.UInt64" | "ulong" => proc
+                .read::<u64>(target_addr)
+                .map(|v| format!("0x{:016X}", v))
+                .unwrap_or_else(|_| "???".to_string()),
+            "System.Int16" | "short" => proc
+                .read::<i16>(target_addr)
+                .map(|v| v.to_string())
+                .unwrap_or_else(|_| "???".to_string()),
+            "System.UInt16" | "ushort" => proc
+                .read::<u16>(target_addr)
+                .map(|v| v.to_string())
+                .unwrap_or_else(|_| "???".to_string()),
+            "System.Byte" | "byte" => proc
+                .read::<u8>(target_addr)
+                .map(|v| format!("0x{:02X} ({})", v, v))
+                .unwrap_or_else(|_| "???".to_string()),
+            "System.Boolean" | "bool" => proc
+                .read::<u8>(target_addr)
+                .map(|v| {
+                    if v != 0 {
+                        "true".to_string()
+                    } else {
+                        "false".to_string()
+                    }
+                })
+                .unwrap_or_else(|_| "???".to_string()),
             "System.String" | "string" => {
-
                 if let Ok(str_ptr) = proc.read::<usize>(target_addr) {
                     if str_ptr == 0 {
                         "null".to_string()
                     } else {
-
                         let length = proc.read::<i32>(str_ptr + 0x10).unwrap_or(0);
                         if length > 0 && length < 256 {
                             if let Ok(s) = proc.read_string(str_ptr + 0x14, length as usize, true) {
@@ -983,7 +1381,6 @@ impl MonoDissector {
                 }
             }
             _ => {
-
                 if let Ok(ptr) = proc.read::<usize>(target_addr) {
                     if ptr == 0 {
                         "null".to_string()
@@ -997,7 +1394,10 @@ impl MonoDissector {
         }
     }
 
-    pub fn search_classes<'a>(&'a self, query: &str) -> Vec<(&'a ManagedAssembly, &'a ManagedClass)> {
+    pub fn search_classes<'a>(
+        &'a self,
+        query: &str,
+    ) -> Vec<(&'a ManagedAssembly, &'a ManagedClass)> {
         let q = query.trim().to_lowercase();
         let mut results = Vec::new();
 
@@ -1007,8 +1407,14 @@ impl MonoDissector {
                     || cls.name.to_lowercase().contains(&q)
                     || cls.namespace.to_lowercase().contains(&q)
                     || cls.full_name.to_lowercase().contains(&q)
-                    || cls.fields.iter().any(|f| f.name.to_lowercase().contains(&q))
-                    || cls.methods.iter().any(|m| m.name.to_lowercase().contains(&q))
+                    || cls
+                        .fields
+                        .iter()
+                        .any(|f| f.name.to_lowercase().contains(&q))
+                    || cls
+                        .methods
+                        .iter()
+                        .any(|m| m.name.to_lowercase().contains(&q))
                 {
                     results.push((asm, cls));
                 }
@@ -1055,13 +1461,22 @@ dealloc(newmem)
 
     pub fn generate_report(&self) -> String {
         let mut report = String::new();
-        report.push_str(&format!("# .NET / Mono Runtime Dissection Report\n\n"));
-        report.push_str(&format!("- **Runtime Type**: {}\n", self.runtime_type.as_str()));
+        report.push_str("# .NET / Mono Runtime Dissection Report\n\n");
+        report.push_str(&format!(
+            "- **Runtime Type**: {}\n",
+            self.runtime_type.as_str()
+        ));
         report.push_str(&format!("- **Module Base**: 0x{:016X}\n", self.module_base));
-        report.push_str(&format!("- **Assemblies Count**: {}\n\n", self.assemblies.len()));
+        report.push_str(&format!(
+            "- **Assemblies Count**: {}\n\n",
+            self.assemblies.len()
+        ));
 
         for asm in &self.assemblies {
-            report.push_str(&format!("## Assembly: `{}` (0x{:016X})\n\n", asm.name, asm.address));
+            report.push_str(&format!(
+                "## Assembly: `{}` (0x{:016X})\n\n",
+                asm.name, asm.address
+            ));
             for cls in &asm.classes {
                 report.push_str(&format!("### Class: `{}`\n", cls.full_name));
                 if let Some(p) = &cls.parent_class {
@@ -1071,22 +1486,34 @@ dealloc(newmem)
                 if !cls.fields.is_empty() {
                     report.push_str("| Field | Offset | Type | Static |\n|---|---|---|---|\n");
                     for f in &cls.fields {
-                        report.push_str(&format!("| `{}` | `+0x{:X}` | `{}` | {} |\n", f.name, f.offset, f.type_name, f.is_static));
+                        report.push_str(&format!(
+                            "| `{}` | `+0x{:X}` | `{}` | {} |\n",
+                            f.name, f.offset, f.type_name, f.is_static
+                        ));
                     }
-                    report.push_str("\n");
+                    report.push('\n');
                 }
 
                 if !cls.methods.is_empty() {
                     report.push_str("| Method | Return Type | Address |\n|---|---|---|\n");
                     for m in &cls.methods {
-                        report.push_str(&format!("| `{}` | `{}` | `0x{:016X}` |\n", m.name, m.return_type, m.address));
+                        report.push_str(&format!(
+                            "| `{}` | `{}` | `0x{:016X}` |\n",
+                            m.name, m.return_type, m.address
+                        ));
                     }
-                    report.push_str("\n");
+                    report.push('\n');
                 }
             }
         }
 
         report
+    }
+}
+
+impl Default for MonoDissector {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -1098,7 +1525,10 @@ pub mod tests {
     fn test_runtime_type_detection() {
         assert_eq!(RuntimeType::Mono.as_str(), "Mono Runtime (mono-2.0)");
         assert_eq!(RuntimeType::Il2Cpp.as_str(), "Unity IL2CPP (GameAssembly)");
-        assert_eq!(RuntimeType::DotNetClr.as_str(), ".NET CLR (CoreCLR / Framework)");
+        assert_eq!(
+            RuntimeType::DotNetClr.as_str(),
+            ".NET CLR (CoreCLR / Framework)"
+        );
         assert_eq!(RuntimeType::None.as_str(), "None Detected");
     }
 
@@ -1112,22 +1542,33 @@ pub mod tests {
             name: "TestGame.dll".to_string(),
             address: 0x7FF70000,
             image_address: 0x7FF70000,
-            classes: vec![
-                ManagedClass {
-                    namespace: "Game.Engine".to_string(),
-                    name: "PlayerController".to_string(),
-                    full_name: "Game.Engine.PlayerController".to_string(),
-                    class_address: 0x7FF71000,
-                    parent_class: Some("System.Object".to_string()),
-                    fields: vec![
-                        ManagedField { name: "health".to_string(), type_name: "System.Single".to_string(), offset: 0x18, is_static: false },
-                        ManagedField { name: "coins".to_string(), type_name: "System.Int32".to_string(), offset: 0x20, is_static: false },
-                    ],
-                    methods: vec![
-                        ManagedMethod { name: "AddCoins".to_string(), return_type: "System.Void".to_string(), param_types: vec!["System.Int32".to_string()], address: 0x7FF72000 },
-                    ],
-                }
-            ],
+            classes: vec![ManagedClass {
+                namespace: "Game.Engine".to_string(),
+                name: "PlayerController".to_string(),
+                full_name: "Game.Engine.PlayerController".to_string(),
+                class_address: 0x7FF71000,
+                parent_class: Some("System.Object".to_string()),
+                fields: vec![
+                    ManagedField {
+                        name: "health".to_string(),
+                        type_name: "System.Single".to_string(),
+                        offset: 0x18,
+                        is_static: false,
+                    },
+                    ManagedField {
+                        name: "coins".to_string(),
+                        type_name: "System.Int32".to_string(),
+                        offset: 0x20,
+                        is_static: false,
+                    },
+                ],
+                methods: vec![ManagedMethod {
+                    name: "AddCoins".to_string(),
+                    return_type: "System.Void".to_string(),
+                    param_types: vec!["System.Int32".to_string()],
+                    address: 0x7FF72000,
+                }],
+            }],
         };
         dissector.assemblies.push(asm);
 
@@ -1146,7 +1587,6 @@ pub mod tests {
 
     #[test]
     fn test_ecma335_metadata_root_parser() {
-
         let mut buf = Vec::new();
         buf.extend_from_slice(b"BSJB");
         buf.extend_from_slice(&[1, 0, 1, 0]);

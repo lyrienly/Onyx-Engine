@@ -1,4 +1,4 @@
-unit LevelSelect;
+﻿unit LevelSelect;
 
 
 //tutorial step1: player and target
@@ -314,7 +314,7 @@ begin
 
 
   reg:=tregistry.create;
-  if reg.OpenKey('\Software\Cheat Engine\GTutorial', false) then
+  if reg.OpenKey('\Software\OnyxEngine\GTutorial', false) then
   begin
     if reg.ValueExists('This does not count as a solution for tutorial 1') then
     begin
@@ -341,7 +341,7 @@ begin
   end;
 
   reg:=tregistry.create;
-  if reg.OpenKey('\Software\Cheat Engine\GTutorial', false) then
+  if reg.OpenKey('\Software\OnyxEngine\GTutorial', false) then
   begin
     if reg.ValueExists('This does not count as a solution for tutorial 2') then
     begin

@@ -6,7 +6,7 @@ end
 function ShowMCPSettingsDialog()
     local s = getSettings("OnyxEngine_MCP")
 
-    local curPipe = (s and s["PipeName"] and s["PipeName"] ~= "") and s["PipeName"] or "CE_MCP_Bridge_v99"
+    local curPipe = (s and s["PipeName"] and s["PipeName"] ~= "") and s["PipeName"] or "Onyx_MCP_Bridge_v1"
     local curPort = (s and s["TcpPort"] and s["TcpPort"] ~= "") and s["TcpPort"] or "9876"
     local curTimeout = (s and s["Timeout"] and s["Timeout"] ~= "") and s["Timeout"] or "30"
     local curAutostart = not (s and (s["Autostart"] == "0" or s["Autostart"] == "false"))
@@ -275,7 +275,7 @@ local function initializeMCPMenu()
         statusTimer.OnTimer = function()
             pcall(function()
                 local state = GetMCPServerState and GetMCPServerState() or (MCPServerState or {})
-                local pipeName = GetMCPPipeName and GetMCPPipeName() or "CE_MCP_Bridge_v99"
+                local pipeName = GetMCPPipeName and GetMCPPipeName() or "Onyx_MCP_Bridge_v1"
                 local _, mcpLabel = resolveMcpStatus(state)
                 pcall(function() MainForm.miMCP.Caption = mcpLabel end)
 
@@ -549,7 +549,7 @@ local function initializeMCPMenu()
     miAbout.Caption = "Sobre a Ponte MCP"
     miAbout.OnClick = function()
         local state = GetMCPServerState and GetMCPServerState() or (MCPServerState or {})
-        local pipeName = GetMCPPipeName and GetMCPPipeName() or "CE_MCP_Bridge_v99"
+        local pipeName = GetMCPPipeName and GetMCPPipeName() or "Onyx_MCP_Bridge_v1"
         local version = GetMCPVersion and GetMCPVersion() or "12.0.0"
         showMessage(string.format(
             "Ponte MCP do OnyxEngine\n" ..
@@ -574,7 +574,7 @@ local function initializeMCPMenu()
     statusTimer.OnTimer = function()
         pcall(function()
             local state = GetMCPServerState and GetMCPServerState() or (MCPServerState or {})
-            local pipeName = GetMCPPipeName and GetMCPPipeName() or "CE_MCP_Bridge_v99"
+            local pipeName = GetMCPPipeName and GetMCPPipeName() or "Onyx_MCP_Bridge_v1"
             local st, label = resolveMcpStatus(state)
             pcall(function() topMenu.Caption = label end)
 

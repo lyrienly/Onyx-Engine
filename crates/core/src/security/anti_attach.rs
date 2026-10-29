@@ -1,5 +1,5 @@
-use std::ffi::c_void;
 use crate::win32::*;
+use std::ffi::c_void;
 
 const RET_ZERO_STUB: [u8; 3] = [0x31, 0xC0, 0xC3];
 const NOP_RET_STUB: [u8; 2] = [0x90, 0xC3];

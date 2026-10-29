@@ -30,7 +30,6 @@ impl AllocHookMonitor {
         let mut new_allocs = Vec::new();
 
         for cur in &current {
-
             let was_present = self.initial_regions.iter().any(|r| r.base == cur.base);
             if !was_present && cur.is_committed() {
                 new_allocs.push(AllocationRecord {
@@ -44,5 +43,11 @@ impl AllocHookMonitor {
         }
 
         Ok(new_allocs)
+    }
+}
+
+impl Default for AllocHookMonitor {
+    fn default() -> Self {
+        Self::new()
     }
 }

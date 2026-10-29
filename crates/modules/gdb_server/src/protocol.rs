@@ -29,7 +29,11 @@ impl fmt::Display for ParseError {
             ParseError::Incomplete => write!(f, "pacote incompleto"),
             ParseError::MissingStart => write!(f, "sem delimitador $"),
             ParseError::BadChecksum { expected, actual } => {
-                write!(f, "checksum invalido esperado={:02x} atual={:02x}", expected, actual)
+                write!(
+                    f,
+                    "checksum invalido esperado={:02x} atual={:02x}",
+                    expected, actual
+                )
             }
             ParseError::BadHex => write!(f, "hex invalido no checksum"),
         }
@@ -105,7 +109,7 @@ pub fn bytes_to_hex(data: &[u8]) -> String {
 
 pub fn hex_to_bytes(s: &str) -> Result<Vec<u8>, ParseError> {
     let bytes = s.as_bytes();
-    if bytes.len() % 2 != 0 {
+    if !bytes.len().is_multiple_of(2) {
         return Err(ParseError::BadHex);
     }
     let mut out = Vec::with_capacity(bytes.len() / 2);
@@ -135,7 +139,6 @@ mod tests {
 
     #[test]
     fn checksum_sanity() {
-
         assert_eq!(checksum(b"OK"), 0x9a);
     }
 

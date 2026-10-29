@@ -1,8 +1,8 @@
-use std::ffi::{c_void, OsStr};
+use crate::win32::*;
+use std::ffi::{OsStr, c_void};
+use std::mem::zeroed;
 use std::os::windows::ffi::OsStrExt;
 use std::ptr::{null, null_mut};
-use std::mem::zeroed;
-use crate::win32::*;
 
 pub const SYMOPT_CASE_INSENSITIVE: u32 = 0x00000001;
 pub const SYMOPT_UNDNAME: u32 = 0x00000002;
@@ -31,16 +31,8 @@ pub struct SYMBOL_INFOW {
 
 type SymInitializeWFn = unsafe extern "system" fn(HANDLE, LPCWSTR, BOOL) -> BOOL;
 type SymCleanupFn = unsafe extern "system" fn(HANDLE) -> BOOL;
-type SymLoadModuleExWFn = unsafe extern "system" fn(
-    HANDLE,
-    HANDLE,
-    LPCWSTR,
-    LPCWSTR,
-    u64,
-    u32,
-    *mut c_void,
-    u32,
-) -> u64;
+type SymLoadModuleExWFn =
+    unsafe extern "system" fn(HANDLE, HANDLE, LPCWSTR, LPCWSTR, u64, u32, *mut c_void, u32) -> u64;
 type SymFromNameWFn = unsafe extern "system" fn(HANDLE, LPCWSTR, *mut SYMBOL_INFOW) -> BOOL;
 type SymFromAddrWFn = unsafe extern "system" fn(HANDLE, u64, *mut u64, *mut SYMBOL_INFOW) -> BOOL;
 type SymSetOptionsFn = unsafe extern "system" fn(u32) -> u32;
@@ -64,7 +56,6 @@ unsafe impl Send for DbgHelpSymbolEngine {}
 unsafe impl Sync for DbgHelpSymbolEngine {}
 
 impl DbgHelpSymbolEngine {
-
     pub fn new(process_handle: HANDLE) -> Result<Self, String> {
         unsafe {
             let dbghelp_name: Vec<u16> = OsStr::new("dbghelp.dll")
@@ -91,11 +82,13 @@ impl DbgHelpSymbolEngine {
 
             let fn_sym_initialize: SymInitializeWFn = get_proc!(SymInitializeWFn, "SymInitializeW");
             let fn_sym_cleanup: SymCleanupFn = get_proc!(SymCleanupFn, "SymCleanup");
-            let fn_sym_load_module: SymLoadModuleExWFn = get_proc!(SymLoadModuleExWFn, "SymLoadModuleExW");
+            let fn_sym_load_module: SymLoadModuleExWFn =
+                get_proc!(SymLoadModuleExWFn, "SymLoadModuleExW");
             let fn_sym_from_name: SymFromNameWFn = get_proc!(SymFromNameWFn, "SymFromNameW");
             let fn_sym_from_addr: SymFromAddrWFn = get_proc!(SymFromAddrWFn, "SymFromAddrW");
             let fn_sym_set_options: SymSetOptionsFn = get_proc!(SymSetOptionsFn, "SymSetOptions");
-            let fn_sym_set_search_path: SymSetSearchPathWFn = get_proc!(SymSetSearchPathWFn, "SymSetSearchPathW");
+            let fn_sym_set_search_path: SymSetSearchPathWFn =
+                get_proc!(SymSetSearchPathWFn, "SymSetSearchPathW");
 
             let options = SYMOPT_CASE_INSENSITIVE
                 | SYMOPT_UNDNAME
@@ -200,7 +193,9 @@ impl DbgHelpSymbolEngine {
             info.max_name_len = 255;
             let mut displacement: u64 = 0;
 
-            if (self.fn_sym_from_addr)(self.handle, address as u64, &mut displacement, &mut info) == TRUE {
+            if (self.fn_sym_from_addr)(self.handle, address as u64, &mut displacement, &mut info)
+                == TRUE
+            {
                 let len = (info.name_len as usize).min(255);
                 let name = String::from_utf16_lossy(&info.name[..len]);
                 Some((name, displacement as usize))
@@ -229,9 +224,11 @@ mod tests {
 
     #[test]
     fn test_dbghelp_initialization() {
-
         let engine = DbgHelpSymbolEngine::new(null_mut());
-        assert!(engine.is_ok(), "DbgHelpSymbolEngine should load dbghelp.dll on Windows");
+        assert!(
+            engine.is_ok(),
+            "DbgHelpSymbolEngine should load dbghelp.dll on Windows"
+        );
         let eng = engine.unwrap();
         assert!(eng.initialized);
     }

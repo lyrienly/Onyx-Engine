@@ -1,13 +1,44 @@
 
 function GetConfiguredMCPPipeName()
-    local name = "CE_MCP_Bridge_v99"
+    local name = nil
     pcall(function()
         local s = getSettings("OnyxEngine_MCP")
         if s and s["PipeName"] and s["PipeName"] ~= "" then
             name = s["PipeName"]
         end
     end)
-    return name
+    if name then return name end
+
+    -- Sem nome configurado: usa (ou cria) um nome aleatorio por instalacao,
+    -- compartilhado com os relays Python via mcp/mcp_pipe.txt.
+    local dir = ""
+    pcall(function() dir = getCheatEngineDir() end)
+    if dir == nil or dir == "" then return "Onyx_MCP_Bridge_v1" end
+    if dir:sub(-1) ~= "\\" and dir:sub(-1) ~= "/" then dir = dir .. "\\" end
+
+    local path = dir .. "mcp\\mcp_pipe.txt"
+    local f = io.open(path, "r")
+    if f then
+        local s = f:read("*l")
+        f:close()
+        if s and #s >= 8 then return s end
+    end
+
+    math.randomseed(os.time() + math.floor((os.clock() * 1000000) % 1000000))
+    local chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+    local parts = {}
+    for i = 1, 20 do
+        local k = math.random(1, #chars)
+        parts[i] = chars:sub(k, k)
+    end
+    local generated = "mcp_" .. table.concat(parts)
+
+    local w = io.open(path, "w")
+    if w then
+        w:write(generated)
+        w:close()
+    end
+    return generated
 end
 
 local PIPE_NAME = GetConfiguredMCPPipeName()

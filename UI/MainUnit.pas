@@ -25,7 +25,7 @@ uses
   {$endif}
 
   {$ifdef windows}
-  jwaWindows, Windows, LCLIntf, LCLProc, Messages, SysUtils, Classes, SyncObjs,
+  jwaWindows, Windows, LCLIntf, LCLProc, lcltype, Messages, SysUtils, Classes, SyncObjs,
   SyncObjs2, Graphics,
   Controls, Forms, ComCtrls, StdCtrls, Menus, Buttons, shellapi,
   imagehlp, ExtCtrls, Dialogs, Clipbrd, CEDebugger, kerneldebugger, assemblerunit,
@@ -288,6 +288,9 @@ type
   //TPreviousResultList=specialize TFPGList<TSavedScanHandler>;
 
   TMainForm = class(TForm)
+  protected
+    procedure CreateParams(var Params: TCreateParams); override;
+  published
     actOpenLuaEngine: TAction;
     actOpenDissectStructure: TAction;
     btnSetSpeedhack2: TButton;
@@ -1147,7 +1150,7 @@ resourcestring
 implementation
 
 
-uses frmAobValidatorUnit, OnyxBackend, cefuncproc, MainUnit2, ProcessWindowUnit, MemoryBrowserFormUnit, TypePopup, HotKeys,
+uses frmAobValidatorUnit, OnyxBackend, OnyxInstance, cefuncproc, MainUnit2, ProcessWindowUnit, MemoryBrowserFormUnit, TypePopup, HotKeys,
   aboutunit, formhotkeyunit, formDifferentBitSizeUnit,
   CommentsUnit, formsettingsunit, formAddressChangeUnit, Changeoffsetunit,
   FoundCodeUnit, AdvancedOptionsUnit, frmProcessWatcherUnit,
@@ -1351,7 +1354,7 @@ resourcestring
   rsBusy = '<busy>';
   rsFileInUse = '<File in use>';
   rsPleaseWait = '<Processing>';
-  rsCEError = 'CE Error:';
+  rsCEError = 'OnyxEngine Error:';
   rsPart = ' part ';
   rsChangeValue = 'Change value';
   rsGiveTheNewValueForTheSelectedAddressEs = 'Give the new value for the selected address(es)';
@@ -1491,6 +1494,13 @@ begin
 end;
 
 //--------------TMainThread------------
+
+procedure TMainForm.CreateParams(var Params: TCreateParams);
+begin
+  inherited CreateParams(Params);
+  // Nome de classe aleatorio por processo: evita assinatura estatica de janela.
+  Params.WinClassName := OnyxWindowClassName;
+end;
 
 procedure TMainForm.recentFilesUpdate(filepath: string);
 var i: integer;
@@ -2532,7 +2542,7 @@ begin
 
     DumpExceptionBackTrace;
 
-    s:=s+#13#10'Please send the cedebug.txt file to Dark Byte. Thanks';
+    s:=s+#13#10'Please send the onyxdebug.txt file to Dark Byte. Thanks';
   end;
 
   if showingException then exit; //don't bother showing another one. Just read the log
@@ -3623,9 +3633,9 @@ begin
     llf.CloseLogFileBetweenWrites:=true; // change LazLogger to use non-buffered output
     if miEnableLCLDebug.checked then
     begin
-      deletefile('cedebug.txt');
+      deletefile('onyxdebug.txt');
 
-      llf.LogName:='cedebug.txt';
+      llf.LogName:='onyxdebug.txt';
       llf.Init;
 
 
@@ -4005,9 +4015,9 @@ end;
 procedure TMainForm.miLuaDocumentationClick(Sender: TObject);
 begin
   {$ifdef darwin}
-  OpenDocument(pchar(ExtractFilePath(application.ExeName)+'../Lua/celua.txt'));
+  OpenDocument(pchar(ExtractFilePath(application.ExeName)+'../Lua/onyxlua.txt'));
   {$else}
-  ShellExecute(0,'open',pchar(ExtractFilePath(application.ExeName)+'celua.txt'),nil,nil,SW_SHOW);
+  ShellExecute(0,'open',pchar(ExtractFilePath(application.ExeName)+'onyxlua.txt'),nil,nil,SW_SHOW);
   {$endif}
 
 end;
@@ -4174,12 +4184,12 @@ end;
 procedure TMainForm.miMCPCopyConfigClick(Sender: TObject);
 begin
   if LuaVM <> nil then
-    lua_dostring(LuaVM, 'local ceDir = getCheatEngineDir(); local bridgePath = (ceDir .. "mcp\\mcp_cheatengine.py"):gsub("\\", "\\\\"); local configJson = string.format("{\n  \"mcpServers\": {\n    \"cheatengine\": {\n      \"command\": \"python\",\n      \"args\": [\n        \"%s\"\n      ],\n      \"env\": {\n        \"CE_MCP_TIMEOUT\": \"30\"\n      }\n    }\n  }\n}", bridgePath); if writeToClipboard then writeToClipboard(configJson); showMessage("Configuracao do servidor MCP copiada para a area de transferencia!\n\n" .. configJson) end');
+    lua_dostring(LuaVM, 'local ceDir = getCheatEngineDir(); local bridgePath = (ceDir .. "mcp\\mcp_onyxengine.py"):gsub("\\", "\\\\"); local configJson = string.format("{\n  \"mcpServers\": {\n    \"onyxengine\": {\n      \"command\": \"python\",\n      \"args\": [\n        \"%s\"\n      ],\n      \"env\": {\n        \"CE_MCP_TIMEOUT\": \"30\"\n      }\n    }\n  }\n}", bridgePath); if writeToClipboard then writeToClipboard(configJson); showMessage("Configuracao do servidor MCP copiada para a area de transferencia!\n\n" .. configJson) end');
 end;
 
 procedure TMainForm.miMCPAboutClick(Sender: TObject);
 begin
-  MessageDlg('Ponte MCP do OnyxEngine'#13#10'===================================='#13#10'Protocolo da Ponte: miscusi-peek MCP Bridge v12.0.0'#13#10'Named Pipe: \\.\pipe\CE_MCP_Bridge_v99'#13#10'Motor do Driver: OwMemDriver (Ring-0 CR3 Fisico)'#13#10'Localizacao: Menu Principal ao lado do D3D'#13#10'===================================='#13#10'Suporte completo a 175 ferramentas nativas de inspecao e memoria do Cheat Engine.', mtInformation, [mbOK], 0);
+  MessageDlg('Ponte MCP do OnyxEngine'#13#10'===================================='#13#10'Protocolo da Ponte: miscusi-peek MCP Bridge v12.0.0'#13#10'Named Pipe: definido em mcp/mcp_pipe.txt'#13#10'Motor do Driver: OwMemDriver (Ring-0 CR3 Fisico)'#13#10'Localizacao: Menu Principal ao lado do D3D'#13#10'===================================='#13#10'Suporte completo a 175 ferramentas nativas de inspecao e memoria do OnyxEngine.', mtInformation, [mbOK], 0);
 end;
 
 procedure TMainForm.miChangeDisplayTypeClick(Sender: TObject);
@@ -6025,7 +6035,7 @@ begin
   callhelp := False;
   Result := True;
 
-  wikipath:='https://wiki.cheatengine.org/index.php';
+  wikipath:='https://github.com/ErlonLy/OnyxEngine';
   wikiurl:='';
 
   if command = HELP_CONTEXT then
@@ -6042,7 +6052,7 @@ begin
 
     {$ifdef windows}
     if wikiurl='' then //no wikilink given
-      HtmlHelpA(Win32WidgetSet.AppHandle, PChar(cheatenginedir + 'cheatengine.chm'), HH_HELP_CONTEXT, Data)
+      HtmlHelpA(Win32WidgetSet.AppHandle, PChar(cheatenginedir + 'onyxengine.chm'), HH_HELP_CONTEXT, Data)
     else
     {$endif}
       ShellExecute(0,'open',pchar(wikipath+wikiurl),nil,nil,SW_SHOW);
@@ -7430,7 +7440,7 @@ end;
 procedure TMainForm.LogoClick(Sender: TObject);
 var s: string;
 begin
-  s:=format('http://www.cheatengine.org/?referredby=CE%.2f',[ceversion]);
+  s:='https://github.com/ErlonLy/OnyxEngine';
   if messagedlg(rsDoYouWantToGoToTheCheatEngineWebsite, mtConfirmation,
     [mbYes, mbNo], 0) = mrYes then
     ShellExecute(0, PChar('open'), PChar(s),
@@ -11328,7 +11338,7 @@ end;
 
 procedure TMainForm.Helpindex1Click(Sender: TObject);
 begin
-  ShellExecute(0,'open','https://wiki.cheatengine.org/index.php',nil,nil,SW_SHOW);
+  ShellExecute(0,'open','https://github.com/ErlonLy/OnyxEngine',nil,nil,SW_SHOW);
 //  Application.HelpContext(1);
 end;
 

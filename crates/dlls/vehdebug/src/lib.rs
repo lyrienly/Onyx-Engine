@@ -1,12 +1,23 @@
-#![allow(non_snake_case, non_camel_case_types, dead_code, unsafe_op_in_unsafe_fn)]
+#![allow(
+    non_snake_case,
+    non_camel_case_types,
+    dead_code,
+    unsafe_op_in_unsafe_fn
+)]
+#![allow(
+    clippy::missing_safety_doc,
+    clippy::not_unsafe_ptr_arg_deref,
+    clippy::upper_case_acronyms,
+    clippy::too_many_arguments
+)]
 #![cfg(windows)]
 
 pub mod debugger;
 pub mod ffi;
 pub mod veh;
 
-use crate::ffi::*;
 use crate::debugger::{BpHit, HwBpAccess, HwBpSize, VehDebugger};
+use crate::ffi::*;
 use crate::veh::BreakpointId;
 
 use std::collections::VecDeque;
@@ -32,7 +43,7 @@ fn push_hit(hit: BpHit) {
 }
 
 fn make_sink() -> crate::debugger::HitSink {
-    Box::new(|hit| push_hit(hit))
+    Box::new(push_hit)
 }
 
 #[unsafe(no_mangle)]
@@ -118,14 +129,8 @@ pub extern "system" fn veh_remove_bp(id: u64) -> BOOL {
         Err(e) => e.into_inner(),
     };
     match slot.as_ref() {
-        Some(dbg) => {
-            if dbg.remove(BreakpointId(id)) {
-                1
-            } else {
-                0
-            }
-        }
-        None => 0,
+        Some(dbg) if dbg.remove(BreakpointId(id)) => 1,
+        _ => 0,
     }
 }
 
@@ -157,7 +162,6 @@ pub unsafe extern "system" fn DllMain(
 ) -> BOOL {
     if fdwReason == DLL_PROCESS_ATTACH {
         DisableThreadLibraryCalls(hinstDLL);
-
     }
     1
 }

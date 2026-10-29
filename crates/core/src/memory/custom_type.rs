@@ -17,7 +17,6 @@ pub struct CustomType {
 
 impl CustomType {
     pub fn new_integer(name: &str, internal_only: bool) -> Self {
-
         CustomType {
             name: name.to_string(),
             kind: CustomTypeKind::Integer,
@@ -41,25 +40,26 @@ impl CustomType {
 
     pub fn default_templates() -> Vec<CustomType> {
         vec![
-
             CustomType {
                 name: "Big Endian 4 Bytes".to_string(),
                 kind: CustomTypeKind::Integer,
                 byte_size: 4,
-                script_bytes_to_val: "return (b[1]<<24) | (b[2]<<16) | (b[3]<<8) | b[4]".to_string(),
-                script_val_to_bytes: "return {(v>>24)&0xFF, (v>>16)&0xFF, (v>>8)&0xFF, v&0xFF}".to_string(),
+                script_bytes_to_val: "return (b[1]<<24) | (b[2]<<16) | (b[3]<<8) | b[4]"
+                    .to_string(),
+                script_val_to_bytes: "return {(v>>24)&0xFF, (v>>16)&0xFF, (v>>8)&0xFF, v&0xFF}"
+                    .to_string(),
                 internal_only: false,
             },
-
             CustomType {
                 name: "Big Endian 8 Bytes".to_string(),
                 kind: CustomTypeKind::Integer,
                 byte_size: 8,
-                script_bytes_to_val: "local res = 0; for i=1,8 do res = (res<<8) | b[i] end return res".to_string(),
-                script_val_to_bytes: "local t = {}; for i=8,1,-1 do t[i] = v&0xFF; v = v>>8 end return t".to_string(),
+                script_bytes_to_val:
+                    "local res = 0; for i=1,8 do res = (res<<8) | b[i] end return res".to_string(),
+                script_val_to_bytes:
+                    "local t = {}; for i=8,1,-1 do t[i] = v&0xFF; v = v>>8 end return t".to_string(),
                 internal_only: false,
             },
-
             CustomType {
                 name: "24-bit Integer".to_string(),
                 kind: CustomTypeKind::Integer,
@@ -68,7 +68,6 @@ impl CustomType {
                 script_val_to_bytes: "return {v&0xFF, (v>>8)&0xFF, (v>>16)&0xFF}".to_string(),
                 internal_only: false,
             },
-
             CustomType {
                 name: "Internal XOR8 Masked".to_string(),
                 kind: CustomTypeKind::Integer,
@@ -88,7 +87,10 @@ mod tests {
     #[test]
     fn test_custom_type_64bit_integer_and_internal_only() {
         let t = CustomType::new_integer("MyInt64", true);
-        assert_eq!(t.byte_size, 8, "Integer variant must be 8 bytes in 64-bit CE");
+        assert_eq!(
+            t.byte_size, 8,
+            "Integer variant must be 8 bytes in 64-bit CE"
+        );
         assert!(t.internal_only, "internal_only flag must be set");
 
         let templates = CustomType::default_templates();

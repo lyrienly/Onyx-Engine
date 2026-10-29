@@ -11,7 +11,7 @@ use eframe::egui::{self, Color32, Rounding, Stroke, Vec2};
 fn main() -> eframe::Result<()> {
     let native_options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
-            .with_title("Cheat Engine 7.7")
+            .with_title("OnyxEngine")
             .with_resizable(true)
             .with_inner_size([1260.0, 880.0])
             .with_min_inner_size([820.0, 560.0]),
@@ -27,7 +27,6 @@ fn main() -> eframe::Result<()> {
         "CheatEngine",
         native_options,
         Box::new(|cc| {
-
             let mut visuals = egui::Visuals::dark();
 
             visuals.panel_fill = Color32::from_rgb(30, 33, 40);
@@ -44,11 +43,13 @@ fn main() -> eframe::Result<()> {
             visuals.widgets.inactive.rounding = Rounding::same(3.0);
 
             visuals.widgets.hovered.bg_fill = Color32::from_rgb(50, 57, 70);
-            visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, Color32::from_rgb(75, 95, 125));
+            visuals.widgets.hovered.bg_stroke =
+                Stroke::new(1.0_f32, Color32::from_rgb(75, 95, 125));
             visuals.widgets.hovered.rounding = Rounding::same(3.0);
 
             visuals.widgets.active.bg_fill = Color32::from_rgb(58, 68, 85);
-            visuals.widgets.active.bg_stroke = Stroke::new(1.0_f32, Color32::from_rgb(95, 120, 160));
+            visuals.widgets.active.bg_stroke =
+                Stroke::new(1.0_f32, Color32::from_rgb(95, 120, 160));
             visuals.widgets.active.rounding = Rounding::same(3.0);
 
             visuals.widgets.open.rounding = Rounding::same(3.0);

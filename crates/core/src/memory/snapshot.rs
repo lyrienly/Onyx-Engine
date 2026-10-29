@@ -133,19 +133,17 @@ impl MemorySnapshot {
         Ok(MemorySnapshot { chunks, algo })
     }
 
-    pub fn capture_range(
-        proc: &Process,
-        base: usize,
-        size: usize,
-    ) -> Result<Self, String> {
+    pub fn capture_range(proc: &Process, base: usize, size: usize) -> Result<Self, String> {
         Self::capture_with(proc, base, base + size, DEFAULT_CHUNK_SIZE, HashAlgo::Xxh3)
     }
 
     pub fn diff(&self, other: &Self) -> Vec<ChangedRegion> {
         let raw = self.collect_changed_pairs(other);
-        let mut flat: Vec<(usize, usize)> =
-            raw.iter().map(|c| (c.address, c.address + c.size)).collect();
-        merge_changed(flat.drain(..).collect())
+        let mut flat: Vec<(usize, usize)> = raw
+            .iter()
+            .map(|c| (c.address, c.address + c.size))
+            .collect();
+        merge_changed(std::mem::take(&mut flat))
     }
 
     pub fn diff_detailed(&self, other: &Self) -> Vec<ChangedChunkDiff> {
@@ -216,10 +214,7 @@ impl MemorySnapshot {
         out
     }
 
-    pub fn diff_with_bytes(
-        &self,
-        proc: &Process,
-    ) -> Result<Vec<ChangedBytes>, String> {
+    pub fn diff_with_bytes(&self, proc: &Process) -> Result<Vec<ChangedBytes>, String> {
         let mut out = Vec::new();
         for chunk in &self.chunks {
             let data = match proc.read_bytes(chunk.address, chunk.size) {
@@ -261,13 +256,13 @@ fn merge_changed(mut raw: Vec<(usize, usize)>) -> Vec<ChangedRegion> {
     let mut out: Vec<ChangedRegion> = Vec::new();
 
     for (s, e) in raw {
-        if let Some(last) = out.last_mut() {
-            if s <= last.end {
-                if e > last.end {
-                    last.end = e;
-                }
-                continue;
+        if let Some(last) = out.last_mut()
+            && s <= last.end
+        {
+            if e > last.end {
+                last.end = e;
             }
+            continue;
         }
         out.push(ChangedRegion { start: s, end: e });
     }
@@ -280,11 +275,18 @@ mod tests {
     use super::*;
 
     fn chunk(address: usize, size: usize, hash: u64) -> SnapshotChunk {
-        SnapshotChunk { address, size, hash }
+        SnapshotChunk {
+            address,
+            size,
+            hash,
+        }
     }
 
     fn snap(chunks: Vec<SnapshotChunk>) -> MemorySnapshot {
-        MemorySnapshot { chunks, algo: HashAlgo::Xxh3 }
+        MemorySnapshot {
+            chunks,
+            algo: HashAlgo::Xxh3,
+        }
     }
 
     #[test]
@@ -317,15 +319,35 @@ mod tests {
         let a = snap(vec![chunk(0x1000, 16, 1), chunk(0x1010, 16, 2)]);
         let b = snap(vec![chunk(0x1000, 16, 1), chunk(0x1010, 16, 99)]);
         let diff = a.diff(&b);
-        assert_eq!(diff, vec![ChangedRegion { start: 0x1010, end: 0x1020 }]);
+        assert_eq!(
+            diff,
+            vec![ChangedRegion {
+                start: 0x1010,
+                end: 0x1020
+            }]
+        );
         assert_eq!(a.changed_byte_count(&b), 16);
     }
 
     #[test]
     fn test_diff_merges_adjacent() {
-        let a = snap(vec![chunk(0x1000, 16, 1), chunk(0x1010, 16, 2), chunk(0x1020, 16, 3)]);
-        let b = snap(vec![chunk(0x1000, 16, 1), chunk(0x1010, 16, 20), chunk(0x1020, 16, 30)]);
-        assert_eq!(a.diff(&b), vec![ChangedRegion { start: 0x1010, end: 0x1030 }]);
+        let a = snap(vec![
+            chunk(0x1000, 16, 1),
+            chunk(0x1010, 16, 2),
+            chunk(0x1020, 16, 3),
+        ]);
+        let b = snap(vec![
+            chunk(0x1000, 16, 1),
+            chunk(0x1010, 16, 20),
+            chunk(0x1020, 16, 30),
+        ]);
+        assert_eq!(
+            a.diff(&b),
+            vec![ChangedRegion {
+                start: 0x1010,
+                end: 0x1030
+            }]
+        );
     }
 
     #[test]

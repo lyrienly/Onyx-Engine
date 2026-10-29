@@ -115,17 +115,12 @@ pub fn find_embedded_pe(buf: &[u8]) -> Vec<usize> {
 
     let mut i = 0;
     while i + 2 <= buf.len() {
-        if buf[i] == 0x4D && buf[i + 1] == 0x5A {
-            if i + 0x40 <= buf.len() {
-                let pe_off = u32::from_le_bytes([
-                    buf[i + 0x3C],
-                    buf[i + 0x3D],
-                    buf[i + 0x3E],
-                    buf[i + 0x3F],
-                ]) as usize;
-                if i + pe_off + 4 <= buf.len() && &buf[i + pe_off..i + pe_off + 4] == b"PE\0\0" {
-                    out.push(i);
-                }
+        if buf[i] == 0x4D && buf[i + 1] == 0x5A && i + 0x40 <= buf.len() {
+            let pe_off =
+                u32::from_le_bytes([buf[i + 0x3C], buf[i + 0x3D], buf[i + 0x3E], buf[i + 0x3F]])
+                    as usize;
+            if i + pe_off + 4 <= buf.len() && &buf[i + pe_off..i + pe_off + 4] == b"PE\0\0" {
+                out.push(i);
             }
         }
         i += 1;
@@ -157,7 +152,13 @@ mod tests {
         b[5] = 0x11;
         b[6] = 0x22;
         let patches = detect_patches(&a, &b);
-        assert_eq!(patches, vec![PatchRange { offset: 4, length: 3 }]);
+        assert_eq!(
+            patches,
+            vec![PatchRange {
+                offset: 4,
+                length: 3
+            }]
+        );
     }
 
     #[test]
@@ -165,7 +166,13 @@ mod tests {
         let a = [1u8; 8];
         let b = [1u8; 12];
         let patches = detect_patches(&a, &b);
-        assert_eq!(patches, vec![PatchRange { offset: 8, length: 4 }]);
+        assert_eq!(
+            patches,
+            vec![PatchRange {
+                offset: 8,
+                length: 4
+            }]
+        );
     }
 
     #[test]
@@ -173,8 +180,14 @@ mod tests {
         assert_eq!(classify_hook(&jmp_stub()), HookKind::JmpRelative);
         assert_eq!(classify_hook(&[0xE8, 0, 0, 0, 0]), HookKind::CallRelative);
         assert_eq!(classify_hook(&[0xEB, 0x10]), HookKind::JmpRelative);
-        assert_eq!(classify_hook(&[0xFF, 0x25, 0, 0, 0, 0]), HookKind::JmpIndirect);
-        assert_eq!(classify_hook(&[0xFF, 0x15, 0, 0, 0, 0]), HookKind::CallIndirect);
+        assert_eq!(
+            classify_hook(&[0xFF, 0x25, 0, 0, 0, 0]),
+            HookKind::JmpIndirect
+        );
+        assert_eq!(
+            classify_hook(&[0xFF, 0x15, 0, 0, 0, 0]),
+            HookKind::CallIndirect
+        );
         assert_eq!(classify_hook(&[0x68, 0, 0, 0, 0, 0xC3]), HookKind::PushRet);
 
         let mut mov_rax = [0u8; 12];
@@ -184,12 +197,17 @@ mod tests {
         mov_rax[11] = 0xE0;
         assert_eq!(classify_hook(&mov_rax), HookKind::MovRaxJmp);
 
-        assert_eq!(classify_hook(&[0x48, 0x89, 0x5C, 0x24]), HookKind::DataPatch);
+        assert_eq!(
+            classify_hook(&[0x48, 0x89, 0x5C, 0x24]),
+            HookKind::DataPatch
+        );
     }
 
     #[test]
     fn test_scan_module_hooks() {
-        let original = [0x55, 0x48, 0x89, 0xE5, 0x48, 0x83, 0xEC, 0x20, 0x90, 0x90, 0x90, 0x90];
+        let original = [
+            0x55, 0x48, 0x89, 0xE5, 0x48, 0x83, 0xEC, 0x20, 0x90, 0x90, 0x90, 0x90,
+        ];
         let mut patched = original;
         patched[0..5].copy_from_slice(&jmp_stub());
         patched[8] = 0xCC;

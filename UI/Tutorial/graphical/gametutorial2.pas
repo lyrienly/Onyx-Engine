@@ -1,4 +1,4 @@
-unit GameTutorial2;
+﻿unit GameTutorial2;
 
 {$mode objfpc}{$H+}
 
@@ -404,7 +404,7 @@ begin
 
     with tregistry.create do
     begin
-      if OpenKey('\Software\Cheat Engine\GTutorial', true) then
+      if OpenKey('\Software\OnyxEngine\GTutorial', true) then
         WriteBool('This does not count as a solution for tutorial 2',True);
 
       free;

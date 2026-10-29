@@ -1,8 +1,8 @@
+use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::collections::HashMap;
 
 use pdb::FallibleIterator;
 
@@ -10,12 +10,16 @@ pub mod codeview;
 pub mod symsrv;
 
 pub use codeview::{CodeViewInfo, read_codeview_from_file};
-pub use symsrv::{SymSrvClient, DEFAULT_SYMBOL_SERVER};
+pub use symsrv::{DEFAULT_SYMBOL_SERVER, SymSrvClient};
+
+type ResolvedEntry = (u32, u32, String);
+type ResolvedMap = HashMap<String, Vec<ResolvedEntry>>;
+type NamesMap = HashMap<String, HashMap<String, u32>>;
 
 pub struct SymbolCache {
     client: SymSrvClient,
-    resolved: Mutex<HashMap<String, Vec<(u32, u32, String)>>>,
-    names: Mutex<HashMap<String, HashMap<String, u32>>>,
+    resolved: Mutex<ResolvedMap>,
+    names: Mutex<NamesMap>,
 }
 
 impl SymbolCache {
@@ -64,15 +68,18 @@ impl SymbolCache {
             .address_map()
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("address_map: {e}")))?;
 
-        let global_syms = pdb
-            .global_symbols()
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("global_symbols: {e}")))?;
+        let global_syms = pdb.global_symbols().map_err(|e| {
+            io::Error::new(io::ErrorKind::InvalidData, format!("global_symbols: {e}"))
+        })?;
 
         let mut rva_to_name: Vec<(u32, u32, String)> = Vec::new();
         let mut name_to_rva: HashMap<String, u32> = HashMap::new();
 
         let mut iter = global_syms.iter();
-        while let Some(sym) = iter.next().map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("sym iter: {e}")))? {
+        while let Some(sym) = iter
+            .next()
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("sym iter: {e}")))?
+        {
             if let Ok(data) = sym.parse() {
                 match data {
                     pdb::SymbolData::Public(d) => {
@@ -103,8 +110,14 @@ impl SymbolCache {
 
         rva_to_name.sort_by_key(|t| t.0);
 
-        self.resolved.lock().unwrap().insert(module_key.clone(), rva_to_name);
-        self.names.lock().unwrap().insert(module_key.clone(), name_to_rva);
+        self.resolved
+            .lock()
+            .unwrap()
+            .insert(module_key.clone(), rva_to_name);
+        self.names
+            .lock()
+            .unwrap()
+            .insert(module_key.clone(), name_to_rva);
 
         Ok(module_key)
     }
@@ -145,7 +158,11 @@ pub fn default_cache_dir() -> PathBuf {
     if let Ok(local) = std::env::var("LOCALAPPDATA") {
         PathBuf::from(local).join("OnyxEngine").join("symbols")
     } else if let Ok(home) = std::env::var("USERPROFILE") {
-        PathBuf::from(home).join("AppData").join("Local").join("OnyxEngine").join("symbols")
+        PathBuf::from(home)
+            .join("AppData")
+            .join("Local")
+            .join("OnyxEngine")
+            .join("symbols")
     } else {
         PathBuf::from(".onyx_symbols")
     }

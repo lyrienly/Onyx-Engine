@@ -1,12 +1,18 @@
-#![allow(non_snake_case, non_camel_case_types, dead_code, unsafe_op_in_unsafe_fn, static_mut_refs)]
+#![allow(
+    non_snake_case,
+    non_camel_case_types,
+    dead_code,
+    unsafe_op_in_unsafe_fn,
+    static_mut_refs
+)]
 
-use std::collections::HashMap;
-use std::ffi::{c_char, c_int, c_void, CStr, CString};
-use std::ptr::null_mut;
-use std::sync::atomic::{AtomicI64, Ordering};
-use std::sync::Mutex;
 use crate::process::Process;
 use crate::win32::*;
+use std::collections::HashMap;
+use std::ffi::{CStr, CString, c_char, c_int, c_void};
+use std::ptr::null_mut;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicI64, Ordering};
 
 type LuaState = *mut c_void;
 type LuaCFunction = unsafe extern "C" fn(LuaState) -> c_int;
@@ -97,7 +103,8 @@ impl CeLuaEngine {
 
             register_ce_functions(L, lib);
 
-            let json_bootstrap = CString::new(r#"
+            let json_bootstrap = CString::new(
+                r#"
 json = {}
 local function encode_val(val)
     local t = type(val)
@@ -201,7 +208,9 @@ local function decode_json(s)
 end
 json.decode = decode_json
 package.loaded["json"] = json
-"#).unwrap();
+"#,
+            )
+            .unwrap();
             let load_res = (lib.loadstring)(L, json_bootstrap.as_ptr());
             if load_res == 0 {
                 (lib.pcallk)(L, 0, 0, 0, 0, null_mut());
@@ -291,14 +300,17 @@ unsafe fn load_lua_library() -> Result<(), String> {
     }
 
     if h_mod.is_null() {
-        return Err("Could not load lua53-64.dll. Ensure it is in PATH or Cheat Engine bin/".to_string());
+        return Err(
+            "Could not load lua53-64.dll. Ensure it is in PATH or Cheat Engine bin/".to_string(),
+        );
     }
 
     macro_rules! get_fn {
         ($name:expr, $t:ty) => {
-            std::mem::transmute::<*mut c_void, $t>(
-                GetProcAddress(h_mod, concat!($name, "\0").as_ptr())
-            )
+            std::mem::transmute::<*mut c_void, $t>(GetProcAddress(
+                h_mod,
+                concat!($name, "\0").as_ptr(),
+            ))
         };
     }
 
@@ -355,7 +367,10 @@ unsafe fn register_ce_functions(L: LuaState, lib: &LuaLib) {
     reg_fn!("allocateMemory", ce_lua_allocateMemory);
     reg_fn!("freeMemory", ce_lua_freeMemory);
     reg_fn!("autoAssemble", ce_lua_autoAssemble);
-    reg_fn!("getProcessIDFromProcessName", ce_lua_getProcessIDFromProcessName);
+    reg_fn!(
+        "getProcessIDFromProcessName",
+        ce_lua_getProcessIDFromProcessName
+    );
     reg_fn!("openProcess", ce_lua_openProcess);
 
     reg_fn!("createMemScan", ce_lua_createMemScan);
@@ -381,11 +396,18 @@ unsafe extern "C" fn ce_lua_readInteger(L: LuaState) -> c_int {
         let mut read: SIZE_T = 0;
 
         let h_proc = ACTIVE_PROCESS_HANDLE.lock().unwrap().unwrap_or(0);
-        if h_proc != 0 {
-            if ReadProcessMemory(h_proc as HANDLE, addr as LPCVOID, &mut val as *mut _ as LPVOID, 4, &mut read) != 0 && read == 4 {
-                (lib.pushinteger)(L, val as i64);
-                return 1;
-            }
+        if h_proc != 0
+            && ReadProcessMemory(
+                h_proc as HANDLE,
+                addr as LPCVOID,
+                &mut val as *mut _ as LPVOID,
+                4,
+                &mut read,
+            ) != 0
+            && read == 4
+        {
+            (lib.pushinteger)(L, val as i64);
+            return 1;
         }
         (lib.pushnil)(L);
         1
@@ -401,11 +423,18 @@ unsafe extern "C" fn ce_lua_readQword(L: LuaState) -> c_int {
         let mut read: SIZE_T = 0;
 
         let h_proc = ACTIVE_PROCESS_HANDLE.lock().unwrap().unwrap_or(0);
-        if h_proc != 0 {
-            if ReadProcessMemory(h_proc as HANDLE, addr as LPCVOID, &mut val as *mut _ as LPVOID, 8, &mut read) != 0 && read == 8 {
-                (lib.pushinteger)(L, val as i64);
-                return 1;
-            }
+        if h_proc != 0
+            && ReadProcessMemory(
+                h_proc as HANDLE,
+                addr as LPCVOID,
+                &mut val as *mut _ as LPVOID,
+                8,
+                &mut read,
+            ) != 0
+            && read == 8
+        {
+            (lib.pushinteger)(L, val as i64);
+            return 1;
         }
         (lib.pushnil)(L);
         1
@@ -421,11 +450,18 @@ unsafe extern "C" fn ce_lua_readFloat(L: LuaState) -> c_int {
         let mut read: SIZE_T = 0;
 
         let h_proc = ACTIVE_PROCESS_HANDLE.lock().unwrap().unwrap_or(0);
-        if h_proc != 0 {
-            if ReadProcessMemory(h_proc as HANDLE, addr as LPCVOID, &mut val as *mut _ as LPVOID, 4, &mut read) != 0 && read == 4 {
-                (lib.pushnumber)(L, val as f64);
-                return 1;
-            }
+        if h_proc != 0
+            && ReadProcessMemory(
+                h_proc as HANDLE,
+                addr as LPCVOID,
+                &mut val as *mut _ as LPVOID,
+                4,
+                &mut read,
+            ) != 0
+            && read == 4
+        {
+            (lib.pushnumber)(L, val as f64);
+            return 1;
         }
         (lib.pushnil)(L);
         1
@@ -441,11 +477,18 @@ unsafe extern "C" fn ce_lua_readDouble(L: LuaState) -> c_int {
         let mut read: SIZE_T = 0;
 
         let h_proc = ACTIVE_PROCESS_HANDLE.lock().unwrap().unwrap_or(0);
-        if h_proc != 0 {
-            if ReadProcessMemory(h_proc as HANDLE, addr as LPCVOID, &mut val as *mut _ as LPVOID, 8, &mut read) != 0 && read == 8 {
-                (lib.pushnumber)(L, val);
-                return 1;
-            }
+        if h_proc != 0
+            && ReadProcessMemory(
+                h_proc as HANDLE,
+                addr as LPCVOID,
+                &mut val as *mut _ as LPVOID,
+                8,
+                &mut read,
+            ) != 0
+            && read == 8
+        {
+            (lib.pushnumber)(L, val);
+            return 1;
         }
         (lib.pushnil)(L);
         1
@@ -464,13 +507,20 @@ unsafe extern "C" fn ce_lua_readString(L: LuaState) -> c_int {
         let mut read: SIZE_T = 0;
 
         let h_proc = ACTIVE_PROCESS_HANDLE.lock().unwrap().unwrap_or(0);
-        if h_proc != 0 {
-            if ReadProcessMemory(h_proc as HANDLE, addr as LPCVOID, buf.as_mut_ptr() as LPVOID, len, &mut read) != 0 && read > 0 {
-                let term = buf[..read].iter().position(|&b| b == 0).unwrap_or(read);
-                let c_str = CString::new(&buf[..term]).unwrap_or_default();
-                (lib.pushstring)(L, c_str.as_ptr());
-                return 1;
-            }
+        if h_proc != 0
+            && ReadProcessMemory(
+                h_proc as HANDLE,
+                addr as LPCVOID,
+                buf.as_mut_ptr() as LPVOID,
+                len,
+                &mut read,
+            ) != 0
+            && read > 0
+        {
+            let term = buf[..read].iter().position(|&b| b == 0).unwrap_or(read);
+            let c_str = CString::new(&buf[..term]).unwrap_or_default();
+            (lib.pushstring)(L, c_str.as_ptr());
+            return 1;
         }
         (lib.pushnil)(L);
         1
@@ -487,7 +537,13 @@ unsafe extern "C" fn ce_lua_writeInteger(L: LuaState) -> c_int {
 
         let h_proc = ACTIVE_PROCESS_HANDLE.lock().unwrap().unwrap_or(0);
         if h_proc != 0 {
-            let ok = WriteProcessMemory(h_proc as HANDLE, addr as LPVOID, &val as *const _ as LPCVOID, 4, &mut written);
+            let ok = WriteProcessMemory(
+                h_proc as HANDLE,
+                addr as LPVOID,
+                &val as *const _ as LPCVOID,
+                4,
+                &mut written,
+            );
             (lib.pushboolean)(L, if ok != 0 && written == 4 { 1 } else { 0 });
             return 1;
         }
@@ -506,7 +562,13 @@ unsafe extern "C" fn ce_lua_writeQword(L: LuaState) -> c_int {
 
         let h_proc = ACTIVE_PROCESS_HANDLE.lock().unwrap().unwrap_or(0);
         if h_proc != 0 {
-            let ok = WriteProcessMemory(h_proc as HANDLE, addr as LPVOID, &val as *const _ as LPCVOID, 8, &mut written);
+            let ok = WriteProcessMemory(
+                h_proc as HANDLE,
+                addr as LPVOID,
+                &val as *const _ as LPCVOID,
+                8,
+                &mut written,
+            );
             (lib.pushboolean)(L, if ok != 0 && written == 8 { 1 } else { 0 });
             return 1;
         }
@@ -525,7 +587,13 @@ unsafe extern "C" fn ce_lua_writeFloat(L: LuaState) -> c_int {
 
         let h_proc = ACTIVE_PROCESS_HANDLE.lock().unwrap().unwrap_or(0);
         if h_proc != 0 {
-            let ok = WriteProcessMemory(h_proc as HANDLE, addr as LPVOID, &val as *const _ as LPCVOID, 4, &mut written);
+            let ok = WriteProcessMemory(
+                h_proc as HANDLE,
+                addr as LPVOID,
+                &val as *const _ as LPCVOID,
+                4,
+                &mut written,
+            );
             (lib.pushboolean)(L, if ok != 0 && written == 4 { 1 } else { 0 });
             return 1;
         }
@@ -544,7 +612,13 @@ unsafe extern "C" fn ce_lua_writeDouble(L: LuaState) -> c_int {
 
         let h_proc = ACTIVE_PROCESS_HANDLE.lock().unwrap().unwrap_or(0);
         if h_proc != 0 {
-            let ok = WriteProcessMemory(h_proc as HANDLE, addr as LPVOID, &val as *const _ as LPCVOID, 8, &mut written);
+            let ok = WriteProcessMemory(
+                h_proc as HANDLE,
+                addr as LPVOID,
+                &val as *const _ as LPCVOID,
+                8,
+                &mut written,
+            );
             (lib.pushboolean)(L, if ok != 0 && written == 8 { 1 } else { 0 });
             return 1;
         }
@@ -563,7 +637,13 @@ unsafe extern "C" fn ce_lua_fullAccess(L: LuaState) -> c_int {
 
         let h_proc = ACTIVE_PROCESS_HANDLE.lock().unwrap().unwrap_or(0);
         if h_proc != 0 {
-            let ok = VirtualProtectEx(h_proc as HANDLE, addr as LPVOID, size, PAGE_EXECUTE_READWRITE, &mut old_protect);
+            let ok = VirtualProtectEx(
+                h_proc as HANDLE,
+                addr as LPVOID,
+                size,
+                PAGE_EXECUTE_READWRITE,
+                &mut old_protect,
+            );
             (lib.pushboolean)(L, if ok != 0 { 1 } else { 0 });
             return 1;
         }
@@ -579,7 +659,13 @@ unsafe extern "C" fn ce_lua_allocateMemory(L: LuaState) -> c_int {
         let size = (lib.tointegerx)(L, 1, null_mut()) as usize;
         let h_proc = ACTIVE_PROCESS_HANDLE.lock().unwrap().unwrap_or(0);
         if h_proc != 0 {
-            let addr = VirtualAllocEx(h_proc as HANDLE, null_mut(), size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+            let addr = VirtualAllocEx(
+                h_proc as HANDLE,
+                null_mut(),
+                size,
+                MEM_COMMIT | MEM_RESERVE,
+                PAGE_EXECUTE_READWRITE,
+            );
             if !addr.is_null() {
                 (lib.pushinteger)(L, addr as i64);
                 return 1;
@@ -614,20 +700,20 @@ unsafe extern "C" fn ce_lua_autoAssemble(L: LuaState) -> c_int {
         if !script_ptr.is_null() {
             let script_str = CStr::from_ptr(script_ptr).to_string_lossy().to_string();
             let pid = ACTIVE_PROCESS_PID.lock().unwrap().unwrap_or(0);
-            if pid != 0 {
-                if let Ok(proc) = Process::attach(pid) {
-                    let mut aa = crate::autoassembler::AutoAssembler::new();
-                    match aa.execute(&proc, &script_str, true) {
-                        Ok(_) => {
-                            (lib.pushboolean)(L, 1);
-                            return 1;
-                        }
-                        Err(e) => {
-                            let err_c = CString::new(e).unwrap_or_default();
-                            (lib.pushboolean)(L, 0);
-                            (lib.pushstring)(L, err_c.as_ptr());
-                            return 2;
-                        }
+            if pid != 0
+                && let Ok(proc) = Process::attach(pid)
+            {
+                let mut aa = crate::autoassembler::AutoAssembler::new();
+                match aa.execute(&proc, &script_str, true) {
+                    Ok(_) => {
+                        (lib.pushboolean)(L, 1);
+                        return 1;
+                    }
+                    Err(e) => {
+                        let err_c = CString::new(e).unwrap_or_default();
+                        (lib.pushboolean)(L, 0);
+                        (lib.pushstring)(L, err_c.as_ptr());
+                        return 2;
                     }
                 }
             }
@@ -663,13 +749,13 @@ unsafe extern "C" fn ce_lua_getProcessIDFromProcessName(L: LuaState) -> c_int {
 unsafe extern "C" fn ce_lua_openProcess(L: LuaState) -> c_int {
     if let Some(lib) = LUA_LIB.as_ref() {
         let pid = (lib.tointegerx)(L, 1, null_mut()) as u32;
-        if pid != 0 {
-            if let Ok(proc) = Process::attach(pid) {
-                *ACTIVE_PROCESS_HANDLE.lock().unwrap() = Some(proc.handle as usize);
-                *ACTIVE_PROCESS_PID.lock().unwrap() = Some(pid);
-                (lib.pushboolean)(L, 1);
-                return 1;
-            }
+        if pid != 0
+            && let Ok(proc) = Process::attach(pid)
+        {
+            *ACTIVE_PROCESS_HANDLE.lock().unwrap() = Some(proc.handle as usize);
+            *ACTIVE_PROCESS_PID.lock().unwrap() = Some(pid);
+            (lib.pushboolean)(L, 1);
+            return 1;
         }
         (lib.pushboolean)(L, 0);
         1
@@ -684,7 +770,10 @@ unsafe extern "C" fn ce_lua_createMemScan(L: LuaState) -> c_int {
         {
             let mut reg = SCANNER_REGISTRY.lock().unwrap();
             if let Some(map) = reg.as_mut() {
-                map.insert(scan_id, crate::scanner::Scanner::new(crate::scanner::ValType::I32));
+                map.insert(
+                    scan_id,
+                    crate::scanner::Scanner::new(crate::scanner::ValType::I32),
+                );
             }
         }
 
@@ -817,18 +906,17 @@ unsafe extern "C" fn ce_lua_memscan_firstScan(L: LuaState) -> c_int {
         };
 
         let pid = ACTIVE_PROCESS_PID.lock().unwrap().unwrap_or(0);
-        if pid != 0 {
-            if let Ok(proc) = Process::attach(pid) {
-                let mut reg = SCANNER_REGISTRY.lock().unwrap();
-                if let Some(map) = reg.as_mut() {
-                    if let Some(scanner) = map.get_mut(&id) {
-                        if let Ok(scan_val) = crate::scanner::ScanValue::parse(scanner.val_type, &val_str) {
-                            let res = scanner.first_scan(&proc, crate::scanner::ScanCondition::Exact(scan_val));
-                            (lib.pushboolean)(L, if res.is_ok() { 1 } else { 0 });
-                            return 1;
-                        }
-                    }
-                }
+        if pid != 0
+            && let Ok(proc) = Process::attach(pid)
+        {
+            let mut reg = SCANNER_REGISTRY.lock().unwrap();
+            if let Some(map) = reg.as_mut()
+                && let Some(scanner) = map.get_mut(&id)
+                && let Ok(scan_val) = crate::scanner::ScanValue::parse(scanner.val_type, &val_str)
+            {
+                let res = scanner.first_scan(&proc, crate::scanner::ScanCondition::Exact(scan_val));
+                (lib.pushboolean)(L, if res.is_ok() { 1 } else { 0 });
+                return 1;
             }
         }
         (lib.pushboolean)(L, 0);
@@ -856,18 +944,17 @@ unsafe extern "C" fn ce_lua_memscan_nextScan(L: LuaState) -> c_int {
         };
 
         let pid = ACTIVE_PROCESS_PID.lock().unwrap().unwrap_or(0);
-        if pid != 0 {
-            if let Ok(proc) = Process::attach(pid) {
-                let mut reg = SCANNER_REGISTRY.lock().unwrap();
-                if let Some(map) = reg.as_mut() {
-                    if let Some(scanner) = map.get_mut(&id) {
-                        if let Ok(scan_val) = crate::scanner::ScanValue::parse(scanner.val_type, &val_str) {
-                            let res = scanner.next_scan(&proc, crate::scanner::ScanCondition::Exact(scan_val));
-                            (lib.pushboolean)(L, if res.is_ok() { 1 } else { 0 });
-                            return 1;
-                        }
-                    }
-                }
+        if pid != 0
+            && let Ok(proc) = Process::attach(pid)
+        {
+            let mut reg = SCANNER_REGISTRY.lock().unwrap();
+            if let Some(map) = reg.as_mut()
+                && let Some(scanner) = map.get_mut(&id)
+                && let Ok(scan_val) = crate::scanner::ScanValue::parse(scanner.val_type, &val_str)
+            {
+                let res = scanner.next_scan(&proc, crate::scanner::ScanCondition::Exact(scan_val));
+                (lib.pushboolean)(L, if res.is_ok() { 1 } else { 0 });
+                return 1;
             }
         }
         (lib.pushboolean)(L, 0);
@@ -883,7 +970,6 @@ unsafe extern "C" fn ce_lua_memscan_index(L: LuaState) -> c_int {
         if !key_ptr.is_null() {
             let key = CStr::from_ptr(key_ptr).to_string_lossy();
             if key == "Results" {
-
                 return ce_lua_memscan_getResults(L);
             } else if key == "Count" {
                 return ce_lua_memscan_getCount(L);
@@ -927,7 +1013,11 @@ unsafe extern "C" fn ce_lua_stacktrace(L: LuaState) -> c_int {
             return 1;
         }
 
-        let h_thread = OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, tid);
+        let h_thread = OpenThread(
+            THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION,
+            FALSE,
+            tid,
+        );
         if !h_thread.is_null() && h_thread != INVALID_HANDLE_VALUE {
             SuspendThread(h_thread);
 
@@ -943,20 +1033,34 @@ unsafe extern "C" fn ce_lua_stacktrace(L: LuaState) -> c_int {
                 let rsp = ctx.Rsp as usize;
                 let mut stack_buf = [0usize; 128];
                 let mut read: SIZE_T = 0;
-                if ReadProcessMemory(h_proc as HANDLE, rsp as LPCVOID, stack_buf.as_mut_ptr() as LPVOID, 128 * 8, &mut read) != 0 {
+                if ReadProcessMemory(
+                    h_proc as HANDLE,
+                    rsp as LPCVOID,
+                    stack_buf.as_mut_ptr() as LPVOID,
+                    128 * 8,
+                    &mut read,
+                ) != 0
+                {
                     let count = read / 8;
                     for i in 0..count {
                         let potential_ret = stack_buf[i];
                         if potential_ret > 0x10000 && potential_ret < 0x7FFFFFFF_FFFFFFFF {
                             let mut mbi: MEMORY_BASIC_INFORMATION = std::mem::zeroed();
-                            if VirtualQueryEx(h_proc as HANDLE, potential_ret as LPCVOID, &mut mbi, std::mem::size_of::<MEMORY_BASIC_INFORMATION>()) != 0 {
-                                if (mbi.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE)) != 0 {
-                                    (lib.pushinteger)(L, potential_ret as i64);
-                                    (lib.rawseti)(L, -2, idx);
-                                    idx += 1;
-                                    if idx > 32 {
-                                        break;
-                                    }
+                            if VirtualQueryEx(
+                                h_proc as HANDLE,
+                                potential_ret as LPCVOID,
+                                &mut mbi,
+                                std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
+                            ) != 0
+                                && (mbi.Protect
+                                    & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE))
+                                    != 0
+                            {
+                                (lib.pushinteger)(L, potential_ret as i64);
+                                (lib.rawseti)(L, -2, idx);
+                                idx += 1;
+                                if idx > 32 {
+                                    break;
                                 }
                             }
                         }
@@ -1018,37 +1122,41 @@ unsafe extern "C" fn ce_lua_executeCodeExThread(L: LuaState) -> c_int {
         let param = (lib.tointegerx)(L, 3, null_mut()) as usize;
 
         let pid = ACTIVE_PROCESS_PID.lock().unwrap().unwrap_or(0);
-        if pid != 0 && code_addr != 0 {
-            if let Ok(proc) = Process::attach(pid) {
-                let h_thread = if tid != 0 {
-                    OpenThread(THREAD_ALL_ACCESS, FALSE, tid)
-                } else {
-                    null_mut()
-                };
+        if pid != 0
+            && code_addr != 0
+            && let Ok(proc) = Process::attach(pid)
+        {
+            let h_thread = if tid != 0 {
+                OpenThread(THREAD_ALL_ACCESS, FALSE, tid)
+            } else {
+                null_mut()
+            };
 
-                let thread_start = std::mem::transmute::<LPVOID, unsafe extern "system" fn(LPVOID) -> DWORD>(code_addr as LPVOID);
-                let h_remote = CreateRemoteThread(
-                    proc.handle,
-                    null_mut(),
-                    0,
-                    thread_start,
-                    param as LPVOID,
-                    0,
-                    null_mut(),
-                );
+            let thread_start = std::mem::transmute::<
+                LPVOID,
+                unsafe extern "system" fn(LPVOID) -> DWORD,
+            >(code_addr as LPVOID);
+            let h_remote = CreateRemoteThread(
+                proc.handle,
+                null_mut(),
+                0,
+                thread_start,
+                param as LPVOID,
+                0,
+                null_mut(),
+            );
 
-                if !h_thread.is_null() && h_thread != INVALID_HANDLE_VALUE {
-                    CloseHandle(h_thread);
-                }
+            if !h_thread.is_null() && h_thread != INVALID_HANDLE_VALUE {
+                CloseHandle(h_thread);
+            }
 
-                if !h_remote.is_null() && h_remote != INVALID_HANDLE_VALUE {
-                    WaitForSingleObject(h_remote, 5000);
-                    let mut exit_code: DWORD = 0;
-                    GetExitCodeThread(h_remote, &mut exit_code);
-                    CloseHandle(h_remote);
-                    (lib.pushinteger)(L, exit_code as i64);
-                    return 1;
-                }
+            if !h_remote.is_null() && h_remote != INVALID_HANDLE_VALUE {
+                WaitForSingleObject(h_remote, 5000);
+                let mut exit_code: DWORD = 0;
+                GetExitCodeThread(h_remote, &mut exit_code);
+                CloseHandle(h_remote);
+                (lib.pushinteger)(L, exit_code as i64);
+                return 1;
             }
         }
         (lib.pushnil)(L);
@@ -1075,28 +1183,37 @@ mod tests {
     #[test]
     fn test_ce_lua_engine_77() {
         if let Ok(lua) = CeLuaEngine::init() {
-
             let ver = lua.execute("return getCEVersion()").unwrap();
             assert_eq!(ver, "7.7");
 
-            let json_enc = lua.execute(r#"return json.encode({name="CheatEngine", version=7.7})"#).unwrap();
+            let json_enc = lua
+                .execute(r#"return json.encode({name="CheatEngine", version=7.7})"#)
+                .unwrap();
             assert!(json_enc.contains("\"name\":\"CheatEngine\""));
             assert!(json_enc.contains("\"version\":7.7"));
 
-            let json_dec = lua.execute(r#"
+            let json_dec = lua
+                .execute(
+                    r#"
                 local obj = json.decode('{"val":1337,"flag":true}')
                 return obj.val
-            "#).unwrap();
+            "#,
+                )
+                .unwrap();
             assert_eq!(json_dec, "1337");
 
-            let ms_test = lua.execute(r#"
+            let ms_test = lua
+                .execute(
+                    r#"
                 local ms = createMemScan()
                 if ms and type(ms.Results) == "table" and ms.Count == 0 then
                     return "OK"
                 else
                     return "FAIL"
                 end
-            "#).unwrap();
+            "#,
+                )
+                .unwrap();
             assert_eq!(ms_test, "OK");
         }
     }

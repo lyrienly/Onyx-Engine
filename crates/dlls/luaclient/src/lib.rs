@@ -1,9 +1,22 @@
-#![allow(non_snake_case, non_camel_case_types, dead_code, unsafe_op_in_unsafe_fn, static_mut_refs)]
+#![allow(
+    non_snake_case,
+    non_camel_case_types,
+    dead_code,
+    unsafe_op_in_unsafe_fn,
+    static_mut_refs
+)]
+#![allow(
+    clippy::missing_safety_doc,
+    clippy::not_unsafe_ptr_arg_deref,
+    clippy::upper_case_acronyms,
+    clippy::too_many_arguments,
+    clippy::manual_c_str_literals
+)]
 
-use std::ffi::{c_char, c_void, CStr};
-use std::sync::atomic::{AtomicIsize, Ordering};
-use std::sync::Mutex;
+use std::ffi::{CStr, c_char, c_void};
 use std::ptr::null_mut;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicIsize, Ordering};
 
 type HANDLE = *mut c_void;
 type BOOL = i32;
@@ -56,13 +69,25 @@ static mut SERVER_NAME: [u8; 260] = [0u8; 260];
 
 unsafe fn write_exact(h: HANDLE, data: &[u8]) -> bool {
     let mut written: DWORD = 0;
-    let res = WriteFile(h, data.as_ptr() as *const c_void, data.len() as DWORD, &mut written, null_mut());
+    let res = WriteFile(
+        h,
+        data.as_ptr() as *const c_void,
+        data.len() as DWORD,
+        &mut written,
+        null_mut(),
+    );
     res != 0 && (written as usize == data.len())
 }
 
 unsafe fn read_exact(h: HANDLE, buf: &mut [u8]) -> bool {
     let mut read_bytes: DWORD = 0;
-    let res = ReadFile(h, buf.as_mut_ptr() as *mut c_void, buf.len() as DWORD, &mut read_bytes, null_mut());
+    let res = ReadFile(
+        h,
+        buf.as_mut_ptr() as *mut c_void,
+        buf.len() as DWORD,
+        &mut read_bytes,
+        null_mut(),
+    );
     res != 0 && (read_bytes as usize == buf.len())
 }
 
@@ -111,7 +136,10 @@ pub unsafe extern "system" fn CELUA_Initialize(pipename: *const c_char) -> BOOL 
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn CELUA_ExecuteFunction(script: *const c_char, _params: usize) -> usize {
+pub unsafe extern "system" fn CELUA_ExecuteFunction(
+    script: *const c_char,
+    _params: usize,
+) -> usize {
     if script.is_null() {
         return 0;
     }
@@ -127,9 +155,15 @@ pub unsafe extern "system" fn CELUA_ExecuteFunction(script: *const c_char, _para
     let len = bytes.len() as u32;
 
     let cmd: [u8; 1] = [1];
-    if !write_exact(h, &cmd) { return 0; }
-    if !write_exact(h, &len.to_le_bytes()) { return 0; }
-    if !write_exact(h, bytes) { return 0; }
+    if !write_exact(h, &cmd) {
+        return 0;
+    }
+    if !write_exact(h, &len.to_le_bytes()) {
+        return 0;
+    }
+    if !write_exact(h, bytes) {
+        return 0;
+    }
 
     let mut resp = [0u8; 9];
     if !read_exact(h, &mut resp) {
@@ -140,7 +174,10 @@ pub unsafe extern "system" fn CELUA_ExecuteFunction(script: *const c_char, _para
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn CELUA_ExecuteFunctionAsync(script: *const c_char, _params: usize) -> usize {
+pub unsafe extern "system" fn CELUA_ExecuteFunctionAsync(
+    script: *const c_char,
+    _params: usize,
+) -> usize {
     if script.is_null() {
         return 0;
     }
@@ -156,15 +193,23 @@ pub unsafe extern "system" fn CELUA_ExecuteFunctionAsync(script: *const c_char, 
     let len = bytes.len() as u32;
 
     let cmd: [u8; 1] = [2];
-    if !write_exact(h, &cmd) { return 0; }
-    if !write_exact(h, &len.to_le_bytes()) { return 0; }
-    if !write_exact(h, bytes) { return 0; }
+    if !write_exact(h, &cmd) {
+        return 0;
+    }
+    if !write_exact(h, &len.to_le_bytes()) {
+        return 0;
+    }
+    if !write_exact(h, bytes) {
+        return 0;
+    }
 
     1
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn CELUA_GetFunctionReferenceFromName(functionname: *const c_char) -> i32 {
+pub unsafe extern "system" fn CELUA_GetFunctionReferenceFromName(
+    functionname: *const c_char,
+) -> i32 {
     if functionname.is_null() {
         return -1;
     }
@@ -180,9 +225,15 @@ pub unsafe extern "system" fn CELUA_GetFunctionReferenceFromName(functionname: *
     let len = bytes.len() as u32;
 
     let cmd: [u8; 1] = [4];
-    if !write_exact(h, &cmd) { return -1; }
-    if !write_exact(h, &len.to_le_bytes()) { return -1; }
-    if !write_exact(h, bytes) { return -1; }
+    if !write_exact(h, &cmd) {
+        return -1;
+    }
+    if !write_exact(h, &len.to_le_bytes()) {
+        return -1;
+    }
+    if !write_exact(h, bytes) {
+        return -1;
+    }
 
     let mut ref_bytes = [0u8; 4];
     if !read_exact(h, &mut ref_bytes) {
@@ -209,17 +260,29 @@ pub unsafe extern "system" fn CELUA_ExecuteFunctionByReference(
     let cmd: [u8; 1] = [3];
     let is_async: [u8; 1] = [if async_call != 0 { 1 } else { 0 }];
 
-    if !write_exact(h, &cmd) { return 0; }
-    if !write_exact(h, &is_async) { return 0; }
-    if !write_exact(h, &func_ref.to_le_bytes()) { return 0; }
-    if !write_exact(h, &(paramcount as u8).to_le_bytes()) { return 0; }
+    if !write_exact(h, &cmd) {
+        return 0;
+    }
+    if !write_exact(h, &is_async) {
+        return 0;
+    }
+    if !write_exact(h, &func_ref.to_le_bytes()) {
+        return 0;
+    }
+    if !write_exact(h, &(paramcount as u8).to_le_bytes()) {
+        return 0;
+    }
 
     for i in 0..paramcount {
         let p_val = *params.add(i as usize);
         let val_type: [u8; 1] = [LuaParamType::Int64 as u8];
         let val_bytes = (p_val as u64).to_le_bytes();
-        if !write_exact(h, &val_type) { return 0; }
-        if !write_exact(h, &val_bytes) { return 0; }
+        if !write_exact(h, &val_type) {
+            return 0;
+        }
+        if !write_exact(h, &val_bytes) {
+            return 0;
+        }
     }
 
     if async_call != 0 {
@@ -234,8 +297,12 @@ pub unsafe extern "system" fn CELUA_ExecuteFunctionByReference(
     if ret_count[0] > 0 {
         let mut ret_type = [0u8; 1];
         let mut ret_val = [0u8; 8];
-        if !read_exact(h, &mut ret_type) { return 0; }
-        if !read_exact(h, &mut ret_val) { return 0; }
+        if !read_exact(h, &mut ret_type) {
+            return 0;
+        }
+        if !read_exact(h, &mut ret_val) {
+            return 0;
+        }
         u64::from_le_bytes(ret_val) as usize
     } else {
         0

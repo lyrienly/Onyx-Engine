@@ -79,7 +79,11 @@ impl SymSrvClient {
             let compressed_sub = {
                 let mut s = sub.clone();
                 let last = s.pop().unwrap_or('_');
-                s.push(if last.is_ascii_alphanumeric() { '_' } else { last });
+                s.push(if last.is_ascii_alphanumeric() {
+                    '_'
+                } else {
+                    last
+                });
                 s
             };
             let compressed_url = format!("{}/{}", base.trim_end_matches('/'), compressed_sub);
@@ -88,7 +92,9 @@ impl SymSrvClient {
             }
         }
 
-        Err(last_err.unwrap_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no symbol server succeeded")))
+        Err(last_err.unwrap_or_else(|| {
+            io::Error::new(io::ErrorKind::NotFound, "no symbol server succeeded")
+        }))
     }
 
     fn download(&self, url: &str) -> io::Result<Vec<u8>> {
@@ -102,13 +108,14 @@ impl SymSrvClient {
         let resp = agent
             .get(url)
             .call()
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("http: {e}")))?;
+            .map_err(|e| io::Error::other(format!("http: {e}")))?;
 
         if resp.status() != 200 {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("http status {} for {}", resp.status(), url),
-            ));
+            return Err(io::Error::other(format!(
+                "http status {} for {}",
+                resp.status(),
+                url
+            )));
         }
 
         let mut reader = resp.into_reader();

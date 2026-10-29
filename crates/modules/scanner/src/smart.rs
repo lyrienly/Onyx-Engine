@@ -46,7 +46,6 @@ impl ScanType {
 
 #[derive(Debug, Clone)]
 pub enum SmartTarget {
-
     Exact(Vec<u8>),
 
     Numeric(f64),
@@ -68,7 +67,6 @@ const PTR_MIN: u64 = 0x1_0000;
 const PTR_MAX: u64 = 0x7FFF_FFFF_FFFF;
 
 fn is_reasonable_i32(v: i32) -> bool {
-
     const BAD: &[i32] = &[
         i32::MIN,
         -1,
@@ -122,7 +120,7 @@ fn is_reasonable_f64(v: f64) -> bool {
 }
 
 fn is_reasonable_pointer(v: u64) -> bool {
-    v >= PTR_MIN && v <= PTR_MAX && (v & 0x7) == 0
+    (PTR_MIN..=PTR_MAX).contains(&v) && (v & 0x7) == 0
 }
 
 fn try_ascii_string(buf: &[u8]) -> Option<(String, usize)> {
@@ -158,7 +156,7 @@ fn try_utf16_string(buf: &[u8]) -> Option<(String, usize)> {
         if u == 0 {
             break;
         }
-        if u < 0x20 || u > 0xFFFD {
+        if !(0x20..=0xFFFD).contains(&u) {
             return None;
         }
         units.push(u);
@@ -219,8 +217,7 @@ fn scan_numeric(buffer: &[u8], base_addr: u64, target: f64) -> Vec<SmartHit> {
     let scale = target_f.abs().max(1.0);
     let eps = F_EPSILON * scale;
 
-    let target_i32_bits: Option<i32> = target_i64
-        .and_then(|t| i32::try_from(t).ok());
+    let target_i32_bits: Option<i32> = target_i64.and_then(|t| i32::try_from(t).ok());
     let target_f32_bits: Option<u32> = {
         let f = target as f32;
         if (f as f64 - target).abs() <= eps {
@@ -230,7 +227,10 @@ fn scan_numeric(buffer: &[u8], base_addr: u64, target: f64) -> Vec<SmartHit> {
         }
     };
     let target_f64_bits: u64 = target.to_bits();
-    let ptr_mode = target >= 0.0 && target.fract() == 0.0 && target >= PTR_MIN as f64 && target <= PTR_MAX as f64;
+    let ptr_mode = target >= 0.0
+        && target.fract() == 0.0
+        && target >= PTR_MIN as f64
+        && target <= PTR_MAX as f64;
     let target_ptr: u64 = if ptr_mode { target as u64 } else { 0 };
 
     let p = buffer.as_ptr();
@@ -238,7 +238,6 @@ fn scan_numeric(buffer: &[u8], base_addr: u64, target: f64) -> Vec<SmartHit> {
 
     while off + 8 <= len {
         unsafe {
-
             let v32a = std::ptr::read_unaligned(p.add(off) as *const i32);
             let v32b = std::ptr::read_unaligned(p.add(off + 4) as *const i32);
             let v64 = std::ptr::read_unaligned(p.add(off) as *const i64);
@@ -284,7 +283,6 @@ fn scan_numeric(buffer: &[u8], base_addr: u64, target: f64) -> Vec<SmartHit> {
                     });
                 }
             } else {
-
                 let fva = f32::from_bits(bits_a);
                 if fva.is_finite() && (fva as f64 - target_f).abs() <= eps {
                     hits.push(SmartHit {
@@ -367,8 +365,8 @@ fn scan_exact(buffer: &[u8], base_addr: u64, needle: &[u8]) -> Vec<SmartHit> {
         if &buffer[off..off + needle.len()] == needle {
             let addr = base_addr.wrapping_add(off as u64);
             let scan_type = match needle.len() {
-                4 if off % 4 == 0 => ScanType::I32,
-                8 if off % 8 == 0 => ScanType::I64,
+                4 if off.is_multiple_of(4) => ScanType::I32,
+                8 if off.is_multiple_of(8) => ScanType::I64,
                 _ => ScanType::StringAscii,
             };
             let interpreted = match scan_type {
@@ -425,7 +423,7 @@ fn scan_any(buffer: &[u8], base_addr: u64) -> Vec<SmartHit> {
             });
         }
 
-        if off + 8 <= len && off % 8 == 0 {
+        if off + 8 <= len && off.is_multiple_of(8) {
             let v64 = unsafe { std::ptr::read_unaligned(p.add(off) as *const i64) };
             let u64v = v64 as u64;
             if is_reasonable_i64(v64) && v64 != 0 {
@@ -544,6 +542,8 @@ mod unit {
         let mut buf = vec![0u8; 32];
         buf[4..8].copy_from_slice(&42i32.to_le_bytes());
         let hits = smart_scan(&buf, 0x1000, SmartTarget::Numeric(42.0));
-        assert!(hits.iter().any(|h| h.scan_type == ScanType::I32 && h.address == 0x1004));
+        assert!(hits
+            .iter()
+            .any(|h| h.scan_type == ScanType::I32 && h.address == 0x1004));
     }
 }

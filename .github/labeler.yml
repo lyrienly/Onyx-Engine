@@ -1,0 +1,37 @@
+backend-rust:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'crates/core/**'
+          - 'crates/backend/**'
+          - 'crates/modules/**'
+
+gui-rust:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'crates/gui/**'
+
+dlls:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'crates/dlls/**'
+
+plugins:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'crates/plugins/**'
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'UI/**'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+          - 'docs/**'

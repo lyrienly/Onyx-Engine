@@ -153,7 +153,7 @@ impl RelocationEngine {
                     let next_ip = new_address.wrapping_add(insn.length);
                     let new_disp = target as i64 - next_ip as i64;
 
-                    if new_disp >= -128 && new_disp <= 127 {
+                    if (-128..=127).contains(&new_disp) {
                         bytes[fixup.offset] = new_disp as i8 as u8;
                     } else {
                         let far_next_ip = new_address.wrapping_add(widened_len);
@@ -204,8 +204,12 @@ impl RelocationEngine {
         while offset < code.len() {
             let insn = Disassembler::decode_one(from_address.wrapping_add(offset), &code[offset..]);
             let len = insn.length.max(1);
-            let new_address = to_address
-                .wrapping_add(instructions.iter().map(|r: &RelocatedInstruction| r.length).sum::<usize>());
+            let new_address = to_address.wrapping_add(
+                instructions
+                    .iter()
+                    .map(|r: &RelocatedInstruction| r.length)
+                    .sum::<usize>(),
+            );
             instructions.push(Self::relocate_instruction(&insn, new_address));
             offset = offset.wrapping_add(len);
 
@@ -249,7 +253,8 @@ impl RelocationEngine {
             cursor = cursor.wrapping_add(insn.length);
         }
 
-        let jump_back = Self::emit_relative_jump(cursor, from_address.wrapping_add(block.original_size));
+        let jump_back =
+            Self::emit_relative_jump(cursor, from_address.wrapping_add(block.original_size));
         buffer.extend_from_slice(&jump_back);
         Ok(buffer)
     }

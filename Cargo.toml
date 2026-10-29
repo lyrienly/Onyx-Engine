@@ -9,7 +9,11 @@ members = [
     "crates/modules/disasm",
     "crates/modules/gdb_server",
     "crates/modules/freezer",
+    "crates/modules/dotnet",
     "crates/modules/hook",
+    "crates/modules/mono",
+    "crates/modules/mono_hook",
+    "crates/modules/overlay",
     "crates/dlls/allochook",
     "crates/dlls/d3dhook",
     "crates/dlls/luaclient",
@@ -17,5 +21,18 @@ members = [
     "crates/dlls/vehdebug",
     "crates/dlls/taskmgr_cloak",
     "crates/plugins/aob_generator",
+    "crates/plugins/dll_mapper",
+    "crates/syscalls-indirect",
 ]
 resolver = "2"
+
+[workspace.lints.clippy]
+missing_safety_doc = "allow"
+upper_case_acronyms = "allow"
+too_many_arguments = "allow"
+not_unsafe_ptr_arg_deref = "allow"
+module_inception = "allow"
+manual_c_str_literals = "allow"
+missing_transmute_annotations = "allow"
+needless_range_loop = "allow"
+field_reassign_with_default = "allow"

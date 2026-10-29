@@ -1,4 +1,4 @@
-program cheatengine;
+program onyxengine;
 
 {$mode objfpc}{$H+}
 
@@ -12,13 +12,16 @@ uses
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
+  {$ifdef windows}
+  Windows,
+  {$endif}
   Interfaces, {CEInterfaces,} // this includes the LCL widgetset
   {$ifdef darwin}
   //
   macport, macportdefines,coresymbolication, macexceptiondebuggerinterface,
   macCreateRemoteThread, macumm, machotkeys, macPipe,
   {$endif}
-  betterControls, controls, sysutils, Forms, LazUTF8, dialogs, SynCompletion,
+  betterControls, OnyxInstance, controls, sysutils, Forms, LazUTF8, dialogs, SynCompletion,
   MainUnit, CEDebugger, NewKernelHandler, OnyxBackend, CEFuncProc, ProcessHandlerUnit,
   symbolhandler, Assemblerunit, hypermode, byteinterpreter, addressparser,
   autoassembler, ProcessWindowUnit, MainUnit2, Filehandler,
@@ -125,7 +128,7 @@ uses
   LuaNetworkInterface, libcepack, symbolsync, gdbserverconnectdialog,
   GDBServerDebuggerInterface;
 
-{$R cheatengine.res}
+{$R onyxengine.res}
 {$IFDEF windows}
 //{$R manifest.res}  //lazarus now has this build in (but sucks as it explicitly turns of dpi aware)
 //{$R Sounds.rc}
@@ -297,6 +300,12 @@ begin
   outputdebugstring('start');
 
   Application.Initialize;
+
+  if not OnyxAcquireSingleInstance then
+  begin
+    MessageBoxW(0, 'OnyxEngine is already running.', 'OnyxEngine', MB_OK or MB_ICONINFORMATION);
+    Halt(0);
+  end;
 
   {$ifdef windows}
   registerDarkModeHintHandler;

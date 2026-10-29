@@ -50,7 +50,6 @@ pub struct PeInfoParser;
 
 impl PeInfoParser {
     pub fn parse_process_module(proc: &Process, module_base: usize) -> Result<PeInfo, String> {
-
         let dos_magic = proc.read::<u16>(module_base)?;
         if dos_magic != IMAGE_DOS_SIGNATURE {
             return Err("Invalid DOS signature (expected MZ)".to_string());
@@ -121,7 +120,6 @@ impl PeInfoParser {
         if import_dir_rva != 0 {
             let mut desc_addr = module_base + import_dir_rva;
             loop {
-
                 let original_first_thunk = proc.read::<u32>(desc_addr)? as usize;
                 let name_rva = proc.read::<u32>(desc_addr + 12)? as usize;
                 let first_thunk = proc.read::<u32>(desc_addr + 16)? as usize;
@@ -130,7 +128,8 @@ impl PeInfoParser {
                     break;
                 }
 
-                let dll_name = proc.read_string(module_base + name_rva, 256, false)
+                let dll_name = proc
+                    .read_string(module_base + name_rva, 256, false)
                     .unwrap_or_else(|_| "Unknown.dll".to_string());
 
                 let thunk_table_rva = if original_first_thunk != 0 {
@@ -160,7 +159,8 @@ impl PeInfoParser {
                             (format!("Ordinal_{}", ordinal), ordinal)
                         } else {
                             let name_entry_addr = module_base + (thunk_val as usize & 0x7FFF_FFFF);
-                            let name = proc.read_string(name_entry_addr + 2, 256, false)
+                            let name = proc
+                                .read_string(name_entry_addr + 2, 256, false)
                                 .unwrap_or_else(|_| format!("Sub_{:X}", thunk_val));
                             (name, 0)
                         };
@@ -190,7 +190,8 @@ impl PeInfoParser {
                             (format!("Ordinal_{}", ordinal), ordinal)
                         } else {
                             let name_entry_addr = module_base + (thunk_val as usize & 0x7FFF_FFFF);
-                            let name = proc.read_string(name_entry_addr + 2, 256, false)
+                            let name = proc
+                                .read_string(name_entry_addr + 2, 256, false)
                                 .unwrap_or_else(|_| format!("Sub_{:X}", thunk_val));
                             (name, 0)
                         };
@@ -217,7 +218,11 @@ impl PeInfoParser {
         }
 
         Ok(PeInfo {
-            image_base: if image_base_addr != 0 { image_base_addr } else { module_base },
+            image_base: if image_base_addr != 0 {
+                image_base_addr
+            } else {
+                module_base
+            },
             entry_point: module_base + entry_point_rva,
             size_of_image,
             is_64bit,

@@ -1,0 +1,29 @@
+name: Lazbuild
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'UI/**'
+      - '.github/workflows/lazbuild.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'UI/**'
+      - '.github/workflows/lazbuild.yml'
+
+jobs:
+  lazbuild:
+    name: lazbuild UI
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lazarus and Free Pascal
+        uses: gcarreno/setup-lazarus@v3.3.1
+        with:
+          lazarus-version: stable
+
+      - name: lazbuild onyxengine.lpi
+        shell: cmd
+        run: lazbuild --build-mode=Release "UI\onyxengine.lpi"

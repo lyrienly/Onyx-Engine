@@ -1,5 +1,5 @@
-use std::ffi::c_void;
 use crate::win32::*;
+use std::ffi::c_void;
 
 pub struct AntiDump;
 
@@ -46,7 +46,13 @@ impl AntiDump {
             let base = module_base as *mut u8;
             let mut old_protect: DWORD = 0;
 
-            if VirtualProtect(base as *mut c_void, 0x1000, PAGE_READWRITE, &mut old_protect) == TRUE {
+            if VirtualProtect(
+                base as *mut c_void,
+                0x1000,
+                PAGE_READWRITE,
+                &mut old_protect,
+            ) == TRUE
+            {
                 std::ptr::write_bytes(base, 0, 0x1000);
                 let mut dummy: DWORD = 0;
                 VirtualProtect(base as *mut c_void, 0x1000, old_protect, &mut dummy);
@@ -64,13 +70,8 @@ impl AntiDump {
 
     #[cfg(target_os = "windows")]
     unsafe fn get_peb_address() -> *mut u8 {
-        type NtQueryInfoProcessFn = unsafe extern "system" fn(
-            HANDLE,
-            u32,
-            *mut c_void,
-            u32,
-            *mut u32,
-        ) -> i32;
+        type NtQueryInfoProcessFn =
+            unsafe extern "system" fn(HANDLE, u32, *mut c_void, u32, *mut u32) -> i32;
 
         unsafe {
             let ntdll = GetModuleHandleA(b"ntdll.dll\0".as_ptr());

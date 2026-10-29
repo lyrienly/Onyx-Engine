@@ -1,4 +1,9 @@
-#![allow(non_snake_case, non_camel_case_types, non_upper_case_globals, dead_code)]
+#![allow(
+    non_snake_case,
+    non_camel_case_types,
+    non_upper_case_globals,
+    dead_code
+)]
 
 use std::ffi::c_void;
 
@@ -77,7 +82,8 @@ pub const TH32CS_SNAPPROCESS: DWORD = 0x00000002;
 pub const TH32CS_SNAPTHREAD: DWORD = 0x00000004;
 pub const TH32CS_SNAPMODULE: DWORD = 0x00000008;
 pub const TH32CS_SNAPMODULE32: DWORD = 0x00000010;
-pub const TH32CS_SNAPALL: DWORD = TH32CS_SNAPHEAPLIST | TH32CS_SNAPPROCESS | TH32CS_SNAPTHREAD | TH32CS_SNAPMODULE;
+pub const TH32CS_SNAPALL: DWORD =
+    TH32CS_SNAPHEAPLIST | TH32CS_SNAPPROCESS | TH32CS_SNAPTHREAD | TH32CS_SNAPMODULE;
 
 pub const TOKEN_ADJUST_PRIVILEGES: DWORD = 0x0020;
 pub const TOKEN_QUERY: DWORD = 0x0008;
@@ -215,7 +221,11 @@ pub const CONTEXT_INTEGER: DWORD = CONTEXT_AMD64 | 0x00000002;
 pub const CONTEXT_SEGMENTS: DWORD = CONTEXT_AMD64 | 0x00000004;
 pub const CONTEXT_FLOATING_POINT: DWORD = CONTEXT_AMD64 | 0x00000008;
 pub const CONTEXT_DEBUG_REGISTERS: DWORD = CONTEXT_AMD64 | 0x00000010;
-pub const CONTEXT_ALL: DWORD = CONTEXT_CONTROL | CONTEXT_INTEGER | CONTEXT_SEGMENTS | CONTEXT_FLOATING_POINT | CONTEXT_DEBUG_REGISTERS;
+pub const CONTEXT_ALL: DWORD = CONTEXT_CONTROL
+    | CONTEXT_INTEGER
+    | CONTEXT_SEGMENTS
+    | CONTEXT_FLOATING_POINT
+    | CONTEXT_DEBUG_REGISTERS;
 
 #[repr(C, align(16))]
 #[derive(Copy, Clone)]
@@ -380,13 +390,52 @@ unsafe extern "system" {
     pub fn OpenProcess(dwDesiredAccess: DWORD, bInheritHandle: BOOL, dwProcessId: DWORD) -> HANDLE;
     pub fn CloseHandle(hObject: HANDLE) -> BOOL;
     pub fn GetCurrentProcess() -> HANDLE;
-    pub fn ReadProcessMemory(hProcess: HANDLE, lpBaseAddress: LPCVOID, lpBuffer: LPVOID, nSize: SIZE_T, lpNumberOfBytesRead: *mut SIZE_T) -> BOOL;
-    pub fn WriteProcessMemory(hProcess: HANDLE, lpBaseAddress: LPVOID, lpBuffer: LPCVOID, nSize: SIZE_T, lpNumberOfBytesWritten: *mut SIZE_T) -> BOOL;
-    pub fn VirtualQueryEx(hProcess: HANDLE, lpAddress: LPCVOID, lpBuffer: *mut MEMORY_BASIC_INFORMATION, dwLength: SIZE_T) -> SIZE_T;
-    pub fn VirtualAllocEx(hProcess: HANDLE, lpAddress: LPVOID, dwSize: SIZE_T, flAllocationType: DWORD, flProtect: DWORD) -> LPVOID;
-    pub fn VirtualFreeEx(hProcess: HANDLE, lpAddress: LPVOID, dwSize: SIZE_T, dwFreeType: DWORD) -> BOOL;
-    pub fn VirtualProtectEx(hProcess: HANDLE, lpAddress: LPVOID, dwSize: SIZE_T, flNewProtect: DWORD, lpflOldProtect: PDWORD) -> BOOL;
-    pub fn VirtualProtect(lpAddress: LPVOID, dwSize: SIZE_T, flNewProtect: DWORD, lpflOldProtect: PDWORD) -> BOOL;
+    pub fn ReadProcessMemory(
+        hProcess: HANDLE,
+        lpBaseAddress: LPCVOID,
+        lpBuffer: LPVOID,
+        nSize: SIZE_T,
+        lpNumberOfBytesRead: *mut SIZE_T,
+    ) -> BOOL;
+    pub fn WriteProcessMemory(
+        hProcess: HANDLE,
+        lpBaseAddress: LPVOID,
+        lpBuffer: LPCVOID,
+        nSize: SIZE_T,
+        lpNumberOfBytesWritten: *mut SIZE_T,
+    ) -> BOOL;
+    pub fn VirtualQueryEx(
+        hProcess: HANDLE,
+        lpAddress: LPCVOID,
+        lpBuffer: *mut MEMORY_BASIC_INFORMATION,
+        dwLength: SIZE_T,
+    ) -> SIZE_T;
+    pub fn VirtualAllocEx(
+        hProcess: HANDLE,
+        lpAddress: LPVOID,
+        dwSize: SIZE_T,
+        flAllocationType: DWORD,
+        flProtect: DWORD,
+    ) -> LPVOID;
+    pub fn VirtualFreeEx(
+        hProcess: HANDLE,
+        lpAddress: LPVOID,
+        dwSize: SIZE_T,
+        dwFreeType: DWORD,
+    ) -> BOOL;
+    pub fn VirtualProtectEx(
+        hProcess: HANDLE,
+        lpAddress: LPVOID,
+        dwSize: SIZE_T,
+        flNewProtect: DWORD,
+        lpflOldProtect: PDWORD,
+    ) -> BOOL;
+    pub fn VirtualProtect(
+        lpAddress: LPVOID,
+        dwSize: SIZE_T,
+        flNewProtect: DWORD,
+        lpflOldProtect: PDWORD,
+    ) -> BOOL;
     pub fn GetCurrentThread() -> HANDLE;
     pub fn CheckRemoteDebuggerPresent(hProcess: HANDLE, pbDebuggerPresent: *mut BOOL) -> BOOL;
     pub fn IsDebuggerPresent() -> BOOL;
@@ -409,9 +458,21 @@ unsafe extern "system" {
 #[link(name = "advapi32")]
 unsafe extern "system" {
 
-    pub fn OpenProcessToken(ProcessHandle: HANDLE, DesiredAccess: DWORD, TokenHandle: *mut HANDLE) -> BOOL;
-    pub fn LookupPrivilegeValueW(lpSystemName: LPCWSTR, lpName: LPCWSTR, lpLuid: *mut LUID) -> BOOL;
-    pub fn AdjustTokenPrivileges(TokenHandle: HANDLE, DisableAllPrivileges: BOOL, NewState: *const TOKEN_PRIVILEGES, BufferLength: DWORD, PreviousState: *mut TOKEN_PRIVILEGES, ReturnLength: PDWORD) -> BOOL;
+    pub fn OpenProcessToken(
+        ProcessHandle: HANDLE,
+        DesiredAccess: DWORD,
+        TokenHandle: *mut HANDLE,
+    ) -> BOOL;
+    pub fn LookupPrivilegeValueW(lpSystemName: LPCWSTR, lpName: LPCWSTR, lpLuid: *mut LUID)
+    -> BOOL;
+    pub fn AdjustTokenPrivileges(
+        TokenHandle: HANDLE,
+        DisableAllPrivileges: BOOL,
+        NewState: *const TOKEN_PRIVILEGES,
+        BufferLength: DWORD,
+        PreviousState: *mut TOKEN_PRIVILEGES,
+        ReturnLength: PDWORD,
+    ) -> BOOL;
 }
 
 #[link(name = "kernel32")]
@@ -440,7 +501,11 @@ unsafe extern "system" {
     pub fn DebugActiveProcess(dwProcessId: DWORD) -> BOOL;
     pub fn DebugActiveProcessStop(dwProcessId: DWORD) -> BOOL;
     pub fn WaitForDebugEvent(lpDebugEvent: *mut DEBUG_EVENT, dwMilliseconds: DWORD) -> BOOL;
-    pub fn ContinueDebugEvent(dwProcessId: DWORD, dwThreadId: DWORD, dwContinueStatus: DWORD) -> BOOL;
+    pub fn ContinueDebugEvent(
+        dwProcessId: DWORD,
+        dwThreadId: DWORD,
+        dwContinueStatus: DWORD,
+    ) -> BOOL;
     pub fn GetLastError() -> DWORD;
     pub fn GetCurrentProcessId() -> DWORD;
 

@@ -16,11 +16,12 @@ This test suite is designed to give 100% confidence in MCP bridge reliability.
 import win32file
 import struct
 import json
+import os
 import time
 import sys
 from typing import Optional, Dict, Any, Tuple, List, Callable
 
-PIPE_NAME = r"\\.\pipe\CE_MCP_Bridge_v99"
+PIPE_NAME = os.environ.get("ONYX_MCP_PIPE") or r"\\.\pipe\Onyx_MCP_Bridge_v1"
 MAX_RESPONSE_BYTES = 32 * 1024 * 1024
 EXPECTED_VERSION_PREFIX = "12."
 

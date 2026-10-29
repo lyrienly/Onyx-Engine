@@ -43,25 +43,11 @@ pub struct OnyxPluginHostAPI {
     pub struct_size: u32,
     pub get_target_pid: Option<unsafe extern "system" fn() -> u32>,
     pub get_target_handle: Option<unsafe extern "system" fn() -> *mut std::ffi::c_void>,
-    pub read_memory: Option<
-        unsafe extern "system" fn(
-            u64,
-            *mut std::ffi::c_void,
-            usize,
-            *mut usize,
-        ) -> i32,
-    >,
-    pub write_memory: Option<
-        unsafe extern "system" fn(
-            u64,
-            *const std::ffi::c_void,
-            usize,
-            *mut usize,
-        ) -> i32,
-    >,
-    pub resolve_symbol: Option<
-        unsafe extern "system" fn(u64, *mut c_char, usize, *mut u64) -> i32,
-    >,
+    pub read_memory:
+        Option<unsafe extern "system" fn(u64, *mut std::ffi::c_void, usize, *mut usize) -> i32>,
+    pub write_memory:
+        Option<unsafe extern "system" fn(u64, *const std::ffi::c_void, usize, *mut usize) -> i32>,
+    pub resolve_symbol: Option<unsafe extern "system" fn(u64, *mut c_char, usize, *mut u64) -> i32>,
     pub log_message: Option<unsafe extern "system" fn(i32, *const c_char)>,
 }
 
@@ -92,8 +78,7 @@ pub unsafe extern "system" fn OnyxPlugin_Init(_host_api: *const OnyxPluginHostAP
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn OnyxPlugin_Shutdown() {
-}
+pub unsafe extern "system" fn OnyxPlugin_Shutdown() {}
 
 fn write_c_string(dest: &mut [c_char], src: &str) {
     let bytes = src.as_bytes();
@@ -137,7 +122,10 @@ pub unsafe extern "system" fn OnyxPlugin_ValidateAOB(
     };
 
     let module_filter = if !module_filter_ptr.is_null() {
-        CStr::from_ptr(module_filter_ptr).to_str().unwrap_or("").trim()
+        CStr::from_ptr(module_filter_ptr)
+            .to_str()
+            .unwrap_or("")
+            .trim()
     } else {
         ""
     };
@@ -159,15 +147,16 @@ pub unsafe extern "system" fn OnyxPlugin_ValidateAOB(
         }
     };
 
-    let modules = match proc.modules() {
-        Ok(m) => m,
-        Err(_) => Vec::new(),
-    };
+    let modules = proc.modules().unwrap_or_default();
 
     let target_modules: Vec<_> = if !module_filter.is_empty() {
         modules
             .into_iter()
-            .filter(|m| m.name.to_lowercase().contains(&module_filter.to_lowercase()))
+            .filter(|m| {
+                m.name
+                    .to_lowercase()
+                    .contains(&module_filter.to_lowercase())
+            })
             .collect()
     } else {
         modules
@@ -271,7 +260,11 @@ pub unsafe extern "system" fn OnyxPlugin_ValidateAOB(
 
         if func_name.is_empty() {
             if !first_match_mod_name.is_empty() {
-                func_name = format!("{}+0x{:X}", first_match_mod_name, (*out_result).module_offset);
+                func_name = format!(
+                    "{}+0x{:X}",
+                    first_match_mod_name,
+                    (*out_result).module_offset
+                );
                 func_start = first_match_addr as u64;
                 func_disp = 0;
             } else {
@@ -291,7 +284,10 @@ pub unsafe extern "system" fn OnyxPlugin_ValidateAOB(
                 let curr_addr = first_match_addr + off;
                 let insn = Disassembler::decode_one(curr_addr, &code_slice[off..]);
                 let len = insn.length.max(1);
-                disasm_lines.push(format!("0x{:X}: {} {}", curr_addr, insn.mnemonic, insn.operands));
+                disasm_lines.push(format!(
+                    "0x{:X}: {} {}",
+                    curr_addr, insn.mnemonic, insn.operands
+                ));
                 off += len;
             }
         }
@@ -336,9 +332,9 @@ pub unsafe extern "system" fn OnyxPlugin_GenerateAOB(
     };
 
     let modules = proc.modules().unwrap_or_default();
-    let enclosing_mod = modules
-        .iter()
-        .find(|m| (target_address as usize) >= m.base && (target_address as usize) < (m.base + m.size));
+    let enclosing_mod = modules.iter().find(|m| {
+        (target_address as usize) >= m.base && (target_address as usize) < (m.base + m.size)
+    });
 
     let (scan_start, scan_stop) = if let Some(m) = enclosing_mod {
         (m.base, m.base + m.size)
@@ -349,7 +345,11 @@ pub unsafe extern "system" fn OnyxPlugin_GenerateAOB(
         )
     };
 
-    let max_sig = if max_len == 0 { 64 } else { (max_len as usize).min(256) };
+    let max_sig = if max_len == 0 {
+        64
+    } else {
+        (max_len as usize).min(256)
+    };
 
     match SignatureMaker::generate_signature(
         &proc,

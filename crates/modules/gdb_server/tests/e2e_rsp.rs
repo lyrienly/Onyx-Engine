@@ -22,7 +22,6 @@ fn exchange(stream: &mut TcpStream, payload: &[u8]) -> Vec<u8> {
     let mut buf: Vec<u8> = Vec::new();
     let mut tmp = [0u8; 2048];
     loop {
-
         let mut scan = buf.as_slice();
         while let Some(&b) = scan.first() {
             if b == b'+' || b == b'-' {
@@ -32,7 +31,6 @@ fn exchange(stream: &mut TcpStream, payload: &[u8]) -> Vec<u8> {
             }
         }
         if let Ok((pkt, _)) = parse_packet(scan) {
-
             stream.write_all(b"+").unwrap();
             stream.flush().unwrap();
             return pkt.data;
@@ -45,13 +43,13 @@ fn exchange(stream: &mut TcpStream, payload: &[u8]) -> Vec<u8> {
 
 #[test]
 fn full_handshake_against_mock() {
-
     let mut regs = Registers::default();
     regs.rax = 0x1122334455667788;
     regs.rbx = 0xaabbccddeeff0011;
     regs.rip = 0x0000_7ffe_0000_1234;
 
-    let mut mock = MockTarget::new().with_memory(0x1000, &[0xde, 0xad, 0xbe, 0xef, 0x90, 0x90, 0xcc, 0xc3]);
+    let mut mock =
+        MockTarget::new().with_memory(0x1000, &[0xde, 0xad, 0xbe, 0xef, 0x90, 0x90, 0xcc, 0xc3]);
     mock.regs = regs.clone();
     let target = Arc::new(Mutex::new(mock));
 
@@ -61,7 +59,9 @@ fn full_handshake_against_mock() {
 
     std::thread::sleep(Duration::from_millis(50));
     let mut stream = TcpStream::connect(&addr).unwrap();
-    stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
 
     let r = exchange(&mut stream, b"qSupported:multiprocess+;xmlRegisters=i386");
     let r_s = std::str::from_utf8(&r).unwrap();
@@ -141,10 +141,15 @@ fn unknown_command_returns_empty() {
     let server = GdbServer::listen(addr.clone(), target).unwrap();
     std::thread::sleep(Duration::from_millis(50));
     let mut stream = TcpStream::connect(&addr).unwrap();
-    stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
 
     let r = exchange(&mut stream, b"XqualquerCoisa");
-    assert!(r.is_empty(), "comando desconhecido deve retornar pacote vazio");
+    assert!(
+        r.is_empty(),
+        "comando desconhecido deve retornar pacote vazio"
+    );
 
     let r = exchange(&mut stream, b"k");
     assert_eq!(&r, b"OK");

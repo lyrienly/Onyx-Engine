@@ -1,5 +1,5 @@
-use std::ffi::c_void;
 use crate::win32::*;
+use std::ffi::c_void;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -83,7 +83,10 @@ impl PeRemap {
         sections
     }
 
-    pub fn find_section<'a>(sections: &'a [SectionBounds], name: &[u8]) -> Option<&'a SectionBounds> {
+    pub fn find_section<'a>(
+        sections: &'a [SectionBounds],
+        name: &[u8],
+    ) -> Option<&'a SectionBounds> {
         sections.iter().find(|s| {
             let s_name = s.name.split(|&b| b == 0).next().unwrap_or(&s.name);
             s_name == name
@@ -115,14 +118,12 @@ impl PeRemap {
 
             let mut old_prot: DWORD = 0;
             unsafe {
-                let ok = VirtualProtect(
-                    target_addr as *mut c_void,
-                    size,
-                    new_prot,
-                    &mut old_prot,
-                );
+                let ok = VirtualProtect(target_addr as *mut c_void, size, new_prot, &mut old_prot);
                 if ok != TRUE {
-                    return Err(format!("Failed to protect section {:?}", String::from_utf8_lossy(sec_name)));
+                    return Err(format!(
+                        "Failed to protect section {:?}",
+                        String::from_utf8_lossy(sec_name)
+                    ));
                 }
             }
         }

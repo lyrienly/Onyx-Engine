@@ -51,7 +51,10 @@ impl SignatureLibrary {
             return Err("signature pattern must not be empty".to_string());
         }
         AobValidator::parse(pattern).map_err(|e| {
-            format!("invalid pattern at token {} ({}): {}", e.token_index, e.token, e.message)
+            format!(
+                "invalid pattern at token {} ({}): {}",
+                e.token_index, e.token, e.message
+            )
         })?;
 
         if let Some(existing) = self.signatures.iter_mut().find(|s| s.name == name) {
@@ -121,14 +124,13 @@ impl SignatureLibrary {
     }
 
     pub fn load(path: &str) -> Result<Self, String> {
-        let text = std::fs::read_to_string(path)
-            .map_err(|e| format!("failed to read {}: {}", path, e))?;
+        let text =
+            std::fs::read_to_string(path).map_err(|e| format!("failed to read {}: {}", path, e))?;
         Self::from_text(&text)
     }
 
     pub fn save(&self, path: &str) -> Result<(), String> {
-        std::fs::write(path, self.to_text())
-            .map_err(|e| format!("failed to write {}: {}", path, e))
+        std::fs::write(path, self.to_text()).map_err(|e| format!("failed to write {}: {}", path, e))
     }
 
     pub fn validate_all(&self, buffer: &[u8], base: usize) -> Vec<SignatureCheck> {
@@ -157,9 +159,10 @@ impl SignatureLibrary {
                 .match_offsets
                 .first()
                 .map(|offset| base.wrapping_add(*offset)),
-            error: validation.error.as_ref().map(|e| {
-                format!("token {} ({}): {}", e.token_index, e.token, e.message)
-            }),
+            error: validation
+                .error
+                .as_ref()
+                .map(|e| format!("token {} ({}): {}", e.token_index, e.token, e.message)),
             warning_flags: validation.warning_flags(),
         }
     }

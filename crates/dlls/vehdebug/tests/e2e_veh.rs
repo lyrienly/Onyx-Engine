@@ -3,13 +3,12 @@
 
 use vehdebug_dll::debugger::VehDebugger;
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[inline(never)]
 #[unsafe(no_mangle)]
 extern "C" fn vehdebug_test_target(x: u64) -> u64 {
-
     let mut r = x.wrapping_add(1);
     r = r.wrapping_mul(3);
     std::hint::black_box(r)

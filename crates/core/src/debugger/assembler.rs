@@ -16,79 +16,350 @@ pub struct RegInfo {
 pub fn parse_reg(s: &str) -> Option<RegInfo> {
     let lower = s.trim().to_lowercase();
     match lower.as_str() {
+        "rax" => Some(RegInfo {
+            id: 0,
+            size: RegSize::Qword,
+            is_high_byte: false,
+        }),
+        "rcx" => Some(RegInfo {
+            id: 1,
+            size: RegSize::Qword,
+            is_high_byte: false,
+        }),
+        "rdx" => Some(RegInfo {
+            id: 2,
+            size: RegSize::Qword,
+            is_high_byte: false,
+        }),
+        "rbx" => Some(RegInfo {
+            id: 3,
+            size: RegSize::Qword,
+            is_high_byte: false,
+        }),
+        "rsp" => Some(RegInfo {
+            id: 4,
+            size: RegSize::Qword,
+            is_high_byte: false,
+        }),
+        "rbp" => Some(RegInfo {
+            id: 5,
+            size: RegSize::Qword,
+            is_high_byte: false,
+        }),
+        "rsi" => Some(RegInfo {
+            id: 6,
+            size: RegSize::Qword,
+            is_high_byte: false,
+        }),
+        "rdi" => Some(RegInfo {
+            id: 7,
+            size: RegSize::Qword,
+            is_high_byte: false,
+        }),
+        "r8" => Some(RegInfo {
+            id: 8,
+            size: RegSize::Qword,
+            is_high_byte: false,
+        }),
+        "r9" => Some(RegInfo {
+            id: 9,
+            size: RegSize::Qword,
+            is_high_byte: false,
+        }),
+        "r10" => Some(RegInfo {
+            id: 10,
+            size: RegSize::Qword,
+            is_high_byte: false,
+        }),
+        "r11" => Some(RegInfo {
+            id: 11,
+            size: RegSize::Qword,
+            is_high_byte: false,
+        }),
+        "r12" => Some(RegInfo {
+            id: 12,
+            size: RegSize::Qword,
+            is_high_byte: false,
+        }),
+        "r13" => Some(RegInfo {
+            id: 13,
+            size: RegSize::Qword,
+            is_high_byte: false,
+        }),
+        "r14" => Some(RegInfo {
+            id: 14,
+            size: RegSize::Qword,
+            is_high_byte: false,
+        }),
+        "r15" => Some(RegInfo {
+            id: 15,
+            size: RegSize::Qword,
+            is_high_byte: false,
+        }),
 
-        "rax" => Some(RegInfo { id: 0, size: RegSize::Qword, is_high_byte: false }),
-        "rcx" => Some(RegInfo { id: 1, size: RegSize::Qword, is_high_byte: false }),
-        "rdx" => Some(RegInfo { id: 2, size: RegSize::Qword, is_high_byte: false }),
-        "rbx" => Some(RegInfo { id: 3, size: RegSize::Qword, is_high_byte: false }),
-        "rsp" => Some(RegInfo { id: 4, size: RegSize::Qword, is_high_byte: false }),
-        "rbp" => Some(RegInfo { id: 5, size: RegSize::Qword, is_high_byte: false }),
-        "rsi" => Some(RegInfo { id: 6, size: RegSize::Qword, is_high_byte: false }),
-        "rdi" => Some(RegInfo { id: 7, size: RegSize::Qword, is_high_byte: false }),
-        "r8"  => Some(RegInfo { id: 8, size: RegSize::Qword, is_high_byte: false }),
-        "r9"  => Some(RegInfo { id: 9, size: RegSize::Qword, is_high_byte: false }),
-        "r10" => Some(RegInfo { id: 10, size: RegSize::Qword, is_high_byte: false }),
-        "r11" => Some(RegInfo { id: 11, size: RegSize::Qword, is_high_byte: false }),
-        "r12" => Some(RegInfo { id: 12, size: RegSize::Qword, is_high_byte: false }),
-        "r13" => Some(RegInfo { id: 13, size: RegSize::Qword, is_high_byte: false }),
-        "r14" => Some(RegInfo { id: 14, size: RegSize::Qword, is_high_byte: false }),
-        "r15" => Some(RegInfo { id: 15, size: RegSize::Qword, is_high_byte: false }),
+        "eax" => Some(RegInfo {
+            id: 0,
+            size: RegSize::Dword,
+            is_high_byte: false,
+        }),
+        "ecx" => Some(RegInfo {
+            id: 1,
+            size: RegSize::Dword,
+            is_high_byte: false,
+        }),
+        "edx" => Some(RegInfo {
+            id: 2,
+            size: RegSize::Dword,
+            is_high_byte: false,
+        }),
+        "ebx" => Some(RegInfo {
+            id: 3,
+            size: RegSize::Dword,
+            is_high_byte: false,
+        }),
+        "esp" => Some(RegInfo {
+            id: 4,
+            size: RegSize::Dword,
+            is_high_byte: false,
+        }),
+        "ebp" => Some(RegInfo {
+            id: 5,
+            size: RegSize::Dword,
+            is_high_byte: false,
+        }),
+        "esi" => Some(RegInfo {
+            id: 6,
+            size: RegSize::Dword,
+            is_high_byte: false,
+        }),
+        "edi" => Some(RegInfo {
+            id: 7,
+            size: RegSize::Dword,
+            is_high_byte: false,
+        }),
+        "r8d" => Some(RegInfo {
+            id: 8,
+            size: RegSize::Dword,
+            is_high_byte: false,
+        }),
+        "r9d" => Some(RegInfo {
+            id: 9,
+            size: RegSize::Dword,
+            is_high_byte: false,
+        }),
+        "r10d" => Some(RegInfo {
+            id: 10,
+            size: RegSize::Dword,
+            is_high_byte: false,
+        }),
+        "r11d" => Some(RegInfo {
+            id: 11,
+            size: RegSize::Dword,
+            is_high_byte: false,
+        }),
+        "r12d" => Some(RegInfo {
+            id: 12,
+            size: RegSize::Dword,
+            is_high_byte: false,
+        }),
+        "r13d" => Some(RegInfo {
+            id: 13,
+            size: RegSize::Dword,
+            is_high_byte: false,
+        }),
+        "r14d" => Some(RegInfo {
+            id: 14,
+            size: RegSize::Dword,
+            is_high_byte: false,
+        }),
+        "r15d" => Some(RegInfo {
+            id: 15,
+            size: RegSize::Dword,
+            is_high_byte: false,
+        }),
 
-        "eax" => Some(RegInfo { id: 0, size: RegSize::Dword, is_high_byte: false }),
-        "ecx" => Some(RegInfo { id: 1, size: RegSize::Dword, is_high_byte: false }),
-        "edx" => Some(RegInfo { id: 2, size: RegSize::Dword, is_high_byte: false }),
-        "ebx" => Some(RegInfo { id: 3, size: RegSize::Dword, is_high_byte: false }),
-        "esp" => Some(RegInfo { id: 4, size: RegSize::Dword, is_high_byte: false }),
-        "ebp" => Some(RegInfo { id: 5, size: RegSize::Dword, is_high_byte: false }),
-        "esi" => Some(RegInfo { id: 6, size: RegSize::Dword, is_high_byte: false }),
-        "edi" => Some(RegInfo { id: 7, size: RegSize::Dword, is_high_byte: false }),
-        "r8d" => Some(RegInfo { id: 8, size: RegSize::Dword, is_high_byte: false }),
-        "r9d" => Some(RegInfo { id: 9, size: RegSize::Dword, is_high_byte: false }),
-        "r10d" => Some(RegInfo { id: 10, size: RegSize::Dword, is_high_byte: false }),
-        "r11d" => Some(RegInfo { id: 11, size: RegSize::Dword, is_high_byte: false }),
-        "r12d" => Some(RegInfo { id: 12, size: RegSize::Dword, is_high_byte: false }),
-        "r13d" => Some(RegInfo { id: 13, size: RegSize::Dword, is_high_byte: false }),
-        "r14d" => Some(RegInfo { id: 14, size: RegSize::Dword, is_high_byte: false }),
-        "r15d" => Some(RegInfo { id: 15, size: RegSize::Dword, is_high_byte: false }),
+        "ax" => Some(RegInfo {
+            id: 0,
+            size: RegSize::Word,
+            is_high_byte: false,
+        }),
+        "cx" => Some(RegInfo {
+            id: 1,
+            size: RegSize::Word,
+            is_high_byte: false,
+        }),
+        "dx" => Some(RegInfo {
+            id: 2,
+            size: RegSize::Word,
+            is_high_byte: false,
+        }),
+        "bx" => Some(RegInfo {
+            id: 3,
+            size: RegSize::Word,
+            is_high_byte: false,
+        }),
+        "sp" => Some(RegInfo {
+            id: 4,
+            size: RegSize::Word,
+            is_high_byte: false,
+        }),
+        "bp" => Some(RegInfo {
+            id: 5,
+            size: RegSize::Word,
+            is_high_byte: false,
+        }),
+        "si" => Some(RegInfo {
+            id: 6,
+            size: RegSize::Word,
+            is_high_byte: false,
+        }),
+        "di" => Some(RegInfo {
+            id: 7,
+            size: RegSize::Word,
+            is_high_byte: false,
+        }),
+        "r8w" => Some(RegInfo {
+            id: 8,
+            size: RegSize::Word,
+            is_high_byte: false,
+        }),
+        "r9w" => Some(RegInfo {
+            id: 9,
+            size: RegSize::Word,
+            is_high_byte: false,
+        }),
+        "r10w" => Some(RegInfo {
+            id: 10,
+            size: RegSize::Word,
+            is_high_byte: false,
+        }),
+        "r11w" => Some(RegInfo {
+            id: 11,
+            size: RegSize::Word,
+            is_high_byte: false,
+        }),
+        "r12w" => Some(RegInfo {
+            id: 12,
+            size: RegSize::Word,
+            is_high_byte: false,
+        }),
+        "r13w" => Some(RegInfo {
+            id: 13,
+            size: RegSize::Word,
+            is_high_byte: false,
+        }),
+        "r14w" => Some(RegInfo {
+            id: 14,
+            size: RegSize::Word,
+            is_high_byte: false,
+        }),
+        "r15w" => Some(RegInfo {
+            id: 15,
+            size: RegSize::Word,
+            is_high_byte: false,
+        }),
 
-        "ax"  => Some(RegInfo { id: 0, size: RegSize::Word, is_high_byte: false }),
-        "cx"  => Some(RegInfo { id: 1, size: RegSize::Word, is_high_byte: false }),
-        "dx"  => Some(RegInfo { id: 2, size: RegSize::Word, is_high_byte: false }),
-        "bx"  => Some(RegInfo { id: 3, size: RegSize::Word, is_high_byte: false }),
-        "sp"  => Some(RegInfo { id: 4, size: RegSize::Word, is_high_byte: false }),
-        "bp"  => Some(RegInfo { id: 5, size: RegSize::Word, is_high_byte: false }),
-        "si"  => Some(RegInfo { id: 6, size: RegSize::Word, is_high_byte: false }),
-        "di"  => Some(RegInfo { id: 7, size: RegSize::Word, is_high_byte: false }),
-        "r8w" => Some(RegInfo { id: 8, size: RegSize::Word, is_high_byte: false }),
-        "r9w" => Some(RegInfo { id: 9, size: RegSize::Word, is_high_byte: false }),
-        "r10w" => Some(RegInfo { id: 10, size: RegSize::Word, is_high_byte: false }),
-        "r11w" => Some(RegInfo { id: 11, size: RegSize::Word, is_high_byte: false }),
-        "r12w" => Some(RegInfo { id: 12, size: RegSize::Word, is_high_byte: false }),
-        "r13w" => Some(RegInfo { id: 13, size: RegSize::Word, is_high_byte: false }),
-        "r14w" => Some(RegInfo { id: 14, size: RegSize::Word, is_high_byte: false }),
-        "r15w" => Some(RegInfo { id: 15, size: RegSize::Word, is_high_byte: false }),
+        "al" => Some(RegInfo {
+            id: 0,
+            size: RegSize::Byte,
+            is_high_byte: false,
+        }),
+        "cl" => Some(RegInfo {
+            id: 1,
+            size: RegSize::Byte,
+            is_high_byte: false,
+        }),
+        "dl" => Some(RegInfo {
+            id: 2,
+            size: RegSize::Byte,
+            is_high_byte: false,
+        }),
+        "bl" => Some(RegInfo {
+            id: 3,
+            size: RegSize::Byte,
+            is_high_byte: false,
+        }),
+        "spl" => Some(RegInfo {
+            id: 4,
+            size: RegSize::Byte,
+            is_high_byte: false,
+        }),
+        "bpl" => Some(RegInfo {
+            id: 5,
+            size: RegSize::Byte,
+            is_high_byte: false,
+        }),
+        "sil" => Some(RegInfo {
+            id: 6,
+            size: RegSize::Byte,
+            is_high_byte: false,
+        }),
+        "dil" => Some(RegInfo {
+            id: 7,
+            size: RegSize::Byte,
+            is_high_byte: false,
+        }),
+        "r8b" => Some(RegInfo {
+            id: 8,
+            size: RegSize::Byte,
+            is_high_byte: false,
+        }),
+        "r9b" => Some(RegInfo {
+            id: 9,
+            size: RegSize::Byte,
+            is_high_byte: false,
+        }),
+        "r10b" => Some(RegInfo {
+            id: 10,
+            size: RegSize::Byte,
+            is_high_byte: false,
+        }),
+        "r11b" => Some(RegInfo {
+            id: 11,
+            size: RegSize::Byte,
+            is_high_byte: false,
+        }),
+        "r12b" => Some(RegInfo {
+            id: 12,
+            size: RegSize::Byte,
+            is_high_byte: false,
+        }),
+        "r13b" => Some(RegInfo {
+            id: 13,
+            size: RegSize::Byte,
+            is_high_byte: false,
+        }),
+        "r14b" => Some(RegInfo {
+            id: 14,
+            size: RegSize::Byte,
+            is_high_byte: false,
+        }),
+        "r15b" => Some(RegInfo {
+            id: 15,
+            size: RegSize::Byte,
+            is_high_byte: false,
+        }),
 
-        "al"  => Some(RegInfo { id: 0, size: RegSize::Byte, is_high_byte: false }),
-        "cl"  => Some(RegInfo { id: 1, size: RegSize::Byte, is_high_byte: false }),
-        "dl"  => Some(RegInfo { id: 2, size: RegSize::Byte, is_high_byte: false }),
-        "bl"  => Some(RegInfo { id: 3, size: RegSize::Byte, is_high_byte: false }),
-        "spl" => Some(RegInfo { id: 4, size: RegSize::Byte, is_high_byte: false }),
-        "bpl" => Some(RegInfo { id: 5, size: RegSize::Byte, is_high_byte: false }),
-        "sil" => Some(RegInfo { id: 6, size: RegSize::Byte, is_high_byte: false }),
-        "dil" => Some(RegInfo { id: 7, size: RegSize::Byte, is_high_byte: false }),
-        "r8b" => Some(RegInfo { id: 8, size: RegSize::Byte, is_high_byte: false }),
-        "r9b" => Some(RegInfo { id: 9, size: RegSize::Byte, is_high_byte: false }),
-        "r10b" => Some(RegInfo { id: 10, size: RegSize::Byte, is_high_byte: false }),
-        "r11b" => Some(RegInfo { id: 11, size: RegSize::Byte, is_high_byte: false }),
-        "r12b" => Some(RegInfo { id: 12, size: RegSize::Byte, is_high_byte: false }),
-        "r13b" => Some(RegInfo { id: 13, size: RegSize::Byte, is_high_byte: false }),
-        "r14b" => Some(RegInfo { id: 14, size: RegSize::Byte, is_high_byte: false }),
-        "r15b" => Some(RegInfo { id: 15, size: RegSize::Byte, is_high_byte: false }),
-
-        "ah"  => Some(RegInfo { id: 4, size: RegSize::Byte, is_high_byte: true }),
-        "ch"  => Some(RegInfo { id: 5, size: RegSize::Byte, is_high_byte: true }),
-        "dh"  => Some(RegInfo { id: 6, size: RegSize::Byte, is_high_byte: true }),
-        "bh"  => Some(RegInfo { id: 7, size: RegSize::Byte, is_high_byte: true }),
+        "ah" => Some(RegInfo {
+            id: 4,
+            size: RegSize::Byte,
+            is_high_byte: true,
+        }),
+        "ch" => Some(RegInfo {
+            id: 5,
+            size: RegSize::Byte,
+            is_high_byte: true,
+        }),
+        "dh" => Some(RegInfo {
+            id: 6,
+            size: RegSize::Byte,
+            is_high_byte: true,
+        }),
+        "bh" => Some(RegInfo {
+            id: 7,
+            size: RegSize::Byte,
+            is_high_byte: true,
+        }),
 
         _ => None,
     }
@@ -208,10 +479,8 @@ pub fn parse_mem_operand(s: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> O
 
         let num_val = if let Some(n) = parse_int_or_hex(t) {
             Some(n)
-        } else if let Some(sym_addr) = resolver(t) {
-            Some(sym_addr as i64)
         } else {
-            None
+            resolver(t).map(|sym_addr| sym_addr as i64)
         };
 
         if let Some(val) = num_val {
@@ -235,32 +504,33 @@ pub fn parse_mem_operand(s: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> O
 
 pub fn parse_int_or_hex(s: &str) -> Option<i64> {
     let t = s.trim();
-    if t.starts_with("0x") || t.starts_with("0X") {
-        i64::from_str_radix(&t[2..], 16).ok()
-    } else if t.starts_with('$') {
-        i64::from_str_radix(&t[1..], 16).ok()
-    } else if t.starts_with('#') {
-        t[1..].trim().parse::<i64>().ok()
-    } else if t.starts_with('-') {
-        let rest = &t[1..].trim();
-        if rest.starts_with("0x") || rest.starts_with("0X") {
-            i64::from_str_radix(&rest[2..], 16).ok().map(|n| -n)
-        } else if rest.starts_with('$') {
-            i64::from_str_radix(&rest[1..], 16).ok().map(|n| -n)
-        } else if rest.starts_with('#') {
-            rest[1..].trim().parse::<i64>().ok().map(|n| -n)
+    if let Some(rest) = t.strip_prefix("0x").or_else(|| t.strip_prefix("0X")) {
+        i64::from_str_radix(rest, 16).ok()
+    } else if let Some(rest) = t.strip_prefix('$') {
+        i64::from_str_radix(rest, 16).ok()
+    } else if let Some(rest) = t.strip_prefix('#') {
+        rest.trim().parse::<i64>().ok()
+    } else if let Some(after_minus) = t.strip_prefix('-') {
+        let rest = after_minus.trim();
+        if let Some(hex) = rest.strip_prefix("0x").or_else(|| rest.strip_prefix("0X")) {
+            i64::from_str_radix(hex, 16).ok().map(|n| -n)
+        } else if let Some(hex) = rest.strip_prefix('$') {
+            i64::from_str_radix(hex, 16).ok().map(|n| -n)
+        } else if let Some(dec) = rest.strip_prefix('#') {
+            dec.trim().parse::<i64>().ok().map(|n| -n)
         } else {
             rest.parse::<i64>().ok().map(|n| -n)
         }
     } else {
-        t.parse::<i64>().ok().or_else(|| i64::from_str_radix(t, 16).ok())
+        t.parse::<i64>()
+            .ok()
+            .or_else(|| i64::from_str_radix(t, 16).ok())
     }
 }
 
 pub struct Assembler;
 
 impl Assembler {
-
     pub fn assemble_line(
         line: &str,
         current_ip: usize,
@@ -282,10 +552,16 @@ impl Assembler {
         } else if lower.starts_with("dq ") {
             return parse_dq_directive(&trimmed[3..], resolver);
         } else if lower.starts_with("float ") {
-            let f = trimmed[6..].trim().parse::<f32>().map_err(|e| e.to_string())?;
+            let f = trimmed[6..]
+                .trim()
+                .parse::<f32>()
+                .map_err(|e| e.to_string())?;
             return Ok(f.to_ne_bytes().to_vec());
         } else if lower.starts_with("double ") {
-            let d = trimmed[7..].trim().parse::<f64>().map_err(|e| e.to_string())?;
+            let d = trimmed[7..]
+                .trim()
+                .parse::<f64>()
+                .map_err(|e| e.to_string())?;
             return Ok(d.to_ne_bytes().to_vec());
         }
 
@@ -327,8 +603,10 @@ impl Assembler {
                     } else if reg.size == RegSize::Dword {
                         return Ok(vec![0x50 + reg.id]);
                     }
-                } else if let Some(imm) = parse_int_or_hex(ops_str).or_else(|| resolver(ops_str).map(|a| a as i64)) {
-                    if imm >= -128 && imm <= 127 {
+                } else if let Some(imm) =
+                    parse_int_or_hex(ops_str).or_else(|| resolver(ops_str).map(|a| a as i64))
+                {
+                    if (-128..=127).contains(&imm) {
                         return Ok(vec![0x6A, imm as u8]);
                     } else {
                         let mut b = vec![0x68];
@@ -366,7 +644,17 @@ impl Assembler {
                 }
 
                 if let Some(mem) = parse_mem_operand(ops_str, resolver) {
-                    return encode_modrm_insn(0xFF, 0xFF, RegInfo { id: 2, size: RegSize::Qword, is_high_byte: false }, &mem, false);
+                    return encode_modrm_insn(
+                        0xFF,
+                        0xFF,
+                        RegInfo {
+                            id: 2,
+                            size: RegSize::Qword,
+                            is_high_byte: false,
+                        },
+                        &mem,
+                        false,
+                    );
                 }
 
                 let target = resolver(ops_str)
@@ -379,7 +667,6 @@ impl Assembler {
                     b.extend_from_slice(&(rel as i32).to_le_bytes());
                     return Ok(b);
                 } else {
-
                     let mut b = vec![0x48, 0xB8];
                     b.extend_from_slice(&(target as u64).to_le_bytes());
                     b.extend_from_slice(&[0xFF, 0xD0]);
@@ -387,18 +674,18 @@ impl Assembler {
                 }
             }
 
-            "je" | "jz"   => return assemble_cond_jump(0x84, 0x74, ops_str, current_ip, resolver),
+            "je" | "jz" => return assemble_cond_jump(0x84, 0x74, ops_str, current_ip, resolver),
             "jne" | "jnz" => return assemble_cond_jump(0x85, 0x75, ops_str, current_ip, resolver),
-            "jb" | "jc"   => return assemble_cond_jump(0x82, 0x72, ops_str, current_ip, resolver),
+            "jb" | "jc" => return assemble_cond_jump(0x82, 0x72, ops_str, current_ip, resolver),
             "jae" | "jnc" => return assemble_cond_jump(0x83, 0x73, ops_str, current_ip, resolver),
-            "jbe"         => return assemble_cond_jump(0x86, 0x76, ops_str, current_ip, resolver),
-            "ja"          => return assemble_cond_jump(0x87, 0x77, ops_str, current_ip, resolver),
-            "jl"          => return assemble_cond_jump(0x8C, 0x7C, ops_str, current_ip, resolver),
-            "jge"         => return assemble_cond_jump(0x8D, 0x7D, ops_str, current_ip, resolver),
-            "jle"         => return assemble_cond_jump(0x8E, 0x7E, ops_str, current_ip, resolver),
-            "jg"          => return assemble_cond_jump(0x8F, 0x7F, ops_str, current_ip, resolver),
-            "js"          => return assemble_cond_jump(0x88, 0x78, ops_str, current_ip, resolver),
-            "jns"         => return assemble_cond_jump(0x89, 0x79, ops_str, current_ip, resolver),
+            "jbe" => return assemble_cond_jump(0x86, 0x76, ops_str, current_ip, resolver),
+            "ja" => return assemble_cond_jump(0x87, 0x77, ops_str, current_ip, resolver),
+            "jl" => return assemble_cond_jump(0x8C, 0x7C, ops_str, current_ip, resolver),
+            "jge" => return assemble_cond_jump(0x8D, 0x7D, ops_str, current_ip, resolver),
+            "jle" => return assemble_cond_jump(0x8E, 0x7E, ops_str, current_ip, resolver),
+            "jg" => return assemble_cond_jump(0x8F, 0x7F, ops_str, current_ip, resolver),
+            "js" => return assemble_cond_jump(0x88, 0x78, ops_str, current_ip, resolver),
+            "jns" => return assemble_cond_jump(0x89, 0x79, ops_str, current_ip, resolver),
 
             "mov" => {
                 return assemble_mov(ops_str, resolver);
@@ -409,7 +696,7 @@ impl Assembler {
             }
 
             "add" => return assemble_alu(0x00, 0, ops_str, resolver),
-            "or"  => return assemble_alu(0x08, 1, ops_str, resolver),
+            "or" => return assemble_alu(0x08, 1, ops_str, resolver),
             "adc" => return assemble_alu(0x10, 2, ops_str, resolver),
             "sbb" => return assemble_alu(0x18, 3, ops_str, resolver),
             "and" => return assemble_alu(0x20, 4, ops_str, resolver),
@@ -425,7 +712,10 @@ impl Assembler {
             _ => {}
         }
 
-        Err(format!("Unsupported or unrecognized assembly instruction: '{}'", line))
+        Err(format!(
+            "Unsupported or unrecognized assembly instruction: '{}'",
+            line
+        ))
     }
 }
 
@@ -447,7 +737,17 @@ fn assemble_branch(
     }
 
     if let Some(mem) = parse_mem_operand(trimmed, resolver) {
-        return encode_modrm_insn(0xFF, 0xFF, RegInfo { id: 4, size: RegSize::Qword, is_high_byte: false }, &mem, false);
+        return encode_modrm_insn(
+            0xFF,
+            0xFF,
+            RegInfo {
+                id: 4,
+                size: RegSize::Qword,
+                is_high_byte: false,
+            },
+            &mem,
+            false,
+        );
     }
 
     let (is_explicit_short, clean_target) = if let Some(stripped) = trimmed.strip_prefix("short ") {
@@ -462,7 +762,7 @@ fn assemble_branch(
 
     let rel2 = (target as i64) - ((current_ip + 2) as i64);
     if is_explicit_short {
-        if rel2 >= -128 && rel2 <= 127 {
+        if (-128..=127).contains(&rel2) {
             return Ok(vec![short_op, rel2 as u8]);
         } else {
             return Err(format!("Short jump out of range: rel={}", rel2));
@@ -497,11 +797,16 @@ fn assemble_cond_jump(
 
     let target = resolver(clean_target)
         .or_else(|| parse_int_or_hex(clean_target).map(|n| n as usize))
-        .ok_or_else(|| format!("Could not resolve conditional jump target '{}'", clean_target))?;
+        .ok_or_else(|| {
+            format!(
+                "Could not resolve conditional jump target '{}'",
+                clean_target
+            )
+        })?;
 
     let rel2 = (target as i64) - ((current_ip + 2) as i64);
     if is_explicit_short {
-        if rel2 >= -128 && rel2 <= 127 {
+        if (-128..=127).contains(&rel2) {
             return Ok(vec![short_op, rel2 as u8]);
         } else {
             return Err(format!("Short conditional jump out of range: rel={}", rel2));
@@ -515,10 +820,16 @@ fn assemble_cond_jump(
         return Ok(b);
     }
 
-    Err(format!("Conditional jump target 0x{:X} out of range from 0x{:X}", target, current_ip))
+    Err(format!(
+        "Conditional jump target 0x{:X} out of range from 0x{:X}",
+        target, current_ip
+    ))
 }
 
-fn assemble_mov(ops_str: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> Result<Vec<u8>, String> {
+fn assemble_mov(
+    ops_str: &str,
+    resolver: &dyn Fn(&str) -> Option<usize>,
+) -> Result<Vec<u8>, String> {
     let parts: Vec<&str> = ops_str.splitn(2, ',').map(|s| s.trim()).collect();
     if parts.len() < 2 {
         return Err("mov requires two operands".to_string());
@@ -538,74 +849,81 @@ fn assemble_mov(ops_str: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> Resu
         if let Some(r) = rex {
             bytes.push(r);
         }
-        let opcode = if dst.size == RegSize::Byte { 0x88 } else { 0x89 };
+        let opcode = if dst.size == RegSize::Byte {
+            0x88
+        } else {
+            0x89
+        };
         bytes.push(opcode);
         let modrm = 0xC0 | ((src.id & 7) << 3) | (dst.id & 7);
         bytes.push(modrm);
         return Ok(bytes);
     }
 
-    if let (Some(dst), None) = (dst_reg, src_reg) {
-        if let Some(imm) = parse_int_or_hex(src_str).or_else(|| resolver(src_str).map(|a| a as i64)) {
-            let mut bytes = Vec::new();
-            match dst.size {
-                RegSize::Qword => {
-                    let rex = make_rex(true, false, false, dst.id >= 8).unwrap_or(0x48);
-                    bytes.push(rex);
-                    bytes.push(0xB8 + (dst.id & 7));
-                    bytes.extend_from_slice(&(imm as u64).to_le_bytes());
-                }
-                RegSize::Dword => {
-                    if dst.id >= 8 {
-                        bytes.push(0x41);
-                    }
-                    bytes.push(0xB8 + (dst.id & 7));
-                    bytes.extend_from_slice(&(imm as u32).to_le_bytes());
-                }
-                RegSize::Word => {
-                    bytes.push(0x66);
-                    if dst.id >= 8 {
-                        bytes.push(0x41);
-                    }
-                    bytes.push(0xB8 + (dst.id & 7));
-                    bytes.extend_from_slice(&(imm as u16).to_le_bytes());
-                }
-                RegSize::Byte => {
-                    if dst.id >= 4 && !dst.is_high_byte {
-                        bytes.push(if dst.id >= 8 { 0x41 } else { 0x40 });
-                    }
-                    bytes.push(0xB0 + (dst.id & 7));
-                    bytes.push(imm as u8);
-                }
+    if let (Some(dst), None) = (dst_reg, src_reg)
+        && let Some(imm) = parse_int_or_hex(src_str).or_else(|| resolver(src_str).map(|a| a as i64))
+    {
+        let mut bytes = Vec::new();
+        match dst.size {
+            RegSize::Qword => {
+                let rex = make_rex(true, false, false, dst.id >= 8).unwrap_or(0x48);
+                bytes.push(rex);
+                bytes.push(0xB8 + (dst.id & 7));
+                bytes.extend_from_slice(&(imm as u64).to_le_bytes());
             }
-            return Ok(bytes);
-        }
-    }
-
-    if let (Some(dst), None) = (dst_reg, src_reg) {
-        if let Some(mem) = parse_mem_operand(src_str, resolver) {
-            return encode_modrm_insn(0x8B, 0x8A, dst, &mem, false);
-        }
-    }
-
-    if let (None, Some(src)) = (dst_reg, src_reg) {
-        if let Some(mem) = parse_mem_operand(dst_str, resolver) {
-            return encode_modrm_insn(0x89, 0x88, src, &mem, true);
-        }
-    }
-
-    if dst_reg.is_none() && src_reg.is_none() {
-        if let Some(mem) = parse_mem_operand(dst_str, resolver) {
-            if let Some(imm) = parse_int_or_hex(src_str).or_else(|| resolver(src_str).map(|a| a as i64)) {
-                return encode_mem_imm(0xC7, 0xC6, 0, &mem, imm);
+            RegSize::Dword => {
+                if dst.id >= 8 {
+                    bytes.push(0x41);
+                }
+                bytes.push(0xB8 + (dst.id & 7));
+                bytes.extend_from_slice(&(imm as u32).to_le_bytes());
+            }
+            RegSize::Word => {
+                bytes.push(0x66);
+                if dst.id >= 8 {
+                    bytes.push(0x41);
+                }
+                bytes.push(0xB8 + (dst.id & 7));
+                bytes.extend_from_slice(&(imm as u16).to_le_bytes());
+            }
+            RegSize::Byte => {
+                if dst.id >= 4 && !dst.is_high_byte {
+                    bytes.push(if dst.id >= 8 { 0x41 } else { 0x40 });
+                }
+                bytes.push(0xB0 + (dst.id & 7));
+                bytes.push(imm as u8);
             }
         }
+        return Ok(bytes);
+    }
+
+    if let (Some(dst), None) = (dst_reg, src_reg)
+        && let Some(mem) = parse_mem_operand(src_str, resolver)
+    {
+        return encode_modrm_insn(0x8B, 0x8A, dst, &mem, false);
+    }
+
+    if let (None, Some(src)) = (dst_reg, src_reg)
+        && let Some(mem) = parse_mem_operand(dst_str, resolver)
+    {
+        return encode_modrm_insn(0x89, 0x88, src, &mem, true);
+    }
+
+    if dst_reg.is_none()
+        && src_reg.is_none()
+        && let Some(mem) = parse_mem_operand(dst_str, resolver)
+        && let Some(imm) = parse_int_or_hex(src_str).or_else(|| resolver(src_str).map(|a| a as i64))
+    {
+        return encode_mem_imm(0xC7, 0xC6, 0, &mem, imm);
     }
 
     Err(format!("Cannot assemble mov instruction: '{}'", ops_str))
 }
 
-fn assemble_lea(ops_str: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> Result<Vec<u8>, String> {
+fn assemble_lea(
+    ops_str: &str,
+    resolver: &dyn Fn(&str) -> Option<usize>,
+) -> Result<Vec<u8>, String> {
     let parts: Vec<&str> = ops_str.splitn(2, ',').map(|s| s.trim()).collect();
     if parts.len() < 2 {
         return Err("lea requires two operands".to_string());
@@ -615,7 +933,12 @@ fn assemble_lea(ops_str: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> Resu
     encode_modrm_insn(0x8D, 0x8D, dst, &mem, false)
 }
 
-fn assemble_alu(base_opcode: u8, reg_op: u8, ops_str: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> Result<Vec<u8>, String> {
+fn assemble_alu(
+    base_opcode: u8,
+    reg_op: u8,
+    ops_str: &str,
+    resolver: &dyn Fn(&str) -> Option<usize>,
+) -> Result<Vec<u8>, String> {
     let parts: Vec<&str> = ops_str.splitn(2, ',').map(|s| s.trim()).collect();
     if parts.len() < 2 {
         return Err("ALU instruction requires two operands".to_string());
@@ -635,65 +958,72 @@ fn assemble_alu(base_opcode: u8, reg_op: u8, ops_str: &str, resolver: &dyn Fn(&s
         if let Some(r) = rex {
             bytes.push(r);
         }
-        let opcode = if dst.size == RegSize::Byte { base_opcode } else { base_opcode + 1 };
+        let opcode = if dst.size == RegSize::Byte {
+            base_opcode
+        } else {
+            base_opcode + 1
+        };
         bytes.push(opcode);
         let modrm = 0xC0 | ((src.id & 7) << 3) | (dst.id & 7);
         bytes.push(modrm);
         return Ok(bytes);
     }
 
-    if let (Some(dst), None) = (dst_reg, src_reg) {
-        if let Some(mem) = parse_mem_operand(src_str, resolver) {
-            return encode_modrm_insn(base_opcode + 3, base_opcode + 2, dst, &mem, false);
-        }
+    if let (Some(dst), None) = (dst_reg, src_reg)
+        && let Some(mem) = parse_mem_operand(src_str, resolver)
+    {
+        return encode_modrm_insn(base_opcode + 3, base_opcode + 2, dst, &mem, false);
     }
 
-    if let (None, Some(src)) = (dst_reg, src_reg) {
-        if let Some(mem) = parse_mem_operand(dst_str, resolver) {
-            return encode_modrm_insn(base_opcode + 1, base_opcode, src, &mem, true);
-        }
+    if let (None, Some(src)) = (dst_reg, src_reg)
+        && let Some(mem) = parse_mem_operand(dst_str, resolver)
+    {
+        return encode_modrm_insn(base_opcode + 1, base_opcode, src, &mem, true);
     }
 
-    if let (Some(dst), None) = (dst_reg, src_reg) {
-        if let Some(imm) = parse_int_or_hex(src_str).or_else(|| resolver(src_str).map(|a| a as i64)) {
-            let mut bytes = Vec::new();
-            let is_qword = dst.size == RegSize::Qword;
-            let rex = make_rex(is_qword, false, false, dst.id >= 8);
-            if dst.size == RegSize::Word {
-                bytes.push(0x66);
-            }
-            if let Some(r) = rex {
-                bytes.push(r);
-            }
-            if dst.size == RegSize::Byte {
-                bytes.push(0x80);
-                bytes.push(0xC0 | (reg_op << 3) | (dst.id & 7));
-                bytes.push(imm as u8);
-            } else if imm >= -128 && imm <= 127 {
-                bytes.push(0x83);
-                bytes.push(0xC0 | (reg_op << 3) | (dst.id & 7));
-                bytes.push(imm as u8);
-            } else {
-                bytes.push(0x81);
-                bytes.push(0xC0 | (reg_op << 3) | (dst.id & 7));
-                bytes.extend_from_slice(&(imm as u32).to_le_bytes());
-            }
-            return Ok(bytes);
+    if let (Some(dst), None) = (dst_reg, src_reg)
+        && let Some(imm) = parse_int_or_hex(src_str).or_else(|| resolver(src_str).map(|a| a as i64))
+    {
+        let mut bytes = Vec::new();
+        let is_qword = dst.size == RegSize::Qword;
+        let rex = make_rex(is_qword, false, false, dst.id >= 8);
+        if dst.size == RegSize::Word {
+            bytes.push(0x66);
         }
+        if let Some(r) = rex {
+            bytes.push(r);
+        }
+        if dst.size == RegSize::Byte {
+            bytes.push(0x80);
+            bytes.push(0xC0 | (reg_op << 3) | (dst.id & 7));
+            bytes.push(imm as u8);
+        } else if (-128..=127).contains(&imm) {
+            bytes.push(0x83);
+            bytes.push(0xC0 | (reg_op << 3) | (dst.id & 7));
+            bytes.push(imm as u8);
+        } else {
+            bytes.push(0x81);
+            bytes.push(0xC0 | (reg_op << 3) | (dst.id & 7));
+            bytes.extend_from_slice(&(imm as u32).to_le_bytes());
+        }
+        return Ok(bytes);
     }
 
-    if dst_reg.is_none() && src_reg.is_none() {
-        if let Some(mem) = parse_mem_operand(dst_str, resolver) {
-            if let Some(imm) = parse_int_or_hex(src_str).or_else(|| resolver(src_str).map(|a| a as i64)) {
-                return encode_mem_imm(0x81, 0x80, reg_op, &mem, imm);
-            }
-        }
+    if dst_reg.is_none()
+        && src_reg.is_none()
+        && let Some(mem) = parse_mem_operand(dst_str, resolver)
+        && let Some(imm) = parse_int_or_hex(src_str).or_else(|| resolver(src_str).map(|a| a as i64))
+    {
+        return encode_mem_imm(0x81, 0x80, reg_op, &mem, imm);
     }
 
     Err(format!("Cannot assemble ALU instruction: '{}'", ops_str))
 }
 
-fn assemble_test(ops_str: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> Result<Vec<u8>, String> {
+fn assemble_test(
+    ops_str: &str,
+    resolver: &dyn Fn(&str) -> Option<usize>,
+) -> Result<Vec<u8>, String> {
     let parts: Vec<&str> = ops_str.splitn(2, ',').map(|s| s.trim()).collect();
     if parts.len() < 2 {
         return Err("test requires two operands".to_string());
@@ -703,17 +1033,28 @@ fn assemble_test(ops_str: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> Res
 
     if let Some(src_r) = src {
         let mut bytes = Vec::new();
-        let rex = make_rex(dst.size == RegSize::Qword, src_r.id >= 8, false, dst.id >= 8);
+        let rex = make_rex(
+            dst.size == RegSize::Qword,
+            src_r.id >= 8,
+            false,
+            dst.id >= 8,
+        );
         if dst.size == RegSize::Word {
             bytes.push(0x66);
         }
         if let Some(r) = rex {
             bytes.push(r);
         }
-        bytes.push(if dst.size == RegSize::Byte { 0x84 } else { 0x85 });
+        bytes.push(if dst.size == RegSize::Byte {
+            0x84
+        } else {
+            0x85
+        });
         bytes.push(0xC0 | ((src_r.id & 7) << 3) | (dst.id & 7));
         return Ok(bytes);
-    } else if let Some(imm) = parse_int_or_hex(parts[1]).or_else(|| resolver(parts[1]).map(|a| a as i64)) {
+    } else if let Some(imm) =
+        parse_int_or_hex(parts[1]).or_else(|| resolver(parts[1]).map(|a| a as i64))
+    {
         let mut bytes = Vec::new();
         let rex = make_rex(dst.size == RegSize::Qword, false, false, dst.id >= 8);
         if dst.size == RegSize::Word {
@@ -737,7 +1078,11 @@ fn assemble_test(ops_str: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> Res
     Err(format!("Unsupported test operands: '{}'", ops_str))
 }
 
-fn assemble_inc_dec(reg_op: u8, ops_str: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> Result<Vec<u8>, String> {
+fn assemble_inc_dec(
+    reg_op: u8,
+    ops_str: &str,
+    resolver: &dyn Fn(&str) -> Option<usize>,
+) -> Result<Vec<u8>, String> {
     if let Some(reg) = parse_reg(ops_str) {
         let mut bytes = Vec::new();
         let rex = make_rex(reg.size == RegSize::Qword, false, false, reg.id >= 8);
@@ -755,7 +1100,11 @@ fn assemble_inc_dec(reg_op: u8, ops_str: &str, resolver: &dyn Fn(&str) -> Option
         bytes.push(0xC0 | (reg_op << 3) | (reg.id & 7));
         return Ok(bytes);
     } else if let Some(mem) = parse_mem_operand(ops_str, resolver) {
-        let op = if mem.explicit_size == Some(RegSize::Byte) { 0xFE } else { 0xFF };
+        let op = if mem.explicit_size == Some(RegSize::Byte) {
+            0xFE
+        } else {
+            0xFF
+        };
         return encode_mem_imm(op, 0xFE, reg_op, &mem, 0);
     }
 
@@ -801,7 +1150,6 @@ fn encode_modrm_insn(
     let base_reg = match &mem.base {
         Some(b) => b,
         None => {
-
             bytes.push(0x04 | (reg_bits << 3));
             bytes.push(0x25);
             bytes.extend_from_slice(&(mem.disp as i32).to_le_bytes());
@@ -868,7 +1216,7 @@ fn encode_mem_imm(
         bytes.push(r);
     }
 
-    let use_imm8 = !is_byte && opcode_std == 0x81 && imm >= -128 && imm <= 127;
+    let use_imm8 = !is_byte && opcode_std == 0x81 && (-128..=127).contains(&imm);
     let actual_opcode = if is_byte {
         opcode_byte
     } else if use_imm8 {
@@ -897,7 +1245,12 @@ fn encode_mem_imm(
         bytes.push(mod_bits | (reg_bits << 3) | rm_bits);
 
         if needs_sib {
-            let scale_bits = match mem.scale { 2 => 1, 4 => 2, 8 => 3, _ => 0 };
+            let scale_bits = match mem.scale {
+                2 => 1,
+                4 => 2,
+                8 => 3,
+                _ => 0,
+            };
             let index_bits = mem.index.as_ref().map(|i| i.id & 7).unwrap_or(4);
             bytes.push((scale_bits << 6) | (index_bits << 3) | base_id);
         }
@@ -927,17 +1280,28 @@ fn encode_mem_imm(
 fn make_rex(w: bool, r: bool, x: bool, b: bool) -> Option<u8> {
     if w || r || x || b {
         let mut rex = 0x40;
-        if w { rex |= 0x08; }
-        if r { rex |= 0x04; }
-        if x { rex |= 0x02; }
-        if b { rex |= 0x01; }
+        if w {
+            rex |= 0x08;
+        }
+        if r {
+            rex |= 0x04;
+        }
+        if x {
+            rex |= 0x02;
+        }
+        if b {
+            rex |= 0x01;
+        }
         Some(rex)
     } else {
         None
     }
 }
 
-fn parse_db_directive(s: &str, _resolver: &dyn Fn(&str) -> Option<usize>) -> Result<Vec<u8>, String> {
+fn parse_db_directive(
+    s: &str,
+    _resolver: &dyn Fn(&str) -> Option<usize>,
+) -> Result<Vec<u8>, String> {
     let mut out = Vec::new();
     let mut in_quote = false;
     let mut quote_char = '\'';
@@ -979,7 +1343,10 @@ fn parse_db_directive(s: &str, _resolver: &dyn Fn(&str) -> Option<usize>) -> Res
     Ok(out)
 }
 
-fn parse_dw_directive(s: &str, _resolver: &dyn Fn(&str) -> Option<usize>) -> Result<Vec<u8>, String> {
+fn parse_dw_directive(
+    s: &str,
+    _resolver: &dyn Fn(&str) -> Option<usize>,
+) -> Result<Vec<u8>, String> {
     let mut out = Vec::new();
     for part in s.split(',').map(|p| p.trim()).filter(|p| !p.is_empty()) {
         let val = parse_int_or_hex(part).ok_or_else(|| format!("Invalid dw: '{}'", part))? as u16;
@@ -988,7 +1355,10 @@ fn parse_dw_directive(s: &str, _resolver: &dyn Fn(&str) -> Option<usize>) -> Res
     Ok(out)
 }
 
-fn parse_dd_directive(s: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> Result<Vec<u8>, String> {
+fn parse_dd_directive(
+    s: &str,
+    resolver: &dyn Fn(&str) -> Option<usize>,
+) -> Result<Vec<u8>, String> {
     let mut out = Vec::new();
     for part in s.split(',').map(|p| p.trim()).filter(|p| !p.is_empty()) {
         let val = parse_int_or_hex(part)
@@ -999,7 +1369,10 @@ fn parse_dd_directive(s: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> Resu
     Ok(out)
 }
 
-fn parse_dq_directive(s: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> Result<Vec<u8>, String> {
+fn parse_dq_directive(
+    s: &str,
+    resolver: &dyn Fn(&str) -> Option<usize>,
+) -> Result<Vec<u8>, String> {
     let mut out = Vec::new();
     for part in s.split(',').map(|p| p.trim()).filter(|p| !p.is_empty()) {
         let val = parse_int_or_hex(part)
@@ -1018,17 +1391,33 @@ mod tests {
     fn test_assemble_simple_instructions() {
         let resolver = |_s: &str| None;
 
-        assert_eq!(Assembler::assemble_line("nop", 0x1000, &resolver).unwrap(), vec![0x90]);
+        assert_eq!(
+            Assembler::assemble_line("nop", 0x1000, &resolver).unwrap(),
+            vec![0x90]
+        );
 
-        assert_eq!(Assembler::assemble_line("ret", 0x1000, &resolver).unwrap(), vec![0xC3]);
+        assert_eq!(
+            Assembler::assemble_line("ret", 0x1000, &resolver).unwrap(),
+            vec![0xC3]
+        );
 
-        assert_eq!(Assembler::assemble_line("push rax", 0x1000, &resolver).unwrap(), vec![0x50]);
+        assert_eq!(
+            Assembler::assemble_line("push rax", 0x1000, &resolver).unwrap(),
+            vec![0x50]
+        );
 
-        assert_eq!(Assembler::assemble_line("push r8", 0x1000, &resolver).unwrap(), vec![0x41, 0x50]);
+        assert_eq!(
+            Assembler::assemble_line("push r8", 0x1000, &resolver).unwrap(),
+            vec![0x41, 0x50]
+        );
 
-        assert_eq!(Assembler::assemble_line("pop rbx", 0x1000, &resolver).unwrap(), vec![0x5B]);
+        assert_eq!(
+            Assembler::assemble_line("pop rbx", 0x1000, &resolver).unwrap(),
+            vec![0x5B]
+        );
 
-        let mov_imm64 = Assembler::assemble_line("mov rax, 0x1234567890ABCDEF", 0x1000, &resolver).unwrap();
+        let mov_imm64 =
+            Assembler::assemble_line("mov rax, 0x1234567890ABCDEF", 0x1000, &resolver).unwrap();
         assert_eq!(mov_imm64[0..2], [0x48, 0xB8]);
         assert_eq!(mov_imm64[2..], 0x1234567890ABCDEFu64.to_le_bytes());
 
@@ -1049,7 +1438,8 @@ mod tests {
             }
         };
 
-        let short_jmp = Assembler::assemble_line("jmp short target_label", 0x1FFD, &sym_table).unwrap();
+        let short_jmp =
+            Assembler::assemble_line("jmp short target_label", 0x1FFD, &sym_table).unwrap();
         assert_eq!(short_jmp, vec![0xEB, 0x01]);
 
         let near_jmp = Assembler::assemble_line("jmp target_label", 0x1000, &sym_table).unwrap();

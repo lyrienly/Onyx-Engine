@@ -14,7 +14,10 @@ impl SkCrypt {
     #[inline(always)]
     pub fn decrypt_string(data: &[u8], key1: u8, key2: u8) -> String {
         let decrypted = Self::decrypt_xor(data, key1, key2);
-        let end = decrypted.iter().position(|&c| c == 0).unwrap_or(decrypted.len());
+        let end = decrypted
+            .iter()
+            .position(|&c| c == 0)
+            .unwrap_or(decrypted.len());
         String::from_utf8_lossy(&decrypted[..end]).to_string()
     }
 

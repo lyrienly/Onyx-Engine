@@ -13,3 +13,6 @@ zydis = "4.1"
 
 [target.'cfg(windows)'.dev-dependencies]
 windows-sys = { version = "0.52", features = ["Win32_Foundation", "Win32_System_LibraryLoader"] }
+
+[lints]
+workspace = true

@@ -46,7 +46,7 @@ if %errorlevel% neq 0 (
 
 :: 4. Compile Pascal Frontend (Cheat Engine)
 echo [*] Step 2/3: Compiling Pascal/Lazarus Frontend with OnyxBackend bridge...
-"%LAZBUILD_EXE%" --build-mode="Release 64-Bit" "UI\cheatengine.lpi"
+"%LAZBUILD_EXE%" --build-mode="Release 64-Bit" "UI\onyxengine.lpi"
 if %errorlevel% neq 0 (
     echo.
     echo [ERROR] Pascal frontend compilation failed!
@@ -60,9 +60,6 @@ echo.
 echo [*] Step 3/3: Synchronizing distribution bin directory...
 if exist "UI\bin\OnyxEngine-x86_64.exe" (
     copy /y "UI\bin\OnyxEngine-x86_64.exe" "bin\OnyxEngine-CE.exe" >nul
-)
-if exist "UI\bin\cheatengine-x86_64.exe" (
-    copy /y "UI\bin\cheatengine-x86_64.exe" "bin\OnyxEngine-CE.exe" >nul
 )
 if exist "UI\bin\lua53-64.dll" (
     copy /y "UI\bin\lua53-64.dll" "bin\lua53-64.dll" >nul

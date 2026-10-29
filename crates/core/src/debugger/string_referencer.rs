@@ -1,5 +1,5 @@
-use crate::process::Process;
 use crate::debugger::disasm::Disassembler;
+use crate::process::Process;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StringReferenceMatch {
@@ -14,7 +14,6 @@ pub struct StringReferenceMatch {
 pub struct StringReferencer;
 
 impl StringReferencer {
-
     pub fn try_extract_ascii(bytes: &[u8], min_len: usize) -> Option<String> {
         if bytes.len() < min_len {
             return None;
@@ -44,7 +43,7 @@ impl StringReferencer {
         }
 
         let mut u16_chars = Vec::new();
-        for chunk in bytes.chunks_exact(2) {
+        for chunk in bytes.as_chunks::<2>().0 {
             let val = u16::from_le_bytes([chunk[0], chunk[1]]);
             if val == 0 {
                 break;
@@ -97,28 +96,30 @@ impl StringReferencer {
                 let insn = Disassembler::decode_one(insn_addr, &code[offset..]);
                 let len = insn.length.max(1);
 
-                if let Some(target) = insn.target_addr {
-
-                    if let Ok(target_bytes) = proc.read_bytes(target, 128) {
-                        if let Some(ascii_str) = Self::try_extract_ascii(&target_bytes, min_string_len) {
-                            results.push(StringReferenceMatch {
-                                instruction_address: insn_addr,
-                                string_address: target,
-                                text: ascii_str,
-                                is_unicode: false,
-                                mnemonic: insn.mnemonic.clone(),
-                                operands: insn.operands.clone(),
-                            });
-                        } else if let Some(utf16_str) = Self::try_extract_utf16(&target_bytes, min_string_len) {
-                            results.push(StringReferenceMatch {
-                                instruction_address: insn_addr,
-                                string_address: target,
-                                text: utf16_str,
-                                is_unicode: true,
-                                mnemonic: insn.mnemonic.clone(),
-                                operands: insn.operands.clone(),
-                            });
-                        }
+                if let Some(target) = insn.target_addr
+                    && let Ok(target_bytes) = proc.read_bytes(target, 128)
+                {
+                    if let Some(ascii_str) = Self::try_extract_ascii(&target_bytes, min_string_len)
+                    {
+                        results.push(StringReferenceMatch {
+                            instruction_address: insn_addr,
+                            string_address: target,
+                            text: ascii_str,
+                            is_unicode: false,
+                            mnemonic: insn.mnemonic.clone(),
+                            operands: insn.operands.clone(),
+                        });
+                    } else if let Some(utf16_str) =
+                        Self::try_extract_utf16(&target_bytes, min_string_len)
+                    {
+                        results.push(StringReferenceMatch {
+                            instruction_address: insn_addr,
+                            string_address: target,
+                            text: utf16_str,
+                            is_unicode: true,
+                            mnemonic: insn.mnemonic.clone(),
+                            operands: insn.operands.clone(),
+                        });
                     }
                 }
 

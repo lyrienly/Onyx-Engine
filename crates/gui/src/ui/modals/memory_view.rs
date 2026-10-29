@@ -1,6 +1,6 @@
+use crate::app::OnyxEngineApp;
 use eframe::egui::{self, Color32, RichText, Stroke, Vec2};
 use onyx_core::disasm::format_symbol;
-use crate::app::OnyxEngineApp;
 
 fn get_mnemonic_description(mnemonic: &str) -> &'static str {
     match mnemonic.to_lowercase().as_str() {
@@ -116,13 +116,11 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                             let dbk_connected = app.dbk_driver.is_some();
                             if dbk_connected {
                                 ui.label(RichText::new("[DBK64 ACTIVE]").color(Color32::GREEN).strong());
-                                if let Some(ref proc) = app.attached_proc {
-                                    if let Some(ref dbk) = app.dbk_driver {
-                                        if let Ok(cr3) = dbk.get_cr3(proc.pid) {
+                                if let Some(ref proc) = app.attached_proc
+                                    && let Some(ref dbk) = app.dbk_driver
+                                        && let Ok(cr3) = dbk.get_cr3(proc.pid) {
                                             ui.label(RichText::new(format!("CR3: 0x{:016X}", cr3)).monospace().color(Color32::LIGHT_GRAY));
                                         }
-                                    }
-                                }
                             } else {
                                 ui.label(RichText::new("[DBK OFFLINE]").color(Color32::GRAY));
                                 if ui.button("Connect DBK Driver...").clicked() {
@@ -426,7 +424,7 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
 
                                                 ui.add_space(10.0);
 
-                                                let ascii_text: String = chunk.iter().map(|&b| if b >= 0x20 && b <= 0x7E { b as char } else { '.' }).collect();
+                                                let ascii_text: String = chunk.iter().map(|&b| if (0x20..=0x7E).contains(&b) { b as char } else { '.' }).collect();
                                                 ui.label(RichText::new(ascii_text).monospace().size(12.0).color(Color32::from_rgb(140, 220, 140)));
                                             });
                                         }
