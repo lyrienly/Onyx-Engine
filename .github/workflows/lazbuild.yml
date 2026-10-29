@@ -27,7 +27,3 @@ jobs:
       - name: lazbuild onyxengine.lpi
         shell: cmd
         run: lazbuild --build-mode=Release "UI\onyxengine.lpi"
-
-      - name: lazbuild cecore.lpi
-        shell: cmd
-        run: lazbuild "UI\cecore.lpi"
