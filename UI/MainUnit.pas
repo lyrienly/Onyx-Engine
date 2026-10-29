@@ -25,7 +25,7 @@ uses
   {$endif}
 
   {$ifdef windows}
-  jwaWindows, Windows, LCLIntf, LCLProc, Messages, SysUtils, Classes, SyncObjs,
+  jwaWindows, Windows, LCLIntf, LCLProc, lcltype, Messages, SysUtils, Classes, SyncObjs,
   SyncObjs2, Graphics,
   Controls, Forms, ComCtrls, StdCtrls, Menus, Buttons, shellapi,
   imagehlp, ExtCtrls, Dialogs, Clipbrd, CEDebugger, kerneldebugger, assemblerunit,
@@ -288,6 +288,9 @@ type
   //TPreviousResultList=specialize TFPGList<TSavedScanHandler>;
 
   TMainForm = class(TForm)
+  protected
+    procedure CreateParams(var Params: TCreateParams); override;
+  published
     actOpenLuaEngine: TAction;
     actOpenDissectStructure: TAction;
     btnSetSpeedhack2: TButton;
@@ -1147,7 +1150,7 @@ resourcestring
 implementation
 
 
-uses frmAobValidatorUnit, OnyxBackend, cefuncproc, MainUnit2, ProcessWindowUnit, MemoryBrowserFormUnit, TypePopup, HotKeys,
+uses frmAobValidatorUnit, OnyxBackend, OnyxInstance, cefuncproc, MainUnit2, ProcessWindowUnit, MemoryBrowserFormUnit, TypePopup, HotKeys,
   aboutunit, formhotkeyunit, formDifferentBitSizeUnit,
   CommentsUnit, formsettingsunit, formAddressChangeUnit, Changeoffsetunit,
   FoundCodeUnit, AdvancedOptionsUnit, frmProcessWatcherUnit,
@@ -1491,6 +1494,13 @@ begin
 end;
 
 //--------------TMainThread------------
+
+procedure TMainForm.CreateParams(var Params: TCreateParams);
+begin
+  inherited CreateParams(Params);
+  // Nome de classe aleatorio por processo: evita assinatura estatica de janela.
+  Params.WinClassName := OnyxWindowClassName;
+end;
 
 procedure TMainForm.recentFilesUpdate(filepath: string);
 var i: integer;
@@ -4179,7 +4189,7 @@ end;
 
 procedure TMainForm.miMCPAboutClick(Sender: TObject);
 begin
-  MessageDlg('Ponte MCP do OnyxEngine'#13#10'===================================='#13#10'Protocolo da Ponte: miscusi-peek MCP Bridge v12.0.0'#13#10'Named Pipe: \\.\pipe\CE_MCP_Bridge_v99'#13#10'Motor do Driver: OwMemDriver (Ring-0 CR3 Fisico)'#13#10'Localizacao: Menu Principal ao lado do D3D'#13#10'===================================='#13#10'Suporte completo a 175 ferramentas nativas de inspecao e memoria do OnyxEngine.', mtInformation, [mbOK], 0);
+  MessageDlg('Ponte MCP do OnyxEngine'#13#10'===================================='#13#10'Protocolo da Ponte: miscusi-peek MCP Bridge v12.0.0'#13#10'Named Pipe: definido em mcp/mcp_pipe.txt'#13#10'Motor do Driver: OwMemDriver (Ring-0 CR3 Fisico)'#13#10'Localizacao: Menu Principal ao lado do D3D'#13#10'===================================='#13#10'Suporte completo a 175 ferramentas nativas de inspecao e memoria do OnyxEngine.', mtInformation, [mbOK], 0);
 end;
 
 procedure TMainForm.miChangeDisplayTypeClick(Sender: TObject);

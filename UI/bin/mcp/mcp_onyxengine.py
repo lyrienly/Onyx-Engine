@@ -136,7 +136,23 @@ def format_result(result):
 # ============================================================================
 
 # Bridge wire protocol endpoint
-PIPE_NAME = r"\\.\pipe\CE_MCP_Bridge_v99"
+def _resolve_pipe_name() -> str:
+    """Nome do pipe compartilhado com ce_mcp_bridge.lua (mcp/mcp_pipe.txt) ou ONYX_MCP_PIPE."""
+    env = os.environ.get("ONYX_MCP_PIPE", "").strip()
+    if env:
+        return env if env.startswith("\\\\.\\pipe\\") else "\\\\.\\pipe\\" + env
+    try:
+        here = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(here, "mcp_pipe.txt"), "r", encoding="utf-8") as fh:
+            name = fh.read().strip()
+        if name:
+            return "\\\\.\\pipe\\" + name
+    except OSError:
+        pass
+    return "\\\\.\\pipe\\Onyx_MCP_Bridge_v1"
+
+
+PIPE_NAME = _resolve_pipe_name()
 MCP_SERVER_NAME = "onyxengine"
 MAX_RESPONSE_SIZE_BYTES = 32 * 1024 * 1024
 DEFAULT_TCP_HOST = "127.0.0.1"

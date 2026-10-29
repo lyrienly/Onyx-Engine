@@ -1,4 +1,4 @@
-program cheatengine;
+program onyxengine;
 
 {$mode objfpc}{$H+}
 
@@ -18,7 +18,7 @@ uses
   macport, macportdefines,coresymbolication, macexceptiondebuggerinterface,
   macCreateRemoteThread, macumm, machotkeys, macPipe,
   {$endif}
-  betterControls, controls, sysutils, Forms, LazUTF8, dialogs, SynCompletion,
+  betterControls, OnyxInstance, controls, sysutils, Forms, LazUTF8, dialogs, SynCompletion,
   MainUnit, CEDebugger, NewKernelHandler, OnyxBackend, CEFuncProc, ProcessHandlerUnit,
   symbolhandler, Assemblerunit, hypermode, byteinterpreter, addressparser,
   autoassembler, ProcessWindowUnit, MainUnit2, Filehandler,
@@ -297,6 +297,12 @@ begin
   outputdebugstring('start');
 
   Application.Initialize;
+
+  if not OnyxAcquireSingleInstance then
+  begin
+    MessageDlg('OnyxEngine is already running.', mtInformation, [mbOK], 0);
+    Halt(0);
+  end;
 
   {$ifdef windows}
   registerDarkModeHintHandler;
