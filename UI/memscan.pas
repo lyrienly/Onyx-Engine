@@ -6404,7 +6404,7 @@ begin
 end;
 
 procedure TScanController.CleanupIsPointerLookupTree(var lookupTree: TAvgLvlTree);
-var e: TAVLTreeNodeEnumerator;
+var e: TAvgLvlTreeNodeEnumerator;
   n: TAvgLvlTreeNode;
 begin
   if lookupTree<>nil then
@@ -6904,7 +6904,7 @@ var
   isWritable, isExecutable, isCopyOnWrite: boolean;
 
   e: TVQEValidCacheEntry;
-  n: TAVLTreeNode;
+  n: TAvgLvlTreeNode;
 begin
   result:=false;
 

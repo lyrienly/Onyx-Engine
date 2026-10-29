@@ -995,7 +995,7 @@ function TReversePointerListHandler.isValidregion(address: ptruint): boolean;
 var
   mbi: _MEMORY_BASIC_INFORMATION;
   e: TVQEValidCacheEntry;
-  n: TAVLTreeNode;
+  n: TAvgLvlTreeNode;
 begin
   result:=false;
 
