@@ -12,3 +12,6 @@ onyx_core = { path = "../core" }
 [[bin]]
 name = "OnyxEngine"
 path = "src/main.rs"
+
+[lints]
+workspace = true

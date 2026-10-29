@@ -19,3 +19,14 @@ members = [
     "crates/plugins/aob_generator",
 ]
 resolver = "2"
+
+[workspace.lints.clippy]
+missing_safety_doc = "allow"
+upper_case_acronyms = "allow"
+too_many_arguments = "allow"
+not_unsafe_ptr_arg_deref = "allow"
+module_inception = "allow"
+manual_c_str_literals = "allow"
+missing_transmute_annotations = "allow"
+needless_range_loop = "allow"
+field_reassign_with_default = "allow"

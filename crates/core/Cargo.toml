@@ -13,3 +13,6 @@ ureq = { version = "2.10", default-features = false, features = ["tls"] }
 dashmap = "6.1"
 crossbeam-queue = "0.3"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
+
+[lints]
+workspace = true
