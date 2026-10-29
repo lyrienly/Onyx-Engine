@@ -92,6 +92,7 @@ begin
 
   {$ifdef windows}
   name := WideString(InstanceMutexName);
+  SetLastError(0);
   FMutex := CreateMutexW(nil, False, PWideChar(name));
   if FMutex = 0 then
     Exit(True); // sem mutex, nao bloqueia a inicializacao

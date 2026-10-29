@@ -12,6 +12,9 @@ uses
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
+  {$ifdef windows}
+  Windows,
+  {$endif}
   Interfaces, {CEInterfaces,} // this includes the LCL widgetset
   {$ifdef darwin}
   //
@@ -300,7 +303,7 @@ begin
 
   if not OnyxAcquireSingleInstance then
   begin
-    MessageDlg('OnyxEngine is already running.', mtInformation, [mbOK], 0);
+    MessageBoxW(0, 'OnyxEngine is already running.', 'OnyxEngine', MB_OK or MB_ICONINFORMATION);
     Halt(0);
   end;
 
