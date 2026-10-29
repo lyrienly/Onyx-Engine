@@ -10,20 +10,10 @@
     clippy::manual_c_str_literals
 )]
 
-//! # OnyxEngine - AllocHook Module (High Performance & Stealth)
-//!
-//! Convergência nativa em Rust do módulo `allochook` do Cheat Engine / OnyxEngine:
-//! - Varredura inicial e enumeração completa de heaps ativos via `HeapWalk`
-//! - Intercepção de baixo nível em tempo real com trampolines seguros de 16 bytes
-//! - Captura dinâmica de `caller_ip` via `RtlCaptureStackBackTrace`
-//! - Mascaramento furtivo de páginas executáveis (VAD / RWX)
-//! - Sincronização direta com a interface gráfica Pascal (Heaplist) e buffer lock-free
-
 use std::ffi::c_void;
 use std::ptr::{copy_nonoverlapping, null_mut};
 use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU64, Ordering};
 
-// --- Tipos Win32 / NT Básicos ---
 type HANDLE = *mut c_void;
 type HMODULE = *mut c_void;
 type BOOL = i32;
@@ -34,7 +24,6 @@ const STATUS_SUCCESS: NTSTATUS = 0;
 const TRUE: BOOL = 1;
 const FALSE: BOOL = 0;
 
-// Constantes de Proteção e Alocação
 pub const PAGE_NOACCESS: DWORD = 0x01;
 pub const PAGE_READONLY: DWORD = 0x02;
 pub const PAGE_READWRITE: DWORD = 0x04;
@@ -46,10 +35,8 @@ pub const MEM_COMMIT: DWORD = 0x1000;
 pub const MEM_RESERVE: DWORD = 0x2000;
 pub const MEM_RELEASE: DWORD = 0x8000;
 
-// Flag indicando que a alocação RWX foi mascarada para discrição em VAD
 pub const STEALTH_FLAG_MASKED_RWX: u32 = 0x8000_0000;
 
-// Constantes de Eventos do Cheat Engine (frmMemoryAllocHandlerUnit.pas)
 pub const HOOKEVENT_ALLOC: i32 = 0;
 pub const HOOKEVENT_FREE: i32 = 1;
 pub const HOOKEVENT_HEAPALLOC: i32 = 2;
@@ -58,7 +45,6 @@ pub const HOOKEVENT_HEAPDESTROY: i32 = 4;
 
 const PROCESS_HEAP_ENTRY_BUSY: u16 = 0x0001;
 
-/// Registro estruturado de evento de alocação/liberação de memória (C-ABI do Onyx)
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AllocRecord {
@@ -71,7 +57,6 @@ pub struct AllocRecord {
     pub timestamp_ms: u64,
 }
 
-// Estruturas de alinhamento exato para a GUI Pascal (64-bit Delphi Mode)
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct PascalAllocData {
@@ -106,11 +91,10 @@ pub union PascalHookPayload {
 #[derive(Copy, Clone)]
 pub struct PascalHookEvent {
     pub eventtype: i32,
-    pub _align_pad: u32, // Pascal alinha a união aos 8 bytes
+    pub _align_pad: u32,
     pub payload: PascalHookPayload,
 }
 
-// Estrutura para enumeração de Heap da Win32 API
 #[repr(C)]
 pub struct PROCESS_HEAP_ENTRY {
     pub lpData: *mut c_void,
@@ -120,10 +104,6 @@ pub struct PROCESS_HEAP_ENTRY {
     pub wFlags: u16,
     pub union_data: [u8; 32],
 }
-
-// =========================================================================
-// SÍMBOLOS GLOBAIS EXPORTADOS EXIGIDOS PELA INTERFACE PASCAL DO CHEAT ENGINE
-// =========================================================================
 
 #[unsafe(no_mangle)]
 pub static mut HasSetupDataEvent: u64 = 0;
@@ -138,12 +118,9 @@ pub static mut CEInitializationFinished: u64 = 0;
 pub static mut HookEventData: PascalHookEvent = PascalHookEvent {
     eventtype: 0,
     _align_pad: 0,
-    payload: PascalHookPayload {
-        raw: [0u8; 64],
-    },
+    payload: PascalHookPayload { raw: [0u8; 64] },
 };
 
-// Capacidade do buffer circular lock-free em memória
 const MAX_RING_BUFFER: usize = 4096;
 
 static mut ALLOC_RING: [AllocRecord; MAX_RING_BUFFER] = [AllocRecord {
@@ -160,21 +137,30 @@ static ALLOC_COUNT: AtomicU64 = AtomicU64::new(0);
 static HOOKS_INSTALLED: AtomicBool = AtomicBool::new(false);
 static IN_HOOK: AtomicBool = AtomicBool::new(false);
 
-// Controle de Stealth e Otimização
 static STEALTH_MASKING_ENABLED: AtomicBool = AtomicBool::new(true);
 static HEAP_MIN_SIZE_FILTER: AtomicU64 = AtomicU64::new(0);
 static PIPE_HANDLE: AtomicIsize = AtomicIsize::new(-1);
 
-// --- Imports de Funções do Kernel e NTDLL ---
 unsafe extern "system" {
     fn GetModuleHandleA(lpModuleName: *const u8) -> HMODULE;
     fn GetProcAddress(hModule: HMODULE, lpProcName: *const u8) -> *mut c_void;
-    fn VirtualProtect(lpAddress: *mut c_void, dwSize: usize, flNewProtect: DWORD, lpflOldProtect: *mut DWORD) -> BOOL;
-    fn VirtualAlloc(lpAddress: *mut c_void, dwSize: usize, flAllocationType: DWORD, flProtect: DWORD) -> *mut c_void;
+    fn VirtualProtect(
+        lpAddress: *mut c_void,
+        dwSize: usize,
+        flNewProtect: DWORD,
+        lpflOldProtect: *mut DWORD,
+    ) -> BOOL;
+    fn VirtualAlloc(
+        lpAddress: *mut c_void,
+        dwSize: usize,
+        flAllocationType: DWORD,
+        flProtect: DWORD,
+    ) -> *mut c_void;
     fn GetCurrentProcess() -> HANDLE;
     fn GetCurrentProcessId() -> DWORD;
     fn GetTickCount64() -> u64;
-    fn FlushInstructionCache(hProcess: HANDLE, lpBaseAddress: *const c_void, dwSize: usize) -> BOOL;
+    fn FlushInstructionCache(hProcess: HANDLE, lpBaseAddress: *const c_void, dwSize: usize)
+    -> BOOL;
     fn SetEvent(hEvent: HANDLE) -> BOOL;
     fn ResetEvent(hEvent: HANDLE) -> BOOL;
     fn WaitForSingleObject(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD;
@@ -207,30 +193,27 @@ unsafe extern "system" {
     fn CloseHandle(hObject: HANDLE) -> BOOL;
 }
 
-// Assinaturas de Tipos Nativos
 type FnNtAllocateVirtualMemory = unsafe extern "system" fn(
-    HANDLE, *mut *mut c_void, usize, *mut usize, DWORD, DWORD,
+    HANDLE,
+    *mut *mut c_void,
+    usize,
+    *mut usize,
+    DWORD,
+    DWORD,
 ) -> NTSTATUS;
 
-type FnNtFreeVirtualMemory = unsafe extern "system" fn(
-    HANDLE, *mut *mut c_void, *mut usize, DWORD,
-) -> NTSTATUS;
+type FnNtFreeVirtualMemory =
+    unsafe extern "system" fn(HANDLE, *mut *mut c_void, *mut usize, DWORD) -> NTSTATUS;
 
-type FnRtlAllocateHeap = unsafe extern "system" fn(
-    *mut c_void, DWORD, usize,
-) -> *mut c_void;
+type FnRtlAllocateHeap = unsafe extern "system" fn(*mut c_void, DWORD, usize) -> *mut c_void;
 
-type FnRtlFreeHeap = unsafe extern "system" fn(
-    *mut c_void, DWORD, *mut c_void,
-) -> BOOL;
+type FnRtlFreeHeap = unsafe extern "system" fn(*mut c_void, DWORD, *mut c_void) -> BOOL;
 
-// Ponteiros dos Trampolines Originais
 static mut ORIG_NT_ALLOC: Option<FnNtAllocateVirtualMemory> = None;
 static mut ORIG_NT_FREE: Option<FnNtFreeVirtualMemory> = None;
 static mut ORIG_RTL_ALLOC: Option<FnRtlAllocateHeap> = None;
 static mut ORIG_RTL_FREE: Option<FnRtlFreeHeap> = None;
 
-/// Captura ultra-rápida do endereço de retorno do chamador (caller_ip)
 #[inline(always)]
 fn capture_caller_ip() -> u64 {
     let mut caller: *mut c_void = null_mut();
@@ -242,8 +225,14 @@ fn capture_caller_ip() -> u64 {
     }
 }
 
-/// Sincroniza o evento com a interface Pascal de forma segura e com timeout
-fn dispatch_event_to_pascal_gui(event_type: i32, address: u64, size: u32, flags: u32, protect: u32, esp: u64) {
+fn dispatch_event_to_pascal_gui(
+    event_type: i32,
+    address: u64,
+    size: u32,
+    flags: u32,
+    protect: u32,
+    esp: u64,
+) {
     unsafe {
         let setup_event = HasSetupDataEvent as HANDLE;
         let handled_event = CEHasHandledItEvent as HANDLE;
@@ -272,13 +261,19 @@ fn dispatch_event_to_pascal_gui(event_type: i32, address: u64, size: u32, flags:
             }
 
             SetEvent(setup_event);
-            WaitForSingleObject(handled_event, 5); // 5ms timeout para não congelar o jogo
+            WaitForSingleObject(handled_event, 5);
         }
     }
 }
 
-/// Envia o registro estruturado para o buffer circular lock-free e Named Pipe
-fn push_record(event_type: u32, address: u64, size: u64, flags: u32, protection: u32, caller_ip: u64) {
+fn push_record(
+    event_type: u32,
+    address: u64,
+    size: u64,
+    flags: u32,
+    protection: u32,
+    caller_ip: u64,
+) {
     let count = ALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
     let idx = (count as usize) % MAX_RING_BUFFER;
 
@@ -292,22 +287,26 @@ fn push_record(event_type: u32, address: u64, size: u64, flags: u32, protection:
         timestamp_ms: unsafe { GetTickCount64() },
     };
 
-    // Gravação lock-free O(1) na memória compartilhada
     unsafe {
         ALLOC_RING[idx] = rec;
     }
 
-    // Sincronização com GUI Pascal
     let pas_event_type = match event_type {
         0 => HOOKEVENT_ALLOC,
         2 => HOOKEVENT_HEAPALLOC,
         _ => -1,
     };
     if pas_event_type != -1 {
-        dispatch_event_to_pascal_gui(pas_event_type, address, size as u32, flags, protection, caller_ip);
+        dispatch_event_to_pascal_gui(
+            pas_event_type,
+            address,
+            size as u32,
+            flags,
+            protection,
+            caller_ip,
+        );
     }
 
-    // Telemetria via Named Pipe (se conectado)
     let h_val = PIPE_HANDLE.load(Ordering::Relaxed);
     if h_val != -1 {
         let h = h_val as HANDLE;
@@ -324,12 +323,6 @@ fn push_record(event_type: u32, address: u64, size: u64, flags: u32, protection:
     }
 }
 
-// =========================================================================
-// ENUMERAÇÃO INICIAL DE HEAPS VIA HEAPWALK (COMPORTAMENTO NATIVO DO CE)
-// =========================================================================
-
-/// Realiza a enumeração de todos os blocos de Heap já existentes no jogo
-/// e preenche a lista do Cheat Engine na inicialização
 unsafe fn perform_initial_heap_walk() {
     let mut dummy: HANDLE = null_mut();
     let num_heaps = GetProcessHeaps(0, &mut dummy);
@@ -355,7 +348,6 @@ unsafe fn perform_initial_heap_walk() {
                 let addr = entry.lpData as u64;
                 let sz = entry.cbData;
 
-                // Registra no buffer interno e sincroniza com a GUI Pascal
                 let count = ALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
                 let idx = (count as usize) % MAX_RING_BUFFER;
                 ALLOC_RING[idx] = AllocRecord {
@@ -375,10 +367,6 @@ unsafe fn perform_initial_heap_walk() {
         HeapUnlock(h_heap);
     }
 }
-
-// =========================================================================
-// HOOKS DE BAIXO NÍVEL COM TRATAMENTO DE RECURSÃO E PROTEÇÃO
-// =========================================================================
 
 unsafe extern "system" fn hook_nt_allocate_virtual_memory(
     process_handle: HANDLE,
@@ -401,9 +389,18 @@ unsafe extern "system" fn hook_nt_allocate_virtual_memory(
         flags_record |= STEALTH_FLAG_MASKED_RWX;
     }
 
-    let status = orig(process_handle, base_address, zero_bits, region_size, allocation_type, actual_protect);
+    let status = orig(
+        process_handle,
+        base_address,
+        zero_bits,
+        region_size,
+        allocation_type,
+        actual_protect,
+    );
 
-    if status == STATUS_SUCCESS && !base_address.is_null() && !region_size.is_null()
+    if status == STATUS_SUCCESS
+        && !base_address.is_null()
+        && !region_size.is_null()
         && !IN_HOOK.swap(true, Ordering::SeqCst)
     {
         let addr = *base_address as u64;
@@ -427,8 +424,16 @@ unsafe extern "system" fn hook_nt_free_virtual_memory(
     };
 
     let caller_ip = capture_caller_ip();
-    let addr = if !base_address.is_null() { *base_address as u64 } else { 0 };
-    let sz = if !region_size.is_null() { *region_size as u64 } else { 0 };
+    let addr = if !base_address.is_null() {
+        *base_address as u64
+    } else {
+        0
+    };
+    let sz = if !region_size.is_null() {
+        *region_size as u64
+    } else {
+        0
+    };
 
     let status = orig(process_handle, base_address, region_size, free_type);
 
@@ -480,21 +485,30 @@ unsafe extern "system" fn hook_rtl_free_heap(
     orig(heap_handle, flags, base_address)
 }
 
-// =========================================================================
-// MOTOR DE TRAMPOLINE 64-BIT COM ALINHAMENTO E FLUSH DE INSTRUCTION CACHE
-// =========================================================================
-
-unsafe fn install_detour64(target: *mut c_void, detour: *mut c_void, stolen_bytes_count: usize) -> *mut c_void {
+unsafe fn install_detour64(
+    target: *mut c_void,
+    detour: *mut c_void,
+    stolen_bytes_count: usize,
+) -> *mut c_void {
     if target.is_null() || detour.is_null() || stolen_bytes_count < 14 {
         return null_mut();
     }
 
-    let trampoline = VirtualAlloc(null_mut(), 64, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    let trampoline = VirtualAlloc(
+        null_mut(),
+        64,
+        MEM_COMMIT | MEM_RESERVE,
+        PAGE_EXECUTE_READWRITE,
+    );
     if trampoline.is_null() {
         return null_mut();
     }
 
-    copy_nonoverlapping(target as *const u8, trampoline as *mut u8, stolen_bytes_count);
+    copy_nonoverlapping(
+        target as *const u8,
+        trampoline as *mut u8,
+        stolen_bytes_count,
+    );
 
     let return_addr = (target as usize) + stolen_bytes_count;
     let mut jump_back = [0u8; 14];
@@ -509,7 +523,13 @@ unsafe fn install_detour64(target: *mut c_void, detour: *mut c_void, stolen_byte
     );
 
     let mut old_protect: DWORD = 0;
-    if VirtualProtect(target, stolen_bytes_count, PAGE_EXECUTE_READWRITE, &mut old_protect) == 0 {
+    if VirtualProtect(
+        target,
+        stolen_bytes_count,
+        PAGE_EXECUTE_READWRITE,
+        &mut old_protect,
+    ) == 0
+    {
         return null_mut();
     }
 
@@ -519,7 +539,11 @@ unsafe fn install_detour64(target: *mut c_void, detour: *mut c_void, stolen_byte
     jump_to_detour[2..6].copy_from_slice(&0u32.to_ne_bytes());
     jump_to_detour[6..14].copy_from_slice(&(detour as usize as u64).to_ne_bytes());
 
-    copy_nonoverlapping(jump_to_detour.as_ptr(), target as *mut u8, stolen_bytes_count);
+    copy_nonoverlapping(
+        jump_to_detour.as_ptr(),
+        target as *mut u8,
+        stolen_bytes_count,
+    );
 
     VirtualProtect(target, stolen_bytes_count, old_protect, &mut old_protect);
 
@@ -529,10 +553,6 @@ unsafe fn install_detour64(target: *mut c_void, detour: *mut c_void, stolen_byte
 
     trampoline
 }
-
-// =========================================================================
-// EXPORTAÇÕES C-ABI PARA O ONYX ENGINE / CHEAT ENGINE
-// =========================================================================
 
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn CeInitializeAllocHook() -> BOOL {
@@ -565,25 +585,29 @@ pub unsafe extern "system" fn CeInitializeAllocHook() -> BOOL {
         PIPE_HANDLE.store(h_pipe as isize, Ordering::SeqCst);
     }
 
-    // NtAllocateVirtualMemory: 16 bytes
     let p_nt_alloc = GetProcAddress(ntdll, b"NtAllocateVirtualMemory\0".as_ptr());
     if !p_nt_alloc.is_null() {
-        let tramp = install_detour64(p_nt_alloc, hook_nt_allocate_virtual_memory as *mut c_void, 16);
+        let tramp = install_detour64(
+            p_nt_alloc,
+            hook_nt_allocate_virtual_memory as *mut c_void,
+            16,
+        );
         if !tramp.is_null() {
-            ORIG_NT_ALLOC = Some(std::mem::transmute::<*mut c_void, FnNtAllocateVirtualMemory>(tramp));
+            ORIG_NT_ALLOC =
+                Some(std::mem::transmute::<*mut c_void, FnNtAllocateVirtualMemory>(tramp));
         }
     }
 
-    // NtFreeVirtualMemory: 16 bytes
     let p_nt_free = GetProcAddress(ntdll, b"NtFreeVirtualMemory\0".as_ptr());
     if !p_nt_free.is_null() {
         let tramp = install_detour64(p_nt_free, hook_nt_free_virtual_memory as *mut c_void, 16);
         if !tramp.is_null() {
-            ORIG_NT_FREE = Some(std::mem::transmute::<*mut c_void, FnNtFreeVirtualMemory>(tramp));
+            ORIG_NT_FREE = Some(std::mem::transmute::<*mut c_void, FnNtFreeVirtualMemory>(
+                tramp,
+            ));
         }
     }
 
-    // RtlAllocateHeap: 19 bytes
     let p_rtl_alloc = GetProcAddress(ntdll, b"RtlAllocateHeap\0".as_ptr());
     if !p_rtl_alloc.is_null() {
         let tramp = install_detour64(p_rtl_alloc, hook_rtl_allocate_heap as *mut c_void, 19);
@@ -592,7 +616,6 @@ pub unsafe extern "system" fn CeInitializeAllocHook() -> BOOL {
         }
     }
 
-    // RtlFreeHeap: 14 bytes
     let p_rtl_free = GetProcAddress(ntdll, b"RtlFreeHeap\0".as_ptr());
     if !p_rtl_free.is_null() {
         let tramp = install_detour64(p_rtl_free, hook_rtl_free_heap as *mut c_void, 14);
@@ -603,10 +626,8 @@ pub unsafe extern "system" fn CeInitializeAllocHook() -> BOOL {
 
     HOOKS_INSTALLED.store(true, Ordering::SeqCst);
 
-    // Executa a enumeração dos heaps já existentes no processo
     perform_initial_heap_walk();
 
-    // Notifica a interface do Cheat Engine de que a inicialização foi concluída com sucesso
     let finished = CEInitializationFinished as HANDLE;
     if !finished.is_null() {
         SetEvent(finished);
@@ -642,7 +663,11 @@ pub extern "system" fn CeSetStealthMasking(enabled: BOOL) -> BOOL {
 
 #[unsafe(no_mangle)]
 pub extern "system" fn CeIsStealthMaskingEnabled() -> BOOL {
-    if STEALTH_MASKING_ENABLED.load(Ordering::Relaxed) { TRUE } else { FALSE }
+    if STEALTH_MASKING_ENABLED.load(Ordering::Relaxed) {
+        TRUE
+    } else {
+        FALSE
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -670,10 +695,6 @@ pub unsafe extern "system" fn DllMain(
     }
     TRUE
 }
-
-// =========================================================================
-// SUÍTE DE TESTES UNITÁRIOS AUTOMATIZADOS (VERIFICAÇÃO DE INTEGRIDADE)
-// =========================================================================
 
 #[cfg(test)]
 mod tests {
