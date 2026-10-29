@@ -1,3 +1,4 @@
+pub mod abi_util;
 pub mod process;
 pub mod scanner;
 pub mod disasm;
@@ -8,3 +9,7 @@ pub mod mono;
 pub mod veh;
 pub mod commonality;
 pub mod tx;
+pub mod aa;
+pub mod hook;
+pub mod gdb;
+pub mod manual_map;
