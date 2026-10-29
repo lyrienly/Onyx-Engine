@@ -2,12 +2,14 @@ use std::mem::size_of;
 use std::ptr::null_mut;
 
 use onyx_core::win32::{
-    CloseHandle, CreateRemoteThread, GetModuleHandleA, GetProcAddress, OpenProcess,
-    ReadProcessMemory, VirtualAllocEx, VirtualFreeEx, VirtualProtectEx, WaitForSingleObject,
-    WriteProcessMemory, DWORD, HANDLE, LPCVOID, LPVOID, MEM_COMMIT, MEM_RELEASE, MEM_RESERVE,
-    PAGE_EXECUTE, PAGE_EXECUTE_READ, PAGE_EXECUTE_READWRITE, PAGE_READONLY, PAGE_READWRITE,
-    PROCESS_ALL_ACCESS, PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION, PROCESS_VM_OPERATION,
-    PROCESS_VM_READ, PROCESS_VM_WRITE,
+    CloseHandle, CreateRemoteThread, CreateToolhelp32Snapshot, GetModuleHandleA, GetProcAddress,
+    GetThreadContext, OpenProcess, OpenThread, ReadProcessMemory, ResumeThread, SetThreadContext,
+    SuspendThread, Thread32First, Thread32Next, VirtualAllocEx, VirtualFreeEx, VirtualProtectEx,
+    WaitForSingleObject, WriteProcessMemory, CONTEXT, CONTEXT_ALL, DWORD, HANDLE,
+    INVALID_HANDLE_VALUE, LPCVOID, LPVOID, MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_EXECUTE,
+    PAGE_EXECUTE_READ, PAGE_EXECUTE_READWRITE, PAGE_READONLY, PAGE_READWRITE, PROCESS_ALL_ACCESS,
+    PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION, PROCESS_VM_OPERATION, PROCESS_VM_READ,
+    PROCESS_VM_WRITE, TH32CS_SNAPTHREAD, THREADENTRY32, THREAD_ALL_ACCESS,
 };
 
 use crate::imports::{parse_imports, ImportSymbol};
@@ -24,6 +26,9 @@ pub struct MapOptions {
     pub erase_headers: bool,
     pub protect_sections: bool,
     pub call_tls: bool,
+    pub thread_hijack: bool,
+    pub use_driver: bool,
+    pub wipe_stub: bool,
 }
 
 impl Default for MapOptions {
@@ -32,6 +37,9 @@ impl Default for MapOptions {
             erase_headers: false,
             protect_sections: true,
             call_tls: true,
+            thread_hijack: false,
+            use_driver: false,
+            wipe_stub: false,
         }
     }
 }
@@ -45,7 +53,25 @@ pub struct MapOutcome {
     pub imports: u32,
 }
 
-fn open_target(pid: u32) -> Result<HANDLE, String> {
+pub fn resolve_pid(target: &str) -> Result<u32, String> {
+    if let Ok(pid) = target.parse::<u32>() {
+        return Ok(pid);
+    }
+    match onyx_core::process::Process::find_by_name(target)? {
+        Some(entry) => Ok(entry.pid),
+        None => Err(format!("Process '{}' not found", target)),
+    }
+}
+
+fn open_target(pid: u32, use_driver: bool) -> Result<HANDLE, String> {
+    if use_driver {
+        if let Ok(driver) = onyx_core::process::kernel::DbkDriver::connect() {
+            if let Ok(h) = driver.open_process(pid) {
+                return Ok(h);
+            }
+        }
+    }
+
     let full = unsafe { OpenProcess(PROCESS_ALL_ACCESS, 0, pid) };
     if !full.is_null() {
         return Ok(full);
@@ -57,11 +83,17 @@ fn open_target(pid: u32) -> Result<HANDLE, String> {
         | PROCESS_VM_READ
         | PROCESS_VM_WRITE;
     let handle = unsafe { OpenProcess(reduced, 0, pid) };
-    if handle.is_null() {
-        Err(format!("OpenProcess failed for pid {}", pid))
-    } else {
-        Ok(handle)
+    if !handle.is_null() {
+        return Ok(handle);
     }
+
+    if let Ok(driver) = onyx_core::process::kernel::DbkDriver::connect() {
+        if let Ok(h) = driver.open_process(pid) {
+            return Ok(h);
+        }
+    }
+
+    Err(format!("OpenProcess failed for pid {}", pid))
 }
 
 fn alloc_remote(process: HANDLE, size: usize, protect: DWORD) -> Result<usize, String> {
@@ -79,6 +111,13 @@ fn free_remote(process: HANDLE, address: usize) {
         unsafe {
             VirtualFreeEx(process, address as LPVOID, 0, MEM_RELEASE);
         }
+    }
+}
+
+fn wipe_remote(process: HANDLE, address: usize, size: usize) {
+    if address != 0 && size != 0 {
+        let zeros = vec![0u8; size];
+        let _ = write_remote(process, address, &zeros);
     }
 }
 
@@ -136,13 +175,158 @@ fn local_proc(module: &str, name: &str) -> Result<u64, String> {
     }
 }
 
-fn remote_call(
+fn find_target_thread(pid: u32) -> Result<u32, String> {
+    let snap = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0) };
+    if snap.is_null() || snap == INVALID_HANDLE_VALUE {
+        return Err("CreateToolhelp32Snapshot failed".to_string());
+    }
+
+    let mut entry: THREADENTRY32 = unsafe { std::mem::zeroed() };
+    entry.dwSize = size_of::<THREADENTRY32>() as DWORD;
+
+    let mut found_tid = 0u32;
+    let mut ok = unsafe { Thread32First(snap, &mut entry) };
+    while ok != 0 {
+        if entry.th32OwnerProcessID == pid {
+            found_tid = entry.th32ThreadID;
+            break;
+        }
+        ok = unsafe { Thread32Next(snap, &mut entry) };
+    }
+
+    unsafe {
+        CloseHandle(snap);
+    }
+
+    if found_tid != 0 {
+        Ok(found_tid)
+    } else {
+        Err(format!("No threads found for PID {}", pid))
+    }
+}
+
+fn remote_call_hijack(
     process: HANDLE,
+    pid: u32,
     stub: usize,
     request: usize,
     function: u64,
     args: [u64; 4],
 ) -> Result<u64, String> {
+    let tid = find_target_thread(pid)?;
+    let thread = unsafe { OpenThread(THREAD_ALL_ACCESS, 0, tid) };
+    if thread.is_null() {
+        return Err("OpenThread failed for thread hijack".to_string());
+    }
+
+    let suspend_count = unsafe { SuspendThread(thread) };
+    if suspend_count == 0xFFFF_FFFF {
+        unsafe {
+            CloseHandle(thread);
+        }
+        return Err("SuspendThread failed".to_string());
+    }
+
+    let mut ctx: CONTEXT = unsafe { std::mem::zeroed() };
+    ctx.ContextFlags = CONTEXT_ALL;
+    if unsafe { GetThreadContext(thread, &mut ctx) } == 0 {
+        unsafe {
+            ResumeThread(thread);
+            CloseHandle(thread);
+        }
+        return Err("GetThreadContext failed".to_string());
+    }
+
+    let saved_ctx = ctx;
+
+    let payload = CallRequest::new(function, args);
+    let bytes = unsafe {
+        std::slice::from_raw_parts(
+            &payload as *const CallRequest as *const u8,
+            size_of::<CallRequest>(),
+        )
+    };
+    write_remote(process, request, bytes)?;
+
+    let flag_addr = request + size_of::<CallRequest>();
+    write_remote(process, flag_addr, &[0u8])?;
+
+    let trampoline_addr = request + size_of::<CallRequest>() + 16;
+    let mut trampoline = Vec::with_capacity(64);
+    trampoline.extend_from_slice(&[0x48, 0x83, 0xEC, 0x28]);
+    trampoline.extend_from_slice(&[0x48, 0xB9]);
+    trampoline.extend_from_slice(&(request as u64).to_le_bytes());
+    trampoline.extend_from_slice(&[0x48, 0xB8]);
+    trampoline.extend_from_slice(&(stub as u64).to_le_bytes());
+    trampoline.extend_from_slice(&[0xFF, 0xD0]);
+    trampoline.extend_from_slice(&[0x48, 0x83, 0xC4, 0x28]);
+    trampoline.extend_from_slice(&[0x48, 0xB8]);
+    trampoline.extend_from_slice(&(flag_addr as u64).to_le_bytes());
+    trampoline.extend_from_slice(&[0xC6, 0x00, 0x01]);
+    trampoline.extend_from_slice(&[0xF3, 0x90]);
+    trampoline.extend_from_slice(&[0xEB, 0xFC]);
+
+    write_remote(process, trampoline_addr, &trampoline)?;
+
+    ctx.Rip = trampoline_addr as u64;
+    ctx.Rsp = (ctx.Rsp & !0xFu64) - 0x28;
+
+    if unsafe { SetThreadContext(thread, &ctx) } == 0 {
+        unsafe {
+            ResumeThread(thread);
+            CloseHandle(thread);
+        }
+        return Err("SetThreadContext failed".to_string());
+    }
+
+    unsafe {
+        ResumeThread(thread);
+    }
+
+    let start_time = std::time::Instant::now();
+    let mut finished = false;
+    while start_time.elapsed() < std::time::Duration::from_millis(5000) {
+        let mut flag = [0u8; 1];
+        if read_remote(process, flag_addr, &mut flag).is_ok() && flag[0] == 1 {
+            finished = true;
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+
+    unsafe {
+        SuspendThread(thread);
+        SetThreadContext(thread, &saved_ctx);
+        ResumeThread(thread);
+        CloseHandle(thread);
+    }
+
+    if !finished {
+        return Err("Thread hijacking execution timed out".to_string());
+    }
+
+    let mut result = [0u8; size_of::<CallRequest>()];
+    read_remote(process, request, &mut result)?;
+    let mut raw = [0u8; 8];
+    raw.copy_from_slice(&result[0x28..0x30]);
+    Ok(u64::from_le_bytes(raw))
+}
+
+fn remote_call(
+    process: HANDLE,
+    pid: u32,
+    stub: usize,
+    request: usize,
+    function: u64,
+    args: [u64; 4],
+    thread_hijack: bool,
+) -> Result<u64, String> {
+    if thread_hijack {
+        if let Ok(res) = remote_call_hijack(process, pid, stub, request, function, args) {
+            return Ok(res);
+        }
+    }
+
     let payload = CallRequest::new(function, args);
     let bytes = unsafe {
         std::slice::from_raw_parts(
@@ -253,11 +437,13 @@ fn erase_headers(process: HANDLE, base: usize, size_of_headers: u32) -> Result<(
 
 fn call_tls_callbacks(
     process: HANDLE,
+    pid: u32,
     base: usize,
     image: &[u8],
     pe: &PeImage,
     stub: usize,
     request: usize,
+    thread_hijack: bool,
 ) -> Result<(), String> {
     if pe.tls_rva == 0 {
         return Ok(());
@@ -294,7 +480,15 @@ fn call_tls_callbacks(
         if callback == 0 {
             break;
         }
-        remote_call(process, stub, request, callback, [base as u64, 1, 0, 0])?;
+        remote_call(
+            process,
+            pid,
+            stub,
+            request,
+            callback,
+            [base as u64, 1, 0, 0],
+            thread_hijack,
+        )?;
         slot += 8;
     }
 
@@ -303,6 +497,7 @@ fn call_tls_callbacks(
 
 fn resolve_imports(
     process: HANDLE,
+    pid: u32,
     base: usize,
     image: &[u8],
     pe: &PeImage,
@@ -311,6 +506,7 @@ fn resolve_imports(
     name_buffer: usize,
     load_library: u64,
     get_proc: u64,
+    thread_hijack: bool,
 ) -> Result<u32, String> {
     let imports = parse_imports(image, pe.import_rva, pe.import_size)?;
     let mut modules: Vec<(String, u64)> = Vec::new();
@@ -332,10 +528,12 @@ fn resolve_imports(
                 write_remote(process, name_buffer, &buffer)?;
                 let loaded = remote_call(
                     process,
+                    pid,
                     stub,
                     request,
                     load_library,
                     [name_buffer as u64, 0, 0, 0],
+                    thread_hijack,
                 )?;
                 if loaded == 0 {
                     return Err(format!("LoadLibraryA failed for {}", entry.module));
@@ -356,18 +554,22 @@ fn resolve_imports(
                 write_remote(process, name_buffer, &buffer)?;
                 remote_call(
                     process,
+                    pid,
                     stub,
                     request,
                     get_proc,
                     [module_base, name_buffer as u64, 0, 0],
+                    thread_hijack,
                 )?
             }
             ImportSymbol::Ordinal(ordinal) => remote_call(
                 process,
+                pid,
                 stub,
                 request,
                 get_proc,
                 [module_base, *ordinal as u64, 0, 0],
+                thread_hijack,
             )?,
         };
 
@@ -395,7 +597,6 @@ fn run_mapping(
     request: usize,
     name_buffer: usize,
 ) -> Result<MapOutcome, String> {
-    let _ = pid;
     let pe = PeImage::parse_file(dll_path)?;
     if !pe.is_pe32_plus {
         return Err("only PE32+ (x64) DLLs are supported".to_string());
@@ -432,6 +633,7 @@ fn run_mapping(
     let get_proc = local_proc("kernel32.dll", "GetProcAddress")?;
     let imports = resolve_imports(
         process,
+        pid,
         base,
         &image,
         &pe,
@@ -440,6 +642,7 @@ fn run_mapping(
         name_buffer,
         load_library,
         get_proc,
+        options.thread_hijack,
     )?;
 
     if options.protect_sections {
@@ -447,7 +650,16 @@ fn run_mapping(
     }
 
     if options.call_tls {
-        call_tls_callbacks(process, base, &image, &pe, stub, request)?;
+        call_tls_callbacks(
+            process,
+            pid,
+            base,
+            &image,
+            &pe,
+            stub,
+            request,
+            options.thread_hijack,
+        )?;
     }
 
     let entry_point = if pe.entry_point_rva != 0 {
@@ -459,10 +671,12 @@ fn run_mapping(
     let dll_main_result = if entry_point != 0 {
         remote_call(
             process,
+            pid,
             stub,
             request,
             entry_point as u64,
             [base as u64, 1, 0, 0],
+            options.thread_hijack,
         )? as i32
     } else {
         1
@@ -482,7 +696,7 @@ fn run_mapping(
 }
 
 pub fn map_dll(pid: u32, dll_path: &str, options: &MapOptions) -> Result<MapOutcome, String> {
-    let process = open_target(pid)?;
+    let process = open_target(pid, options.use_driver)?;
 
     let stub_code = call_stub();
     let stub = alloc_remote(process, stub_code.len(), PAGE_EXECUTE_READWRITE)?;
@@ -495,6 +709,12 @@ pub fn map_dll(pid: u32, dll_path: &str, options: &MapOptions) -> Result<MapOutc
         Err(error) => Err(error),
     };
 
+    if options.wipe_stub {
+        wipe_remote(process, name_buffer, NAME_BUFFER_SIZE);
+        wipe_remote(process, request, SCRATCH_SIZE);
+        wipe_remote(process, stub, stub_code.len());
+    }
+
     free_remote(process, name_buffer);
     free_remote(process, request);
     free_remote(process, stub);
@@ -503,6 +723,15 @@ pub fn map_dll(pid: u32, dll_path: &str, options: &MapOptions) -> Result<MapOutc
     }
 
     outcome
+}
+
+pub fn map_dll_by_name(
+    target_name: &str,
+    dll_path: &str,
+    options: &MapOptions,
+) -> Result<MapOutcome, String> {
+    let pid = resolve_pid(target_name)?;
+    map_dll(pid, dll_path, options)
 }
 
 #[cfg(test)]
@@ -524,5 +753,14 @@ mod tests {
         assert!(!options.erase_headers);
         assert!(options.protect_sections);
         assert!(options.call_tls);
+        assert!(!options.thread_hijack);
+        assert!(!options.use_driver);
+        assert!(!options.wipe_stub);
+    }
+
+    #[test]
+    fn test_resolve_pid_numeric() {
+        let pid = resolve_pid("1234").unwrap();
+        assert_eq!(pid, 1234);
     }
 }

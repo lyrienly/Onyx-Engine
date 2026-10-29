@@ -22,6 +22,9 @@ pub const ONYX_PLUGIN_ERR_NOT_SUPPORTED: i32 = -5;
 pub const ONYX_MAP_ERASE_HEADERS: u32 = 1;
 pub const ONYX_MAP_PROTECT_SECTIONS: u32 = 2;
 pub const ONYX_MAP_CALL_TLS: u32 = 4;
+pub const ONYX_MAP_THREAD_HIJACK: u32 = 8;
+pub const ONYX_MAP_USE_DRIVER: u32 = 16;
+pub const ONYX_MAP_WIPE_STUB: u32 = 32;
 
 #[repr(C)]
 pub struct OnyxPluginInfo {
@@ -66,10 +69,10 @@ pub struct OnyxMapResult {
 }
 
 static PLUGIN_NAME: &[u8] = b"Onyx DLL Manual Mapper\0";
-static PLUGIN_VERSION: &[u8] = b"1.0.0\0";
+static PLUGIN_VERSION: &[u8] = b"1.1.0\0";
 static PLUGIN_AUTHOR: &[u8] = b"OnyxEngine Team\0";
 static PLUGIN_DESC: &[u8] =
-    b"Manual (mapped) DLL injection in the target process without LoadLibrary\0";
+    b"Manual (mapped) DLL injection with thread hijacking, driver elevation, and PE wiping\0";
 
 static HOST: AtomicUsize = AtomicUsize::new(0);
 static MAPPED: Mutex<Vec<u64>> = Mutex::new(Vec::new());
@@ -162,9 +165,75 @@ pub unsafe extern "system" fn OnyxPlugin_MapDll(
         erase_headers: flags & ONYX_MAP_ERASE_HEADERS != 0,
         protect_sections: flags & ONYX_MAP_PROTECT_SECTIONS != 0,
         call_tls: flags & ONYX_MAP_CALL_TLS != 0,
+        thread_hijack: flags & ONYX_MAP_THREAD_HIJACK != 0,
+        use_driver: flags & ONYX_MAP_USE_DRIVER != 0,
+        wipe_stub: flags & ONYX_MAP_WIPE_STUB != 0,
     };
 
     match mapper::map_dll(pid, path, &map_options) {
+        Ok(outcome) => {
+            (*out_result).image_base = outcome.image_base as u64;
+            (*out_result).entry_point = outcome.entry_point as u64;
+            (*out_result).dll_main_result = outcome.dll_main_result;
+            (*out_result).flags_applied = flags;
+            (*out_result).relocations = outcome.relocations;
+            (*out_result).imports = outcome.imports;
+            if let Ok(mut mapped) = MAPPED.lock() {
+                mapped.push(outcome.image_base as u64);
+            }
+            ONYX_PLUGIN_OK
+        }
+        Err(error) => {
+            write_c_string(&mut (*out_result).error, &error);
+            ONYX_PLUGIN_ERR_EXECUTION
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "system" fn OnyxPlugin_MapDllNamed(
+    target_name: *const c_char,
+    dll_path: *const c_char,
+    options: *const OnyxMapOptions,
+    out_result: *mut OnyxMapResult,
+) -> i32 {
+    if target_name.is_null() || dll_path.is_null() || out_result.is_null() {
+        return ONYX_PLUGIN_ERR_INVALID_PARAM;
+    }
+    clear_c_string(&mut (*out_result).error);
+
+    let name = match CStr::from_ptr(target_name).to_str() {
+        Ok(value) => value,
+        Err(_) => {
+            write_c_string(&mut (*out_result).error, "invalid UTF-8 target name");
+            return ONYX_PLUGIN_ERR_INVALID_PARAM;
+        }
+    };
+
+    let path = match CStr::from_ptr(dll_path).to_str() {
+        Ok(value) => value,
+        Err(_) => {
+            write_c_string(&mut (*out_result).error, "invalid UTF-8 path");
+            return ONYX_PLUGIN_ERR_INVALID_PARAM;
+        }
+    };
+
+    let flags = if options.is_null() {
+        ONYX_MAP_PROTECT_SECTIONS | ONYX_MAP_CALL_TLS
+    } else {
+        (*options).flags
+    };
+
+    let map_options = mapper::MapOptions {
+        erase_headers: flags & ONYX_MAP_ERASE_HEADERS != 0,
+        protect_sections: flags & ONYX_MAP_PROTECT_SECTIONS != 0,
+        call_tls: flags & ONYX_MAP_CALL_TLS != 0,
+        thread_hijack: flags & ONYX_MAP_THREAD_HIJACK != 0,
+        use_driver: flags & ONYX_MAP_USE_DRIVER != 0,
+        wipe_stub: flags & ONYX_MAP_WIPE_STUB != 0,
+    };
+
+    match mapper::map_dll_by_name(name, path, &map_options) {
         Ok(outcome) => {
             (*out_result).image_base = outcome.image_base as u64;
             (*out_result).entry_point = outcome.entry_point as u64;

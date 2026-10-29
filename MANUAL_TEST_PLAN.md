@@ -68,12 +68,12 @@ Este documento detalha o roteiro prático e passo a passo para você testar manu
 
 ---
 
-## 2. Plugin DLL Mapper (Issue #89)
+## 2. Plugin DLL Mapper (Issue #89 & Anarchy Enhancements)
 
-*Objetivo*: Validar a interface de plugin para injeção por Manual Mapping.
+*Objetivo*: Validar a interface de plugin para injeção por Manual Mapping, auto-descoberta por nome de processo, evasão por Thread Hijacking, elevação de handle via Kernel Driver e limpeza do stub.
 
 ### Passo a Passo
-1. Execute a suíte de testes do plugin:
+1. Execute a suíte de testes do plugin (18 testes):
    ```powershell
    cd C:\Users\Administrator\Desktop\OnyxEngine
    cargo test -p onyx_dll_mapper -- --nocapture
@@ -81,16 +81,21 @@ Este documento detalha o roteiro prático e passo a passo para você testar manu
 2. Inicie um processo de teste (ex: `notepad.exe`):
    ```powershell
    $p = Start-Process notepad.exe -PassThru
-   $pid_notepad = $p.Id
    ```
-3. Execute o mapper chamando a DLL compilada de exemplo:
-   ```powershell
-   cargo run -p onyx_dll_mapper -- --pid $pid_notepad --dll target\debug\allochook.dll
-   ```
+3. Teste a injeção via C-ABI chamando `OnyxPlugin_MapDllNamed`:
+   - Alvo por nome direto (`notepad.exe` ou `notepad`).
+   - Flags ativas:
+     - `ONYX_MAP_PROTECT_SECTIONS (2)`: converte RWX para RX / RO / RW por seção.
+     - `ONYX_MAP_CALL_TLS (4)`: executa TLS callbacks antes do DllMain.
+     - `ONYX_MAP_THREAD_HIJACK (8)`: sequestra thread existente sem criar novas threads (`CreateRemoteThread`).
+     - `ONYX_MAP_USE_DRIVER (16)`: elevação para `PROCESS_ALL_ACCESS` via DBK driver caso permissões usermode sejam insuficientes.
+     - `ONYX_MAP_WIPE_STUB (32)`: sobrescreve com zeros e desaloca a memória do bootstrap stub.
+     - `ONYX_MAP_ERASE_HEADERS (1)`: apaga os cabeçalhos MZ / PE.
 ### Critérios de Sucesso
-- `17 passed; 0 failed`.
-- `OpenProcess`, alocação de seções (`PAGE_EXECUTE_READWRITE` convertida para `PAGE_EXECUTE_READ` ou `PAGE_READONLY`), resolução de IAT de `kernel32.dll` e execução de stub remoto retornam código `0`.
-- Feche o processo: `Stop-Process -Id $pid_notepad`.
+- `18 passed; 0 failed`.
+- Descoberta automática de PID pelo nome executável `Process::find_by_name`.
+- Mapeamento executado com sucesso e `DllMain` retornando `1`.
+- Feche o processo de teste ao concluir: `Stop-Process -Name notepad`.
 
 ---
 
