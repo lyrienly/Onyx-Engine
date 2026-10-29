@@ -46,3 +46,9 @@ impl AllocHookMonitor {
         Ok(new_allocs)
     }
 }
+
+impl Default for AllocHookMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}

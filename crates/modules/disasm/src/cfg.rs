@@ -74,7 +74,7 @@ pub fn build_cfg(instructions: &[Instruction]) -> ControlFlowGraph {
             | FlowType::Call
             | FlowType::Return
             | FlowType::Int => true,
-            FlowType::Sequential => next_addr.map_or(false, |a| leaders.contains(&a)),
+            FlowType::Sequential => next_addr.is_some_and(|a| leaders.contains(&a)),
         };
 
         if terminator {

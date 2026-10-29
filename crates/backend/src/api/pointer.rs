@@ -70,6 +70,12 @@ impl PointerScannerSession {
     }
 }
 
+impl Default for PointerScannerSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn onyx_pointer_scanner_create() -> *mut PointerScannerSession {
     Box::into_raw(Box::new(PointerScannerSession::new()))

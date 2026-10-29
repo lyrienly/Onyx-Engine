@@ -67,9 +67,9 @@ end;
 procedure TForm4.Label4Click(Sender: TObject);
 begin
   {$ifdef windows}
-  ShellExecute(0, PChar('open'), PChar('http://forum.cheatengine.org/'),PChar(''), PChar(''), SW_MAXIMIZE);
+  ShellExecute(0, PChar('open'), PChar('https://github.com/ErlonLy/OnyxEngine/issues'),PChar(''), PChar(''), SW_MAXIMIZE);
   {$else}
-  OpenURL('http://forum.cheatengine.org/');
+  OpenURL('https://github.com/ErlonLy/OnyxEngine/issues');
   {$endif}
 end;
 

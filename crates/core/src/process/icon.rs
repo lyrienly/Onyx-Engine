@@ -115,7 +115,7 @@ impl ProcessIconExtractor {
             }
 
             let mut has_alpha = false;
-            for chunk in pixels.chunks_exact(4) {
+            for chunk in pixels.as_chunks::<4>().0 {
                 if chunk[3] > 0 {
                     has_alpha = true;
                     break;
@@ -144,12 +144,12 @@ impl ProcessIconExtractor {
                 }
             } else if !has_alpha {
 
-                for chunk in pixels.chunks_exact_mut(4) {
+                for chunk in pixels.as_chunks_mut::<4>().0 {
                     chunk[3] = if chunk[0] == 0 && chunk[1] == 0 && chunk[2] == 0 { 0 } else { 255 };
                 }
             }
 
-            for chunk in pixels.chunks_exact_mut(4) {
+            for chunk in pixels.as_chunks_mut::<4>().0 {
                 chunk.swap(0, 2);
             }
         } else {
@@ -194,11 +194,10 @@ impl ProcessIconExtractor {
 
         let mut h_small: HICON = null_mut();
         let count = unsafe { ExtractIconExW(wide.as_ptr(), 0, null_mut(), &mut h_small, 1) };
-        if count > 0 && count != u32::MAX && !h_small.is_null() {
-            if let Some(rgba) = Self::extract_rgba_from_hicon(h_small, true) {
+        if count > 0 && count != u32::MAX && !h_small.is_null()
+            && let Some(rgba) = Self::extract_rgba_from_hicon(h_small, true) {
                 return Some(rgba);
             }
-        }
 
         let mut shfi: SHFILEINFOW = unsafe { std::mem::zeroed() };
         let res = unsafe {
@@ -234,11 +233,10 @@ impl ProcessIconExtractor {
             )
         };
 
-        if res != 0 && !shfi.hIcon.is_null() {
-            if let Some(icon) = Self::extract_rgba_from_hicon(shfi.hIcon, true) {
+        if res != 0 && !shfi.hIcon.is_null()
+            && let Some(icon) = Self::extract_rgba_from_hicon(shfi.hIcon, true) {
                 return Some(icon);
             }
-        }
 
         let sys_icon = unsafe { LoadIconW(null_mut(), IDI_APPLICATION) };
         if !sys_icon.is_null() {
@@ -249,11 +247,10 @@ impl ProcessIconExtractor {
     }
 
     pub fn get_process_icon(pid: u32, name: &str) -> Option<(u32, u32, Vec<u8>)> {
-        if let Some(path) = Self::get_process_path(pid, name) {
-            if let Some(icon) = Self::extract_icon_for_path(&path) {
+        if let Some(path) = Self::get_process_path(pid, name)
+            && let Some(icon) = Self::extract_icon_for_path(&path) {
                 return Some(icon);
             }
-        }
 
         if let Some(icon) = Self::extract_icon_for_path(name) {
             return Some(icon);

@@ -70,6 +70,12 @@ impl PointerScannerSession {
     }
 }
 
+impl Default for PointerScannerSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn onyx_pointer_module_ping() -> i32 {
     1

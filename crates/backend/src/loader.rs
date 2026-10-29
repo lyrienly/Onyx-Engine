@@ -104,7 +104,7 @@ pub extern "C" fn onyx_module_is_loaded(module_idx: u32) -> i32 {
             0 => if reg.pointer_dll.is_some() { 1 } else { 0 },
             1 => if reg.scanner_dll.is_some() { 1 } else { 0 },
             2 => if reg.disasm_dll.is_some() { 1 } else { 0 },
-            3 => if reg.freezer_dll.is_some() { 1 } else { 0 },
+            3 if reg.freezer_dll.is_some() => { 1 },
             _ => 0,
         }
     } else {

@@ -109,11 +109,10 @@ impl SymbolResolver {
                 if let Some(m) = mods.iter().find(|m| {
                     let mn = m.name.to_lowercase();
                     mn == *pref || mn.strip_suffix(".dll").unwrap_or(&mn) == pref.strip_suffix(".dll").unwrap_or(pref)
-                }) {
-                    if let Some(addr) = self.resolve_module_export(proc, &m.name, trimmed) {
+                })
+                    && let Some(addr) = self.resolve_module_export(proc, &m.name, trimmed) {
                         return Some(addr);
                     }
-                }
             }
 
             for m in &mods {
@@ -121,11 +120,10 @@ impl SymbolResolver {
                 let already_checked = preferences.iter().any(|pref| {
                     mn == *pref || mn.strip_suffix(".dll").unwrap_or(&mn) == pref.strip_suffix(".dll").unwrap_or(pref)
                 });
-                if !already_checked {
-                    if let Some(addr) = self.resolve_module_export(proc, &m.name, trimmed) {
+                if !already_checked
+                    && let Some(addr) = self.resolve_module_export(proc, &m.name, trimmed) {
                         return Some(addr);
                     }
-                }
             }
 
             None
@@ -199,7 +197,7 @@ impl SymbolResolver {
         let name_rvas: Vec<u32> = {
             let mut buf = vec![0u8; num_names * 4];
             proc.read_raw(names_addr, &mut buf)?;
-            buf.chunks_exact(4)
+            buf.as_chunks::<4>().0.iter()
                 .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
                 .collect()
         };
@@ -207,7 +205,7 @@ impl SymbolResolver {
         let ordinals: Vec<u16> = {
             let mut buf = vec![0u8; num_names * 2];
             proc.read_raw(ords_addr, &mut buf)?;
-            buf.chunks_exact(2)
+            buf.as_chunks::<2>().0.iter()
                 .map(|c| u16::from_le_bytes([c[0], c[1]]))
                 .collect()
         };
@@ -215,7 +213,7 @@ impl SymbolResolver {
         let func_rvas: Vec<u32> = {
             let mut buf = vec![0u8; num_functions * 4];
             proc.read_raw(funcs_addr, &mut buf)?;
-            buf.chunks_exact(4)
+            buf.as_chunks::<4>().0.iter()
                 .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
                 .collect()
         };
@@ -247,6 +245,12 @@ impl SymbolResolver {
         } else {
             Vec::new()
         }
+    }
+}
+
+impl Default for SymbolResolver {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -145,7 +145,7 @@ mod tests {
         }
         assert_eq!(EntropyScanner::classify(&full), EntropyClass::Encrypted);
 
-        let low = vec![0xAA, 0xBB].repeat(512);
+        let low = [0xAA, 0xBB].repeat(512);
         assert_eq!(EntropyScanner::classify(&low), EntropyClass::Plain);
     }
 

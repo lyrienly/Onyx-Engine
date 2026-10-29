@@ -12,6 +12,7 @@ fn seeded_rand(seed: u64, len: usize) -> Vec<u8> {
     out
 }
 
+#[allow(clippy::approx_constant)]
 fn build_known_buffer() -> Vec<u8> {
     let mut buf = vec![0u8; 0x1000];
     buf[0x100..0x104].copy_from_slice(&42i32.to_le_bytes());
@@ -51,6 +52,7 @@ fn numeric_scan_finds_i64() {
 }
 
 #[test]
+#[allow(clippy::approx_constant)]
 fn numeric_scan_finds_f64() {
     let buf = build_known_buffer();
     let hits = smart_scan(&buf, 0, SmartTarget::Numeric(3.14159));
@@ -386,7 +388,7 @@ mod e2e_windows {
 
         let hits = smart_scan(&readback, base, SmartTarget::Numeric(42.0));
         assert!(
-            hits.iter().any(|h| h.scan_type == ScanType::I32 && h.address == base + 0x00),
+            hits.iter().any(|h| h.scan_type == ScanType::I32 && h.address == base),
             "nao encontrou i32=42 em +0x00"
         );
 

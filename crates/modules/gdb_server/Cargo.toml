@@ -8,3 +8,6 @@ name = "onyx_gdb_server"
 crate-type = ["rlib"]
 
 [dependencies]
+
+[lints]
+workspace = true

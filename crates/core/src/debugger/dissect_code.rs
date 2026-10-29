@@ -90,9 +90,9 @@ impl DissectCodeEngine {
                     xrefs.entry(target).or_default().push(insn_addr);
                 }
                 last_was_ret = true;
-            } else if m.starts_with('j') {
+            } else if m.starts_with('j')
 
-                if let Some(target) = insn.target_addr {
+                && let Some(target) = insn.target_addr {
                     result.branches.push(DissectBranch {
                         from_address: insn_addr,
                         to_address: target,
@@ -100,7 +100,6 @@ impl DissectCodeEngine {
                     });
                     xrefs.entry(target).or_default().push(insn_addr);
                 }
-            }
 
             offset += len;
         }

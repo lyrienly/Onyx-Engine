@@ -93,8 +93,8 @@ pub fn analyze(script: &Script) -> Result<(), AaError> {
                 }
                 Statement::RegisterSymbol { name, span }
                 | Statement::UnregisterSymbol { name, span }
-                | Statement::Dealloc { name, span } => {
-                    if !symbols.contains(name) {
+                | Statement::Dealloc { name, span }
+                    if !symbols.contains(name) => {
                         return Err(AaError {
                             msg: format!(
                                 "simbolo '{}' nao foi declarado antes de ser referenciado",
@@ -103,7 +103,6 @@ pub fn analyze(script: &Script) -> Result<(), AaError> {
                             span: *span,
                         });
                     }
-                }
                 _ => {}
             }
         }

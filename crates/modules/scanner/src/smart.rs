@@ -122,7 +122,7 @@ fn is_reasonable_f64(v: f64) -> bool {
 }
 
 fn is_reasonable_pointer(v: u64) -> bool {
-    v >= PTR_MIN && v <= PTR_MAX && (v & 0x7) == 0
+    (PTR_MIN..=PTR_MAX).contains(&v) && (v & 0x7) == 0
 }
 
 fn try_ascii_string(buf: &[u8]) -> Option<(String, usize)> {
@@ -158,7 +158,7 @@ fn try_utf16_string(buf: &[u8]) -> Option<(String, usize)> {
         if u == 0 {
             break;
         }
-        if u < 0x20 || u > 0xFFFD {
+        if !(0x20..=0xFFFD).contains(&u) {
             return None;
         }
         units.push(u);
@@ -367,8 +367,8 @@ fn scan_exact(buffer: &[u8], base_addr: u64, needle: &[u8]) -> Vec<SmartHit> {
         if &buffer[off..off + needle.len()] == needle {
             let addr = base_addr.wrapping_add(off as u64);
             let scan_type = match needle.len() {
-                4 if off % 4 == 0 => ScanType::I32,
-                8 if off % 8 == 0 => ScanType::I64,
+                4 if off.is_multiple_of(4) => ScanType::I32,
+                8 if off.is_multiple_of(8) => ScanType::I64,
                 _ => ScanType::StringAscii,
             };
             let interpreted = match scan_type {
@@ -425,7 +425,7 @@ fn scan_any(buffer: &[u8], base_addr: u64) -> Vec<SmartHit> {
             });
         }
 
-        if off + 8 <= len && off % 8 == 0 {
+        if off + 8 <= len && off.is_multiple_of(8) {
             let v64 = unsafe { std::ptr::read_unaligned(p.add(off) as *const i64) };
             let u64v = v64 as u64;
             if is_reasonable_i64(v64) && v64 != 0 {

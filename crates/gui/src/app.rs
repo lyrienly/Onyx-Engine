@@ -286,7 +286,7 @@ dealloc(newmem)
 
     pub fn refresh_proc_list(&mut self) {
         if let Ok(mut list) = Process::list_all() {
-            list.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+            list.sort_by_key(|a| a.name.to_lowercase());
             self.proc_list = list;
         }
     }
@@ -332,13 +332,12 @@ dealloc(newmem)
                     lua.set_active_process(&p);
                 }
 
-                if let Ok(mods) = p.modules() {
-                    if let Some(main_mod) = mods.first() {
+                if let Ok(mods) = p.modules()
+                    && let Some(main_mod) = mods.first() {
                         self.mem_addr_text = format!("0x{:016X}", main_mod.base + 0x1000);
                         self.hex_addr_text = format!("0x{:016X}", main_mod.base);
                         self.manual_module_text = main_mod.name.clone();
                     }
-                }
 
                 let (rt, _) = MonoDissector::detect_runtime(&p);
                 if rt != RuntimeType::None {
@@ -1025,14 +1024,13 @@ impl eframe::App for OnyxEngineApp {
                     });
                 });
 
-            if add_top_candidate {
-                if let Some(first) = self.candidates.first() {
+            if add_top_candidate
+                && let Some(first) = self.candidates.first() {
                     let addr = first.0;
                     let val_type = self.parse_val_type_from_idx();
                     self.add_candidate_to_table(addr, val_type);
                     self.status_msg = format!("Added 0x{:08X} to Cheat Table.", addr);
                 }
-            }
 
             ui.add_space(4.0);
 

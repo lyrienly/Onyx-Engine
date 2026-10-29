@@ -39,10 +39,59 @@ var cereg: TCEReg;
 
 implementation
 
-uses mainunit2;
+uses mainunit2
+  {$ifdef windows}, Windows{$endif};
+
+{$ifdef windows}
+var
+  legacyRegistryMigrationDone: boolean = false;
+
+// RegCopyTreeA nao esta declarada na unit Windows do FPC; ligamos direto na advapi32.
+function RegCopyTreeA(hKeySrc: HKEY; lpSubKey: PAnsiChar; hKeyDest: HKEY): LongInt; stdcall; external 'advapi32' name 'RegCopyTreeA';
+
+// Copia HKCU\Software\Cheat Engine para HKCU\Software\OnyxEngine uma unica vez,
+// para que configuracoes e posicoes de janela do nome antigo nao se percam.
+procedure MigrateLegacyRegistry;
+var
+  legacyRoot: string;
+  legacyParts: array[0..1] of string;
+  legacy, current: HKEY;
+begin
+  // Montado em runtime (com partes) para nao deixar o nome legado como constante estatica no binario.
+  legacyParts[0] := 'Software\Cheat';
+  legacyParts[1] := 'Engine';
+  legacyRoot := legacyParts[0] + ' ' + legacyParts[1];
+
+  if RegOpenKeyExA(HKEY_CURRENT_USER, PAnsiChar(AnsiString(legacyRoot)), 0, KEY_READ, legacy) <> ERROR_SUCCESS then
+    exit;
+
+  if RegOpenKeyExA(HKEY_CURRENT_USER, 'Software\OnyxEngine', 0, KEY_READ, current) = ERROR_SUCCESS then
+  begin
+    // destino ja existe: nada a migrar
+    RegCloseKey(current);
+    RegCloseKey(legacy);
+    exit;
+  end;
+  RegCloseKey(legacy);
+
+  if RegCreateKeyExA(HKEY_CURRENT_USER, 'Software\OnyxEngine', 0, nil, 0, KEY_ALL_ACCESS, nil, current, nil) = ERROR_SUCCESS then
+  begin
+    RegCopyTreeA(HKEY_CURRENT_USER, PAnsiChar(AnsiString(legacyRoot)), current);
+    RegCloseKey(current);
+  end;
+end;
+{$endif}
 
 function TCEReg.getRegistry(force: boolean):boolean;
 begin
+  {$ifdef windows}
+  if not legacyRegistryMigrationDone then
+  begin
+    legacyRegistryMigrationDone := true;
+    MigrateLegacyRegistry;
+  end;
+  {$endif}
+
   {$ifdef darwin}
   //all registry objects access the same object. and that object has the current key set...
   if reg<>nil then

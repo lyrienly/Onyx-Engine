@@ -123,24 +123,22 @@ impl MemoryTransaction {
         while let Some(entry) = self.log.pop() {
             match entry {
                 UndoEntry::Write(op) => {
-                    if let Err(e) = self.process.write_raw(op.address, &op.old_bytes) {
-                        if first_err.is_none() {
+                    if let Err(e) = self.process.write_raw(op.address, &op.old_bytes)
+                        && first_err.is_none() {
                             first_err = Some(format!(
                                 "rollback write at 0x{:X}: {}",
                                 op.address, e
                             ));
                         }
-                    }
                 }
                 UndoEntry::Protect(op) => {
-                    if let Err(e) = self.process.protect(op.address, op.size, op.old_protect) {
-                        if first_err.is_none() {
+                    if let Err(e) = self.process.protect(op.address, op.size, op.old_protect)
+                        && first_err.is_none() {
                             first_err = Some(format!(
                                 "rollback protect at 0x{:X}: {}",
                                 op.address, e
                             ));
                         }
-                    }
                 }
             }
         }
@@ -169,7 +167,7 @@ mod tests {
         let ptr = Box::into_raw(buf) as *mut u8;
         f(ptr as usize);
         unsafe {
-            drop(Box::from_raw(std::slice::from_raw_parts_mut(ptr, size)));
+            drop(Box::from_raw(std::ptr::slice_from_raw_parts_mut(ptr, size)));
         }
     }
 

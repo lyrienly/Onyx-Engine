@@ -22,15 +22,7 @@ impl Pattern {
             if tok == "??" || tok == "?" {
                 bytes.push(0);
                 mask.push(false);
-            } else if tok.len() == 2 {
-                match u8::from_str_radix(tok, 16) {
-                    Ok(b) => {
-                        bytes.push(b);
-                        mask.push(true);
-                    }
-                    Err(_) => return Err(PatternError::InvalidToken(tok.to_string())),
-                }
-            } else if tok.len() == 1 {
+            } else if tok.len() == 2 || tok.len() == 1 {
                 match u8::from_str_radix(tok, 16) {
                     Ok(b) => {
                         bytes.push(b);
@@ -207,12 +199,7 @@ mod avx2 {
         }
 
         let fallback_start = if p == 0 { 0 } else { p };
-        for q in fallback_start..=end {
-            if matches_at(haystack, q, needle, mask) {
-                return Some(q);
-            }
-        }
-        None
+        (fallback_start..=end).find(|&q| matches_at(haystack, q, needle, mask))
     }
 
     #[target_feature(enable = "avx2")]
@@ -282,11 +269,10 @@ mod avx2 {
 
         let fallback_start = if p == 0 { 0 } else { p };
         for q in fallback_start..=end {
-            if matches_at(haystack, q, needle, mask) {
-                if !out.last().map_or(false, |&l| l == q) {
+            if matches_at(haystack, q, needle, mask)
+                && !out.last().is_some_and(|&l| l == q) {
                     out.push(q);
                 }
-            }
         }
         out.sort_unstable();
         out.dedup();

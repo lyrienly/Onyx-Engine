@@ -1,5 +1,20 @@
 
-local PIPE_NAME = "CE_MCP_Bridge_v99"
+local function _resolvePipeName()
+    local dir = ""
+    pcall(function() dir = getCheatEngineDir() end)
+    if dir and dir ~= "" then
+        if dir:sub(-1) ~= "\\" and dir:sub(-1) ~= "/" then dir = dir .. "\\" end
+        local f = io.open(dir .. "mcp\\mcp_pipe.txt", "r")
+        if f then
+            local s = f:read("*l")
+            f:close()
+            if s and #s >= 8 then return s end
+        end
+    end
+    return "Onyx_MCP_Bridge_v1"
+end
+
+local PIPE_NAME = _resolvePipeName()
 local VERSION = "12.0.0"
 
 local serverState = {

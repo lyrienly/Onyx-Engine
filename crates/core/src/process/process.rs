@@ -170,11 +170,10 @@ impl Process {
     }
 
     pub fn list_all() -> Result<Vec<ProcessEntry>, String> {
-        if let Ok(entries) = Self::list_all_nt() {
-            if !entries.is_empty() {
+        if let Ok(entries) = Self::list_all_nt()
+            && !entries.is_empty() {
                 return Ok(entries);
             }
-        }
 
         let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
         if snapshot == INVALID_HANDLE_VALUE {
@@ -238,13 +237,11 @@ impl Process {
 
         let mut handle: HANDLE = null_mut();
 
-        if mode == ProcessAccessMode::KernelDbk {
-            if let Some(ref driver) = dbk {
-                if let Ok(h) = driver.open_process(pid) {
+        if mode == ProcessAccessMode::KernelDbk
+            && let Some(ref driver) = dbk
+                && let Ok(h) = driver.open_process(pid) {
                     handle = h;
                 }
-            }
-        }
 
         if handle.is_null() && (mode == ProcessAccessMode::NtApi || mode == ProcessAccessMode::KernelDbk) {
             let mut client_id = CLIENT_ID {
@@ -354,26 +351,22 @@ impl Process {
 
     pub fn modules(&self) -> Result<Vec<ModuleEntry>, String> {
 
-        if self.access_mode == ProcessAccessMode::KernelDbk {
-            if let Some(ref dbk) = self.dbk {
-                if let Ok(vad_mods) = dbk.enum_vad_modules(self.pid) {
-                    if !vad_mods.is_empty() {
+        if self.access_mode == ProcessAccessMode::KernelDbk
+            && let Some(ref dbk) = self.dbk
+                && let Ok(vad_mods) = dbk.enum_vad_modules(self.pid)
+                    && !vad_mods.is_empty() {
                         return Ok(vad_mods);
                     }
-                }
-            }
-        }
 
         let snapshot = unsafe {
             CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, self.pid)
         };
         if snapshot == INVALID_HANDLE_VALUE {
 
-            if let Some(ref dbk) = self.dbk {
-                if let Ok(vad_mods) = dbk.enum_vad_modules(self.pid) {
+            if let Some(ref dbk) = self.dbk
+                && let Ok(vad_mods) = dbk.enum_vad_modules(self.pid) {
                     return Ok(vad_mods);
                 }
-            }
             return Err(format!("Failed to create module snapshot for PID {}", self.pid));
         }
 
@@ -462,11 +455,10 @@ impl Process {
                 mem_type: mbi.Type,
             };
 
-            if reg.is_readable() {
-                if !writable_only || reg.is_writable() {
+            if reg.is_readable()
+                && (!writable_only || reg.is_writable()) {
                     regions.push(reg);
                 }
-            }
 
             let next_addr = (mbi.BaseAddress as usize).saturating_add(mbi.RegionSize);
             if next_addr <= addr {
@@ -483,16 +475,15 @@ impl Process {
             return Ok(0);
         }
 
-        if self.access_mode == ProcessAccessMode::KernelDbk {
-            if let Some(ref dbk) = self.dbk {
+        if self.access_mode == ProcessAccessMode::KernelDbk
+            && let Some(ref dbk) = self.dbk {
 
-                if let Ok(bytes) = dbk.bulk_dump_cr3(self.pid, address as u64, buf.len()) {
-                    if !bytes.is_empty() {
+                if let Ok(bytes) = dbk.bulk_dump_cr3(self.pid, address as u64, buf.len())
+                    && !bytes.is_empty() {
                         let to_copy = bytes.len().min(buf.len());
                         buf[..to_copy].copy_from_slice(&bytes[..to_copy]);
                         return Ok(to_copy);
                     }
-                }
 
                 if let Ok(bytes) = dbk.read_memory(self.pid, address, buf.len()) {
                     let to_copy = bytes.len().min(buf.len());
@@ -500,7 +491,6 @@ impl Process {
                     return Ok(to_copy);
                 }
             }
-        }
 
         if self.access_mode == ProcessAccessMode::NtApi || self.access_mode == ProcessAccessMode::KernelDbk {
             let mut bytes_read: SIZE_T = 0;
@@ -575,13 +565,11 @@ impl Process {
             return Ok(0);
         }
 
-        if self.access_mode == ProcessAccessMode::KernelDbk {
-            if let Some(ref dbk) = self.dbk {
-                if let Ok(written) = dbk.write_memory(self.pid, address, data) {
+        if self.access_mode == ProcessAccessMode::KernelDbk
+            && let Some(ref dbk) = self.dbk
+                && let Ok(written) = dbk.write_memory(self.pid, address, data) {
                     return Ok(written);
                 }
-            }
-        }
 
         if self.access_mode == ProcessAccessMode::NtApi || self.access_mode == ProcessAccessMode::KernelDbk {
             let mut base_addr = address as PVOID;
@@ -843,8 +831,8 @@ impl Process {
             return std::fs::canonicalize(p).map_err(|e| e.to_string());
         }
 
-        if let Ok(exe_path) = std::env::current_exe() {
-            if let Some(exe_dir) = exe_path.parent() {
+        if let Ok(exe_path) = std::env::current_exe()
+            && let Some(exe_dir) = exe_path.parent() {
                 let candidate = exe_dir.join(p);
                 if candidate.exists() {
                     return std::fs::canonicalize(&candidate).map_err(|e| e.to_string());
@@ -856,7 +844,6 @@ impl Process {
                     }
                 }
             }
-        }
 
         if p.exists() {
             return std::fs::canonicalize(p).map_err(|e| e.to_string());
@@ -892,11 +879,7 @@ impl Process {
     pub fn inject_dll(&self, dll_path: &str) -> Result<usize, String> {
         let full_path = Self::resolve_dll_path(dll_path)?;
         let full_path_str = full_path.to_str().ok_or("Invalid UTF-8 DLL path")?;
-        let clean_path = if full_path_str.starts_with(r"\\?\") {
-            &full_path_str[4..]
-        } else {
-            full_path_str
-        };
+        let clean_path = full_path_str.strip_prefix(r"\\?\").unwrap_or(full_path_str);
 
         let wide_path: Vec<u16> = clean_path.encode_utf16().chain(std::iter::once(0)).collect();
         let path_bytes = wide_path.len() * 2;

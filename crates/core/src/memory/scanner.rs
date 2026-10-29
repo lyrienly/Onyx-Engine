@@ -267,13 +267,10 @@ impl ScanValue {
 
     pub fn parse(val_type: ValType, text: &str) -> Result<Self, String> {
         let trimmed = text.trim();
-        let hex_stripped = if trimmed.starts_with('$') {
-            Some(&trimmed[1..])
-        } else if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
-            Some(&trimmed[2..])
-        } else {
-            None
-        };
+        let hex_stripped = trimmed
+            .strip_prefix('$')
+            .or_else(|| trimmed.strip_prefix("0x"))
+            .or_else(|| trimmed.strip_prefix("0X"));
 
         match val_type {
             ValType::I8 => {
@@ -653,8 +650,8 @@ impl Scanner {
                         let cur_size = (region.size - offset).min(chunk_size);
                         let cur_addr = region.base + offset;
 
-                        if let Ok(bytes_read) = dummy_proc.read_raw(cur_addr, &mut buf[..cur_size]) {
-                            if bytes_read >= val_type.size() {
+                        if let Ok(bytes_read) = dummy_proc.read_raw(cur_addr, &mut buf[..cur_size])
+                            && bytes_read >= val_type.size() {
                                 scan_buffer(
                                     cur_addr,
                                     &buf[..bytes_read],
@@ -664,7 +661,6 @@ impl Scanner {
                                     &mut local_candidates,
                                 );
                             }
-                        }
                         if offset + cur_size < region.size {
                             offset += cur_size.saturating_sub(overlap);
                         } else {
@@ -762,9 +758,9 @@ impl Scanner {
                             cached_page_len = bytes_read;
                         } else {
                             let mut single_buf = vec![0u8; cand_size];
-                            if dummy_proc.read_raw(addr, &mut single_buf).is_ok() {
-                                if let Some(new_val) = ScanValue::read_from_bytes(cand_val_type, &single_buf) {
-                                    if check_candidate_condition(cand, &new_val, &cond_clone, val_type) {
+                            if dummy_proc.read_raw(addr, &mut single_buf).is_ok()
+                                && let Some(new_val) = ScanValue::read_from_bytes(cand_val_type, &single_buf)
+                                    && check_candidate_condition(cand, &new_val, &cond_clone, val_type) {
                                         local.push(ScanCandidate {
                                             address: cand.address,
                                             current_value: new_val,
@@ -773,16 +769,14 @@ impl Scanner {
                                             group_offsets: cand.group_offsets.clone(),
                                         });
                                     }
-                                }
-                            }
                             continue;
                         }
                     }
 
                     if addr >= cached_page_base && (addr + cand_size) <= (cached_page_base + cached_page_len) {
                         let offset = addr - cached_page_base;
-                        if let Some(new_val) = ScanValue::read_from_bytes(cand_val_type, &page_buf[offset..offset + cand_size]) {
-                            if check_candidate_condition(cand, &new_val, &cond_clone, val_type) {
+                        if let Some(new_val) = ScanValue::read_from_bytes(cand_val_type, &page_buf[offset..offset + cand_size])
+                            && check_candidate_condition(cand, &new_val, &cond_clone, val_type) {
                                 local.push(ScanCandidate {
                                     address: cand.address,
                                     current_value: new_val,
@@ -791,7 +785,6 @@ impl Scanner {
                                     group_offsets: cand.group_offsets.clone(),
                                 });
                             }
-                        }
                     }
                 }
 
@@ -1044,7 +1037,7 @@ unsafe fn scan_aob_exact_avx2(
             i += 32;
         }
 
-        let mut tail_idx = if len >= 32 { len - 32 } else { 0 };
+        let mut tail_idx = len.saturating_sub(32);
         if tail_idx <= max_idx {
             while tail_idx <= max_idx {
                 let mut matched = true;
@@ -1185,11 +1178,10 @@ fn scan_buffer(
     let mut i = 0;
 
     while i <= max_idx {
-        if let Some(val) = ScanValue::read_from_bytes(val_type, &buf[i..i + size]) {
-            if matches_first_condition(&val, cond) {
+        if let Some(val) = ScanValue::read_from_bytes(val_type, &buf[i..i + size])
+            && matches_first_condition(&val, cond) {
                 out.push(ScanCandidate::new(base_addr + i, val, val_type.ce_type_ordinal()));
             }
-        }
         i += alignment;
     }
 }
@@ -1236,18 +1228,17 @@ fn scan_buffer_all(
         ScanCondition::Exact(ScanValue::All(targets)) => {
             while i < len {
                 let addr = base_addr + i;
-                let div2 = (addr % 2) == 0;
-                let div4 = (addr % 4) == 0;
+                let div2 = addr.is_multiple_of(2);
+                let div4 = addr.is_multiple_of(4);
 
                 if let Some(target) = targets.u8_val {
                     if buf[i] == target {
                         out.push(ScanCandidate::new(addr, ScanValue::U8(target), 0));
                     }
-                } else if let Some(target) = targets.i8_val {
-                    if buf[i] as i8 == target {
+                } else if let Some(target) = targets.i8_val
+                    && buf[i] as i8 == target {
                         out.push(ScanCandidate::new(addr, ScanValue::I8(target), 0));
                     }
-                }
 
                 if div2 && i + 2 <= len {
                     let w = u16::from_ne_bytes([buf[i], buf[i + 1]]);
@@ -1255,11 +1246,10 @@ fn scan_buffer_all(
                         if w == target {
                             out.push(ScanCandidate::new(addr, ScanValue::U16(target), 1));
                         }
-                    } else if let Some(target) = targets.i16_val {
-                        if (w as i16) == target {
+                    } else if let Some(target) = targets.i16_val
+                        && (w as i16) == target {
                             out.push(ScanCandidate::new(addr, ScanValue::I16(target), 1));
                         }
-                    }
                 }
 
                 if div4 && i + 4 <= len {
@@ -1268,11 +1258,10 @@ fn scan_buffer_all(
                         if d == target {
                             out.push(ScanCandidate::new(addr, ScanValue::U32(target), 2));
                         }
-                    } else if let Some(target) = targets.i32_val {
-                        if (d as i32) == target {
+                    } else if let Some(target) = targets.i32_val
+                        && (d as i32) == target {
                             out.push(ScanCandidate::new(addr, ScanValue::I32(target), 2));
                         }
-                    }
 
                     if let Some(target_f) = targets.f32_val {
                         let f = f32::from_ne_bytes([buf[i], buf[i + 1], buf[i + 2], buf[i + 3]]);
@@ -1291,11 +1280,10 @@ fn scan_buffer_all(
                         if q == target {
                             out.push(ScanCandidate::new(addr, ScanValue::U64(target), 3));
                         }
-                    } else if let Some(target) = targets.i64_val {
-                        if (q as i64) == target {
+                    } else if let Some(target) = targets.i64_val
+                        && (q as i64) == target {
                             out.push(ScanCandidate::new(addr, ScanValue::I64(target), 3));
                         }
-                    }
 
                     if let Some(target_d) = targets.f64_val {
                         let d = f64::from_ne_bytes([
@@ -1314,8 +1302,8 @@ fn scan_buffer_all(
         ScanCondition::UnknownInitial => {
             while i < len {
                 let addr = base_addr + i;
-                let div2 = (addr % 2) == 0;
-                let div4 = (addr % 4) == 0;
+                let div2 = addr.is_multiple_of(2);
+                let div4 = addr.is_multiple_of(4);
 
                 let b = buf[i];
                 out.push(ScanCandidate::new(addr, ScanValue::U8(b), 0));
@@ -1364,8 +1352,8 @@ fn check_candidate_condition(
     cond: &ScanCondition,
     scan_val_type: ValType,
 ) -> bool {
-    if scan_val_type == ValType::All {
-        if let ScanCondition::Exact(ScanValue::All(targets)) = cond {
+    if scan_val_type == ValType::All
+        && let ScanCondition::Exact(ScanValue::All(targets)) = cond {
             return match cand.extra_type {
                 0 => {
                     if let Some(t) = targets.u8_val {
@@ -1428,7 +1416,6 @@ fn check_candidate_condition(
                 _ => false,
             };
         }
-    }
     matches_next_condition(&cand.current_value, new_val, cond)
 }
 

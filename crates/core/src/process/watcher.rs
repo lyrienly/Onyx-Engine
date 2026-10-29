@@ -88,11 +88,10 @@ impl ProcessWatcher {
 
                         if !known_pids.contains_key(&pid) {
                             let is_target = targets.is_empty() || targets.contains(&p_name_lower);
-                            if is_target {
-                                if let Ok(mut q) = events_lock.lock() {
+                            if is_target
+                                && let Ok(mut q) = events_lock.lock() {
                                     q.push_back(ProcessWatchEvent::Created(p.clone()));
                                 }
-                            }
                         }
                         current_map.insert(pid, p);
                     }
@@ -101,11 +100,10 @@ impl ProcessWatcher {
                         if !current_map.contains_key(&pid) {
                             let old_name_lower = old_proc.name.to_lowercase();
                             let is_target = targets.is_empty() || targets.contains(&old_name_lower);
-                            if is_target {
-                                if let Ok(mut q) = events_lock.lock() {
+                            if is_target
+                                && let Ok(mut q) = events_lock.lock() {
                                     q.push_back(ProcessWatchEvent::Terminated(pid));
                                 }
-                            }
                         }
                     }
 
@@ -134,6 +132,12 @@ impl ProcessWatcher {
 
     pub fn is_running(&self) -> bool {
         self.running.load(Ordering::SeqCst)
+    }
+}
+
+impl Default for ProcessWatcher {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

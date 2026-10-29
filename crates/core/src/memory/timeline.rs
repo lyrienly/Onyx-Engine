@@ -180,8 +180,8 @@ impl MemoryTimeline {
         };
 
         for frame in 1..self.frames.len() {
-            if let Some(current) = self.read_byte(address, frame) {
-                if current != previous {
+            if let Some(current) = self.read_byte(address, frame)
+                && current != previous {
                     events.push(ChangeEvent {
                         frame,
                         timestamp: self.frames[frame].timestamp,
@@ -190,7 +190,6 @@ impl MemoryTimeline {
                     });
                     previous = current;
                 }
-            }
         }
 
         events
@@ -215,14 +214,13 @@ impl MemoryTimeline {
         ranges.sort_by_key(|&(start, _)| start);
         let mut merged: Vec<(usize, usize)> = Vec::new();
         for (start, end) in ranges {
-            if let Some(last) = merged.last_mut() {
-                if start <= last.1 {
+            if let Some(last) = merged.last_mut()
+                && start <= last.1 {
                     if end > last.1 {
                         last.1 = end;
                     }
                     continue;
                 }
-            }
             merged.push((start, end));
         }
         merged
