@@ -19,7 +19,7 @@ uses
   {$endif}
   Classes, SysUtils, Sockets, resolve, ctypes, networkconfig,
   cefuncproc, newkernelhandler, math, zstream, syncobjs, ProcessHandlerUnit,
-  VirtualQueryExCache, gutil, gmap;
+  VirtualQueryExCache, gutil, gmap, lz4decode, networktls;
   {$endif}
 
 
@@ -974,14 +974,26 @@ begin
           compressedbuffer.Size:=compressedresult.compressedsize;
           if receive(compressedbuffer.Memory, compressedresult.compressedsize)>0 then
           begin
-            //decompress this
-            d:=Tdecompressionstream.create(compressedbuffer, false);
-            try
-              d.ReadBuffer(lpbuffer^, compressedresult.uncompressedsize);
-              result:=compressedresult.uncompressedsize>0;
-              lpNumberOfBytesRead:=compressedresult.uncompressedsize;
-            finally
-              d.free;
+            if input.compressed = COMPRESSION_LZ4 then
+            begin
+              if LZ4_Decompress(PByte(compressedbuffer.Memory), compressedresult.compressedsize,
+                                PByte(lpBuffer), compressedresult.uncompressedsize) = PtrInt(compressedresult.uncompressedsize) then
+              begin
+                result := compressedresult.uncompressedsize > 0;
+                lpNumberOfBytesRead := compressedresult.uncompressedsize;
+              end;
+            end
+            else
+            begin
+              //decompress this
+              d:=Tdecompressionstream.create(compressedbuffer, false);
+              try
+                d.ReadBuffer(lpbuffer^, compressedresult.uncompressedsize);
+                result:=compressedresult.uncompressedsize>0;
+                lpNumberOfBytesRead:=compressedresult.uncompressedsize;
+              finally
+                d.free;
+              end;
             end;
 
           end;
@@ -2673,7 +2685,10 @@ begin
 
   while (result<size) do
   begin
-    i:=fpsend(socket, pointer(ptruint(buffer)+result), size-result, 0);
+    if TLSActive then
+      i:=TLSSend(socket, pointer(ptruint(buffer)+result), size-result)
+    else
+      i:=fpsend(socket, pointer(ptruint(buffer)+result), size-result, 0);
     if i<=0 then
     begin
       OutputDebugString('Error during send');
@@ -2700,7 +2715,10 @@ begin
     result:=0;
     while (result<size) do
     begin
-      i:=fprecv(socket, pointer(ptruint(buffer)+result), size-result, 0);
+      if TLSActive then
+        i:=TLSReceive(socket, pointer(ptruint(buffer)+result), size-result)
+      else
+        i:=fprecv(socket, pointer(ptruint(buffer)+result), size-result, 0);
       if i<=0 then
       begin
         fConnected:=false;
@@ -2742,6 +2760,7 @@ constructor TCEConnection.create;
 var SockAddr: TInetSockAddr;
   retry: integer;
   B: BOOL;
+  peerPin, tlsErr: string;
 begin
   OutputDebugString('Inside TCEConnection.create');
   WriteProcessMemoryBufferCS:=TCriticalSection.create;
@@ -2781,6 +2800,26 @@ begin
       b:=TRUE;
       fpsetsockopt(socket, IPPROTO_TCP, TCP_NODELAY, @B, sizeof(B)); //just to be sure
       fConnected:=true;
+
+      if networkUseTLS then
+      begin
+        if TLSClientConnect(socket, networkTLSFingerprint, peerPin, tlsErr) then
+        begin
+          // TOFU: primeira conexao sem pin salvo adota o fingerprint apresentado
+          if networkTLSFingerprint = '' then
+          begin
+            networkTLSFingerprint := peerPin;
+            OutputDebugString('TLS peer fingerprint: ' + peerPin);
+          end;
+        end
+        else
+        begin
+          OutputDebugString('TLS failure: ' + tlsErr);
+          fConnected := false;
+          CloseSocket(socket);
+          socket := cint(INVALID_SOCKET);
+        end;
+      end;
     end
     else
     begin

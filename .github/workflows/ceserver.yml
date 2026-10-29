@@ -1,0 +1,23 @@
+name: CEServer
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential zlib1g-dev liblz4-dev libssl-dev
+
+      - name: Build (x86_64)
+        working-directory: UI/ceserver/gcc
+        run: make -j"$(nproc)"

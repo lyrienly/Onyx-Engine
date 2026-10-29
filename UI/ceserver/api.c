@@ -124,14 +124,14 @@ unsigned char SPECIFIED_ARCH = 9;
 
 #ifdef SYS_process_vm_readv
 
-ssize_t process_vm_readv2(pid_t process_id, struct iovec *io_local, struct iovec *io_remote, int len, int flags) {
+ssize_t process_vm_readv2(pid_t process_id, const struct iovec *io_local, unsigned long liovcnt, const struct iovec *io_remote, unsigned long riovcnt, unsigned long flags) {
     if (process_id < 0) return FALSE;
-    return syscall(SYS_process_vm_readv, process_id, io_local, len, io_remote, len, 0);
+    return syscall(SYS_process_vm_readv, process_id, io_local, liovcnt, io_remote, riovcnt, flags);
 }
 
-ssize_t process_vm_writev2(pid_t process_id, struct iovec *io_local, struct iovec *io_remote, int len, int flags) {
+ssize_t process_vm_writev2(pid_t process_id, const struct iovec *io_local, unsigned long liovcnt, const struct iovec *io_remote, unsigned long riovcnt, unsigned long flags) {
     if (process_id < 0) return FALSE;
-    return syscall(SYS_process_vm_writev, process_id, io_local, len, io_remote, len, 0);
+    return syscall(SYS_process_vm_writev, process_id, io_local, liovcnt, io_remote, riovcnt, flags);
 }
 #endif
 

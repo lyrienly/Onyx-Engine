@@ -12,6 +12,11 @@
 #include <sys/select.h>
 
 #include <zlib.h>
+#include <lz4.h>
+
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#include <openssl/x509.h>
 
 #include <errno.h>
 #include <elf.h>
@@ -49,6 +54,13 @@ __thread int debugfd;
 
 __thread char* threadname;
 
+static int TLS_ENABLED=0;
+static const char *TLS_CERT_PATH=NULL;
+static const char *TLS_KEY_PATH=NULL;
+static SSL_CTX *TLS_CTX=NULL;
+static __thread SSL *TLS_SSL=NULL;
+static __thread int TLS_SOCKET=-1;
+
 #define CESERVERVERSION 6
 
 char versionstring[]="CHEATENGINE Network 2.3";
@@ -84,6 +96,24 @@ ssize_t recvall (int s, void *buf, size_t size, int flags)
   ssize_t totalreceived=0;
   ssize_t sizeleft=size;
   unsigned char *buffer=(unsigned char*)buf;
+
+  if (TLS_SSL && s==TLS_SOCKET)
+  {
+    size_t total=0;
+    while (total<size)
+    {
+      int i=SSL_read(TLS_SSL, (char*)buf+total, (int)(size-total));
+      if (i<=0)
+      {
+        int e=SSL_get_error(TLS_SSL, i);
+        if (e==SSL_ERROR_WANT_READ || e==SSL_ERROR_WANT_WRITE)
+          continue;
+        return (total>0)?(ssize_t)total:-1;
+      }
+      total+=(size_t)i;
+    }
+    return (ssize_t)total;
+  }
 
   flags=flags | MSG_WAITALL;
 
@@ -128,6 +158,24 @@ ssize_t sendall (int s, void *buf, size_t size, int flags)
   ssize_t totalsent=0;
   ssize_t sizeleft=size;
   unsigned char *buffer=(unsigned char*)buf;
+
+  if (TLS_SSL && s==TLS_SOCKET)
+  {
+    size_t total=0;
+    while (total<size)
+    {
+      int i=SSL_write(TLS_SSL, (const char*)buf+total, (int)(size-total));
+      if (i<=0)
+      {
+        int e=SSL_get_error(TLS_SSL, i);
+        if (e==SSL_ERROR_WANT_WRITE || e==SSL_ERROR_WANT_READ)
+          continue;
+        return (total>0)?(ssize_t)total:-1;
+      }
+      total+=(size_t)i;
+    }
+    return (ssize_t)total;
+  }
 
   while (sizeleft>0)
   {
@@ -761,12 +809,39 @@ case CMD_SETTHREADCONTEXT:
 
         if (c.compress)
         {
-
-#define COMPRESS_BLOCKSIZE (64*1024)
-          int i;
           unsigned char *uncompressed=(unsigned char *)&o[1];
           uint32_t uncompressedSize=o->read;
           uint32_t compressedSize=0;
+          int i;
+
+          if (c.compress == COMPRESSION_LZ4)
+          {
+            int bound=LZ4_compressBound((int)uncompressedSize);
+            char *lz4block=NULL;
+            int lz4size=0;
+
+            if (bound>0)
+            {
+              lz4block=(char*)malloc((size_t)bound);
+              if (lz4block)
+                lz4size=LZ4_compress_default((const char*)uncompressed, lz4block, (int)uncompressedSize, bound);
+            }
+
+            if (lz4size>0)
+            {
+              compressedSize=(uint32_t)lz4size;
+              sendall(currentsocket, &uncompressedSize, sizeof(uncompressedSize), MSG_MORE);
+              sendall(currentsocket, &compressedSize, sizeof(compressedSize), MSG_MORE);
+              sendall(currentsocket, lz4block, lz4size, 0);
+            }
+            else
+              debug_log("Error while compressing with LZ4\n");
+
+            free(lz4block);
+          }
+          else
+          {
+#define COMPRESS_BLOCKSIZE (64*1024)
           int maxBlocks=1+(c.size / COMPRESS_BLOCKSIZE);
 
           unsigned char **compressedBlocks=malloc(maxBlocks*sizeof(unsigned char *) );
@@ -863,6 +938,7 @@ case CMD_SETTHREADCONTEXT:
             free(compressedBlocks[i]);
           }
           free(compressedBlocks);
+          }
         }
         else
           sendall(currentsocket, o, sizeof(CeReadProcessMemoryOutput)+o->read, 0);
@@ -1646,6 +1722,28 @@ void *newconnection(void *arg)
 
   int currentsocket=s;
 
+  if (TLS_ENABLED)
+  {
+    TLS_SSL=SSL_new(TLS_CTX);
+    if (!TLS_SSL)
+    {
+      close(s);
+      return NULL;
+    }
+
+    SSL_set_fd(TLS_SSL, s);
+    if (SSL_accept(TLS_SSL)<=0)
+    {
+      debug_log("TLS: handshake failed\n");
+      SSL_free(TLS_SSL);
+      TLS_SSL=NULL;
+      close(s);
+      return NULL;
+    }
+
+    TLS_SOCKET=s;
+  }
+
   threadStartedEvent(currentsocket);
 
   threadname=NULL;
@@ -1749,6 +1847,15 @@ void *newconnection(void *arg)
   }
 
   threadClosedEvent(s);
+
+  if (TLS_SSL)
+  {
+    SSL_shutdown(TLS_SSL);
+    SSL_free(TLS_SSL);
+    TLS_SSL=NULL;
+    TLS_SOCKET=-1;
+  }
+
   close(s);
 
   return NULL;
@@ -1879,7 +1986,7 @@ int main(int argc, char *argv[])
   int argv_port;
   int argv_arch;
   int argv_pid;
-  while((opt = getopt(argc, argv, "a:m:p:s:t:")) != -1)
+  while((opt = getopt(argc, argv, "a:m:p:s:t:Tc:k:")) != -1)
   {
     switch(opt)
     {
@@ -1915,12 +2022,85 @@ int main(int argc, char *argv[])
             TEST_PID = argv_pid;
           break;
 
+      case 'T':
+          TLS_ENABLED=1;
+          break;
+      case 'c':
+          TLS_CERT_PATH=optarg;
+          break;
+      case 'k':
+          TLS_KEY_PATH=optarg;
+          break;
+
       default:
-          debug_log("Usage: %s [-a <attach_pid>] [-m <search_option>] [-p <port>] [-t <pid>] arg1 ...\n", argv[0]);
+          debug_log("Usage: %s [-a <attach_pid>] [-m <search_option>] [-p <port>] [-t <pid>] [-T] [-c <cert.pem>] [-k <key.pem>] arg1 ...\n", argv[0]);
           break;
     }
   }
   #endif
+
+  if (TLS_ENABLED)
+  {
+    int ti;
+
+    if (!TLS_CERT_PATH || !TLS_KEY_PATH)
+    {
+      debug_log("TLS: -c <cert.pem> and -k <key.pem> are required\n");
+      return 1;
+    }
+
+    OPENSSL_init_ssl(0, NULL);
+    TLS_CTX=SSL_CTX_new(TLS_server_method());
+    if (!TLS_CTX)
+    {
+      debug_log("TLS: SSL_CTX_new failed\n");
+      return 1;
+    }
+
+    if (SSL_CTX_use_certificate_file(TLS_CTX, TLS_CERT_PATH, SSL_FILETYPE_PEM)<=0)
+    {
+      debug_log("TLS: failed to load certificate %s\n", TLS_CERT_PATH);
+      return 1;
+    }
+
+    if (SSL_CTX_use_PrivateKey_file(TLS_CTX, TLS_KEY_PATH, SSL_FILETYPE_PEM)<=0)
+    {
+      debug_log("TLS: failed to load private key %s\n", TLS_KEY_PATH);
+      return 1;
+    }
+
+    if (!SSL_CTX_check_private_key(TLS_CTX))
+    {
+      debug_log("TLS: private key does not match certificate\n");
+      return 1;
+    }
+
+    {
+      X509 *cert=SSL_CTX_get0_certificate(TLS_CTX);
+      unsigned char md[EVP_MAX_MD_SIZE];
+      unsigned int mdlen=0;
+
+      if (cert && X509_digest(cert, EVP_sha256(), md, &mdlen)==1)
+      {
+        char hex[EVP_MAX_MD_SIZE*2+1];
+
+        for (ti=0; ti<(int)mdlen; ti++)
+          sprintf(&hex[ti*2], "%02x", md[ti]);
+        hex[mdlen*2]=0;
+
+        debug_log("TLS fingerprint (sha256): %s\n", hex);
+
+        FILE *fp=fopen("ceserver-tls.fingerprint","w");
+        if (fp)
+        {
+          fprintf(fp, "%s\n", hex);
+          fclose(fp);
+        }
+      }
+    }
+
+    debug_log("TLS enabled (cert=%s)\n", TLS_CERT_PATH);
+  }
 
   debug_log("listening on port %d\n",PORT);
   debug_log("---\n");

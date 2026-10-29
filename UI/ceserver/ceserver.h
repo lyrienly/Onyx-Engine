@@ -5,6 +5,10 @@
 #include <sys/types.h>
 #include "porthelp.h"
 
+/* Valor do campo "compressed" em CeReadProcessMemoryInput.
+   1..9 = nivel zlib (comportamento legado); 10 = bloco LZ4. */
+#define COMPRESSION_LZ4 10
+
 #define CMD_GETVERSION 0
 #define CMD_CLOSECONNECTION 1
 #define CMD_TERMINATESERVER 2
