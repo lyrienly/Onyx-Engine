@@ -38,11 +38,7 @@ impl MonoApi {
                 b"mono_gc_enable\0",
                 b"mono_compile_method\0",
             ),
-            MonoRuntime::Il2Cpp => (
-                b"il2cpp_gc_disable\0",
-                b"il2cpp_gc_enable\0",
-                b"\0",
-            ),
+            MonoRuntime::Il2Cpp => (b"il2cpp_gc_disable\0", b"il2cpp_gc_enable\0", b"\0"),
         };
         unsafe {
             let p = GetProcAddress(hmod, dis_name.as_ptr());
@@ -68,7 +64,11 @@ impl MonoApi {
             MonoRuntime::MonoClassic => {
                 let f = self.compile_method?;
                 let p = unsafe { f(method_desc) };
-                if p.is_null() { None } else { Some(p) }
+                if p.is_null() {
+                    None
+                } else {
+                    Some(p)
+                }
             }
             MonoRuntime::Il2Cpp => {
                 if method_desc.is_null() {
@@ -76,7 +76,11 @@ impl MonoApi {
                 }
                 unsafe {
                     let mp = *(method_desc as *const *mut c_void);
-                    if mp.is_null() { None } else { Some(mp) }
+                    if mp.is_null() {
+                        None
+                    } else {
+                        Some(mp)
+                    }
                 }
             }
         }

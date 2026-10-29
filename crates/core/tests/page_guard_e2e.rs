@@ -67,7 +67,10 @@ struct ProcessInformation {
 }
 
 fn to_wide(s: &str) -> Vec<u16> {
-    OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
+    OsStr::new(s)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect()
 }
 
 struct CobaiaGuard {
@@ -94,16 +97,10 @@ impl Drop for CobaiaGuard {
     }
 }
 
-const SHELLCODE_WRITE_DWORD: [u8; 10] = [
-    0xC7, 0x01, 0xEF, 0xBE, 0xAD, 0xDE,
-    0x31, 0xC0,
-    0xC3,
-    0x90,
-];
+const SHELLCODE_WRITE_DWORD: [u8; 10] =
+    [0xC7, 0x01, 0xEF, 0xBE, 0xAD, 0xDE, 0x31, 0xC0, 0xC3, 0x90];
 
-const SHELLCODE_READ_DWORD: [u8; 4] = [
-    0x8B, 0x01, 0xC3, 0x90,
-];
+const SHELLCODE_READ_DWORD: [u8; 4] = [0x8B, 0x01, 0xC3, 0x90];
 
 fn spawn_cobaia() -> CobaiaGuard {
     let mut cmd = to_wide("C:\\Windows\\System32\\cmd.exe /K rem onyx-page-guard-cobaia");
@@ -170,7 +167,11 @@ fn write_remote(h_process: HANDLE, addr: usize, bytes: &[u8]) {
             &mut written,
         )
     };
-    assert!(ok != 0 && written == bytes.len(), "WriteProcessMemory falhou @ 0x{:X}", addr);
+    assert!(
+        ok != 0 && written == bytes.len(),
+        "WriteProcessMemory falhou @ 0x{:X}",
+        addr
+    );
 }
 
 fn run_remote_shellcode(h_process: HANDLE, code_addr: usize, arg: usize) -> u32 {
@@ -223,7 +224,10 @@ fn e2e_page_guard_captura_write_remoto_e_filtra_falso_positivo() {
     std::thread::sleep(Duration::from_millis(300));
 
     let hits_after_falso = hits.lock().unwrap().clone();
-    eprintln!("[e2e] hits apos acesso FORA do range: {:?}", hits_after_falso);
+    eprintln!(
+        "[e2e] hits apos acesso FORA do range: {:?}",
+        hits_after_falso
+    );
     assert!(
         hits_after_falso.is_empty(),
         "falso positivo nao foi filtrado: {:?}",

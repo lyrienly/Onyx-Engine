@@ -24,9 +24,12 @@ pub fn apply_relocations(
     let mut applied = 0u32;
 
     while cursor + 8 <= end {
-        let page_rva =
-            u32::from_le_bytes([image[cursor], image[cursor + 1], image[cursor + 2], image[cursor + 3]])
-                as usize;
+        let page_rva = u32::from_le_bytes([
+            image[cursor],
+            image[cursor + 1],
+            image[cursor + 2],
+            image[cursor + 3],
+        ]) as usize;
         let block_size = u32::from_le_bytes([
             image[cursor + 4],
             image[cursor + 5],
@@ -34,7 +37,7 @@ pub fn apply_relocations(
             image[cursor + 7],
         ]) as usize;
 
-        if block_size < 8 || block_size % 2 != 0 {
+        if block_size < 8 || !block_size.is_multiple_of(2) {
             return Err(format!("invalid relocation block size {}", block_size));
         }
         if cursor + block_size > end {
@@ -52,7 +55,10 @@ pub fn apply_relocations(
                 REL_BASED_ABSOLUTE => {}
                 REL_BASED_HIGHLOW => {
                     if target + 4 > image.len() {
-                        return Err(format!("HIGHLOW relocation out of bounds at 0x{:X}", target));
+                        return Err(format!(
+                            "HIGHLOW relocation out of bounds at 0x{:X}",
+                            target
+                        ));
                     }
                     let value = u32::from_le_bytes([
                         image[target],

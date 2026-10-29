@@ -25,7 +25,11 @@ fn scratchpad_dir() -> PathBuf {
 fn log(msg: &str) {
     let path = scratchpad_dir().join("overlay_e2e.log");
     use std::io::Write;
-    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
         let _ = writeln!(f, "{}", msg);
     }
     eprintln!("{}", msg);
@@ -129,7 +133,10 @@ fn e2e_overlay_hook_presente_e_desenha() {
             );
         }
         assert!(hr >= 0, "D3D11CreateDeviceAndSwapChain hr={:#x}", hr);
-        log(&format!("device/swapchain criados hr={:#x} level={:#x}", hr, got_level));
+        log(&format!(
+            "device/swapchain criados hr={:#x} level={:#x}",
+            hr, got_level
+        ));
 
         OverlayEngine::install(device, context).expect("install overlay");
         OverlayEngine::set_clear_color(0.10, 0.80, 0.20, 1.0);
@@ -147,7 +154,10 @@ fn e2e_overlay_hook_presente_e_desenha() {
         let hits = OverlayEngine::hit_count();
         log(&format!("hits apos 30 frames = {}", hits));
         assert!(hits >= 30, "hits insuficientes: {}", hits);
-        assert!(USER_CB_HITS.load(Ordering::SeqCst) >= 30, "callback de usuario nao foi chamado");
+        assert!(
+            USER_CB_HITS.load(Ordering::SeqCst) >= 30,
+            "callback de usuario nao foi chamado"
+        );
 
         // Staging texture para captura
         let dev_vtbl = *(device as *const *const ID3D11DeviceVtbl);
@@ -167,9 +177,12 @@ fn e2e_overlay_hook_presente_e_desenha() {
             MiscFlags: 0,
         };
         let mut staging: *mut ID3D11Texture2D = null_mut();
-        let hr =
-            ((*dev_vtbl).create_texture_2d)(device, &staging_desc, null(), &mut staging);
-        assert!(hr >= 0 && !staging.is_null(), "CreateTexture2D hr={:#x}", hr);
+        let hr = ((*dev_vtbl).create_texture_2d)(device, &staging_desc, null(), &mut staging);
+        assert!(
+            hr >= 0 && !staging.is_null(),
+            "CreateTexture2D hr={:#x}",
+            hr
+        );
 
         // Captura: callback copia o backbuffer PRE-Present original (apos clear do overlay)
         static CAPTURED: AtomicU64 = AtomicU64::new(0);
@@ -181,12 +194,8 @@ fn e2e_overlay_hook_presente_e_desenha() {
                 let ctx_vtbl = *(frame.context as *const *const ID3D11DeviceContextVtbl);
                 let sc_vtbl2 = *(frame.swapchain as *const *const IDXGISwapChainVtbl);
                 let mut bb: *mut c_void = null_mut();
-                let hr = ((*sc_vtbl2).get_buffer)(
-                    frame.swapchain,
-                    0,
-                    &IID_ID3D11_TEXTURE2D,
-                    &mut bb,
-                );
+                let hr =
+                    ((*sc_vtbl2).get_buffer)(frame.swapchain, 0, &IID_ID3D11_TEXTURE2D, &mut bb);
                 if hr >= 0 && !bb.is_null() {
                     let st = STAGING_PTR.load(Ordering::SeqCst);
                     ((*ctx_vtbl).copy_resource)(
@@ -234,7 +243,7 @@ fn e2e_overlay_hook_presente_e_desenha() {
 
         let mut non_black = 0usize;
         let mut green_dominant = 0usize;
-        for px in rgba.chunks_exact(4) {
+        for px in rgba.as_chunks::<4>().0 {
             if px[0] != 0 || px[1] != 0 || px[2] != 0 {
                 non_black += 1;
             }
@@ -248,7 +257,10 @@ fn e2e_overlay_hook_presente_e_desenha() {
             w * h,
             green_dominant
         ));
-        assert!(non_black > (w * h) / 2, "esperava backbuffer colorido pelo overlay");
+        assert!(
+            non_black > (w * h) / 2,
+            "esperava backbuffer colorido pelo overlay"
+        );
         assert!(green_dominant > (w * h) / 2, "overlay nao pintou de verde");
 
         let png_path = scratchpad_dir().join("overlay_e2e_frame.png");
@@ -274,7 +286,10 @@ fn e2e_overlay_hook_presente_e_desenha() {
             "hits antes uninstall = {}, apos 5 presents sem hook = {}",
             hits_before, hits_after
         ));
-        assert_eq!(hits_before, hits_after, "detour continuou ativo apos uninstall");
+        assert_eq!(
+            hits_before, hits_after,
+            "detour continuou ativo apos uninstall"
+        );
 
         release_com(swapchain);
         release_com(context);

@@ -53,7 +53,6 @@ unsafe impl Send for Hook {}
 unsafe impl Sync for Hook {}
 
 impl Hook {
-
     #[cfg(windows)]
     pub fn new(target_fn: *const u8, hook_fn: *const u8) -> Result<Self, HookError> {
         if target_fn.is_null() || hook_fn.is_null() {
@@ -90,7 +89,11 @@ impl Hook {
         }
 
         unsafe {
-            core::ptr::copy_nonoverlapping(tramp.bytes.as_ptr(), cave as *mut u8, tramp.bytes.len());
+            core::ptr::copy_nonoverlapping(
+                tramp.bytes.as_ptr(),
+                cave as *mut u8,
+                tramp.bytes.len(),
+            );
         }
 
         let mut original_bytes = [0u8; PATCH_SIZE];
@@ -117,12 +120,7 @@ impl Hook {
         }
         let mut dummy: u32 = 0;
         unsafe {
-            VirtualProtect(
-                target_fn as *mut _,
-                PATCH_SIZE,
-                old_protect,
-                &mut dummy,
-            );
+            VirtualProtect(target_fn as *mut _, PATCH_SIZE, old_protect, &mut dummy);
             FlushInstructionCache(GetCurrentProcess(), target_fn as *const _, PATCH_SIZE);
             FlushInstructionCache(GetCurrentProcess(), cave as *const _, tramp.bytes.len());
         }
@@ -189,7 +187,11 @@ impl Hook {
                 old_protect,
                 &mut dummy,
             );
-            FlushInstructionCache(GetCurrentProcess(), self.target as *const _, self.patched_len);
+            FlushInstructionCache(
+                GetCurrentProcess(),
+                self.target as *const _,
+                self.patched_len,
+            );
             VirtualFree(self.trampoline_ptr as *mut _, 0, MEM_RELEASE);
         }
         self.active = false;

@@ -14,10 +14,22 @@ impl CodeViewInfo {
         let g = &self.guid;
         format!(
             "{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}{:X}",
-            g[3], g[2], g[1], g[0],
-            g[5], g[4],
-            g[7], g[6],
-            g[8], g[9], g[10], g[11], g[12], g[13], g[14], g[15],
+            g[3],
+            g[2],
+            g[1],
+            g[0],
+            g[5],
+            g[4],
+            g[7],
+            g[6],
+            g[8],
+            g[9],
+            g[10],
+            g[11],
+            g[12],
+            g[13],
+            g[14],
+            g[15],
             self.age
         )
     }
@@ -47,7 +59,12 @@ fn read_u32_le(buf: &[u8], off: usize) -> io::Result<u32> {
     if off + 4 > buf.len() {
         return Err(ioerr("short read u32"));
     }
-    Ok(u32::from_le_bytes([buf[off], buf[off + 1], buf[off + 2], buf[off + 3]]))
+    Ok(u32::from_le_bytes([
+        buf[off],
+        buf[off + 1],
+        buf[off + 2],
+        buf[off + 3],
+    ]))
 }
 
 pub fn read_codeview_from_file(path: &Path) -> io::Result<CodeViewInfo> {
@@ -155,10 +172,17 @@ pub fn read_codeview_from_file(path: &Path) -> io::Result<CodeViewInfo> {
         let age = read_u32_le(&cv_buf, 20)?;
 
         let name_bytes = &cv_buf[24..];
-        let nul = name_bytes.iter().position(|&b| b == 0).unwrap_or(name_bytes.len());
+        let nul = name_bytes
+            .iter()
+            .position(|&b| b == 0)
+            .unwrap_or(name_bytes.len());
         let pdb_name = String::from_utf8_lossy(&name_bytes[..nul]).into_owned();
 
-        return Ok(CodeViewInfo { pdb_name, guid, age });
+        return Ok(CodeViewInfo {
+            pdb_name,
+            guid,
+            age,
+        });
     }
 
     Err(ioerr("no RSDS CodeView entry found in debug directory"))
@@ -173,10 +197,8 @@ mod tests {
         let info = CodeViewInfo {
             pdb_name: "ntdll.pdb".to_string(),
             guid: [
-                0x11, 0x22, 0x33, 0x44,
-                0x55, 0x66,
-                0x77, 0x88,
-                0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00,
+                0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE,
+                0xFF, 0x00,
             ],
             age: 1,
         };

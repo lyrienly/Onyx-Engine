@@ -52,8 +52,16 @@ fn e2e_jit_hook_com_gc_lifecycle() {
     let tramp = mgr.original(id).expect("trampolim deve existir");
     TRAMP.store(tramp as usize, Ordering::SeqCst);
 
-    assert_eq!(DISABLES.load(Ordering::SeqCst), 1, "GC disable deve ter sido chamado antes do patch");
-    assert_eq!(ENABLES.load(Ordering::SeqCst), 1, "GC enable deve ter sido chamado apos o patch");
+    assert_eq!(
+        DISABLES.load(Ordering::SeqCst),
+        1,
+        "GC disable deve ter sido chamado antes do patch"
+    );
+    assert_eq!(
+        ENABLES.load(Ordering::SeqCst),
+        1,
+        "GC enable deve ter sido chamado apos o patch"
+    );
 
     let out = fake_jit_method(5);
     assert_eq!(out, 150, "hook deve interceptar e somar 100 ao original");
@@ -63,6 +71,10 @@ fn e2e_jit_hook_com_gc_lifecycle() {
     assert_eq!(DISABLES.load(Ordering::SeqCst), 2);
     assert_eq!(ENABLES.load(Ordering::SeqCst), 2);
 
-    assert_eq!(fake_jit_method(5), 50, "funcao original deve voltar ao normal");
+    assert_eq!(
+        fake_jit_method(5),
+        50,
+        "funcao original deve voltar ao normal"
+    );
     assert!(mgr.is_empty());
 }

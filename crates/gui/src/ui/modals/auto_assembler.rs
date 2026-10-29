@@ -1,6 +1,6 @@
+use crate::app::OnyxEngineApp;
 use eframe::egui::{self, Color32, RichText, Vec2};
 use onyx_core::autoassembler::AutoAssembler;
-use crate::app::OnyxEngineApp;
 
 pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
     if !app.show_aa_modal {
@@ -22,7 +22,11 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
             }
 
             egui::CentralPanel::default()
-                .frame(egui::Frame::none().fill(Color32::from_rgb(26, 29, 36)).inner_margin(egui::Margin::same(8.0)))
+                .frame(
+                    egui::Frame::none()
+                        .fill(Color32::from_rgb(26, 29, 36))
+                        .inner_margin(egui::Margin::same(8.0)),
+                )
                 .show(ctx, |ui| {
                     ui.horizontal(|ui| {
                         ui.label(RichText::new("Script Editor ([ENABLE] / [DISABLE]):").strong());
@@ -43,7 +47,8 @@ ret
 
 [DISABLE]
 dealloc(newmem)
-"#.to_string();
+"#
+                                .to_string();
                             }
                         });
                     });
@@ -51,16 +56,29 @@ dealloc(newmem)
                     let editor_h = (ui.available_height() - 70.0).max(180.0);
                     ui.add_sized(
                         Vec2::new(ui.available_width(), editor_h),
-                        egui::TextEdit::multiline(&mut app.aa_script).code_editor().desired_width(f32::INFINITY)
+                        egui::TextEdit::multiline(&mut app.aa_script)
+                            .code_editor()
+                            .desired_width(f32::INFINITY),
                     );
 
                     ui.add_space(4.0);
                     ui.horizontal(|ui| {
-                        if ui.button(RichText::new("[Execute Script]").strong().color(Color32::GREEN)).clicked() {
+                        if ui
+                            .button(
+                                RichText::new("[Execute Script]")
+                                    .strong()
+                                    .color(Color32::GREEN),
+                            )
+                            .clicked()
+                        {
                             if let Some(proc) = &app.attached_proc {
                                 let mut aa = AutoAssembler::new();
                                 match aa.execute(proc, &app.aa_script, true) {
-                                    Ok(_) => app.aa_status = "[+] Auto Assembler script executed successfully!".to_string(),
+                                    Ok(_) => {
+                                        app.aa_status =
+                                            "[+] Auto Assembler script executed successfully!"
+                                                .to_string()
+                                    }
                                     Err(e) => app.aa_status = format!("[-] Script error: {}", e),
                                 }
                             } else {

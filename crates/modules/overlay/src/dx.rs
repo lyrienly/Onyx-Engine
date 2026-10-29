@@ -146,8 +146,11 @@ unsafe extern "system" {
 
 #[repr(C)]
 pub struct IUnknownVtbl {
-    pub query_interface:
-        unsafe extern "system" fn(this: *mut c_void, iid: *const GUID, ppv: *mut *mut c_void) -> HRESULT,
+    pub query_interface: unsafe extern "system" fn(
+        this: *mut c_void,
+        iid: *const GUID,
+        ppv: *mut *mut c_void,
+    ) -> HRESULT,
     pub add_ref: unsafe extern "system" fn(this: *mut c_void) -> u32,
     pub release: unsafe extern "system" fn(this: *mut c_void) -> u32,
 }
@@ -160,7 +163,8 @@ pub struct IDXGISwapChainVtbl {
     pub _get_private_data: *const c_void,
     pub _get_parent: *const c_void,
     pub _get_device: *const c_void,
-    pub present: unsafe extern "system" fn(this: *mut c_void, sync_interval: u32, flags: u32) -> HRESULT,
+    pub present:
+        unsafe extern "system" fn(this: *mut c_void, sync_interval: u32, flags: u32) -> HRESULT,
     pub get_buffer: unsafe extern "system" fn(
         this: *mut c_void,
         buffer: u32,
@@ -215,8 +219,11 @@ pub struct ID3D11DeviceContextVtbl {
         map_flags: u32,
         mapped: *mut D3D11_MAPPED_SUBRESOURCE,
     ) -> HRESULT, // slot 14
-    pub unmap:
-        unsafe extern "system" fn(this: *mut c_void, resource: *mut ID3D11Resource, subresource: u32), // slot 15
+    pub unmap: unsafe extern "system" fn(
+        this: *mut c_void,
+        resource: *mut ID3D11Resource,
+        subresource: u32,
+    ), // slot 15
     pub _ps_set_cb: *const c_void,
     pub _ia_set_il: *const c_void,
     pub _ia_set_vb: *const c_void,

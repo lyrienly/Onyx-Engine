@@ -1,6 +1,6 @@
+use crate::app::OnyxEngineApp;
 use eframe::egui::{self, Color32, RichText, Stroke, Vec2};
 use onyx_core::disasm::format_symbol;
-use crate::app::OnyxEngineApp;
 
 fn get_mnemonic_description(mnemonic: &str) -> &'static str {
     match mnemonic.to_lowercase().as_str() {

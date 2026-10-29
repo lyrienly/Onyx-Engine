@@ -17,7 +17,10 @@ pub struct ControlFlowGraph {
 
 pub fn build_cfg(instructions: &[Instruction]) -> ControlFlowGraph {
     if instructions.is_empty() {
-        return ControlFlowGraph { entry: 0, blocks: BTreeMap::new() };
+        return ControlFlowGraph {
+            entry: 0,
+            blocks: BTreeMap::new(),
+        };
     }
 
     let entry = instructions[0].address;
@@ -98,7 +101,6 @@ pub fn build_cfg(instructions: &[Instruction]) -> ControlFlowGraph {
                         }
                     }
                     FlowType::Call => {
-
                         if let Some(next) = next_addr {
                             block.successors.push(next);
                         }

@@ -1,6 +1,6 @@
+use crate::process::{MemoryRegion, Process};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use crate::process::{MemoryRegion, Process};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValType {
@@ -83,11 +83,17 @@ pub struct AobByte {
 
 impl AobByte {
     pub fn exact(b: u8) -> Self {
-        AobByte { value: b, mask: 0xFF }
+        AobByte {
+            value: b,
+            mask: 0xFF,
+        }
     }
 
     pub fn wildcard() -> Self {
-        AobByte { value: 0, mask: 0x00 }
+        AobByte {
+            value: 0,
+            mask: 0x00,
+        }
     }
 
     pub fn matches(&self, b: u8) -> bool {
@@ -124,7 +130,10 @@ impl AobByte {
         if t.starts_with('|') && t.ends_with('|') && t.len() >= 3 {
             let bits = &t[1..t.len() - 1];
             if bits.len() != 8 {
-                return Err(format!("Binary AOB token must be exactly 8 bits, got: {}", t));
+                return Err(format!(
+                    "Binary AOB token must be exactly 8 bits, got: {}",
+                    t
+                ));
             }
             let mut value: u8 = 0;
             let mut mask: u8 = 0;
@@ -139,9 +148,7 @@ impl AobByte {
                     '0' => {
                         mask |= 1;
                     }
-                    '*' | '?' | 'x' | 'X' => {
-
-                    }
+                    '*' | '?' | 'x' | 'X' => {}
                     _ => return Err(format!("Invalid char in binary token '{}' in {}", ch, t)),
                 }
             }
@@ -155,12 +162,18 @@ impl AobByte {
                 (true, false) => {
                     let low = Self::nibble_hex(b[1])
                         .ok_or_else(|| format!("Invalid nibble wildcard: {}", t))?;
-                    return Ok(AobByte { value: low, mask: 0x0F });
+                    return Ok(AobByte {
+                        value: low,
+                        mask: 0x0F,
+                    });
                 }
                 (false, true) => {
                     let high = Self::nibble_hex(b[0])
                         .ok_or_else(|| format!("Invalid nibble wildcard: {}", t))?;
-                    return Ok(AobByte { value: high << 4, mask: 0xF0 });
+                    return Ok(AobByte {
+                        value: high << 4,
+                        mask: 0xF0,
+                    });
                 }
                 (false, false) => {}
             }
@@ -171,8 +184,8 @@ impl AobByte {
         } else {
             t
         };
-        let b = u8::from_str_radix(hex_str, 16)
-            .map_err(|_| format!("Invalid hex byte: {}", token))?;
+        let b =
+            u8::from_str_radix(hex_str, 16).map_err(|_| format!("Invalid hex byte: {}", token))?;
         Ok(Self::exact(b))
     }
 
@@ -275,62 +288,108 @@ impl ScanValue {
         match val_type {
             ValType::I8 => {
                 if let Some(h) = hex_stripped {
-                    i8::from_str_radix(h, 16).map(ScanValue::I8).map_err(|e| e.to_string())
+                    i8::from_str_radix(h, 16)
+                        .map(ScanValue::I8)
+                        .map_err(|e| e.to_string())
                 } else {
-                    trimmed.parse::<i8>().map(ScanValue::I8).map_err(|e| e.to_string())
+                    trimmed
+                        .parse::<i8>()
+                        .map(ScanValue::I8)
+                        .map_err(|e| e.to_string())
                 }
             }
             ValType::U8 => {
                 if let Some(h) = hex_stripped {
-                    u8::from_str_radix(h, 16).map(ScanValue::U8).map_err(|e| e.to_string())
+                    u8::from_str_radix(h, 16)
+                        .map(ScanValue::U8)
+                        .map_err(|e| e.to_string())
                 } else {
-                    trimmed.parse::<u8>().map(ScanValue::U8).map_err(|e| e.to_string())
+                    trimmed
+                        .parse::<u8>()
+                        .map(ScanValue::U8)
+                        .map_err(|e| e.to_string())
                 }
             }
             ValType::I16 => {
                 if let Some(h) = hex_stripped {
-                    i16::from_str_radix(h, 16).map(ScanValue::I16).map_err(|e| e.to_string())
+                    i16::from_str_radix(h, 16)
+                        .map(ScanValue::I16)
+                        .map_err(|e| e.to_string())
                 } else {
-                    trimmed.parse::<i16>().map(ScanValue::I16).map_err(|e| e.to_string())
+                    trimmed
+                        .parse::<i16>()
+                        .map(ScanValue::I16)
+                        .map_err(|e| e.to_string())
                 }
             }
             ValType::U16 => {
                 if let Some(h) = hex_stripped {
-                    u16::from_str_radix(h, 16).map(ScanValue::U16).map_err(|e| e.to_string())
+                    u16::from_str_radix(h, 16)
+                        .map(ScanValue::U16)
+                        .map_err(|e| e.to_string())
                 } else {
-                    trimmed.parse::<u16>().map(ScanValue::U16).map_err(|e| e.to_string())
+                    trimmed
+                        .parse::<u16>()
+                        .map(ScanValue::U16)
+                        .map_err(|e| e.to_string())
                 }
             }
             ValType::I32 => {
                 if let Some(h) = hex_stripped {
-                    i32::from_str_radix(h, 16).map(ScanValue::I32).map_err(|e| e.to_string())
+                    i32::from_str_radix(h, 16)
+                        .map(ScanValue::I32)
+                        .map_err(|e| e.to_string())
                 } else {
-                    trimmed.parse::<i32>().map(ScanValue::I32).map_err(|e| e.to_string())
+                    trimmed
+                        .parse::<i32>()
+                        .map(ScanValue::I32)
+                        .map_err(|e| e.to_string())
                 }
             }
             ValType::U32 => {
                 if let Some(h) = hex_stripped {
-                    u32::from_str_radix(h, 16).map(ScanValue::U32).map_err(|e| e.to_string())
+                    u32::from_str_radix(h, 16)
+                        .map(ScanValue::U32)
+                        .map_err(|e| e.to_string())
                 } else {
-                    trimmed.parse::<u32>().map(ScanValue::U32).map_err(|e| e.to_string())
+                    trimmed
+                        .parse::<u32>()
+                        .map(ScanValue::U32)
+                        .map_err(|e| e.to_string())
                 }
             }
             ValType::I64 => {
                 if let Some(h) = hex_stripped {
-                    i64::from_str_radix(h, 16).map(ScanValue::I64).map_err(|e| e.to_string())
+                    i64::from_str_radix(h, 16)
+                        .map(ScanValue::I64)
+                        .map_err(|e| e.to_string())
                 } else {
-                    trimmed.parse::<i64>().map(ScanValue::I64).map_err(|e| e.to_string())
+                    trimmed
+                        .parse::<i64>()
+                        .map(ScanValue::I64)
+                        .map_err(|e| e.to_string())
                 }
             }
             ValType::U64 => {
                 if let Some(h) = hex_stripped {
-                    u64::from_str_radix(h, 16).map(ScanValue::U64).map_err(|e| e.to_string())
+                    u64::from_str_radix(h, 16)
+                        .map(ScanValue::U64)
+                        .map_err(|e| e.to_string())
                 } else {
-                    trimmed.parse::<u64>().map(ScanValue::U64).map_err(|e| e.to_string())
+                    trimmed
+                        .parse::<u64>()
+                        .map(ScanValue::U64)
+                        .map_err(|e| e.to_string())
                 }
             }
-            ValType::Float => trimmed.parse::<f32>().map(ScanValue::Float).map_err(|e| e.to_string()),
-            ValType::Double => trimmed.parse::<f64>().map(ScanValue::Double).map_err(|e| e.to_string()),
+            ValType::Float => trimmed
+                .parse::<f32>()
+                .map(ScanValue::Float)
+                .map_err(|e| e.to_string()),
+            ValType::Double => trimmed
+                .parse::<f64>()
+                .map(ScanValue::Double)
+                .map_err(|e| e.to_string()),
             ValType::Str => Ok(ScanValue::Str(trimmed.to_string())),
             ValType::Aob => {
                 let parts: Vec<&str> = trimmed.split_whitespace().collect();
@@ -345,25 +404,37 @@ impl ScanValue {
             }
             ValType::All => {
                 let (i8_val, u8_val) = if let Some(h) = hex_stripped {
-                    (i8::from_str_radix(h, 16).ok(), u8::from_str_radix(h, 16).ok())
+                    (
+                        i8::from_str_radix(h, 16).ok(),
+                        u8::from_str_radix(h, 16).ok(),
+                    )
                 } else {
                     (trimmed.parse::<i8>().ok(), trimmed.parse::<u8>().ok())
                 };
 
                 let (i16_val, u16_val) = if let Some(h) = hex_stripped {
-                    (i16::from_str_radix(h, 16).ok(), u16::from_str_radix(h, 16).ok())
+                    (
+                        i16::from_str_radix(h, 16).ok(),
+                        u16::from_str_radix(h, 16).ok(),
+                    )
                 } else {
                     (trimmed.parse::<i16>().ok(), trimmed.parse::<u16>().ok())
                 };
 
                 let (i32_val, u32_val) = if let Some(h) = hex_stripped {
-                    (i32::from_str_radix(h, 16).ok(), u32::from_str_radix(h, 16).ok())
+                    (
+                        i32::from_str_radix(h, 16).ok(),
+                        u32::from_str_radix(h, 16).ok(),
+                    )
                 } else {
                     (trimmed.parse::<i32>().ok(), trimmed.parse::<u32>().ok())
                 };
 
                 let (i64_val, u64_val) = if let Some(h) = hex_stripped {
-                    (i64::from_str_radix(h, 16).ok(), u64::from_str_radix(h, 16).ok())
+                    (
+                        i64::from_str_radix(h, 16).ok(),
+                        u64::from_str_radix(h, 16).ok(),
+                    )
                 } else {
                     (trimmed.parse::<i64>().ok(), trimmed.parse::<u64>().ok())
                 };
@@ -371,18 +442,31 @@ impl ScanValue {
                 let f32_val = if hex_stripped.is_some() {
                     None
                 } else {
-                    trimmed.parse::<f32>().ok().filter(|f| !f.is_nan() && !f.is_infinite())
+                    trimmed
+                        .parse::<f32>()
+                        .ok()
+                        .filter(|f| !f.is_nan() && !f.is_infinite())
                 };
 
                 let f64_val = if hex_stripped.is_some() {
                     None
                 } else {
-                    trimmed.parse::<f64>().ok().filter(|d| !d.is_nan() && !d.is_infinite())
+                    trimmed
+                        .parse::<f64>()
+                        .ok()
+                        .filter(|d| !d.is_nan() && !d.is_infinite())
                 };
 
-                if i8_val.is_none() && u8_val.is_none() && i16_val.is_none() && u16_val.is_none()
-                    && i32_val.is_none() && u32_val.is_none() && i64_val.is_none() && u64_val.is_none()
-                    && f32_val.is_none() && f64_val.is_none()
+                if i8_val.is_none()
+                    && u8_val.is_none()
+                    && i16_val.is_none()
+                    && u16_val.is_none()
+                    && i32_val.is_none()
+                    && u32_val.is_none()
+                    && i64_val.is_none()
+                    && u64_val.is_none()
+                    && f32_val.is_none()
+                    && f64_val.is_none()
                 {
                     return Err(format!("Cannot parse '{}' for All types scan", text));
                 }
@@ -401,8 +485,7 @@ impl ScanValue {
                 }))
             }
             ValType::Group => {
-                crate::memory::group_scan::GroupScanConfig::parse(text)
-                    .map(ScanValue::Group)
+                crate::memory::group_scan::GroupScanConfig::parse(text).map(ScanValue::Group)
             }
         }
     }
@@ -416,14 +499,28 @@ impl ScanValue {
             ValType::U8 => Some(ScanValue::U8(buf[0])),
             ValType::I16 => Some(ScanValue::I16(i16::from_ne_bytes([buf[0], buf[1]]))),
             ValType::U16 => Some(ScanValue::U16(u16::from_ne_bytes([buf[0], buf[1]]))),
-            ValType::I32 => Some(ScanValue::I32(i32::from_ne_bytes([buf[0], buf[1], buf[2], buf[3]]))),
-            ValType::U32 => Some(ScanValue::U32(u32::from_ne_bytes([buf[0], buf[1], buf[2], buf[3]]))),
-            ValType::I64 => Some(ScanValue::I64(i64::from_ne_bytes([buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]]))),
-            ValType::U64 => Some(ScanValue::U64(u64::from_ne_bytes([buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]]))),
-            ValType::Float => Some(ScanValue::Float(f32::from_ne_bytes([buf[0], buf[1], buf[2], buf[3]]))),
-            ValType::Double => Some(ScanValue::Double(f64::from_ne_bytes([buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]]))),
+            ValType::I32 => Some(ScanValue::I32(i32::from_ne_bytes([
+                buf[0], buf[1], buf[2], buf[3],
+            ]))),
+            ValType::U32 => Some(ScanValue::U32(u32::from_ne_bytes([
+                buf[0], buf[1], buf[2], buf[3],
+            ]))),
+            ValType::I64 => Some(ScanValue::I64(i64::from_ne_bytes([
+                buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7],
+            ]))),
+            ValType::U64 => Some(ScanValue::U64(u64::from_ne_bytes([
+                buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7],
+            ]))),
+            ValType::Float => Some(ScanValue::Float(f32::from_ne_bytes([
+                buf[0], buf[1], buf[2], buf[3],
+            ]))),
+            ValType::Double => Some(ScanValue::Double(f64::from_ne_bytes([
+                buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7],
+            ]))),
             ValType::Str => Some(ScanValue::Str(String::from_utf8_lossy(buf).to_string())),
-            ValType::Aob => Some(ScanValue::Aob(buf.iter().map(|&b| AobByte::exact(b)).collect())),
+            ValType::Aob => Some(ScanValue::Aob(
+                buf.iter().map(|&b| AobByte::exact(b)).collect(),
+            )),
             ValType::All => Some(ScanValue::U8(buf[0])),
             ValType::Group => None,
         }
@@ -461,29 +558,36 @@ impl ScanValue {
             ScanValue::Double(v) => format!("{:.6}", v),
             ScanValue::Str(s) => format!("\"{}\"", s),
             ScanValue::All(_) => "All".to_string(),
-            ScanValue::Group(g) => format!("Grouped ({} elements, blocksize {})", g.elements.len(), g.blocksize),
+            ScanValue::Group(g) => format!(
+                "Grouped ({} elements, blocksize {})",
+                g.elements.len(),
+                g.blocksize
+            ),
             ScanValue::Aob(p) => {
-                let bytes: Vec<String> = p.iter().map(|b| {
-                    if b.mask == 0xFF {
-                        format!("{:02X}", b.value)
-                    } else if b.mask == 0x00 {
-                        "??".to_string()
-                    } else {
-                        let mut s = String::with_capacity(10);
-                        s.push('|');
-                        for bit in (0..8).rev() {
-                            if (b.mask & (1 << bit)) == 0 {
-                                s.push('*');
-                            } else if (b.value & (1 << bit)) != 0 {
-                                s.push('1');
-                            } else {
-                                s.push('0');
+                let bytes: Vec<String> = p
+                    .iter()
+                    .map(|b| {
+                        if b.mask == 0xFF {
+                            format!("{:02X}", b.value)
+                        } else if b.mask == 0x00 {
+                            "??".to_string()
+                        } else {
+                            let mut s = String::with_capacity(10);
+                            s.push('|');
+                            for bit in (0..8).rev() {
+                                if (b.mask & (1 << bit)) == 0 {
+                                    s.push('*');
+                                } else if (b.value & (1 << bit)) != 0 {
+                                    s.push('1');
+                                } else {
+                                    s.push('0');
+                                }
                             }
+                            s.push('|');
+                            s
                         }
-                        s.push('|');
-                        s
-                    }
-                }).collect();
+                    })
+                    .collect();
                 bytes.join(" ")
             }
         }
@@ -525,7 +629,12 @@ impl ScanCandidate {
         }
     }
 
-    pub fn with_offsets(address: usize, current_value: ScanValue, extra_type: u32, group_offsets: Vec<u32>) -> Self {
+    pub fn with_offsets(
+        address: usize,
+        current_value: ScanValue,
+        extra_type: u32,
+        group_offsets: Vec<u32>,
+    ) -> Self {
         Self {
             address,
             previous_value: current_value.clone(),
@@ -582,10 +691,18 @@ impl Scanner {
         }
     }
 
-    pub fn first_scan(&mut self, proc: &Process, condition: ScanCondition) -> Result<usize, String> {
+    pub fn first_scan(
+        &mut self,
+        proc: &Process,
+        condition: ScanCondition,
+    ) -> Result<usize, String> {
         let all_regions = proc.regions(self.writable_only)?;
         let start = self.start_addr;
-        let stop = if self.stop_addr == 0 { usize::MAX } else { self.stop_addr };
+        let stop = if self.stop_addr == 0 {
+            usize::MAX
+        } else {
+            self.stop_addr
+        };
 
         let regions: Vec<MemoryRegion> = all_regions
             .into_iter()
@@ -608,7 +725,9 @@ impl Scanner {
         let results = Arc::new(Mutex::new(Vec::new()));
         let mut handles = Vec::new();
 
-        let num_cpus = thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+        let num_cpus = thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4);
         let chunks: Vec<Vec<MemoryRegion>> = regions
             .chunks((regions.len() / num_cpus).max(1))
             .map(|c| c.to_vec())
@@ -651,16 +770,17 @@ impl Scanner {
                         let cur_addr = region.base + offset;
 
                         if let Ok(bytes_read) = dummy_proc.read_raw(cur_addr, &mut buf[..cur_size])
-                            && bytes_read >= val_type.size() {
-                                scan_buffer(
-                                    cur_addr,
-                                    &buf[..bytes_read],
-                                    val_type,
-                                    alignment,
-                                    &cond_clone,
-                                    &mut local_candidates,
-                                );
-                            }
+                            && bytes_read >= val_type.size()
+                        {
+                            scan_buffer(
+                                cur_addr,
+                                &buf[..bytes_read],
+                                val_type,
+                                alignment,
+                                &cond_clone,
+                                &mut local_candidates,
+                            );
+                        }
                         if offset + cur_size < region.size {
                             offset += cur_size.saturating_sub(overlap);
                         } else {
@@ -697,9 +817,12 @@ impl Scanner {
 
         let val_size = self.val_type.size();
         let val_type = self.val_type;
-        let num_cpus = thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+        let num_cpus = thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4);
         let chunk_size = (self.candidates.len() / num_cpus).max(1);
-        let chunks: Vec<Vec<ScanCandidate>> = self.candidates
+        let chunks: Vec<Vec<ScanCandidate>> = self
+            .candidates
             .chunks(chunk_size)
             .map(|c| c.to_vec())
             .collect();
@@ -759,24 +882,10 @@ impl Scanner {
                         } else {
                             let mut single_buf = vec![0u8; cand_size];
                             if dummy_proc.read_raw(addr, &mut single_buf).is_ok()
-                                && let Some(new_val) = ScanValue::read_from_bytes(cand_val_type, &single_buf)
-                                    && check_candidate_condition(cand, &new_val, &cond_clone, val_type) {
-                                        local.push(ScanCandidate {
-                                            address: cand.address,
-                                            current_value: new_val,
-                                            previous_value: cand.current_value.clone(),
-                                            extra_type: cand.extra_type,
-                                            group_offsets: cand.group_offsets.clone(),
-                                        });
-                                    }
-                            continue;
-                        }
-                    }
-
-                    if addr >= cached_page_base && (addr + cand_size) <= (cached_page_base + cached_page_len) {
-                        let offset = addr - cached_page_base;
-                        if let Some(new_val) = ScanValue::read_from_bytes(cand_val_type, &page_buf[offset..offset + cand_size])
-                            && check_candidate_condition(cand, &new_val, &cond_clone, val_type) {
+                                && let Some(new_val) =
+                                    ScanValue::read_from_bytes(cand_val_type, &single_buf)
+                                && check_candidate_condition(cand, &new_val, &cond_clone, val_type)
+                            {
                                 local.push(ScanCandidate {
                                     address: cand.address,
                                     current_value: new_val,
@@ -785,6 +894,27 @@ impl Scanner {
                                     group_offsets: cand.group_offsets.clone(),
                                 });
                             }
+                            continue;
+                        }
+                    }
+
+                    if addr >= cached_page_base
+                        && (addr + cand_size) <= (cached_page_base + cached_page_len)
+                    {
+                        let offset = addr - cached_page_base;
+                        if let Some(new_val) = ScanValue::read_from_bytes(
+                            cand_val_type,
+                            &page_buf[offset..offset + cand_size],
+                        ) && check_candidate_condition(cand, &new_val, &cond_clone, val_type)
+                        {
+                            local.push(ScanCandidate {
+                                address: cand.address,
+                                current_value: new_val,
+                                previous_value: cand.current_value.clone(),
+                                extra_type: cand.extra_type,
+                                group_offsets: cand.group_offsets.clone(),
+                            });
+                        }
                     }
                 }
 
@@ -852,7 +982,11 @@ unsafe fn scan_i32_exact_avx2(
                         } else {
                             ScanValue::I32(target)
                         };
-                        out.push(ScanCandidate::new(addr, cand_val, val_type.ce_type_ordinal()));
+                        out.push(ScanCandidate::new(
+                            addr,
+                            cand_val,
+                            val_type.ce_type_ordinal(),
+                        ));
                     }
                 }
             }
@@ -868,7 +1002,11 @@ unsafe fn scan_i32_exact_avx2(
             } else {
                 ScanValue::I32(target)
             };
-            out.push(ScanCandidate::new(base_addr + i, cand_val, val_type.ce_type_ordinal()));
+            out.push(ScanCandidate::new(
+                base_addr + i,
+                cand_val,
+                val_type.ce_type_ordinal(),
+            ));
         }
         i += alignment;
     }
@@ -958,7 +1096,11 @@ unsafe fn scan_u8_exact_avx2(
                 } else {
                     ScanValue::U8(target)
                 };
-                out.push(ScanCandidate::new(addr, cand_val, val_type.ce_type_ordinal()));
+                out.push(ScanCandidate::new(
+                    addr,
+                    cand_val,
+                    val_type.ce_type_ordinal(),
+                ));
                 mask &= mask - 1;
             }
             i += 32;
@@ -972,7 +1114,11 @@ unsafe fn scan_u8_exact_avx2(
             } else {
                 ScanValue::U8(target)
             };
-            out.push(ScanCandidate::new(base_addr + i, cand_val, val_type.ce_type_ordinal()));
+            out.push(ScanCandidate::new(
+                base_addr + i,
+                cand_val,
+                val_type.ce_type_ordinal(),
+            ));
         }
         i += alignment;
     }
@@ -1131,7 +1277,10 @@ fn scan_buffer(
                 }
             }
             if matched {
-                let cand_bytes: Vec<AobByte> = buf[i..i + pat_len].iter().map(|&b| AobByte::exact(b)).collect();
+                let cand_bytes: Vec<AobByte> = buf[i..i + pat_len]
+                    .iter()
+                    .map(|&b| AobByte::exact(b))
+                    .collect();
                 let cand_val = ScanValue::Aob(cand_bytes);
                 out.push(ScanCandidate::new(base_addr + i, cand_val, 8));
             }
@@ -1145,23 +1294,33 @@ fn scan_buffer(
         if is_x86_feature_detected!("avx2") {
             match cond {
                 ScanCondition::Exact(ScanValue::I32(v)) if val_type == ValType::I32 => {
-                    unsafe { scan_i32_exact_avx2(base_addr, buf, *v, alignment, val_type, out); }
+                    unsafe {
+                        scan_i32_exact_avx2(base_addr, buf, *v, alignment, val_type, out);
+                    }
                     return;
                 }
                 ScanCondition::Exact(ScanValue::U32(v)) if val_type == ValType::U32 => {
-                    unsafe { scan_i32_exact_avx2(base_addr, buf, *v as i32, alignment, val_type, out); }
+                    unsafe {
+                        scan_i32_exact_avx2(base_addr, buf, *v as i32, alignment, val_type, out);
+                    }
                     return;
                 }
                 ScanCondition::Exact(ScanValue::Float(v)) if val_type == ValType::Float => {
-                    unsafe { scan_float_exact_avx2(base_addr, buf, *v, alignment, out); }
+                    unsafe {
+                        scan_float_exact_avx2(base_addr, buf, *v, alignment, out);
+                    }
                     return;
                 }
                 ScanCondition::Exact(ScanValue::U8(v)) if val_type == ValType::U8 => {
-                    unsafe { scan_u8_exact_avx2(base_addr, buf, *v, alignment, val_type, out); }
+                    unsafe {
+                        scan_u8_exact_avx2(base_addr, buf, *v, alignment, val_type, out);
+                    }
                     return;
                 }
                 ScanCondition::Exact(ScanValue::I8(v)) if val_type == ValType::I8 => {
-                    unsafe { scan_u8_exact_avx2(base_addr, buf, *v as u8, alignment, val_type, out); }
+                    unsafe {
+                        scan_u8_exact_avx2(base_addr, buf, *v as u8, alignment, val_type, out);
+                    }
                     return;
                 }
                 _ => {}
@@ -1179,9 +1338,14 @@ fn scan_buffer(
 
     while i <= max_idx {
         if let Some(val) = ScanValue::read_from_bytes(val_type, &buf[i..i + size])
-            && matches_first_condition(&val, cond) {
-                out.push(ScanCandidate::new(base_addr + i, val, val_type.ce_type_ordinal()));
-            }
+            && matches_first_condition(&val, cond)
+        {
+            out.push(ScanCandidate::new(
+                base_addr + i,
+                val,
+                val_type.ce_type_ordinal(),
+            ));
+        }
         i += alignment;
     }
 }
@@ -1236,9 +1400,10 @@ fn scan_buffer_all(
                         out.push(ScanCandidate::new(addr, ScanValue::U8(target), 0));
                     }
                 } else if let Some(target) = targets.i8_val
-                    && buf[i] as i8 == target {
-                        out.push(ScanCandidate::new(addr, ScanValue::I8(target), 0));
-                    }
+                    && buf[i] as i8 == target
+                {
+                    out.push(ScanCandidate::new(addr, ScanValue::I8(target), 0));
+                }
 
                 if div2 && i + 2 <= len {
                     let w = u16::from_ne_bytes([buf[i], buf[i + 1]]);
@@ -1247,9 +1412,10 @@ fn scan_buffer_all(
                             out.push(ScanCandidate::new(addr, ScanValue::U16(target), 1));
                         }
                     } else if let Some(target) = targets.i16_val
-                        && (w as i16) == target {
-                            out.push(ScanCandidate::new(addr, ScanValue::I16(target), 1));
-                        }
+                        && (w as i16) == target
+                    {
+                        out.push(ScanCandidate::new(addr, ScanValue::I16(target), 1));
+                    }
                 }
 
                 if div4 && i + 4 <= len {
@@ -1259,9 +1425,10 @@ fn scan_buffer_all(
                             out.push(ScanCandidate::new(addr, ScanValue::U32(target), 2));
                         }
                     } else if let Some(target) = targets.i32_val
-                        && (d as i32) == target {
-                            out.push(ScanCandidate::new(addr, ScanValue::I32(target), 2));
-                        }
+                        && (d as i32) == target
+                    {
+                        out.push(ScanCandidate::new(addr, ScanValue::I32(target), 2));
+                    }
 
                     if let Some(target_f) = targets.f32_val {
                         let f = f32::from_ne_bytes([buf[i], buf[i + 1], buf[i + 2], buf[i + 3]]);
@@ -1273,22 +1440,35 @@ fn scan_buffer_all(
 
                 if div4 && i + 8 <= len {
                     let q = u64::from_ne_bytes([
-                        buf[i], buf[i + 1], buf[i + 2], buf[i + 3],
-                        buf[i + 4], buf[i + 5], buf[i + 6], buf[i + 7],
+                        buf[i],
+                        buf[i + 1],
+                        buf[i + 2],
+                        buf[i + 3],
+                        buf[i + 4],
+                        buf[i + 5],
+                        buf[i + 6],
+                        buf[i + 7],
                     ]);
                     if let Some(target) = targets.u64_val {
                         if q == target {
                             out.push(ScanCandidate::new(addr, ScanValue::U64(target), 3));
                         }
                     } else if let Some(target) = targets.i64_val
-                        && (q as i64) == target {
-                            out.push(ScanCandidate::new(addr, ScanValue::I64(target), 3));
-                        }
+                        && (q as i64) == target
+                    {
+                        out.push(ScanCandidate::new(addr, ScanValue::I64(target), 3));
+                    }
 
                     if let Some(target_d) = targets.f64_val {
                         let d = f64::from_ne_bytes([
-                            buf[i], buf[i + 1], buf[i + 2], buf[i + 3],
-                            buf[i + 4], buf[i + 5], buf[i + 6], buf[i + 7],
+                            buf[i],
+                            buf[i + 1],
+                            buf[i + 2],
+                            buf[i + 3],
+                            buf[i + 4],
+                            buf[i + 5],
+                            buf[i + 6],
+                            buf[i + 7],
                         ]);
                         if !d.is_nan() && !d.is_infinite() && (d - target_d).abs() < 0.00001 {
                             out.push(ScanCandidate::new(addr, ScanValue::Double(d), 5));
@@ -1325,14 +1505,26 @@ fn scan_buffer_all(
 
                 if div4 && i + 8 <= len {
                     let q = u64::from_ne_bytes([
-                        buf[i], buf[i + 1], buf[i + 2], buf[i + 3],
-                        buf[i + 4], buf[i + 5], buf[i + 6], buf[i + 7],
+                        buf[i],
+                        buf[i + 1],
+                        buf[i + 2],
+                        buf[i + 3],
+                        buf[i + 4],
+                        buf[i + 5],
+                        buf[i + 6],
+                        buf[i + 7],
                     ]);
                     out.push(ScanCandidate::new(addr, ScanValue::U64(q), 3));
 
                     let d = f64::from_ne_bytes([
-                        buf[i], buf[i + 1], buf[i + 2], buf[i + 3],
-                        buf[i + 4], buf[i + 5], buf[i + 6], buf[i + 7],
+                        buf[i],
+                        buf[i + 1],
+                        buf[i + 2],
+                        buf[i + 3],
+                        buf[i + 4],
+                        buf[i + 5],
+                        buf[i + 6],
+                        buf[i + 7],
                     ]);
                     if !d.is_nan() && !d.is_infinite() {
                         out.push(ScanCandidate::new(addr, ScanValue::Double(d), 5));
@@ -1353,69 +1545,70 @@ fn check_candidate_condition(
     scan_val_type: ValType,
 ) -> bool {
     if scan_val_type == ValType::All
-        && let ScanCondition::Exact(ScanValue::All(targets)) = cond {
-            return match cand.extra_type {
-                0 => {
-                    if let Some(t) = targets.u8_val {
-                        *new_val == ScanValue::U8(t)
-                    } else if let Some(t) = targets.i8_val {
-                        *new_val == ScanValue::I8(t)
+        && let ScanCondition::Exact(ScanValue::All(targets)) = cond
+    {
+        return match cand.extra_type {
+            0 => {
+                if let Some(t) = targets.u8_val {
+                    *new_val == ScanValue::U8(t)
+                } else if let Some(t) = targets.i8_val {
+                    *new_val == ScanValue::I8(t)
+                } else {
+                    false
+                }
+            }
+            1 => {
+                if let Some(t) = targets.u16_val {
+                    *new_val == ScanValue::U16(t)
+                } else if let Some(t) = targets.i16_val {
+                    *new_val == ScanValue::I16(t)
+                } else {
+                    false
+                }
+            }
+            2 => {
+                if let Some(t) = targets.u32_val {
+                    *new_val == ScanValue::U32(t)
+                } else if let Some(t) = targets.i32_val {
+                    *new_val == ScanValue::I32(t)
+                } else {
+                    false
+                }
+            }
+            3 => {
+                if let Some(t) = targets.u64_val {
+                    *new_val == ScanValue::U64(t)
+                } else if let Some(t) = targets.i64_val {
+                    *new_val == ScanValue::I64(t)
+                } else {
+                    false
+                }
+            }
+            4 => {
+                if let Some(t) = targets.f32_val {
+                    if let ScanValue::Float(f) = new_val {
+                        (f - t).abs() < 0.001
                     } else {
                         false
                     }
+                } else {
+                    false
                 }
-                1 => {
-                    if let Some(t) = targets.u16_val {
-                        *new_val == ScanValue::U16(t)
-                    } else if let Some(t) = targets.i16_val {
-                        *new_val == ScanValue::I16(t)
+            }
+            5 => {
+                if let Some(t) = targets.f64_val {
+                    if let ScanValue::Double(d) = new_val {
+                        (d - t).abs() < 0.00001
                     } else {
                         false
                     }
+                } else {
+                    false
                 }
-                2 => {
-                    if let Some(t) = targets.u32_val {
-                        *new_val == ScanValue::U32(t)
-                    } else if let Some(t) = targets.i32_val {
-                        *new_val == ScanValue::I32(t)
-                    } else {
-                        false
-                    }
-                }
-                3 => {
-                    if let Some(t) = targets.u64_val {
-                        *new_val == ScanValue::U64(t)
-                    } else if let Some(t) = targets.i64_val {
-                        *new_val == ScanValue::I64(t)
-                    } else {
-                        false
-                    }
-                }
-                4 => {
-                    if let Some(t) = targets.f32_val {
-                        if let ScanValue::Float(f) = new_val {
-                            (f - t).abs() < 0.001
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                }
-                5 => {
-                    if let Some(t) = targets.f64_val {
-                        if let ScanValue::Double(d) = new_val {
-                            (d - t).abs() < 0.00001
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                }
-                _ => false,
-            };
-        }
+            }
+            _ => false,
+        };
+    }
     matches_next_condition(&cand.current_value, new_val, cond)
 }
 
@@ -1487,10 +1680,22 @@ fn value_cmp(a: &ScanValue, b: &ScanValue) -> i32 {
         (ScanValue::I64(x), ScanValue::I64(y)) => x.cmp(y) as i32,
         (ScanValue::U64(x), ScanValue::U64(y)) => x.cmp(y) as i32,
         (ScanValue::Float(x), ScanValue::Float(y)) => {
-            if (x - y).abs() < 0.0001 { 0 } else if x > y { 1 } else { -1 }
+            if (x - y).abs() < 0.0001 {
+                0
+            } else if x > y {
+                1
+            } else {
+                -1
+            }
         }
         (ScanValue::Double(x), ScanValue::Double(y)) => {
-            if (x - y).abs() < 0.000001 { 0 } else if x > y { 1 } else { -1 }
+            if (x - y).abs() < 0.000001 {
+                0
+            } else if x > y {
+                1
+            } else {
+                -1
+            }
         }
         _ => 0,
     }
@@ -1499,35 +1704,67 @@ fn value_cmp(a: &ScanValue, b: &ScanValue) -> i32 {
 fn matches_diff(old: &ScanValue, cur: &ScanValue, diff: &ScanValue, is_increase: bool) -> bool {
     match (old, cur, diff) {
         (ScanValue::I8(o), ScanValue::I8(c), ScanValue::I8(d)) => {
-            let actual = if is_increase { c.wrapping_sub(*o) } else { o.wrapping_sub(*c) };
+            let actual = if is_increase {
+                c.wrapping_sub(*o)
+            } else {
+                o.wrapping_sub(*c)
+            };
             actual == *d
         }
         (ScanValue::U8(o), ScanValue::U8(c), ScanValue::U8(d)) => {
-            let actual = if is_increase { c.wrapping_sub(*o) } else { o.wrapping_sub(*c) };
+            let actual = if is_increase {
+                c.wrapping_sub(*o)
+            } else {
+                o.wrapping_sub(*c)
+            };
             actual == *d
         }
         (ScanValue::I16(o), ScanValue::I16(c), ScanValue::I16(d)) => {
-            let actual = if is_increase { c.wrapping_sub(*o) } else { o.wrapping_sub(*c) };
+            let actual = if is_increase {
+                c.wrapping_sub(*o)
+            } else {
+                o.wrapping_sub(*c)
+            };
             actual == *d
         }
         (ScanValue::U16(o), ScanValue::U16(c), ScanValue::U16(d)) => {
-            let actual = if is_increase { c.wrapping_sub(*o) } else { o.wrapping_sub(*c) };
+            let actual = if is_increase {
+                c.wrapping_sub(*o)
+            } else {
+                o.wrapping_sub(*c)
+            };
             actual == *d
         }
         (ScanValue::I32(o), ScanValue::I32(c), ScanValue::I32(d)) => {
-            let actual = if is_increase { c.wrapping_sub(*o) } else { o.wrapping_sub(*c) };
+            let actual = if is_increase {
+                c.wrapping_sub(*o)
+            } else {
+                o.wrapping_sub(*c)
+            };
             actual == *d
         }
         (ScanValue::U32(o), ScanValue::U32(c), ScanValue::U32(d)) => {
-            let actual = if is_increase { c.wrapping_sub(*o) } else { o.wrapping_sub(*c) };
+            let actual = if is_increase {
+                c.wrapping_sub(*o)
+            } else {
+                o.wrapping_sub(*c)
+            };
             actual == *d
         }
         (ScanValue::I64(o), ScanValue::I64(c), ScanValue::I64(d)) => {
-            let actual = if is_increase { c.wrapping_sub(*o) } else { o.wrapping_sub(*c) };
+            let actual = if is_increase {
+                c.wrapping_sub(*o)
+            } else {
+                o.wrapping_sub(*c)
+            };
             actual == *d
         }
         (ScanValue::U64(o), ScanValue::U64(c), ScanValue::U64(d)) => {
-            let actual = if is_increase { c.wrapping_sub(*o) } else { o.wrapping_sub(*c) };
+            let actual = if is_increase {
+                c.wrapping_sub(*o)
+            } else {
+                o.wrapping_sub(*c)
+            };
             actual == *d
         }
         (ScanValue::Float(o), ScanValue::Float(c), ScanValue::Float(d)) => {
@@ -1569,9 +1806,7 @@ mod tests {
 
     #[test]
     fn test_aob_pattern_token_roundtrip() {
-        let cases = vec![
-            "FF", "00", "??", "A?", "?A", "|1?0?1?0?|", "|11110000|",
-        ];
+        let cases = vec!["FF", "00", "??", "A?", "?A", "|1?0?1?0?|", "|11110000|"];
         for case in cases {
             let byte = AobByte::parse(case).unwrap_or_else(|e| panic!("failed {}: {}", case, e));
             let token = byte.to_pattern_token();
@@ -1611,7 +1846,6 @@ mod tests {
 
     #[test]
     fn test_scan_buffer_all_candidates() {
-
         let mut buf = vec![0u8; 32];
         let val_u32: u32 = 100;
         buf[0..4].copy_from_slice(&val_u32.to_ne_bytes());

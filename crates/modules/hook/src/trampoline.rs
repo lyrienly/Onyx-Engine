@@ -5,7 +5,6 @@ pub const PATCH_SIZE: usize = 14;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TrampolineError {
-
     PrologueTooShort,
 
     DecodeFailed,
@@ -18,10 +17,18 @@ pub enum TrampolineError {
 impl core::fmt::Display for TrampolineError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            TrampolineError::PrologueTooShort => write!(f, "prologue muito curto para patch de {} bytes", PATCH_SIZE),
-            TrampolineError::DecodeFailed => write!(f, "falha ao decodificar instrucao do prologue"),
-            TrampolineError::UnsupportedRelativeBranch => write!(f, "branch relativo no prologue nao suportado"),
-            TrampolineError::DisplacementOutOfRange => write!(f, "deslocamento RIP-relative fora de i32 apos relocacao"),
+            TrampolineError::PrologueTooShort => {
+                write!(f, "prologue muito curto para patch de {} bytes", PATCH_SIZE)
+            }
+            TrampolineError::DecodeFailed => {
+                write!(f, "falha ao decodificar instrucao do prologue")
+            }
+            TrampolineError::UnsupportedRelativeBranch => {
+                write!(f, "branch relativo no prologue nao suportado")
+            }
+            TrampolineError::DisplacementOutOfRange => {
+                write!(f, "deslocamento RIP-relative fora de i32 apos relocacao")
+            }
         }
     }
 }
@@ -30,7 +37,6 @@ impl std::error::Error for TrampolineError {}
 
 #[derive(Debug, Clone)]
 pub struct RelocationInfo {
-
     pub trampoline_offset: usize,
 
     pub source_offset: usize,
@@ -42,14 +48,12 @@ pub struct RelocationInfo {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RelocationKind {
-
     None,
 
     RipRelative { old_disp: i32, new_disp: i32 },
 }
 
 pub struct Trampoline {
-
     pub bytes: Vec<u8>,
 
     pub consumed: usize,
@@ -100,7 +104,6 @@ pub fn build_trampoline(
             let disp_offset = insn.raw.disp.offset as usize;
             let disp_size_bits = insn.raw.disp.size;
             if disp_size_bits != 32 || disp_offset == 0 || disp_offset + 4 > length {
-
                 return Err(TrampolineError::DecodeFailed);
             }
 
@@ -121,10 +124,7 @@ pub fn build_trampoline(
             let new_disp = new_disp_i128 as i32;
             let bytes = new_disp.to_le_bytes();
             insn_bytes[disp_offset..disp_offset + 4].copy_from_slice(&bytes);
-            rel_kind = RelocationKind::RipRelative {
-                old_disp,
-                new_disp,
-            };
+            rel_kind = RelocationKind::RipRelative { old_disp, new_disp };
         }
 
         out.extend_from_slice(&insn_bytes);

@@ -83,7 +83,6 @@ fn read_i32(h: HANDLE, addr: usize) -> Option<i32> {
 
 #[test]
 fn e2e_freeze_mantem_valor_contra_sobrescrita_externa() {
-
     let mut child = Command::new("cmd.exe")
         .args(["/C", "ping -n 15 127.0.0.1 > nul"])
         .stdin(Stdio::null())

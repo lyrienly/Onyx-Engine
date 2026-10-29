@@ -20,6 +20,7 @@ impl SectionHeader {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct PeImage {
     pub data: Vec<u8>,
     pub is_pe32_plus: bool,
@@ -288,7 +289,10 @@ mod tests {
     #[test]
     fn test_section_for_rva() {
         let pe = PeImage::parse(&minimal_pe32_plus()).expect("parse");
-        assert_eq!(pe.section_for_rva(0x1000).map(|s| s.name_string()), Some(".text".to_string()));
+        assert_eq!(
+            pe.section_for_rva(0x1000).map(|s| s.name_string()),
+            Some(".text".to_string())
+        );
         assert!(pe.section_for_rva(0x9000).is_none());
     }
 

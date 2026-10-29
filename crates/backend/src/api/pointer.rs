@@ -114,7 +114,8 @@ pub unsafe extern "C" fn onyx_pointer_scanner_start_scan(
     }
 
     s.cancel_flag.store(false, Ordering::SeqCst);
-    s.phase.store(OnyxPointerScanPhase::GeneratingMap as u32, Ordering::SeqCst);
+    s.phase
+        .store(OnyxPointerScanPhase::GeneratingMap as u32, Ordering::SeqCst);
     if let Ok(mut pct) = s.progress_pct.lock() {
         *pct = 0.0;
     }
@@ -179,23 +180,27 @@ pub unsafe extern "C" fn onyx_pointer_scanner_start_scan(
             return;
         }
 
-        phase_arc.store(OnyxPointerScanPhase::SearchingPaths as u32, Ordering::SeqCst);
+        phase_arc.store(
+            OnyxPointerScanPhase::SearchingPaths as u32,
+            Ordering::SeqCst,
+        );
 
         let scanner = match scanner_arc.lock() {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
         };
 
-        let scan_res = scanner.scan_paths_with_progress(&process, target_addr, &config, &mut |pct, found| {
-            if cancel_arc.load(Ordering::Relaxed) {
-                return false;
-            }
-            if let Ok(mut guard) = progress_arc.lock() {
-                *guard = 50.0 + (pct * 0.5);
-            }
-            count_arc.store(found, Ordering::Relaxed);
-            true
-        });
+        let scan_res =
+            scanner.scan_paths_with_progress(&process, target_addr, &config, &mut |pct, found| {
+                if cancel_arc.load(Ordering::Relaxed) {
+                    return false;
+                }
+                if let Ok(mut guard) = progress_arc.lock() {
+                    *guard = 50.0 + (pct * 0.5);
+                }
+                count_arc.store(found, Ordering::Relaxed);
+                true
+            });
 
         match scan_res {
             Ok(paths) => {
@@ -238,7 +243,8 @@ pub unsafe extern "C" fn onyx_pointer_scanner_start_rescan(
     }
 
     s.cancel_flag.store(false, Ordering::SeqCst);
-    s.phase.store(OnyxPointerScanPhase::Rescanning as u32, Ordering::SeqCst);
+    s.phase
+        .store(OnyxPointerScanPhase::Rescanning as u32, Ordering::SeqCst);
     if let Ok(mut pct) = s.progress_pct.lock() {
         *pct = 0.0;
     }
@@ -319,7 +325,8 @@ pub unsafe extern "C" fn onyx_pointer_scanner_start_value_rescan(
     }
 
     s.cancel_flag.store(false, Ordering::SeqCst);
-    s.phase.store(OnyxPointerScanPhase::Rescanning as u32, Ordering::SeqCst);
+    s.phase
+        .store(OnyxPointerScanPhase::Rescanning as u32, Ordering::SeqCst);
     if let Ok(mut pct) = s.progress_pct.lock() {
         *pct = 0.0;
     }
@@ -417,7 +424,9 @@ pub unsafe extern "C" fn onyx_pointer_scanner_get_status(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn onyx_pointer_scanner_get_count(session: *mut PointerScannerSession) -> usize {
+pub unsafe extern "C" fn onyx_pointer_scanner_get_count(
+    session: *mut PointerScannerSession,
+) -> usize {
     if session.is_null() {
         return 0;
     }
@@ -510,7 +519,8 @@ pub unsafe extern "C" fn onyx_pointer_scanner_load_results(
             if let Ok(mut guard) = s.results.write() {
                 *guard = paths;
             }
-            s.phase.store(OnyxPointerScanPhase::Completed as u32, Ordering::SeqCst);
+            s.phase
+                .store(OnyxPointerScanPhase::Completed as u32, Ordering::SeqCst);
             1
         }
         Err(_) => 0,
@@ -595,7 +605,10 @@ pub unsafe extern "C" fn onyx_pointer_scanner_save_map(
     let modules = if !proc.is_null() {
         (*proc).modules().unwrap_or_default()
     } else {
-        s.loaded_modules.read().map(|g| g.clone()).unwrap_or_default()
+        s.loaded_modules
+            .read()
+            .map(|g| g.clone())
+            .unwrap_or_default()
     };
     let scanner = match s.scanner.lock() {
         Ok(g) => g,
@@ -652,7 +665,10 @@ pub unsafe extern "C" fn onyx_pointer_scanner_start_offline_scan(
         let _ = h.join();
     }
     s.cancel_flag.store(false, Ordering::SeqCst);
-    s.phase.store(OnyxPointerScanPhase::SearchingPaths as u32, Ordering::SeqCst);
+    s.phase.store(
+        OnyxPointerScanPhase::SearchingPaths as u32,
+        Ordering::SeqCst,
+    );
     if let Ok(mut pct) = s.progress_pct.lock() {
         *pct = 0.0;
     }
@@ -686,16 +702,17 @@ pub unsafe extern "C" fn onyx_pointer_scanner_start_offline_scan(
             Err(e) => e.into_inner(),
         };
 
-        let scan_res = scanner.scan_paths_offline(&mods, target_addr, &config, &mut |pct, found| {
-            if cancel_arc.load(Ordering::Relaxed) {
-                return false;
-            }
-            if let Ok(mut g) = progress_arc.lock() {
-                *g = pct;
-            }
-            count_arc.store(found, Ordering::Relaxed);
-            true
-        });
+        let scan_res =
+            scanner.scan_paths_offline(&mods, target_addr, &config, &mut |pct, found| {
+                if cancel_arc.load(Ordering::Relaxed) {
+                    return false;
+                }
+                if let Ok(mut g) = progress_arc.lock() {
+                    *g = pct;
+                }
+                count_arc.store(found, Ordering::Relaxed);
+                true
+            });
 
         match scan_res {
             Ok(paths) => {

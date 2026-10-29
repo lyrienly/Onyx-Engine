@@ -1,10 +1,10 @@
 use onyx_core::disasm::Disassembler;
 
-pub mod zydis_backend;
 pub mod cfg;
+pub mod zydis_backend;
 
-pub use zydis_backend::{disassemble, format_instruction, FlowType, Instruction};
 pub use cfg::{build_cfg, cfg_to_dot, BasicBlock, ControlFlowGraph};
+pub use zydis_backend::{disassemble, format_instruction, FlowType, Instruction};
 
 #[no_mangle]
 pub unsafe extern "C" fn onyx_disasm_cfg_dot(

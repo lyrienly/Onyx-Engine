@@ -1,10 +1,10 @@
-use std::mem::zeroed;
 use crate::debugger::{
-    clear_hw_breakpoint_from_threads, read_thread_debug_registers, set_hw_breakpoint_for_threads,
-    BreakpointSize, BreakpointType, HW_BREAKPOINT_SLOTS,
+    BreakpointSize, BreakpointType, HW_BREAKPOINT_SLOTS, clear_hw_breakpoint_from_threads,
+    read_thread_debug_registers, set_hw_breakpoint_for_threads,
 };
 use crate::process::Process;
 use crate::win32::*;
+use std::mem::zeroed;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HwBreakpointSlot {
@@ -15,7 +15,6 @@ pub struct HwBreakpointSlot {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HwBpError {
-
     NoFreeSlot,
 
     InvalidSlot,
@@ -26,7 +25,6 @@ pub enum HwBpError {
 }
 
 impl HwBpError {
-
     pub fn code(self) -> i32 {
         match self {
             HwBpError::NoFreeSlot => -2,
@@ -218,10 +216,8 @@ impl VehDebugger {
                 ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS | CONTEXT_CONTROL;
 
                 let hit = if GetThreadContext(h_thread, &mut ctx) == TRUE {
-
                     let dr6 = ctx.Dr6;
                     if (dr6 & 0x0F) != 0 {
-
                         ctx.Dr6 = 0;
                         ctx.EFlags |= 0x00010000;
                         SetThreadContext(h_thread, &ctx);
@@ -252,12 +248,8 @@ mod tests {
     fn reserve_n(veh: &mut VehDebugger, count: usize) -> Vec<usize> {
         (0..count)
             .map(|i| {
-                veh.reserve_slot(
-                    0x1000 + i * 8,
-                    BreakpointType::Write,
-                    BreakpointSize::Byte4,
-                )
-                .expect("slot available")
+                veh.reserve_slot(0x1000 + i * 8, BreakpointType::Write, BreakpointSize::Byte4)
+                    .expect("slot available")
             })
             .collect()
     }

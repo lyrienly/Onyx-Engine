@@ -144,7 +144,11 @@ fn speedhack_hooks_double_and_halve_time() {
     let q_after_rebase = qpc_now();
     let jump_ms = ticks_to_ms(q_after_rebase - q_before_rebase, freq).abs();
     println!("[speedhack-e2e] salto no rebase: {:.4} ms", jump_ms);
-    assert!(jump_ms < 5.0, "rebase gerou salto de {:.2} ms (>5ms)", jump_ms);
+    assert!(
+        jump_ms < 5.0,
+        "rebase gerou salto de {:.2} ms (>5ms)",
+        jump_ms
+    );
 
     let q3 = qpc_now();
     std::thread::sleep(Duration::from_millis(200));

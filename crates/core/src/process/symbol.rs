@@ -1,6 +1,6 @@
+use crate::process::Process;
 use std::collections::HashMap;
 use std::mem::size_of;
-use crate::process::Process;
 
 #[repr(C, packed)]
 #[derive(Copy, Clone)]
@@ -53,7 +53,6 @@ pub struct ExportSymbol {
 }
 
 pub struct SymbolResolver {
-
     cache: HashMap<String, HashMap<String, usize>>,
 
     pub module_preference: Vec<String>,
@@ -108,22 +107,27 @@ impl SymbolResolver {
             for pref in &preferences {
                 if let Some(m) = mods.iter().find(|m| {
                     let mn = m.name.to_lowercase();
-                    mn == *pref || mn.strip_suffix(".dll").unwrap_or(&mn) == pref.strip_suffix(".dll").unwrap_or(pref)
-                })
-                    && let Some(addr) = self.resolve_module_export(proc, &m.name, trimmed) {
-                        return Some(addr);
-                    }
+                    mn == *pref
+                        || mn.strip_suffix(".dll").unwrap_or(&mn)
+                            == pref.strip_suffix(".dll").unwrap_or(pref)
+                }) && let Some(addr) = self.resolve_module_export(proc, &m.name, trimmed)
+                {
+                    return Some(addr);
+                }
             }
 
             for m in &mods {
                 let mn = m.name.to_lowercase();
                 let already_checked = preferences.iter().any(|pref| {
-                    mn == *pref || mn.strip_suffix(".dll").unwrap_or(&mn) == pref.strip_suffix(".dll").unwrap_or(pref)
+                    mn == *pref
+                        || mn.strip_suffix(".dll").unwrap_or(&mn)
+                            == pref.strip_suffix(".dll").unwrap_or(pref)
                 });
                 if !already_checked
-                    && let Some(addr) = self.resolve_module_export(proc, &m.name, trimmed) {
-                        return Some(addr);
-                    }
+                    && let Some(addr) = self.resolve_module_export(proc, &m.name, trimmed)
+                {
+                    return Some(addr);
+                }
             }
 
             None
@@ -145,7 +149,8 @@ impl SymbolResolver {
     }
 
     pub fn load_module_exports(&mut self, proc: &Process, mod_name: &str) -> Result<usize, String> {
-        let m = proc.find_module(mod_name)
+        let m = proc
+            .find_module(mod_name)
             .ok_or_else(|| format!("Module '{}' not found", mod_name))?;
 
         let base = m.base;
@@ -165,11 +170,9 @@ impl SymbolResolver {
         let opt_magic: u16 = proc.read(opt_hdr_addr)?;
 
         let export_dir_rva: u32 = if opt_magic == 0x020B {
-
             let export_data_dir: ImageDataDirectory = proc.read(opt_hdr_addr + 112)?;
             export_data_dir.virtual_address
         } else if opt_magic == 0x010B {
-
             let export_data_dir: ImageDataDirectory = proc.read(opt_hdr_addr + 96)?;
             export_data_dir.virtual_address
         } else {
@@ -197,7 +200,9 @@ impl SymbolResolver {
         let name_rvas: Vec<u32> = {
             let mut buf = vec![0u8; num_names * 4];
             proc.read_raw(names_addr, &mut buf)?;
-            buf.as_chunks::<4>().0.iter()
+            buf.as_chunks::<4>()
+                .0
+                .iter()
                 .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
                 .collect()
         };
@@ -205,7 +210,9 @@ impl SymbolResolver {
         let ordinals: Vec<u16> = {
             let mut buf = vec![0u8; num_names * 2];
             proc.read_raw(ords_addr, &mut buf)?;
-            buf.as_chunks::<2>().0.iter()
+            buf.as_chunks::<2>()
+                .0
+                .iter()
                 .map(|c| u16::from_le_bytes([c[0], c[1]]))
                 .collect()
         };
@@ -213,7 +220,9 @@ impl SymbolResolver {
         let func_rvas: Vec<u32> = {
             let mut buf = vec![0u8; num_functions * 4];
             proc.read_raw(funcs_addr, &mut buf)?;
-            buf.as_chunks::<4>().0.iter()
+            buf.as_chunks::<4>()
+                .0
+                .iter()
                 .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
                 .collect()
         };
@@ -261,10 +270,21 @@ mod tests {
     #[test]
     fn test_module_preference_order() {
         let mut resolver = SymbolResolver::new();
-        assert!(resolver.module_preference.contains(&"kernel32.dll".to_string()));
-        assert!(resolver.module_preference.contains(&"ntdll.dll".to_string()));
+        assert!(
+            resolver
+                .module_preference
+                .contains(&"kernel32.dll".to_string())
+        );
+        assert!(
+            resolver
+                .module_preference
+                .contains(&"ntdll.dll".to_string())
+        );
 
-        resolver.set_module_preference(vec!["custom_mod.dll".to_string(), "kernel32.dll".to_string()]);
+        resolver.set_module_preference(vec![
+            "custom_mod.dll".to_string(),
+            "kernel32.dll".to_string(),
+        ]);
         assert_eq!(resolver.module_preference[0], "custom_mod.dll");
         assert_eq!(resolver.module_preference[1], "kernel32.dll");
 

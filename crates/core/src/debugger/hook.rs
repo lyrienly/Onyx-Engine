@@ -13,13 +13,11 @@ pub struct Hook {
 pub struct HookEngine;
 
 impl HookEngine {
-
     pub fn install_detour_64(
         proc: &Process,
         target_addr: usize,
         payload_bytes: &[u8],
     ) -> Result<Hook, String> {
-
         const HOOK_SIZE_MIN: usize = 14;
 
         let preview = proc.read_bytes(target_addr, 32)?;
@@ -77,7 +75,8 @@ impl HookEngine {
     }
 
     pub fn uninstall(proc: &Process, hook: &Hook) -> Result<(), String> {
-        let old_protect = proc.protect(hook.target_address, hook.hook_size, PAGE_EXECUTE_READWRITE)?;
+        let old_protect =
+            proc.protect(hook.target_address, hook.hook_size, PAGE_EXECUTE_READWRITE)?;
         proc.write_raw(hook.target_address, &hook.original_bytes)?;
         let _ = proc.protect(hook.target_address, hook.hook_size, old_protect);
         proc.free(hook.allocated_address)?;

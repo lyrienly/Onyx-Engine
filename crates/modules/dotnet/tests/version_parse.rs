@@ -11,16 +11,14 @@ fn parses_fixed_file_info_signature() {
     buf.extend_from_slice(&[0x00, 0x02]); // wLength (ignorado pelo parser)
     buf.extend_from_slice(&52u16.to_le_bytes()); // wValueLength
     buf.extend_from_slice(&[0x00, 0x00]); // wType
-    // padding ate o fixed-info
-    for _ in 0..16 {
-        buf.push(0);
-    }
+                                          // padding ate o fixed-info
+    buf.extend(std::iter::repeat_n(0u8, 16));
     // VS_FIXEDFILEINFO (52 bytes)
     buf.extend_from_slice(&0xFEEF04BDu32.to_le_bytes()); // dwSignature
     buf.extend_from_slice(&0x00010000u32.to_le_bytes()); // strucVersion
-    // fileVersionMS = major<<16 | minor
-    let ms: u32 = (7u32 << 16) | 0u32;
-    let ls: u32 = (11u32 << 16) | 0u32;
+                                                         // fileVersionMS = major<<16 | minor
+    let ms: u32 = 7u32 << 16;
+    let ls: u32 = 11u32 << 16;
     buf.extend_from_slice(&ms.to_le_bytes());
     buf.extend_from_slice(&ls.to_le_bytes());
     // productVersionMS/LS

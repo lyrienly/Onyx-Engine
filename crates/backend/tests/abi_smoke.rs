@@ -33,7 +33,9 @@ fn aa_analyze_valid_script_ok() {
     let mut err: *mut c_char = ptr::null_mut();
     let rc = unsafe { onyx_aa_analyze(src.as_ptr(), &mut err) };
     if !err.is_null() {
-        let s = unsafe { CStr::from_ptr(err) }.to_string_lossy().into_owned();
+        let s = unsafe { CStr::from_ptr(err) }
+            .to_string_lossy()
+            .into_owned();
         unsafe { onyx_abi_free_string(err) };
         panic!("analyze failed: {}", s);
     }
@@ -47,7 +49,9 @@ fn aa_analyze_invalid_script_fails() {
     let rc = unsafe { onyx_aa_analyze(src.as_ptr(), &mut err) };
     assert_ne!(rc, 0);
     if !err.is_null() {
-        let _s = unsafe { CStr::from_ptr(err) }.to_string_lossy().into_owned();
+        let _s = unsafe { CStr::from_ptr(err) }
+            .to_string_lossy()
+            .into_owned();
         unsafe { onyx_abi_free_string(err) };
     }
 }
@@ -96,17 +100,15 @@ fn hook_engine_install_and_remove_on_live_fn() {
 
     let name = cstr("abi_test_hook");
     let mut orig: *const c_void = ptr::null();
-    let rc = unsafe {
-        onyx_hook_engine_install(engine, name.as_ptr(), target_ptr, hook_ptr, &mut orig)
-    };
+    let rc =
+        unsafe { onyx_hook_engine_install(engine, name.as_ptr(), target_ptr, hook_ptr, &mut orig) };
     assert_eq!(rc, 0, "install should succeed");
     assert!(!orig.is_null());
     assert_eq!(unsafe { onyx_hook_engine_len(engine) }, 1);
 
     let fp_raw = std::hint::black_box(target_ptr);
-    let fp: extern "C" fn() -> i32 = unsafe {
-        std::mem::transmute::<*const c_void, extern "C" fn() -> i32>(fp_raw)
-    };
+    let fp: extern "C" fn() -> i32 =
+        unsafe { std::mem::transmute::<*const c_void, extern "C" fn() -> i32>(fp_raw) };
     let patched_val = std::hint::black_box(fp)();
     assert_eq!(patched_val, 777, "redirected call must return hook value");
 
@@ -142,9 +144,22 @@ fn gdb_abi_roundtrip_with_mock_target() {
         MEM.get_or_init(|| {
             Arc::new(Mutex::new(Backing {
                 regs: OnyxGdbRegisters {
-                    rax: 0xdead_beef, rbx: 0, rcx: 0, rdx: 0,
-                    rsi: 0, rdi: 0, rbp: 0, rsp: 0,
-                    r8: 0, r9: 0, r10: 0, r11: 0, r12: 0, r13: 0, r14: 0, r15: 0,
+                    rax: 0xdead_beef,
+                    rbx: 0,
+                    rcx: 0,
+                    rdx: 0,
+                    rsi: 0,
+                    rdi: 0,
+                    rbp: 0,
+                    rsp: 0,
+                    r8: 0,
+                    r9: 0,
+                    r10: 0,
+                    r11: 0,
+                    r12: 0,
+                    r13: 0,
+                    r14: 0,
+                    r15: 0,
                     rip: 0x1000,
                 },
             }))
@@ -164,13 +179,23 @@ fn gdb_abi_roundtrip_with_mock_target() {
         g.regs = *regs;
         0
     }
-    unsafe extern "C" fn read_mem(_user: *mut c_void, _addr: u64, out_buf: *mut u8, len: usize) -> i32 {
+    unsafe extern "C" fn read_mem(
+        _user: *mut c_void,
+        _addr: u64,
+        out_buf: *mut u8,
+        len: usize,
+    ) -> i32 {
         for i in 0..len {
             *out_buf.add(i) = 0xAB;
         }
         0
     }
-    unsafe extern "C" fn write_mem(_user: *mut c_void, _addr: u64, _buf: *const u8, _len: usize) -> i32 {
+    unsafe extern "C" fn write_mem(
+        _user: *mut c_void,
+        _addr: u64,
+        _buf: *const u8,
+        _len: usize,
+    ) -> i32 {
         0
     }
 
@@ -245,7 +270,11 @@ fn gdb_abi_roundtrip_with_mock_target() {
 
     stream.write_all(&pkt(b"g")).unwrap();
     let resp = read_until(&mut stream, |s| s.contains("efbeadde"));
-    assert!(resp.contains("efbeadde"), "rax little-endian should appear, got {:?}", resp);
+    assert!(
+        resp.contains("efbeadde"),
+        "rax little-endian should appear, got {:?}",
+        resp
+    );
     stream.write_all(b"+").unwrap();
 
     stream.write_all(&pkt(b"k")).unwrap();

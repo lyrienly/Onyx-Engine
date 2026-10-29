@@ -1,10 +1,9 @@
 use crate::ffi::*;
 use crate::veh::{
-    BreakpointId, VehDisposition, VehHandler, allocate_id, register_handler,
-    unregister_handler,
+    BreakpointId, VehDisposition, VehHandler, allocate_id, register_handler, unregister_handler,
 };
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
 #[derive(Debug, Copy, Clone, Default)]
 pub struct BpHit {
@@ -71,21 +70,14 @@ impl SwBreakpoint {
 
 impl Drop for SwBreakpoint {
     fn drop(&mut self) {
-
         let _ = self.disarm();
     }
 }
 
 impl Drop for HwBreakpoint {
     fn drop(&mut self) {
-
-        let _ = program_debug_registers(
-            0,
-            self.dr_index,
-            HwBpAccess::Execute,
-            HwBpSize::One,
-            false,
-        );
+        let _ =
+            program_debug_registers(0, self.dr_index, HwBpAccess::Execute, HwBpSize::One, false);
     }
 }
 
@@ -96,13 +88,11 @@ impl VehHandler for SwBreakpoint {
 
     fn matches(&self, record: &EXCEPTION_RECORD, context: &CONTEXT) -> bool {
         if record.ExceptionCode == EXCEPTION_BREAKPOINT {
-
             return context.Rip as usize == self.address;
         }
         if record.ExceptionCode == EXCEPTION_SINGLE_STEP
             && self.expecting_single_step.load(Ordering::SeqCst)
         {
-
             return true;
         }
         false
@@ -111,7 +101,6 @@ impl VehHandler for SwBreakpoint {
     fn handle(&self, record: &EXCEPTION_RECORD, context: &mut CONTEXT) -> VehDisposition {
         match record.ExceptionCode {
             EXCEPTION_BREAKPOINT => {
-
                 if let Some(sink) = &self.sink {
                     sink(BpHit {
                         id: self.id.0,
@@ -140,7 +129,6 @@ impl VehHandler for SwBreakpoint {
                 VehDisposition::Continue
             }
             EXCEPTION_SINGLE_STEP => {
-
                 self.expecting_single_step.store(false, Ordering::SeqCst);
                 let _ = self.arm();
                 context.EFlags &= !EFLAGS_TF;
@@ -251,7 +239,6 @@ impl VehDebugger {
 
     pub fn remove(&self, id: BreakpointId) -> bool {
         if let Some(h) = unregister_handler(id) {
-
             drop(h);
 
             true

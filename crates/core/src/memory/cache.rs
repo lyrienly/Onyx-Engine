@@ -175,12 +175,7 @@ impl MemoryCache {
         Ok(out)
     }
 
-    pub fn read_process(
-        &self,
-        proc: &Process,
-        addr: u64,
-        size: usize,
-    ) -> Result<Vec<u8>, String> {
+    pub fn read_process(&self, proc: &Process, addr: u64, size: usize) -> Result<Vec<u8>, String> {
         self.get_or_load(addr, size, |a, n| proc.read_bytes(a as usize, n))
     }
 

@@ -1,4 +1,9 @@
-#![allow(non_snake_case, non_camel_case_types, dead_code, unsafe_op_in_unsafe_fn)]
+#![allow(
+    non_snake_case,
+    non_camel_case_types,
+    dead_code,
+    unsafe_op_in_unsafe_fn
+)]
 #![allow(
     clippy::missing_safety_doc,
     clippy::not_unsafe_ptr_arg_deref,
@@ -11,8 +16,8 @@ pub mod debugger;
 pub mod ffi;
 pub mod veh;
 
-use crate::ffi::*;
 use crate::debugger::{BpHit, HwBpAccess, HwBpSize, VehDebugger};
+use crate::ffi::*;
 use crate::veh::BreakpointId;
 
 use std::collections::VecDeque;
@@ -157,7 +162,6 @@ pub unsafe extern "system" fn DllMain(
 ) -> BOOL {
     if fdwReason == DLL_PROCESS_ATTACH {
         DisableThreadLibraryCalls(hinstDLL);
-
     }
     1
 }

@@ -49,7 +49,9 @@ fn pascal_hex_dollar() {
 #[test]
 fn string_literal() {
     let toks = tokenize_line(1, "aobscanmodule(sym, game.exe, 48 8B 05)").unwrap();
-    assert!(toks.iter().any(|t| matches!(&t.kind, TokenKind::Ident(s) if s == "aobscanmodule")));
+    assert!(toks
+        .iter()
+        .any(|t| matches!(&t.kind, TokenKind::Ident(s) if s == "aobscanmodule")));
 }
 
 #[test]

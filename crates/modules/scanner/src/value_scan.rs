@@ -97,12 +97,8 @@ pub fn scan_exact_scalar(buffer: &[u8], needle: Needle, align: usize) -> Vec<usi
             let target = needle.as_i32_bits();
             let mut i = 0usize;
             while i <= end {
-                let v = i32::from_le_bytes([
-                    buffer[i],
-                    buffer[i + 1],
-                    buffer[i + 2],
-                    buffer[i + 3],
-                ]);
+                let v =
+                    i32::from_le_bytes([buffer[i], buffer[i + 1], buffer[i + 2], buffer[i + 3]]);
                 if v == target {
                     out.push(i);
                 }
@@ -184,12 +180,8 @@ mod avx2 {
             }
             // tail escalar alinhado ao step
             while i <= end {
-                let v = i32::from_le_bytes([
-                    buffer[i],
-                    buffer[i + 1],
-                    buffer[i + 2],
-                    buffer[i + 3],
-                ]);
+                let v =
+                    i32::from_le_bytes([buffer[i], buffer[i + 1], buffer[i + 2], buffer[i + 3]]);
                 if v == target {
                     out.push(i);
                 }
@@ -200,12 +192,8 @@ mod avx2 {
             // (comum em cases de align=1,2; nao vale a pena vetorizar.)
             let mut i = 0usize;
             while i <= end {
-                let v = i32::from_le_bytes([
-                    buffer[i],
-                    buffer[i + 1],
-                    buffer[i + 2],
-                    buffer[i + 3],
-                ]);
+                let v =
+                    i32::from_le_bytes([buffer[i], buffer[i + 1], buffer[i + 2], buffer[i + 3]]);
                 if v == target {
                     out.push(i);
                 }
@@ -282,18 +270,10 @@ mod avx2 {
         out
     }
 
-    pub unsafe fn scan_exact_dispatch(
-        buffer: &[u8],
-        needle: Needle,
-        align: usize,
-    ) -> Vec<usize> {
+    pub unsafe fn scan_exact_dispatch(buffer: &[u8], needle: Needle, align: usize) -> Vec<usize> {
         match needle.kind() {
-            ValueKind::I32 | ValueKind::F32 => {
-                scan_exact_i32(buffer, needle.as_i32_bits(), align)
-            }
-            ValueKind::I64 | ValueKind::F64 => {
-                scan_exact_i64(buffer, needle.as_i64_bits(), align)
-            }
+            ValueKind::I32 | ValueKind::F32 => scan_exact_i32(buffer, needle.as_i32_bits(), align),
+            ValueKind::I64 | ValueKind::F64 => scan_exact_i64(buffer, needle.as_i64_bits(), align),
         }
     }
 }
@@ -334,12 +314,8 @@ mod avx512 {
                 i += 64;
             }
             while i <= end {
-                let v = i32::from_le_bytes([
-                    buffer[i],
-                    buffer[i + 1],
-                    buffer[i + 2],
-                    buffer[i + 3],
-                ]);
+                let v =
+                    i32::from_le_bytes([buffer[i], buffer[i + 1], buffer[i + 2], buffer[i + 3]]);
                 if v == target {
                     out.push(i);
                 }
@@ -348,12 +324,8 @@ mod avx512 {
         } else {
             let mut i = 0usize;
             while i <= end {
-                let v = i32::from_le_bytes([
-                    buffer[i],
-                    buffer[i + 1],
-                    buffer[i + 2],
-                    buffer[i + 3],
-                ]);
+                let v =
+                    i32::from_le_bytes([buffer[i], buffer[i + 1], buffer[i + 2], buffer[i + 3]]);
                 if v == target {
                     out.push(i);
                 }
@@ -429,18 +401,10 @@ mod avx512 {
         out
     }
 
-    pub unsafe fn scan_exact_dispatch(
-        buffer: &[u8],
-        needle: Needle,
-        align: usize,
-    ) -> Vec<usize> {
+    pub unsafe fn scan_exact_dispatch(buffer: &[u8], needle: Needle, align: usize) -> Vec<usize> {
         match needle.kind() {
-            ValueKind::I32 | ValueKind::F32 => {
-                scan_exact_i32(buffer, needle.as_i32_bits(), align)
-            }
-            ValueKind::I64 | ValueKind::F64 => {
-                scan_exact_i64(buffer, needle.as_i64_bits(), align)
-            }
+            ValueKind::I32 | ValueKind::F32 => scan_exact_i32(buffer, needle.as_i32_bits(), align),
+            ValueKind::I64 | ValueKind::F64 => scan_exact_i64(buffer, needle.as_i64_bits(), align),
         }
     }
 }
@@ -596,7 +560,9 @@ pub mod process_pipeline {
                 .map(|n| n.get())
                 .unwrap_or(4)
                 .max(1);
-            let chunks: Vec<&[(usize, usize)]> = regions.chunks(regions.len().div_ceil(n_threads).max(1)).collect();
+            let chunks: Vec<&[(usize, usize)]> = regions
+                .chunks(regions.len().div_ceil(n_threads).max(1))
+                .collect();
 
             std::thread::scope(|s| {
                 for chunk in chunks {
@@ -695,7 +661,7 @@ mod tests {
     #[test]
     fn f32_bitwise_exact() {
         let mut buf = vec![0u8; 256];
-        let v: f32 = 3.1415927;
+        let v: f32 = std::f32::consts::PI;
         buf[16..20].copy_from_slice(&v.to_le_bytes());
         buf[64..68].copy_from_slice(&v.to_le_bytes());
         let hits = scan_exact(&buf, Needle::F32(v), 4);

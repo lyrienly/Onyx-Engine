@@ -1,5 +1,5 @@
-use eframe::egui::{self, Color32, RichText, Vec2};
 use crate::app::OnyxEngineApp;
+use eframe::egui::{self, Color32, RichText, Vec2};
 
 pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
     if !app.show_lua_console {
@@ -21,7 +21,11 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
             }
 
             egui::CentralPanel::default()
-                .frame(egui::Frame::none().fill(Color32::from_rgb(26, 29, 36)).inner_margin(egui::Margin::same(8.0)))
+                .frame(
+                    egui::Frame::none()
+                        .fill(Color32::from_rgb(26, 29, 36))
+                        .inner_margin(egui::Margin::same(8.0)),
+                )
                 .show(ctx, |ui| {
                     let avail_h = ui.available_height();
                     let edit_h = (avail_h * 0.42).clamp(100.0, 240.0);
@@ -30,18 +34,23 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                     ui.label(RichText::new("Lua Code:").strong());
                     ui.add_sized(
                         Vec2::new(ui.available_width(), edit_h),
-                        egui::TextEdit::multiline(&mut app.lua_script).code_editor().desired_width(f32::INFINITY)
+                        egui::TextEdit::multiline(&mut app.lua_script)
+                            .code_editor()
+                            .desired_width(f32::INFINITY),
                     );
 
                     ui.add_space(4.0);
                     ui.horizontal(|ui| {
-                        if ui.button(RichText::new("[Run Lua]").strong().color(Color32::GREEN)).clicked()
-                            && let Some(lua) = &app.lua_engine {
-                                match lua.execute(&app.lua_script) {
-                                    Ok(res) => app.lua_output.push(format!("[Out]: {}", res)),
-                                    Err(e) => app.lua_output.push(format!("[Err]: {}", e)),
-                                }
+                        if ui
+                            .button(RichText::new("[Run Lua]").strong().color(Color32::GREEN))
+                            .clicked()
+                            && let Some(lua) = &app.lua_engine
+                        {
+                            match lua.execute(&app.lua_script) {
+                                Ok(res) => app.lua_output.push(format!("[Out]: {}", res)),
+                                Err(e) => app.lua_output.push(format!("[Err]: {}", e)),
                             }
+                        }
                         if ui.button("Clear Log").clicked() {
                             app.lua_output.clear();
                         }

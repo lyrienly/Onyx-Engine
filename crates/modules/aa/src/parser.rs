@@ -24,7 +24,6 @@ pub struct Script {
 
 #[derive(Debug, Clone)]
 pub enum Statement {
-
     Alloc {
         symbol: String,
         size: u64,
@@ -32,7 +31,10 @@ pub enum Statement {
         span: Span,
     },
 
-    Label { name: String, span: Span },
+    Label {
+        name: String,
+        span: Span,
+    },
 
     AobScanModule {
         symbol: String,
@@ -53,11 +55,20 @@ pub enum Statement {
         span: Span,
     },
 
-    RegisterSymbol { name: String, span: Span },
+    RegisterSymbol {
+        name: String,
+        span: Span,
+    },
 
-    UnregisterSymbol { name: String, span: Span },
+    UnregisterSymbol {
+        name: String,
+        span: Span,
+    },
 
-    Dealloc { name: String, span: Span },
+    Dealloc {
+        name: String,
+        span: Span,
+    },
 
     Define {
         name: String,
@@ -65,13 +76,25 @@ pub enum Statement {
         span: Span,
     },
 
-    Include { path: String, span: Span },
+    Include {
+        path: String,
+        span: Span,
+    },
 
-    LabelTarget { name: String, span: Span },
+    LabelTarget {
+        name: String,
+        span: Span,
+    },
 
-    Assembly { line: String, span: Span },
+    Assembly {
+        line: String,
+        span: Span,
+    },
 
-    RawBlock { text: String, span: Span },
+    RawBlock {
+        text: String,
+        span: Span,
+    },
 }
 
 impl Statement {
@@ -164,12 +187,18 @@ fn try_capture_define(line_no: usize, text: &str) -> Result<Option<(String, Stri
     if let Some(stripped) = rest_trim.strip_prefix('(') {
         let end = stripped.rfind(')').ok_or_else(|| AaError {
             msg: "define(..) sem parentese de fechamento".into(),
-            span: Span { line: line_no, col: 1 },
+            span: Span {
+                line: line_no,
+                col: 1,
+            },
         })?;
         let inside = &stripped[..end];
         let (name, value) = split_pair(inside).ok_or_else(|| AaError {
             msg: "define(..) espera 'nome, valor'".into(),
-            span: Span { line: line_no, col: 1 },
+            span: Span {
+                line: line_no,
+                col: 1,
+            },
         })?;
         return Ok(Some((name.trim().to_string(), value.trim().to_string())));
     }
@@ -184,7 +213,6 @@ fn try_capture_define(line_no: usize, text: &str) -> Result<Option<(String, Stri
 }
 
 fn split_pair(s: &str) -> Option<(&str, &str)> {
-
     let mut depth = 0i32;
     for (i, c) in s.char_indices() {
         match c {
@@ -202,7 +230,10 @@ fn parse_statement(
     text: &str,
     defines: &[(String, String)],
 ) -> Result<Statement, AaError> {
-    let span = Span { line: line_no, col: 1 };
+    let span = Span {
+        line: line_no,
+        col: 1,
+    };
 
     if let Some(name) = text.strip_suffix(':') {
         let n = name.trim();
@@ -306,7 +337,7 @@ fn parse_statement(
                         span,
                     });
                 }
-                _ => {  }
+                _ => {}
             }
         }
     }
@@ -438,7 +469,6 @@ fn parse_number(text: &str) -> Option<u64> {
     } else if t.chars().all(|c| c.is_ascii_digit()) {
         t.parse().ok()
     } else if t.chars().all(|c| c.is_ascii_hexdigit()) {
-
         u64::from_str_radix(t, 16).ok()
     } else {
         None

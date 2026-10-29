@@ -85,7 +85,6 @@ pub fn strip_comments(src: &str) -> Vec<Line> {
                 i += 1;
             }
             b'"' => {
-
                 buf.push('"');
                 i += 1;
                 while i < bytes.len() && bytes[i] != b'"' && bytes[i] != b'\n' {
@@ -105,10 +104,7 @@ pub fn strip_comments(src: &str) -> Vec<Line> {
     }
 
     if !buf.is_empty() || out.is_empty() {
-        out.push(Line {
-            line_no,
-            text: buf,
-        });
+        out.push(Line { line_no, text: buf });
     }
     out
 }
@@ -215,7 +211,6 @@ pub fn tokenize_line(line_no: usize, text: &str) -> Result<Vec<Token>, LexError>
                 col += 1;
             }
             b'$' => {
-
                 i += 1;
                 col += 1;
                 let start = i;
@@ -294,11 +289,7 @@ pub fn tokenize_line(line_no: usize, text: &str) -> Result<Vec<Token>, LexError>
                 let start = i;
                 while i < bytes.len() {
                     let cc = bytes[i];
-                    if cc.is_ascii_alphanumeric()
-                        || cc == b'_'
-                        || cc == b'.'
-                        || cc == b'@'
-                    {
+                    if cc.is_ascii_alphanumeric() || cc == b'_' || cc == b'.' || cc == b'@' {
                         i += 1;
                         col += 1;
                     } else {

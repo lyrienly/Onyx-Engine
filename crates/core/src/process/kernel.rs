@@ -1,7 +1,7 @@
+use crate::process::ModuleEntry;
+use crate::win32::*;
 use std::mem::size_of;
 use std::ptr::null_mut;
-use crate::win32::*;
-use crate::process::ModuleEntry;
 
 pub const IOCTL_CE_READMEMORY: DWORD = 0x22E000;
 pub const IOCTL_CE_WRITEMEMORY: DWORD = 0x22E004;
@@ -123,9 +123,11 @@ unsafe impl Send for DbkDriver {}
 unsafe impl Sync for DbkDriver {}
 
 impl DbkDriver {
-
     pub fn connect_device(device_path: &str) -> Result<Self, String> {
-        let wide_name: Vec<u16> = device_path.encode_utf16().chain(std::iter::once(0)).collect();
+        let wide_name: Vec<u16> = device_path
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
         let handle = unsafe {
             CreateFileW(
                 wide_name.as_ptr(),
@@ -171,7 +173,10 @@ impl DbkDriver {
             }
         }
 
-        Err("Failed to connect to kernel driver (OwMemDriver/lydumen/DBK64). Is driver loaded?".to_string())
+        Err(
+            "Failed to connect to kernel driver (OwMemDriver/lydumen/DBK64). Is driver loaded?"
+                .to_string(),
+        )
     }
 
     pub fn test(&self) -> bool {
@@ -349,12 +354,19 @@ impl DbkDriver {
         if ok == TRUE {
             Ok(())
         } else {
-            Err(format!("Failed to {} process PID {}", if freeze { "freeze" } else { "thaw" }, pid))
+            Err(format!(
+                "Failed to {} process PID {}",
+                if freeze { "freeze" } else { "thaw" },
+                pid
+            ))
         }
     }
 
     pub fn cloak_symlink(&self, new_symlink: &str) -> Result<(), String> {
-        let wide: Vec<u16> = new_symlink.encode_utf16().chain(std::iter::once(0)).collect();
+        let wide: Vec<u16> = new_symlink
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
         let mut returned: DWORD = 0;
         let ok = unsafe {
             DeviceIoControl(
@@ -394,7 +406,10 @@ impl DbkDriver {
         if ok == TRUE && base_addr != 0 {
             Ok(base_addr)
         } else {
-            Err(format!("Failed to resolve process base via kernel for PID {}", pid))
+            Err(format!(
+                "Failed to resolve process base via kernel for PID {}",
+                pid
+            ))
         }
     }
 
@@ -420,11 +435,19 @@ impl DbkDriver {
         if ok == TRUE && phys_addr != 0 {
             Ok(phys_addr)
         } else {
-            Err(format!("Failed to translate VA 0x{:X} via CR3 for PID {}", virtual_address, pid))
+            Err(format!(
+                "Failed to translate VA 0x{:X} via CR3 for PID {}",
+                virtual_address, pid
+            ))
         }
     }
 
-    pub fn bulk_dump_cr3(&self, pid: u32, base_address: u64, size: usize) -> Result<Vec<u8>, String> {
+    pub fn bulk_dump_cr3(
+        &self,
+        pid: u32,
+        base_address: u64,
+        size: usize,
+    ) -> Result<Vec<u8>, String> {
         let mut output = vec![0u8; size];
         let inp = CeBulkDumpInput {
             process_id: pid as u64,
@@ -501,7 +524,8 @@ impl DbkDriver {
 
     pub fn enum_vad_modules(&self, pid: u32) -> Result<Vec<ModuleEntry>, String> {
         const MAX_MODULES: usize = 256;
-        let buf_size = size_of::<VadEnumOutputHeader>() + MAX_MODULES * size_of::<VadModuleEntryRaw>();
+        let buf_size =
+            size_of::<VadEnumOutputHeader>() + MAX_MODULES * size_of::<VadModuleEntryRaw>();
         let mut buffer = vec![0u8; buf_size];
         let mut input_pid = pid;
         let mut returned: DWORD = 0;
@@ -525,15 +549,25 @@ impl DbkDriver {
 
         let header = unsafe { &*(buffer.as_ptr() as *const VadEnumOutputHeader) };
         let count = (header.count as usize).min(MAX_MODULES);
-        let entries_ptr = unsafe { buffer.as_ptr().add(size_of::<VadEnumOutputHeader>()) as *const VadModuleEntryRaw };
+        let entries_ptr = unsafe {
+            buffer.as_ptr().add(size_of::<VadEnumOutputHeader>()) as *const VadModuleEntryRaw
+        };
 
         let mut modules = Vec::with_capacity(count);
         for i in 0..count {
             let entry = unsafe { &*entries_ptr.add(i) };
-            let name_len = entry.module_name.iter().position(|&c| c == 0).unwrap_or(entry.module_name.len());
+            let name_len = entry
+                .module_name
+                .iter()
+                .position(|&c| c == 0)
+                .unwrap_or(entry.module_name.len());
             let name = String::from_utf16_lossy(&entry.module_name[..name_len]);
 
-            let path_len = entry.full_path.iter().position(|&c| c == 0).unwrap_or(entry.full_path.len());
+            let path_len = entry
+                .full_path
+                .iter()
+                .position(|&c| c == 0)
+                .unwrap_or(entry.full_path.len());
             let path = String::from_utf16_lossy(&entry.full_path[..path_len]);
 
             if !name.is_empty() && entry.base_address > 0 {
@@ -606,7 +640,10 @@ impl DbkDriver {
                 result.extend_from_slice(&out_buf[..returned as usize]);
                 offset += returned as usize;
             } else {
-                return Err(format!("DBK IOCTL_CE_READMEMORY failed at 0x{:X}", address + offset));
+                return Err(format!(
+                    "DBK IOCTL_CE_READMEMORY failed at 0x{:X}",
+                    address + offset
+                ));
             }
         }
 
@@ -659,7 +696,10 @@ impl DbkDriver {
                 total_written += chunk_len as usize;
                 offset += chunk_len as usize;
             } else {
-                return Err(format!("DBK IOCTL_CE_WRITEMEMORY failed at 0x{:X}", address + offset));
+                return Err(format!(
+                    "DBK IOCTL_CE_WRITEMEMORY failed at 0x{:X}",
+                    address + offset
+                ));
             }
         }
 
@@ -703,7 +743,9 @@ impl DbkDriver {
                 .args(["-NoProfile", "-Command", "Confirm-SecureBootUEFI 2>$null"])
                 .output()
             {
-                let text = String::from_utf8_lossy(&output.stdout).trim().to_lowercase();
+                let text = String::from_utf8_lossy(&output.stdout)
+                    .trim()
+                    .to_lowercase();
                 if text == "true" {
                     return true;
                 }

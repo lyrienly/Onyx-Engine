@@ -1,10 +1,10 @@
+use crate::process::Process;
+use crate::scanner::ScanValue;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use crate::process::Process;
-use crate::scanner::ScanValue;
 
 #[derive(Debug, Clone)]
 pub struct FrozenEntry {
@@ -77,7 +77,11 @@ impl Freezer {
                     std::mem::forget(dummy_proc);
                 }
 
-                thread::sleep(Duration::from_millis(if interval_ms == 0 { 50 } else { interval_ms }));
+                thread::sleep(Duration::from_millis(if interval_ms == 0 {
+                    50
+                } else {
+                    interval_ms
+                }));
             }
         });
     }
@@ -140,7 +144,8 @@ impl Freezer {
 
     pub fn unfreeze_by_address(&self, address: usize) -> bool {
         let mut lock = self.entries.lock().unwrap();
-        let to_remove: Vec<usize> = lock.values()
+        let to_remove: Vec<usize> = lock
+            .values()
             .filter(|e| e.address == address)
             .map(|e| e.id)
             .collect();

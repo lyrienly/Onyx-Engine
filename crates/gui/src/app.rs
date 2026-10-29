@@ -1,22 +1,21 @@
-use std::time::Instant;
-use std::sync::Arc;
-use std::collections::HashMap;
 use eframe::egui::{self, Color32, RichText, Rounding, Stroke, Vec2};
 use onyx_core::disasm::Disassembler;
 use onyx_core::freeze::Freezer;
+use onyx_core::kernel::DbkDriver;
 use onyx_core::lua_api::CeLuaEngine;
 use onyx_core::mono::{MonoDissector, RuntimeType};
 use onyx_core::pointer_scanner::{PointerPath, PointerScanner};
-use onyx_core::process::{Process, ProcessEntry, ProcessAccessMode};
-use onyx_core::kernel::DbkDriver;
+use onyx_core::process::{Process, ProcessAccessMode, ProcessEntry};
 use onyx_core::scanner::{ScanCondition, ScanValue, Scanner, ValType};
 use onyx_core::speedhack::SpeedhackInjector;
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Instant;
 
 use crate::state::GuiTableEntry;
 use crate::ui;
 
 pub struct OnyxEngineApp {
-
     pub attached_proc: Option<Process>,
     pub proc_name: String,
     pub proc_pid: u32,
@@ -225,12 +224,14 @@ ret
 
 [DISABLE]
 dealloc(newmem)
-"#.to_string(),
+"#
+            .to_string(),
             aa_status: String::new(),
 
             lua_engine: CeLuaEngine::init().ok(),
             lua_script: r#"print("OnyxEngine Lua Runtime Ready")
-"#.to_string(),
+"#
+            .to_string(),
             lua_output: vec!["Lua Engine 5.3 Ready.".to_string()],
 
             speedhack_enabled: false,
@@ -301,10 +302,8 @@ dealloc(newmem)
             .or_else(onyx_core::process::ProcessIconExtractor::extract_default_exe_icon);
 
         if let Some((w, h, pixels)) = icon_data {
-            let color_image = egui::ColorImage::from_rgba_unmultiplied(
-                [w as usize, h as usize],
-                &pixels,
-            );
+            let color_image =
+                egui::ColorImage::from_rgba_unmultiplied([w as usize, h as usize], &pixels);
             let texture = ctx.load_texture(
                 format!("proc_icon_{}", key),
                 color_image,
@@ -323,7 +322,12 @@ dealloc(newmem)
             Ok(p) => {
                 self.proc_name = format!("{:08X} - {}", p.pid, p.name);
                 self.proc_pid = p.pid;
-                self.status_msg = format!("Attached to {} (PID: 0x{:X}) | Mode: {}", p.name, p.pid, p.access_mode.badge());
+                self.status_msg = format!(
+                    "Attached to {} (PID: 0x{:X}) | Mode: {}",
+                    p.name,
+                    p.pid,
+                    p.access_mode.badge()
+                );
 
                 self.freezer.stop();
                 self.freezer.start(&p, self.freeze_interval_ms);
@@ -333,17 +337,23 @@ dealloc(newmem)
                 }
 
                 if let Ok(mods) = p.modules()
-                    && let Some(main_mod) = mods.first() {
-                        self.mem_addr_text = format!("0x{:016X}", main_mod.base + 0x1000);
-                        self.hex_addr_text = format!("0x{:016X}", main_mod.base);
-                        self.manual_module_text = main_mod.name.clone();
-                    }
+                    && let Some(main_mod) = mods.first()
+                {
+                    self.mem_addr_text = format!("0x{:016X}", main_mod.base + 0x1000);
+                    self.hex_addr_text = format!("0x{:016X}", main_mod.base);
+                    self.manual_module_text = main_mod.name.clone();
+                }
 
                 let (rt, _) = MonoDissector::detect_runtime(&p);
                 if rt != RuntimeType::None {
                     let _ = self.mono_dissector.attach(&p);
                     let _ = self.mono_dissector.dissect(&p);
-                    self.status_msg = format!("Attached to {} (PID: 0x{:X}) | {} active", p.name, p.pid, rt.as_str());
+                    self.status_msg = format!(
+                        "Attached to {} (PID: 0x{:X}) | {} active",
+                        p.name,
+                        p.pid,
+                        rt.as_str()
+                    );
                 }
 
                 self.attached_proc = Some(p);
@@ -498,15 +508,13 @@ dealloc(newmem)
         };
 
         let condition = match self.scan_type_idx {
-            0 => {
-                match ScanValue::parse(val_type, &val_str) {
-                    Ok(v) => ScanCondition::Exact(v),
-                    Err(e) => {
-                        self.status_msg = format!("Value parse error: {}", e);
-                        return;
-                    }
+            0 => match ScanValue::parse(val_type, &val_str) {
+                Ok(v) => ScanCondition::Exact(v),
+                Err(e) => {
+                    self.status_msg = format!("Value parse error: {}", e);
+                    return;
                 }
-            }
+            },
             1 => ScanCondition::Increased,
             2 => ScanCondition::Decreased,
             3 => {
@@ -529,24 +537,20 @@ dealloc(newmem)
             4 => ScanCondition::UnknownInitial,
             5 => ScanCondition::Changed,
             6 => ScanCondition::Unchanged,
-            7 => {
-                match ScanValue::parse(val_type, &val_str) {
-                    Ok(v) => ScanCondition::IncreasedBy(v),
-                    Err(e) => {
-                        self.status_msg = format!("Error: {}", e);
-                        return;
-                    }
+            7 => match ScanValue::parse(val_type, &val_str) {
+                Ok(v) => ScanCondition::IncreasedBy(v),
+                Err(e) => {
+                    self.status_msg = format!("Error: {}", e);
+                    return;
                 }
-            }
-            8 => {
-                match ScanValue::parse(val_type, &val_str) {
-                    Ok(v) => ScanCondition::DecreasedBy(v),
-                    Err(e) => {
-                        self.status_msg = format!("Error: {}", e);
-                        return;
-                    }
+            },
+            8 => match ScanValue::parse(val_type, &val_str) {
+                Ok(v) => ScanCondition::DecreasedBy(v),
+                Err(e) => {
+                    self.status_msg = format!("Error: {}", e);
+                    return;
                 }
-            }
+            },
             _ => ScanCondition::Exact(ScanValue::I32(0)),
         };
 
@@ -554,7 +558,8 @@ dealloc(newmem)
         match self.scanner.next_scan(proc, condition) {
             Ok(count) => {
                 self.found_count = count;
-                self.status_msg = format!("Next Scan: {} remaining in {:.2?}", count, start.elapsed());
+                self.status_msg =
+                    format!("Next Scan: {} remaining in {:.2?}", count, start.elapsed());
                 self.refresh_candidates_cache();
             }
             Err(e) => {
@@ -578,24 +583,63 @@ dealloc(newmem)
         let sample = self.scanner.results(150);
         self.candidates = sample
             .iter()
-            .map(|c| (c.address, c.current_value.to_display_string(), c.previous_value.to_display_string()))
+            .map(|c| {
+                (
+                    c.address,
+                    c.current_value.to_display_string(),
+                    c.previous_value.to_display_string(),
+                )
+            })
             .collect();
     }
 
     pub fn add_candidate_to_table(&mut self, addr: usize, val_type: ValType) {
         let cur_val = if let Some(proc) = &self.attached_proc {
             match val_type {
-                ValType::I8 => proc.read::<i8>(addr).map(|v| v.to_string()).unwrap_or("???".to_string()),
-                ValType::U8 => proc.read::<u8>(addr).map(|v| v.to_string()).unwrap_or("???".to_string()),
-                ValType::I16 => proc.read::<i16>(addr).map(|v| v.to_string()).unwrap_or("???".to_string()),
-                ValType::U16 => proc.read::<u16>(addr).map(|v| v.to_string()).unwrap_or("???".to_string()),
-                ValType::I32 => proc.read::<i32>(addr).map(|v| v.to_string()).unwrap_or("???".to_string()),
-                ValType::U32 => proc.read::<u32>(addr).map(|v| v.to_string()).unwrap_or("???".to_string()),
-                ValType::I64 => proc.read::<i64>(addr).map(|v| v.to_string()).unwrap_or("???".to_string()),
-                ValType::U64 => proc.read::<u64>(addr).map(|v| v.to_string()).unwrap_or("???".to_string()),
-                ValType::Float => proc.read::<f32>(addr).map(|v| format!("{:.2}", v)).unwrap_or("???".to_string()),
-                ValType::Double => proc.read::<f64>(addr).map(|v| format!("{:.4}", v)).unwrap_or("???".to_string()),
-                _ => proc.read::<i32>(addr).map(|v| v.to_string()).unwrap_or("???".to_string()),
+                ValType::I8 => proc
+                    .read::<i8>(addr)
+                    .map(|v| v.to_string())
+                    .unwrap_or("???".to_string()),
+                ValType::U8 => proc
+                    .read::<u8>(addr)
+                    .map(|v| v.to_string())
+                    .unwrap_or("???".to_string()),
+                ValType::I16 => proc
+                    .read::<i16>(addr)
+                    .map(|v| v.to_string())
+                    .unwrap_or("???".to_string()),
+                ValType::U16 => proc
+                    .read::<u16>(addr)
+                    .map(|v| v.to_string())
+                    .unwrap_or("???".to_string()),
+                ValType::I32 => proc
+                    .read::<i32>(addr)
+                    .map(|v| v.to_string())
+                    .unwrap_or("???".to_string()),
+                ValType::U32 => proc
+                    .read::<u32>(addr)
+                    .map(|v| v.to_string())
+                    .unwrap_or("???".to_string()),
+                ValType::I64 => proc
+                    .read::<i64>(addr)
+                    .map(|v| v.to_string())
+                    .unwrap_or("???".to_string()),
+                ValType::U64 => proc
+                    .read::<u64>(addr)
+                    .map(|v| v.to_string())
+                    .unwrap_or("???".to_string()),
+                ValType::Float => proc
+                    .read::<f32>(addr)
+                    .map(|v| format!("{:.2}", v))
+                    .unwrap_or("???".to_string()),
+                ValType::Double => proc
+                    .read::<f64>(addr)
+                    .map(|v| format!("{:.4}", v))
+                    .unwrap_or("???".to_string()),
+                _ => proc
+                    .read::<i32>(addr)
+                    .map(|v| v.to_string())
+                    .unwrap_or("???".to_string()),
             }
         } else {
             "???".to_string()
@@ -617,7 +661,9 @@ dealloc(newmem)
     pub fn add_pointer_to_table(&mut self, path: &PointerPath, val_type: ValType) {
         let cur_val = if let Some(proc) = &self.attached_proc {
             if let Ok(resolved) = PointerScanner::evaluate_path(proc, path) {
-                proc.read::<i32>(resolved).map(|v| v.to_string()).unwrap_or("???".to_string())
+                proc.read::<i32>(resolved)
+                    .map(|v| v.to_string())
+                    .unwrap_or("???".to_string())
             } else {
                 "???".to_string()
             }
@@ -627,7 +673,10 @@ dealloc(newmem)
 
         self.cheat_table.push(GuiTableEntry {
             active: false,
-            description: format!("Pointer [\"{}\"+0x{:X}]", path.module_name, path.base_offset),
+            description: format!(
+                "Pointer [\"{}\"+0x{:X}]",
+                path.module_name, path.base_offset
+            ),
             address: path.final_address,
             module_name: Some(path.module_name.clone()),
             base_offset: path.base_offset,
@@ -674,30 +723,60 @@ dealloc(newmem)
                 }
 
                 entry.current_val = match entry.val_type {
-                    ValType::I8 => proc.read::<i8>(entry.address).map(|v| v.to_string()).unwrap_or("???".to_string()),
-                    ValType::U8 => proc.read::<u8>(entry.address).map(|v| v.to_string()).unwrap_or("???".to_string()),
-                    ValType::I16 => proc.read::<i16>(entry.address).map(|v| v.to_string()).unwrap_or("???".to_string()),
-                    ValType::U16 => proc.read::<u16>(entry.address).map(|v| v.to_string()).unwrap_or("???".to_string()),
-                    ValType::I32 => proc.read::<i32>(entry.address).map(|v| v.to_string()).unwrap_or("???".to_string()),
-                    ValType::U32 => proc.read::<u32>(entry.address).map(|v| v.to_string()).unwrap_or("???".to_string()),
-                    ValType::I64 => proc.read::<i64>(entry.address).map(|v| v.to_string()).unwrap_or("???".to_string()),
-                    ValType::U64 => proc.read::<u64>(entry.address).map(|v| v.to_string()).unwrap_or("???".to_string()),
-                    ValType::Float => proc.read::<f32>(entry.address).map(|v| format!("{:.2}", v)).unwrap_or("???".to_string()),
-                    ValType::Double => proc.read::<f64>(entry.address).map(|v| format!("{:.4}", v)).unwrap_or("???".to_string()),
-                    ValType::Str => {
-
-                        match proc.read_string(entry.address, 1001, false) {
-                            Ok(s) => {
-                                if s.chars().count() > 1000 {
-                                    s.chars().take(1000).collect()
-                                } else {
-                                    s
-                                }
+                    ValType::I8 => proc
+                        .read::<i8>(entry.address)
+                        .map(|v| v.to_string())
+                        .unwrap_or("???".to_string()),
+                    ValType::U8 => proc
+                        .read::<u8>(entry.address)
+                        .map(|v| v.to_string())
+                        .unwrap_or("???".to_string()),
+                    ValType::I16 => proc
+                        .read::<i16>(entry.address)
+                        .map(|v| v.to_string())
+                        .unwrap_or("???".to_string()),
+                    ValType::U16 => proc
+                        .read::<u16>(entry.address)
+                        .map(|v| v.to_string())
+                        .unwrap_or("???".to_string()),
+                    ValType::I32 => proc
+                        .read::<i32>(entry.address)
+                        .map(|v| v.to_string())
+                        .unwrap_or("???".to_string()),
+                    ValType::U32 => proc
+                        .read::<u32>(entry.address)
+                        .map(|v| v.to_string())
+                        .unwrap_or("???".to_string()),
+                    ValType::I64 => proc
+                        .read::<i64>(entry.address)
+                        .map(|v| v.to_string())
+                        .unwrap_or("???".to_string()),
+                    ValType::U64 => proc
+                        .read::<u64>(entry.address)
+                        .map(|v| v.to_string())
+                        .unwrap_or("???".to_string()),
+                    ValType::Float => proc
+                        .read::<f32>(entry.address)
+                        .map(|v| format!("{:.2}", v))
+                        .unwrap_or("???".to_string()),
+                    ValType::Double => proc
+                        .read::<f64>(entry.address)
+                        .map(|v| format!("{:.4}", v))
+                        .unwrap_or("???".to_string()),
+                    ValType::Str => match proc.read_string(entry.address, 1001, false) {
+                        Ok(s) => {
+                            if s.chars().count() > 1000 {
+                                s.chars().take(1000).collect()
+                            } else {
+                                s
                             }
-                            Err(_) => "???".to_string(),
                         }
-                    }
-                    _ => proc.read::<i32>(entry.address).map(|v| v.to_string()).unwrap_or("???".to_string()),
+                        Err(_) => "???".to_string(),
+                    },
+                    _ => proc
+                        .read::<i32>(entry.address)
+                        .map(|v| v.to_string())
+                        .unwrap_or("???".to_string()),
                 };
 
                 if entry.active {
@@ -725,7 +804,9 @@ dealloc(newmem)
     }
 
     pub fn write_table_entry_value(&mut self, idx: usize, new_val_str: &str) {
-        if idx >= self.cheat_table.len() { return; }
+        if idx >= self.cheat_table.len() {
+            return;
+        }
         let entry = &mut self.cheat_table[idx];
         if let Some(proc) = &self.attached_proc {
             match entry.val_type {
@@ -879,7 +960,9 @@ impl eframe::App for OnyxEngineApp {
             ctx.request_repaint_after(std::time::Duration::from_millis(33));
         }
 
-        if ctx.input(|i| (i.modifiers.ctrl && i.key_pressed(egui::Key::Comma)) || i.key_pressed(egui::Key::F2)) {
+        if ctx.input(|i| {
+            (i.modifiers.ctrl && i.key_pressed(egui::Key::Comma)) || i.key_pressed(egui::Key::F2)
+        }) {
             self.show_settings_modal = !self.show_settings_modal;
         }
         if ctx.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::O)) {
@@ -902,16 +985,24 @@ impl eframe::App for OnyxEngineApp {
         if ctx.input(|i| i.key_pressed(egui::Key::F11)) {
             self.speedhack_enabled = !self.speedhack_enabled;
             if let Some(proc) = &self.attached_proc {
-                let mult = if self.speedhack_enabled { self.speedhack_val } else { 1.0 };
+                let mult = if self.speedhack_enabled {
+                    self.speedhack_val
+                } else {
+                    1.0
+                };
                 let _ = self.speedhack_injector.enable_speedhack(proc, mult);
                 self.status_msg = format!("Speedhack toggled: {:.1}x", mult);
             }
         }
 
-        if ctx.input(|i| i.key_pressed(egui::Key::F10) || (i.modifiers.ctrl && i.modifiers.shift && i.key_pressed(egui::Key::G))) {
+        if ctx.input(|i| {
+            i.key_pressed(egui::Key::F10)
+                || (i.modifiers.ctrl && i.modifiers.shift && i.key_pressed(egui::Key::G))
+        }) {
             self.ghost_mode = !self.ghost_mode;
             self.status_msg = if self.ghost_mode {
-                "Ghost Mode [ON]: Window is click-through (overlay). Press F10 to disable.".to_string()
+                "Ghost Mode [ON]: Window is click-through (overlay). Press F10 to disable."
+                    .to_string()
             } else {
                 "Ghost Mode [OFF]: Window interaction restored.".to_string()
             };
@@ -954,13 +1045,16 @@ impl eframe::App for OnyxEngineApp {
                     ui.set_height(28.0);
                     let total_w = ui.available_width();
                     ui.horizontal(|ui| {
-
                         let mem_btn_resp = if let Some(ref icons) = self.icons {
-                            let img = egui::Image::new(&icons.memory_view).fit_to_exact_size(Vec2::splat(18.0));
+                            let img = egui::Image::new(&icons.memory_view)
+                                .fit_to_exact_size(Vec2::splat(18.0));
                             ui.add(
                                 egui::Button::image_and_text(
                                     img,
-                                    RichText::new("Memory View").size(12.0).color(Color32::WHITE).strong(),
+                                    RichText::new("Memory View")
+                                        .size(12.0)
+                                        .color(Color32::WHITE)
+                                        .strong(),
                                 )
                                 .fill(Color32::from_rgb(32, 42, 58))
                                 .stroke(Stroke::new(1.0_f32, Color32::from_rgb(52, 72, 105)))
@@ -969,11 +1063,16 @@ impl eframe::App for OnyxEngineApp {
                             )
                         } else {
                             ui.add(
-                                egui::Button::new(RichText::new("Memory View").size(12.0).color(Color32::WHITE).strong())
-                                    .fill(Color32::from_rgb(32, 42, 58))
-                                    .stroke(Stroke::new(1.0_f32, Color32::from_rgb(52, 72, 105)))
-                                    .min_size(Vec2::new(105.0, 26.0))
-                                    .rounding(Rounding::same(3.0)),
+                                egui::Button::new(
+                                    RichText::new("Memory View")
+                                        .size(12.0)
+                                        .color(Color32::WHITE)
+                                        .strong(),
+                                )
+                                .fill(Color32::from_rgb(32, 42, 58))
+                                .stroke(Stroke::new(1.0_f32, Color32::from_rgb(52, 72, 105)))
+                                .min_size(Vec2::new(105.0, 26.0))
+                                .rounding(Rounding::same(3.0)),
                             )
                         };
 
@@ -984,11 +1083,13 @@ impl eframe::App for OnyxEngineApp {
 
                         let arrow_w = 40.0;
                         let mem_w = 120.0;
-                        let space_to_center = ((total_w / 2.0) - mem_w - (arrow_w / 2.0) - 8.0).max(8.0);
+                        let space_to_center =
+                            ((total_w / 2.0) - mem_w - (arrow_w / 2.0) - 8.0).max(8.0);
                         ui.add_space(space_to_center);
 
                         let arrow_btn_resp = if let Some(ref icons) = self.icons {
-                            let img = egui::Image::new(&icons.arrow_down).fit_to_exact_size(Vec2::splat(22.0));
+                            let img = egui::Image::new(&icons.arrow_down)
+                                .fit_to_exact_size(Vec2::splat(22.0));
                             ui.add(
                                 egui::Button::image(img)
                                     .fill(Color32::from_rgb(180, 35, 35))
@@ -998,24 +1099,37 @@ impl eframe::App for OnyxEngineApp {
                             )
                         } else {
                             ui.add(
-                                egui::Button::new(RichText::new("  \\/  ").size(13.0).color(Color32::WHITE).strong())
-                                    .fill(Color32::from_rgb(180, 35, 35))
-                                    .stroke(Stroke::new(1.0_f32, Color32::from_rgb(230, 60, 60)))
-                                    .min_size(Vec2::new(arrow_w, 26.0))
-                                    .rounding(Rounding::same(3.0)),
+                                egui::Button::new(
+                                    RichText::new("  \\/  ")
+                                        .size(13.0)
+                                        .color(Color32::WHITE)
+                                        .strong(),
+                                )
+                                .fill(Color32::from_rgb(180, 35, 35))
+                                .stroke(Stroke::new(1.0_f32, Color32::from_rgb(230, 60, 60)))
+                                .min_size(Vec2::new(arrow_w, 26.0))
+                                .rounding(Rounding::same(3.0)),
                             )
                         };
 
-                        if arrow_btn_resp.on_hover_text("Copy selected / top candidate to Cheat Table").clicked() {
+                        if arrow_btn_resp
+                            .on_hover_text("Copy selected / top candidate to Cheat Table")
+                            .clicked()
+                        {
                             add_top_candidate = true;
                         }
 
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            let manual_btn = egui::Button::new(RichText::new("+ Add Address Manually").size(12.0).color(Color32::WHITE).strong())
-                                .fill(Color32::from_rgb(28, 70, 42))
-                                .stroke(Stroke::new(1.0_f32, Color32::from_rgb(45, 120, 70)))
-                                .min_size(Vec2::new(145.0, 26.0))
-                                .rounding(Rounding::same(3.0));
+                            let manual_btn = egui::Button::new(
+                                RichText::new("+ Add Address Manually")
+                                    .size(12.0)
+                                    .color(Color32::WHITE)
+                                    .strong(),
+                            )
+                            .fill(Color32::from_rgb(28, 70, 42))
+                            .stroke(Stroke::new(1.0_f32, Color32::from_rgb(45, 120, 70)))
+                            .min_size(Vec2::new(145.0, 26.0))
+                            .rounding(Rounding::same(3.0));
 
                             if ui.add(manual_btn).clicked() {
                                 self.show_add_addr_modal = true;
@@ -1024,13 +1138,12 @@ impl eframe::App for OnyxEngineApp {
                     });
                 });
 
-            if add_top_candidate
-                && let Some(first) = self.candidates.first() {
-                    let addr = first.0;
-                    let val_type = self.parse_val_type_from_idx();
-                    self.add_candidate_to_table(addr, val_type);
-                    self.status_msg = format!("Added 0x{:08X} to Cheat Table.", addr);
-                }
+            if add_top_candidate && let Some(first) = self.candidates.first() {
+                let addr = first.0;
+                let val_type = self.parse_val_type_from_idx();
+                self.add_candidate_to_table(addr, val_type);
+                self.status_msg = format!("Added 0x{:08X} to Cheat Table.", addr);
+            }
 
             ui.add_space(4.0);
 

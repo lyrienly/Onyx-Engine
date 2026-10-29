@@ -1,11 +1,11 @@
-use std::collections::HashMap;
-use std::mem::zeroed;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
 use crate::disasm::Disassembler;
 use crate::process::Process;
 use crate::win32::*;
+use std::collections::HashMap;
+use std::mem::zeroed;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BreakpointType {
@@ -23,7 +23,6 @@ pub enum BreakpointSize {
 }
 
 impl BreakpointSize {
-
     pub fn byte_size(self) -> usize {
         match self {
             BreakpointSize::Byte1 => 1,
@@ -52,7 +51,6 @@ pub struct AccessHit {
 pub struct HardwareBreakpointMonitor;
 
 impl HardwareBreakpointMonitor {
-
     pub fn monitor_address(
         proc: &Process,
         slot: usize,
@@ -103,22 +101,26 @@ impl HardwareBreakpointMonitor {
                     if code == EXCEPTION_SINGLE_STEP {
                         let insn_addr = ex.ExceptionRecord.ExceptionAddress as usize;
 
-                        let h_thread = unsafe { OpenThread(THREAD_ALL_ACCESS, FALSE, event.dwThreadId) };
+                        let h_thread =
+                            unsafe { OpenThread(THREAD_ALL_ACCESS, FALSE, event.dwThreadId) };
                         if !h_thread.is_null() && h_thread != INVALID_HANDLE_VALUE {
                             let mut ctx: CONTEXT = unsafe { zeroed() };
                             ctx.ContextFlags = CONTEXT_ALL;
 
                             if unsafe { GetThreadContext(h_thread, &mut ctx) } == TRUE {
-
                                 let entry = hits.entry(insn_addr).or_insert_with(|| {
-
                                     let mut insn_bytes = [0u8; 15];
-                                    let read = proc.read_raw(insn_addr, &mut insn_bytes).unwrap_or(0);
-                                    let decoded = Disassembler::decode_one(insn_addr, &insn_bytes[..read]);
+                                    let read =
+                                        proc.read_raw(insn_addr, &mut insn_bytes).unwrap_or(0);
+                                    let decoded =
+                                        Disassembler::decode_one(insn_addr, &insn_bytes[..read]);
 
                                     AccessHit {
                                         instruction_address: insn_addr,
-                                        instruction_text: format!("{} {}", decoded.mnemonic, decoded.operands),
+                                        instruction_text: format!(
+                                            "{} {}",
+                                            decoded.mnemonic, decoded.operands
+                                        ),
                                         count: 0,
                                         last_rax: ctx.Rax,
                                         last_rbx: ctx.Rbx,
@@ -145,7 +147,6 @@ impl HardwareBreakpointMonitor {
                             unsafe { CloseHandle(h_thread) };
                         }
                     } else if code == EXCEPTION_BREAKPOINT {
-
                         continue_status = DBG_CONTINUE;
                     } else {
                         continue_status = DBG_EXCEPTION_NOT_HANDLED;
@@ -495,7 +496,6 @@ pub struct CallStackFrame {
 }
 
 impl HardwareBreakpointMonitor {
-
     pub fn break_and_trace(
         proc: &Process,
         start_addr: usize,
@@ -514,7 +514,13 @@ impl HardwareBreakpointMonitor {
         }
 
         for &tid in &thread_ids {
-            let _ = set_hw_breakpoint_on_thread(tid, 0, start_addr, BreakpointType::Execute, BreakpointSize::Byte1);
+            let _ = set_hw_breakpoint_on_thread(
+                tid,
+                0,
+                start_addr,
+                BreakpointType::Execute,
+                BreakpointSize::Byte1,
+            );
         }
 
         let mut traces = Vec::new();
@@ -522,7 +528,11 @@ impl HardwareBreakpointMonitor {
         let mut active_trace_thread: u32 = 0;
         let mut event: DEBUG_EVENT = unsafe { zeroed() };
 
-        let max_steps = if config.max_steps == 0 { 1000 } else { config.max_steps };
+        let max_steps = if config.max_steps == 0 {
+            1000
+        } else {
+            config.max_steps
+        };
 
         while !stop_signal.load(Ordering::Relaxed) {
             let got_event = unsafe { WaitForDebugEvent(&mut event, 100) };
@@ -534,7 +544,8 @@ impl HardwareBreakpointMonitor {
                     let code = ex.ExceptionRecord.ExceptionCode;
 
                     if code == EXCEPTION_SINGLE_STEP {
-                        let h_thread = unsafe { OpenThread(THREAD_ALL_ACCESS, FALSE, event.dwThreadId) };
+                        let h_thread =
+                            unsafe { OpenThread(THREAD_ALL_ACCESS, FALSE, event.dwThreadId) };
                         if !h_thread.is_null() && h_thread != INVALID_HANDLE_VALUE {
                             let mut ctx: CONTEXT = unsafe { zeroed() };
                             ctx.ContextFlags = CONTEXT_ALL;
@@ -543,7 +554,6 @@ impl HardwareBreakpointMonitor {
                                 let cur_ip = ctx.Rip as usize;
 
                                 if !in_trace_mode {
-
                                     in_trace_mode = true;
                                     active_trace_thread = event.dwThreadId;
 
@@ -554,15 +564,18 @@ impl HardwareBreakpointMonitor {
                                     ctx.EFlags |= 0x00010100;
                                     unsafe { SetThreadContext(h_thread, &ctx) };
                                 } else if event.dwThreadId == active_trace_thread {
-
                                     let mut insn_bytes = [0u8; 15];
                                     let read = proc.read_raw(cur_ip, &mut insn_bytes).unwrap_or(0);
-                                    let decoded = Disassembler::decode_one(cur_ip, &insn_bytes[..read]);
+                                    let decoded =
+                                        Disassembler::decode_one(cur_ip, &insn_bytes[..read]);
 
                                     let record = TraceRecord {
                                         step: traces.len() + 1,
                                         address: cur_ip,
-                                        instruction: format!("{} {}", decoded.mnemonic, decoded.operands),
+                                        instruction: format!(
+                                            "{} {}",
+                                            decoded.mnemonic, decoded.operands
+                                        ),
                                         rax: ctx.Rax,
                                         rbx: ctx.Rbx,
                                         rcx: ctx.Rcx,
@@ -588,15 +601,19 @@ impl HardwareBreakpointMonitor {
                                         || (config.stop_address == Some(cur_ip));
 
                                     if should_stop {
-
                                         ctx.EFlags &= !0x00000100;
                                         ctx.EFlags |= 0x00010000;
                                         unsafe { SetThreadContext(h_thread, &ctx) };
                                         unsafe { CloseHandle(h_thread) };
-                                        unsafe { ContinueDebugEvent(event.dwProcessId, event.dwThreadId, DBG_CONTINUE) };
+                                        unsafe {
+                                            ContinueDebugEvent(
+                                                event.dwProcessId,
+                                                event.dwThreadId,
+                                                DBG_CONTINUE,
+                                            )
+                                        };
                                         break;
                                     } else {
-
                                         ctx.EFlags |= 0x00010100;
                                         unsafe { SetThreadContext(h_thread, &ctx) };
                                     }
@@ -627,7 +644,11 @@ impl HardwareBreakpointMonitor {
         Ok(traces)
     }
 
-    pub fn walk_call_stack(proc: &Process, thread_id: u32, max_depth: usize) -> Result<Vec<CallStackFrame>, String> {
+    pub fn walk_call_stack(
+        proc: &Process,
+        thread_id: u32,
+        max_depth: usize,
+    ) -> Result<Vec<CallStackFrame>, String> {
         let h_thread = unsafe { OpenThread(THREAD_ALL_ACCESS, FALSE, thread_id) };
         if h_thread.is_null() || h_thread == INVALID_HANDLE_VALUE {
             return Err(format!("Could not open thread {}", thread_id));
@@ -652,7 +673,10 @@ impl HardwareBreakpointMonitor {
         let mut frames = Vec::new();
 
         let cur_rip = ctx.Rip as usize;
-        let (mod_name, offset) = if let Some(m) = modules.iter().find(|m| cur_rip >= m.base && cur_rip < m.base + m.size) {
+        let (mod_name, offset) = if let Some(m) = modules
+            .iter()
+            .find(|m| cur_rip >= m.base && cur_rip < m.base + m.size)
+        {
             (m.name.clone(), cur_rip - m.base)
         } else {
             ("Unknown".to_string(), cur_rip)
@@ -676,10 +700,15 @@ impl HardwareBreakpointMonitor {
                     break;
                 }
                 let ptr_val = usize::from_ne_bytes(
-                    stack_buf[i * ptr_size..(i + 1) * ptr_size].try_into().unwrap_or_default(),
+                    stack_buf[i * ptr_size..(i + 1) * ptr_size]
+                        .try_into()
+                        .unwrap_or_default(),
                 );
 
-                if let Some(m) = modules.iter().find(|m| ptr_val >= m.base && ptr_val < m.base + m.size) {
+                if let Some(m) = modules
+                    .iter()
+                    .find(|m| ptr_val >= m.base && ptr_val < m.base + m.size)
+                {
                     frames.push(CallStackFrame {
                         frame_index: frames.len(),
                         address: ptr_val,

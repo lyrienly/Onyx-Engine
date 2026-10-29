@@ -27,7 +27,8 @@ static REGISTRY: Mutex<Option<ModuleRegistry>> = Mutex::new(None);
 
 fn get_exe_dir() -> PathBuf {
     let mut buf = vec![0u16; 1024];
-    let len = unsafe { GetModuleFileNameW(std::ptr::null_mut(), buf.as_mut_ptr(), buf.len() as u32) };
+    let len =
+        unsafe { GetModuleFileNameW(std::ptr::null_mut(), buf.as_mut_ptr(), buf.len() as u32) };
     if len > 0 {
         let path_str = String::from_utf16_lossy(&buf[..len as usize]);
         if let Some(parent) = std::path::Path::new(&path_str).parent() {
@@ -41,7 +42,11 @@ fn load_dll_from_path(path: &std::path::Path) -> Option<HMODULE> {
     if !path.exists() {
         return None;
     }
-    let path_w: Vec<u16> = path.to_str()?.encode_utf16().chain(std::iter::once(0)).collect();
+    let path_w: Vec<u16> = path
+        .to_str()?
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect();
     let handle = unsafe { LoadLibraryW(path_w.as_ptr()) };
     if handle.is_null() {
         None
@@ -88,10 +93,18 @@ pub fn cleanup_modules() {
     let mut guard = REGISTRY.lock().unwrap();
     if let Some(mut reg) = guard.take() {
         unsafe {
-            if let Some(h) = reg.pointer_dll.take() { FreeLibrary(h); }
-            if let Some(h) = reg.scanner_dll.take() { FreeLibrary(h); }
-            if let Some(h) = reg.disasm_dll.take() { FreeLibrary(h); }
-            if let Some(h) = reg.freezer_dll.take() { FreeLibrary(h); }
+            if let Some(h) = reg.pointer_dll.take() {
+                FreeLibrary(h);
+            }
+            if let Some(h) = reg.scanner_dll.take() {
+                FreeLibrary(h);
+            }
+            if let Some(h) = reg.disasm_dll.take() {
+                FreeLibrary(h);
+            }
+            if let Some(h) = reg.freezer_dll.take() {
+                FreeLibrary(h);
+            }
         }
     }
 }
@@ -101,10 +114,28 @@ pub extern "C" fn onyx_module_is_loaded(module_idx: u32) -> i32 {
     let guard = REGISTRY.lock().unwrap();
     if let Some(reg) = guard.as_ref() {
         match module_idx {
-            0 => if reg.pointer_dll.is_some() { 1 } else { 0 },
-            1 => if reg.scanner_dll.is_some() { 1 } else { 0 },
-            2 => if reg.disasm_dll.is_some() { 1 } else { 0 },
-            3 if reg.freezer_dll.is_some() => { 1 },
+            0 => {
+                if reg.pointer_dll.is_some() {
+                    1
+                } else {
+                    0
+                }
+            }
+            1 => {
+                if reg.scanner_dll.is_some() {
+                    1
+                } else {
+                    0
+                }
+            }
+            2 => {
+                if reg.disasm_dll.is_some() {
+                    1
+                } else {
+                    0
+                }
+            }
+            3 if reg.freezer_dll.is_some() => 1,
             _ => 0,
         }
     } else {

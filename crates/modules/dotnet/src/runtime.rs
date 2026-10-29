@@ -162,10 +162,7 @@ pub fn detect_runtime(pid: u32) -> Option<ClrRuntime> {
     let modules = enumerate_modules(pid);
     for kind in [ClrKind::CoreClr, ClrKind::FrameworkV4, ClrKind::FrameworkV2] {
         let target = kind.module_name();
-        if let Some(m) = modules
-            .iter()
-            .find(|m| m.name.eq_ignore_ascii_case(target))
-        {
+        if let Some(m) = modules.iter().find(|m| m.name.eq_ignore_ascii_case(target)) {
             let version = read_file_version(&m.path).unwrap_or_else(|| "unknown".to_string());
             return Some(ClrRuntime {
                 kind,
@@ -218,7 +215,8 @@ pub fn parse_pe_file_version(bytes: &[u8]) -> Option<String> {
         return None;
     }
     let res_rva = u32::from_le_bytes(bytes[res_entry..res_entry + 4].try_into().ok()?) as usize;
-    let res_size = u32::from_le_bytes(bytes[res_entry + 4..res_entry + 8].try_into().ok()?) as usize;
+    let res_size =
+        u32::from_le_bytes(bytes[res_entry + 4..res_entry + 8].try_into().ok()?) as usize;
     if res_rva == 0 || res_size == 0 {
         return None;
     }
@@ -258,13 +256,17 @@ pub fn parse_pe_file_version(bytes: &[u8]) -> Option<String> {
     if bytes.len() < data_entry + 16 {
         return None;
     }
-    let payload_rva = u32::from_le_bytes(bytes[data_entry..data_entry + 4].try_into().ok()?) as usize;
-    let payload_size = u32::from_le_bytes(bytes[data_entry + 4..data_entry + 8].try_into().ok()?) as usize;
+    let payload_rva =
+        u32::from_le_bytes(bytes[data_entry..data_entry + 4].try_into().ok()?) as usize;
+    let payload_size =
+        u32::from_le_bytes(bytes[data_entry + 4..data_entry + 8].try_into().ok()?) as usize;
     let payload_off = res_offset + (payload_rva - res_va);
     if bytes.len() < payload_off + payload_size.min(0x1000) {
         return None;
     }
-    parse_vs_versioninfo(&bytes[payload_off..payload_off + payload_size.min(bytes.len() - payload_off)])
+    parse_vs_versioninfo(
+        &bytes[payload_off..payload_off + payload_size.min(bytes.len() - payload_off)],
+    )
 }
 
 fn find_resource_entry(
@@ -323,7 +325,7 @@ pub fn parse_vs_versioninfo(buf: &[u8]) -> Option<String> {
     // Procurar a assinatura 0xFEEF04BD do VS_FIXEDFILEINFO.
     let max_start = buf.len().saturating_sub(52);
     for i in 0..=max_start {
-        if &buf[i..i + 4] == &[0xBD, 0x04, 0xEF, 0xFE] {
+        if buf[i..i + 4] == [0xBD, 0x04, 0xEF, 0xFE] {
             let ff = &buf[i..i + 52];
             let file_ver_ms = u32::from_le_bytes(ff[8..12].try_into().ok()?);
             let file_ver_ls = u32::from_le_bytes(ff[12..16].try_into().ok()?);

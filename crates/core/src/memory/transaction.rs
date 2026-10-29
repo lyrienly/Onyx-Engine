@@ -89,7 +89,12 @@ impl MemoryTransaction {
         Ok(())
     }
 
-    pub fn protect(&mut self, address: usize, size: usize, new_protect: u32) -> Result<u32, String> {
+    pub fn protect(
+        &mut self,
+        address: usize,
+        size: usize,
+        new_protect: u32,
+    ) -> Result<u32, String> {
         if self.committed || self.rolled_back {
             return Err("transaction already finalized".to_string());
         }
@@ -124,21 +129,17 @@ impl MemoryTransaction {
             match entry {
                 UndoEntry::Write(op) => {
                     if let Err(e) = self.process.write_raw(op.address, &op.old_bytes)
-                        && first_err.is_none() {
-                            first_err = Some(format!(
-                                "rollback write at 0x{:X}: {}",
-                                op.address, e
-                            ));
-                        }
+                        && first_err.is_none()
+                    {
+                        first_err = Some(format!("rollback write at 0x{:X}: {}", op.address, e));
+                    }
                 }
                 UndoEntry::Protect(op) => {
                     if let Err(e) = self.process.protect(op.address, op.size, op.old_protect)
-                        && first_err.is_none() {
-                            first_err = Some(format!(
-                                "rollback protect at 0x{:X}: {}",
-                                op.address, e
-                            ));
-                        }
+                        && first_err.is_none()
+                    {
+                        first_err = Some(format!("rollback protect at 0x{:X}: {}", op.address, e));
+                    }
                 }
             }
         }

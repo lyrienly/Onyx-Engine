@@ -1,5 +1,5 @@
-use std::ffi::c_void;
 use crate::win32::*;
+use std::ffi::c_void;
 
 const THREAD_HIDE_FROM_DEBUGGER: u32 = 0x11;
 
@@ -29,12 +29,20 @@ impl AntiDebug {
             }
 
             let nt_set_info: NtSetInformationThreadFn = std::mem::transmute(p_fn);
-            let status = nt_set_info(GetCurrentThread(), THREAD_HIDE_FROM_DEBUGGER, std::ptr::null_mut(), 0);
+            let status = nt_set_info(
+                GetCurrentThread(),
+                THREAD_HIDE_FROM_DEBUGGER,
+                std::ptr::null_mut(),
+                0,
+            );
 
             if status >= 0 {
                 Ok(())
             } else {
-                Err(format!("NtSetInformationThread failed with NTSTATUS 0x{:X}", status))
+                Err(format!(
+                    "NtSetInformationThread failed with NTSTATUS 0x{:X}",
+                    status
+                ))
             }
         }
         #[cfg(not(target_os = "windows"))]

@@ -175,7 +175,6 @@ mod avx2 {
             let mut mask_bits = _mm256_movemask_epi8(eq) as u32;
 
             if has_second {
-
                 let sec_pos = anchor_pos + second_off;
                 if sec_pos + 32 <= haystack.len() {
                     let chunk2 =
@@ -203,11 +202,7 @@ mod avx2 {
     }
 
     #[target_feature(enable = "avx2")]
-    pub unsafe fn find_all_avx2(
-        haystack: &[u8],
-        needle: &[u8],
-        mask: &[bool],
-    ) -> Vec<usize> {
+    pub unsafe fn find_all_avx2(haystack: &[u8], needle: &[u8], mask: &[bool]) -> Vec<usize> {
         let mut out = Vec::new();
         let n = needle.len();
         if n == 0 || haystack.len() < n {
@@ -269,10 +264,9 @@ mod avx2 {
 
         let fallback_start = if p == 0 { 0 } else { p };
         for q in fallback_start..=end {
-            if matches_at(haystack, q, needle, mask)
-                && !out.last().is_some_and(|&l| l == q) {
-                    out.push(q);
-                }
+            if matches_at(haystack, q, needle, mask) && !out.last().is_some_and(|&l| l == q) {
+                out.push(q);
+            }
         }
         out.sort_unstable();
         out.dedup();
@@ -339,7 +333,10 @@ mod tests {
     fn parse_basic() {
         let p = Pattern::parse("48 8B ?? ?? E8 ?? ?? ?? ??").unwrap();
         assert_eq!(p.bytes.len(), 9);
-        assert_eq!(p.mask, vec![true, true, false, false, true, false, false, false, false]);
+        assert_eq!(
+            p.mask,
+            vec![true, true, false, false, true, false, false, false, false]
+        );
         assert_eq!(p.bytes[0], 0x48);
         assert_eq!(p.bytes[1], 0x8B);
         assert_eq!(p.bytes[4], 0xE8);

@@ -1,9 +1,9 @@
+use crate::process::{Process, ProcessEntry};
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use crate::process::{Process, ProcessEntry};
 
 #[derive(Debug, Clone)]
 pub enum ProcessWatchEvent {
@@ -80,7 +80,11 @@ impl ProcessWatcher {
                     };
 
                     let mut current_map: HashMap<u32, ProcessEntry> = HashMap::new();
-                    let targets = targets_lock.lock().ok().map(|t| t.clone()).unwrap_or_default();
+                    let targets = targets_lock
+                        .lock()
+                        .ok()
+                        .map(|t| t.clone())
+                        .unwrap_or_default();
 
                     for p in current_list {
                         let pid = p.pid;
@@ -88,10 +92,9 @@ impl ProcessWatcher {
 
                         if !known_pids.contains_key(&pid) {
                             let is_target = targets.is_empty() || targets.contains(&p_name_lower);
-                            if is_target
-                                && let Ok(mut q) = events_lock.lock() {
-                                    q.push_back(ProcessWatchEvent::Created(p.clone()));
-                                }
+                            if is_target && let Ok(mut q) = events_lock.lock() {
+                                q.push_back(ProcessWatchEvent::Created(p.clone()));
+                            }
                         }
                         current_map.insert(pid, p);
                     }
@@ -100,10 +103,9 @@ impl ProcessWatcher {
                         if !current_map.contains_key(&pid) {
                             let old_name_lower = old_proc.name.to_lowercase();
                             let is_target = targets.is_empty() || targets.contains(&old_name_lower);
-                            if is_target
-                                && let Ok(mut q) = events_lock.lock() {
-                                    q.push_back(ProcessWatchEvent::Terminated(pid));
-                                }
+                            if is_target && let Ok(mut q) = events_lock.lock() {
+                                q.push_back(ProcessWatchEvent::Terminated(pid));
+                            }
                         }
                     }
 

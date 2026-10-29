@@ -1,5 +1,5 @@
-use zydis::{Decoder, Formatter, InstructionCategory, VisibleOperands};
 use zydis::ffi::{DecodedOperand, DecodedOperandKind};
+use zydis::{Decoder, Formatter, InstructionCategory, VisibleOperands};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlowType {
@@ -33,7 +33,11 @@ fn classify(category: InstructionCategory) -> FlowType {
     }
 }
 
-fn operand_target(ip: u64, insn: &zydis::Instruction<VisibleOperands>, ops: &[DecodedOperand]) -> Option<u64> {
+fn operand_target(
+    ip: u64,
+    insn: &zydis::Instruction<VisibleOperands>,
+    ops: &[DecodedOperand],
+) -> Option<u64> {
     for op in ops {
         if matches!(op.kind, DecodedOperandKind::Imm(_)) {
             if let Ok(addr) = insn.calc_absolute_address(ip, op) {
@@ -86,6 +90,14 @@ pub fn disassemble(bytes: &[u8], base_addr: u64) -> Vec<Instruction> {
 }
 
 pub fn format_instruction(insn: &Instruction) -> String {
-    let hex = insn.bytes.iter().map(|b| format!("{:02X}", b)).collect::<Vec<_>>().join(" ");
-    format!("0x{:016X}: {:<24} {} {}", insn.address, hex, insn.mnemonic, insn.operands)
+    let hex = insn
+        .bytes
+        .iter()
+        .map(|b| format!("{:02X}", b))
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!(
+        "0x{:016X}: {:<24} {} {}",
+        insn.address, hex, insn.mnemonic, insn.operands
+    )
 }

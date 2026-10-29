@@ -166,8 +166,14 @@ pub fn install(speed: f64) -> Result<(), InstallError> {
         TRAMP_QPC.store(tramp as *mut c_void, Ordering::Release);
 
         for (i, p) in resolve_kernel_all(b"GetTickCount\0").iter().enumerate() {
-            if p.is_null() { continue; }
-            let name = if i == 0 { "GetTickCount@kernelbase" } else { "GetTickCount@kernel32" };
+            if p.is_null() {
+                continue;
+            }
+            let name = if i == 0 {
+                "GetTickCount@kernelbase"
+            } else {
+                "GetTickCount@kernel32"
+            };
             match engine.install(name, *p, hooked_gtc as *const u8) {
                 Ok(t) => {
                     if TRAMP_GTC.load(Ordering::Relaxed).is_null() {
@@ -179,8 +185,14 @@ pub fn install(speed: f64) -> Result<(), InstallError> {
         }
 
         for (i, p) in resolve_kernel_all(b"GetTickCount64\0").iter().enumerate() {
-            if p.is_null() { continue; }
-            let name = if i == 0 { "GetTickCount64@kernelbase" } else { "GetTickCount64@kernel32" };
+            if p.is_null() {
+                continue;
+            }
+            let name = if i == 0 {
+                "GetTickCount64@kernelbase"
+            } else {
+                "GetTickCount64@kernel32"
+            };
             match engine.install(name, *p, hooked_gtc64 as *const u8) {
                 Ok(t) => {
                     if TRAMP_GTC64.load(Ordering::Relaxed).is_null() {

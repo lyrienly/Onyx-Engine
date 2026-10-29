@@ -62,11 +62,8 @@ fn write_rip_add(page: *mut u8) -> usize {
     let d = disp.to_le_bytes();
 
     let code: [u8; 18] = [
-        0x48, 0x8B, 0x05, d[0], d[1], d[2], d[3],
-        0x48, 0x03, 0xC1,
-        0x48, 0x03, 0xC2,
-        0x48, 0x83, 0xC0, 0x00,
-        0xC3,
+        0x48, 0x8B, 0x05, d[0], d[1], d[2], d[3], 0x48, 0x03, 0xC1, 0x48, 0x03, 0xC2, 0x48, 0x83,
+        0xC0, 0x00, 0xC3,
     ];
     unsafe {
         core::ptr::copy_nonoverlapping(code.as_ptr(), page, code.len());
@@ -90,7 +87,11 @@ fn e2e_hook_desvia_e_restaura_simples() {
     assert_eq!(f(10, 15), 250);
 
     hook.remove().expect("remover hook");
-    assert_eq!(f(2, 3), 5, "pos-remove deve voltar ao comportamento original");
+    assert_eq!(
+        f(2, 3),
+        5,
+        "pos-remove deve voltar ao comportamento original"
+    );
 
     free_rwx(page);
 }
@@ -107,7 +108,11 @@ fn e2e_hook_prologue_rip_relative() {
     let hook = Hook::new(page as *const u8, hook_rip as *const u8).expect("instalar hook rip");
     TRAMP_RIP.store(hook.original() as usize, Ordering::Relaxed);
 
-    assert_eq!(f(2, 3), 112, "trampolim rip-relative deve ler constante 100");
+    assert_eq!(
+        f(2, 3),
+        112,
+        "trampolim rip-relative deve ler constante 100"
+    );
     assert_eq!(f(20, 30), 157, "100 + 20 + 30 + 7");
 
     hook.remove().expect("remover hook rip");

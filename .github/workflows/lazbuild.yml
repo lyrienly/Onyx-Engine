@@ -24,9 +24,9 @@ jobs:
         with:
           lazarus-version: stable
 
-      - name: lazbuild cheatengine.lpi
+      - name: lazbuild onyxengine.lpi
         shell: cmd
-        run: lazbuild --build-mode=Release "UI\cheatengine.lpi"
+        run: lazbuild --build-mode=Release "UI\onyxengine.lpi"
 
       - name: lazbuild cecore.lpi
         shell: cmd

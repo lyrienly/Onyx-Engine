@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicBool, Ordering};
 use crate::win32::*;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 type HWND = *mut std::ffi::c_void;
 
@@ -88,6 +88,8 @@ mod tests {
         assert!(AnalysisHunter::is_blacklisted_title("x64dbg - module.dll"));
         assert!(AnalysisHunter::is_blacklisted_title("IDA Pro - main"));
         assert!(!AnalysisHunter::is_blacklisted_title("File Explorer"));
-        assert!(!AnalysisHunter::is_blacklisted_title("Gerenciador de Arquivos"));
+        assert!(!AnalysisHunter::is_blacklisted_title(
+            "Gerenciador de Arquivos"
+        ));
     }
 }

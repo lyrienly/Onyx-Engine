@@ -81,7 +81,6 @@ pub struct XMM_SAVE_AREA32 {
 #[repr(C, align(16))]
 #[derive(Copy, Clone)]
 pub struct CONTEXT {
-
     pub P1Home: u64,
     pub P2Home: u64,
     pub P3Home: u64,
@@ -143,16 +142,12 @@ pub struct EXCEPTION_POINTERS {
     pub ContextRecord: *mut CONTEXT,
 }
 
-pub type PVECTORED_EXCEPTION_HANDLER =
-    unsafe extern "system" fn(*mut EXCEPTION_POINTERS) -> LONG;
+pub type PVECTORED_EXCEPTION_HANDLER = unsafe extern "system" fn(*mut EXCEPTION_POINTERS) -> LONG;
 
 #[link(name = "kernel32")]
 unsafe extern "system" {
     pub fn DisableThreadLibraryCalls(hLibModule: HMODULE) -> BOOL;
-    pub fn AddVectoredExceptionHandler(
-        First: u32,
-        Handler: PVECTORED_EXCEPTION_HANDLER,
-    ) -> PVOID;
+    pub fn AddVectoredExceptionHandler(First: u32, Handler: PVECTORED_EXCEPTION_HANDLER) -> PVOID;
     pub fn RemoveVectoredExceptionHandler(Handle: PVOID) -> DWORD;
     pub fn GetCurrentProcessId() -> DWORD;
     pub fn GetCurrentThreadId() -> DWORD;
@@ -165,10 +160,6 @@ unsafe extern "system" {
         flNewProtect: DWORD,
         lpflOldProtect: *mut DWORD,
     ) -> BOOL;
-    pub fn FlushInstructionCache(
-        hProcess: HANDLE,
-        lpBaseAddress: LPCVOID,
-        dwSize: usize,
-    ) -> BOOL;
+    pub fn FlushInstructionCache(hProcess: HANDLE, lpBaseAddress: LPCVOID, dwSize: usize) -> BOOL;
     pub fn GetCurrentProcess() -> HANDLE;
 }

@@ -99,11 +99,9 @@ impl MonoApi {
         let mut api = MonoApi::new(module, hmod as usize);
         for name in wanted {
             let cname = CString::new(*name).map_err(|e| e.to_string())?;
-            let maybe_addr =
-                unsafe { GetProcAddress(hmod, cname.as_ptr() as *const u8) };
+            let maybe_addr = unsafe { GetProcAddress(hmod, cname.as_ptr() as *const u8) };
             if let Some(fn_ptr) = maybe_addr {
-                api.resolved
-                    .insert((*name).to_string(), fn_ptr as usize);
+                api.resolved.insert((*name).to_string(), fn_ptr as usize);
             }
         }
         Ok(api)
@@ -197,16 +195,14 @@ impl MonoApi {
                 Err(_) => continue,
             };
 
-            if !wanted.iter().any(|w| *w == name) {
+            if !wanted.contains(&name) {
                 continue;
             }
 
-            let ord =
-                u16::from_le_bytes(ords_tbl[i * 2..i * 2 + 2].try_into().unwrap()) as usize;
+            let ord = u16::from_le_bytes(ords_tbl[i * 2..i * 2 + 2].try_into().unwrap()) as usize;
             let fn_tbl = read_bytes(module_base + addr_funcs + ord * 4, 4)?;
             let fn_rva = u32::from_le_bytes(fn_tbl[0..4].try_into().unwrap()) as usize;
-            api.resolved
-                .insert(name.to_string(), module_base + fn_rva);
+            api.resolved.insert(name.to_string(), module_base + fn_rva);
         }
         Ok(api)
     }
@@ -219,16 +215,18 @@ mod tests {
     #[test]
     fn missing_lists_only_absent_exports() {
         let mut api = MonoApi::new("mono-2.0-bdwgc.dll", 0x1000);
-        api.resolved.insert("mono_get_root_domain".to_string(), 0x2000);
+        api.resolved
+            .insert("mono_get_root_domain".to_string(), 0x2000);
         let missing = api.missing(&["mono_get_root_domain", "mono_thread_attach"]);
         assert_eq!(missing, vec!["mono_thread_attach"]);
     }
 
     #[test]
     fn resolve_remote_rejects_non_pe() {
-        let result = MonoApi::resolve_remote("fake.dll", 0, &["mono_get_root_domain"], |_, size| {
-            Ok(vec![0u8; size])
-        });
+        let result =
+            MonoApi::resolve_remote("fake.dll", 0, &["mono_get_root_domain"], |_, size| {
+                Ok(vec![0u8; size])
+            });
         assert!(result.is_err());
     }
 

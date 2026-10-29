@@ -1,8 +1,8 @@
-use std::time::Instant;
 use crate::hook::Hook;
 use crate::process::Process;
 use crate::symbol::SymbolResolver;
 use crate::win32::*;
+use std::time::Instant;
 
 #[derive(Debug, Clone)]
 pub struct SpeedController {
@@ -23,7 +23,6 @@ impl SpeedController {
     }
 
     pub fn set_speed(&mut self, speed: f32) {
-
         let current_real_elapsed = self.start_real_time.elapsed().as_millis() as f64;
         self.last_virtual_time_ms += (current_real_elapsed * (self.multiplier as f64)) as u64;
         self.start_real_time = Instant::now();
@@ -32,7 +31,6 @@ impl SpeedController {
 
     pub fn get_scaled_time_ms(&self) -> u64 {
         if self.multiplier <= 0.0 {
-
             return self.last_virtual_time_ms;
         }
         let current_real_elapsed = self.start_real_time.elapsed().as_millis() as f64;
@@ -52,11 +50,7 @@ impl SpeedhackInjector {
         }
     }
 
-    pub fn enable_speedhack(
-        &mut self,
-        proc: &Process,
-        multiplier: f32,
-    ) -> Result<(), String> {
+    pub fn enable_speedhack(&mut self, proc: &Process, multiplier: f32) -> Result<(), String> {
         let mut resolver = SymbolResolver::new();
         let qpc_addr = resolver
             .resolve(proc, "kernel32.dll!QueryPerformanceCounter")
@@ -72,7 +66,10 @@ impl SpeedhackInjector {
 
         payload.extend_from_slice(&[0x5A, 0x59, 0x5B]);
 
-        println!("[+] Speedhack state block allocated at 0x{:016X} (Speed: {}x)", state_addr, multiplier);
+        println!(
+            "[+] Speedhack state block allocated at 0x{:016X} (Speed: {}x)",
+            state_addr, multiplier
+        );
         println!("[+] QueryPerformanceCounter located at 0x{:016X}", qpc_addr);
 
         Ok(())

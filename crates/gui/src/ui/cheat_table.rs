@@ -1,7 +1,7 @@
-use eframe::egui::{self, Color32, RichText, Rounding, Stroke, Vec2};
-use onyx_core::ct_parser::CtParser;
 use crate::app::OnyxEngineApp;
 use crate::state::GuiTableEntry;
+use eframe::egui::{self, Color32, RichText, Rounding, Stroke, Vec2};
+use onyx_core::ct_parser::CtParser;
 
 pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, lower_height: f32) {
     egui::Frame::none()
@@ -13,16 +13,30 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, lower_height: f32) {
             ui.set_height(lower_height);
 
             ui.horizontal(|ui| {
-                ui.label(RichText::new("Address List:").size(12.0).strong().color(Color32::from_rgb(180, 185, 195)));
-                ui.label(RichText::new(format!("{} records", app.cheat_table.len())).size(11.5).color(Color32::GRAY));
+                ui.label(
+                    RichText::new("Address List:")
+                        .size(12.0)
+                        .strong()
+                        .color(Color32::from_rgb(180, 185, 195)),
+                );
+                ui.label(
+                    RichText::new(format!("{} records", app.cheat_table.len()))
+                        .size(11.5)
+                        .color(Color32::GRAY),
+                );
 
                 ui.add_space(8.0);
 
-                let add_btn = egui::Button::new(RichText::new("+ Add Address").size(11.5).color(Color32::WHITE).strong())
-                    .fill(Color32::from_rgb(30, 85, 45))
-                    .stroke(Stroke::new(1.0_f32, Color32::from_rgb(45, 130, 70)))
-                    .min_size(Vec2::new(90.0, 22.0))
-                    .rounding(Rounding::same(2.0));
+                let add_btn = egui::Button::new(
+                    RichText::new("+ Add Address")
+                        .size(11.5)
+                        .color(Color32::WHITE)
+                        .strong(),
+                )
+                .fill(Color32::from_rgb(30, 85, 45))
+                .stroke(Stroke::new(1.0_f32, Color32::from_rgb(45, 130, 70)))
+                .min_size(Vec2::new(90.0, 22.0))
+                .rounding(Rounding::same(2.0));
                 if ui.add(add_btn).clicked() {
                     app.show_add_addr_modal = true;
                 }
@@ -38,29 +52,36 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, lower_height: f32) {
                             if e.offsets.is_empty() {
                                 ct.add_simple(&e.description, e.address, e.val_type);
                             } else {
-                                ct.add_pointer(&e.description, e.module_name.as_deref().unwrap_or(""), e.base_offset, e.offsets.clone(), e.val_type);
+                                ct.add_pointer(
+                                    &e.description,
+                                    e.module_name.as_deref().unwrap_or(""),
+                                    e.base_offset,
+                                    e.offsets.clone(),
+                                    e.val_type,
+                                );
                             }
                         }
                         let _ = CtParser::save_ct_file(&ct, "onyx_table.CT");
                         app.status_msg = "Table saved to onyx_table.CT".to_string();
                     }
                     if ui.button("Load .CT").clicked()
-                        && let Ok(table) = CtParser::load_ct_file("onyx_table.CT") {
-                            for e in table.entries {
-                                app.cheat_table.push(GuiTableEntry {
-                                    active: false,
-                                    description: e.description,
-                                    address: e.base_offset,
-                                    module_name: e.module_name,
-                                    base_offset: e.base_offset,
-                                    offsets: e.offsets,
-                                    val_type: e.val_type,
-                                    current_val: "0".to_string(),
-                                    target_val: "0".to_string(),
-                                });
-                            }
-                            app.status_msg = "Table loaded.".to_string();
+                        && let Ok(table) = CtParser::load_ct_file("onyx_table.CT")
+                    {
+                        for e in table.entries {
+                            app.cheat_table.push(GuiTableEntry {
+                                active: false,
+                                description: e.description,
+                                address: e.base_offset,
+                                module_name: e.module_name,
+                                base_offset: e.base_offset,
+                                offsets: e.offsets,
+                                val_type: e.val_type,
+                                current_val: "0".to_string(),
+                                target_val: "0".to_string(),
+                            });
                         }
+                        app.status_msg = "Table loaded.".to_string();
+                    }
                 });
             });
 
@@ -83,7 +104,12 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, lower_height: f32) {
                                 .inner_margin(egui::Margin::symmetric(6.0, 3.0))
                                 .show(ui, |ui| {
                                     ui.set_width(w);
-                                    ui.label(RichText::new(text).size(11.5).strong().color(Color32::from_rgb(200, 205, 215)));
+                                    ui.label(
+                                        RichText::new(text)
+                                            .size(11.5)
+                                            .strong()
+                                            .color(Color32::from_rgb(200, 205, 215)),
+                                    );
                                 });
                         };
 
@@ -112,25 +138,45 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, lower_height: f32) {
                                     let mut ptr_scan_click: Option<usize> = None;
 
                                     for (idx, entry) in app.cheat_table.iter_mut().enumerate() {
-
                                         let (active_text, active_color) = if entry.active {
                                             ("[X]", Color32::from_rgb(255, 50, 50))
                                         } else {
                                             ("[ ]", Color32::from_rgb(130, 135, 150))
                                         };
-                                        if ui.selectable_label(entry.active, RichText::new(active_text).monospace().strong().color(active_color)).clicked() {
+                                        if ui
+                                            .selectable_label(
+                                                entry.active,
+                                                RichText::new(active_text)
+                                                    .monospace()
+                                                    .strong()
+                                                    .color(active_color),
+                                            )
+                                            .clicked()
+                                        {
                                             entry.active = !entry.active;
                                         }
 
-                                        ui.add(egui::TextEdit::singleline(&mut entry.description).desired_width(180.0));
+                                        ui.add(
+                                            egui::TextEdit::singleline(&mut entry.description)
+                                                .desired_width(180.0),
+                                        );
 
                                         let is_ptr = !entry.offsets.is_empty();
                                         let addr_text = if !is_ptr {
                                             format!("{:08X}", entry.address)
                                         } else {
-                                            let mod_str = entry.module_name.as_deref().unwrap_or("mem");
-                                            let off_chain = entry.offsets.iter().map(|o| format!("+{:X}", o)).collect::<Vec<_>>().join("->");
-                                            format!("P->[\"{}\"+{:X}]->{}", mod_str, entry.base_offset, off_chain)
+                                            let mod_str =
+                                                entry.module_name.as_deref().unwrap_or("mem");
+                                            let off_chain = entry
+                                                .offsets
+                                                .iter()
+                                                .map(|o| format!("+{:X}", o))
+                                                .collect::<Vec<_>>()
+                                                .join("->");
+                                            format!(
+                                                "P->[\"{}\"+{:X}]->{}",
+                                                mod_str, entry.base_offset, off_chain
+                                            )
                                         };
 
                                         let badge_color = if !is_ptr {
@@ -139,10 +185,15 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, lower_height: f32) {
                                             Color32::from_rgb(255, 195, 100)
                                         };
 
-                                        let addr_btn = egui::Button::new(RichText::new(&addr_text).monospace().size(12.0).color(badge_color))
-                                            .fill(Color32::from_rgb(24, 27, 34))
-                                            .stroke(Stroke::NONE)
-                                            .rounding(Rounding::same(2.0));
+                                        let addr_btn = egui::Button::new(
+                                            RichText::new(&addr_text)
+                                                .monospace()
+                                                .size(12.0)
+                                                .color(badge_color),
+                                        )
+                                        .fill(Color32::from_rgb(24, 27, 34))
+                                        .stroke(Stroke::NONE)
+                                        .rounding(Rounding::same(2.0));
 
                                         let resp = ui.add(addr_btn);
                                         if resp.clicked() {
@@ -158,7 +209,8 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, lower_height: f32) {
                                                 disasm_click = Some(entry.address);
                                                 ui.close_menu();
                                             }
-                                            if ui.button("Pointer scan for this address").clicked() {
+                                            if ui.button("Pointer scan for this address").clicked()
+                                            {
                                                 ptr_scan_click = Some(entry.address);
                                                 ui.close_menu();
                                             }
@@ -169,13 +221,25 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, lower_height: f32) {
                                             }
                                         });
 
-                                        ui.label(RichText::new(entry.val_type.as_str()).size(11.5).color(Color32::from_rgb(160, 180, 205)));
+                                        ui.label(
+                                            RichText::new(entry.val_type.as_str())
+                                                .size(11.5)
+                                                .color(Color32::from_rgb(160, 180, 205)),
+                                        );
 
                                         let val_resp = ui.add(
-                                            egui::Button::new(RichText::new(&entry.current_val).monospace().strong().color(Color32::WHITE))
-                                                .fill(Color32::from_rgb(26, 30, 40))
-                                                .stroke(Stroke::new(1.0_f32, Color32::from_rgb(45, 52, 68)))
-                                                .rounding(Rounding::same(2.0)),
+                                            egui::Button::new(
+                                                RichText::new(&entry.current_val)
+                                                    .monospace()
+                                                    .strong()
+                                                    .color(Color32::WHITE),
+                                            )
+                                            .fill(Color32::from_rgb(26, 30, 40))
+                                            .stroke(Stroke::new(
+                                                1.0_f32,
+                                                Color32::from_rgb(45, 52, 68),
+                                            ))
+                                            .rounding(Rounding::same(2.0)),
                                         );
 
                                         if val_resp.double_clicked() {
@@ -191,9 +255,10 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, lower_height: f32) {
                                         app.show_edit_byte_modal = true;
                                     }
                                     if let Some(idx) = delete_click
-                                        && idx < app.cheat_table.len() {
-                                            app.cheat_table.remove(idx);
-                                        }
+                                        && idx < app.cheat_table.len()
+                                    {
+                                        app.cheat_table.remove(idx);
+                                    }
                                     if let Some(addr) = browse_click {
                                         app.navigate_hex(addr);
                                         app.show_memory_view = true;

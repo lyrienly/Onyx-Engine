@@ -6,13 +6,11 @@ use std::os::windows::ffi::OsStrExt;
 use std::ptr::null_mut;
 use std::time::{Duration, Instant};
 
-use onyx_core::memory::snapshot::{
-    DEFAULT_CHUNK_SIZE, HashAlgo, MemorySnapshot, xxh3,
-};
+use onyx_core::memory::snapshot::{DEFAULT_CHUNK_SIZE, HashAlgo, MemorySnapshot, xxh3};
 use onyx_core::process::Process;
 use onyx_core::win32::{
-    CloseHandle, HANDLE, LPCVOID, LPVOID, MEM_COMMIT, MEM_RELEASE, MEM_RESERVE,
-    PAGE_READWRITE, SIZE_T, VirtualAllocEx, VirtualFreeEx, WriteProcessMemory,
+    CloseHandle, HANDLE, LPCVOID, LPVOID, MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_READWRITE,
+    SIZE_T, VirtualAllocEx, VirtualFreeEx, WriteProcessMemory,
 };
 
 #[link(name = "kernel32")]
@@ -63,7 +61,10 @@ struct ProcessInformation {
 }
 
 fn to_wide(s: &str) -> Vec<u16> {
-    OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
+    OsStr::new(s)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect()
 }
 
 struct CobaiaGuard {
@@ -154,7 +155,11 @@ fn write_bytes(guard: &CobaiaGuard, offset: usize, bytes: &[u8]) {
             &mut written as *mut _,
         )
     };
-    assert!(ok != 0 && written == bytes.len(), "WPM falhou offset=0x{:X}", offset);
+    assert!(
+        ok != 0 && written == bytes.len(),
+        "WPM falhou offset=0x{:X}",
+        offset
+    );
 }
 
 #[test]
@@ -182,7 +187,11 @@ fn e2e_snapshot_detecta_chunks_alterados() {
         in_range.len()
     );
 
-    write_bytes(&guard, DEFAULT_CHUNK_SIZE * 3 + 10, &[0xDE, 0xAD, 0xBE, 0xEF]);
+    write_bytes(
+        &guard,
+        DEFAULT_CHUNK_SIZE * 3 + 10,
+        &[0xDE, 0xAD, 0xBE, 0xEF],
+    );
     write_bytes(&guard, DEFAULT_CHUNK_SIZE * 7, &[0xCA, 0xFE]);
 
     let snap2 = MemorySnapshot::capture_range(&proc, addr, region_size).expect("snap2");
@@ -223,7 +232,10 @@ fn e2e_snapshot_detecta_chunks_alterados() {
         let recomputed = xxh3(&c.bytes);
         assert_eq!(recomputed, c.new_hash);
     }
-    println!("[snap-e2e] PASS: diff_with_bytes retornou {} chunks", changed_in.len());
+    println!(
+        "[snap-e2e] PASS: diff_with_bytes retornou {} chunks",
+        changed_in.len()
+    );
 }
 
 #[test]
@@ -255,10 +267,7 @@ fn benchmark_xxh3_vs_memcmp_100mb() {
         dt_hash,
         hashed
     );
-    println!(
-        "[bench] memcmp direto 100MB: {:?} (eq={})",
-        dt_memcmp, eq
-    );
+    println!("[bench] memcmp direto 100MB: {:?} (eq={})", dt_memcmp, eq);
 
     let max_duration = if cfg!(debug_assertions) {
         Duration::from_millis(2500)
@@ -266,11 +275,7 @@ fn benchmark_xxh3_vs_memcmp_100mb() {
         Duration::from_millis(500)
     };
 
-    assert!(
-        dt_hash < max_duration,
-        "xxh3 muito lento: {:?}",
-        dt_hash
-    );
+    assert!(dt_hash < max_duration, "xxh3 muito lento: {:?}", dt_hash);
 }
 
 #[test]

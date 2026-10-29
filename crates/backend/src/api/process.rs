@@ -1,16 +1,19 @@
+use crate::types::{
+    OnyxMemoryRegion, OnyxModuleEntry, OnyxPeImport, OnyxPeSection, OnyxProcessEntry,
+};
+use onyx_core::kernel::DbkDriver;
+use onyx_core::process::{
+    DbgHelpSymbolEngine, PeInfoParser, Process, ProcessAccessMode, ProcessWatchEvent,
+    ProcessWatcher,
+};
 use std::ffi::{c_void, CStr};
 use std::os::raw::c_char;
 use std::sync::{Arc, Mutex, OnceLock};
-use onyx_core::process::{Process, ProcessAccessMode, ProcessWatcher, ProcessWatchEvent, DbgHelpSymbolEngine, PeInfoParser};
-use onyx_core::kernel::DbkDriver;
-use crate::types::{OnyxModuleEntry, OnyxProcessEntry, OnyxMemoryRegion, OnyxPeSection, OnyxPeImport};
 
 static GLOBAL_DBK: OnceLock<Mutex<Option<Arc<DbkDriver>>>> = OnceLock::new();
 
 fn get_dbk_mutex() -> &'static Mutex<Option<Arc<DbkDriver>>> {
-    GLOBAL_DBK.get_or_init(|| {
-        Mutex::new(DbkDriver::connect().ok().map(Arc::new))
-    })
+    GLOBAL_DBK.get_or_init(|| Mutex::new(DbkDriver::connect().ok().map(Arc::new)))
 }
 
 pub fn get_global_dbk() -> Option<Arc<DbkDriver>> {
@@ -194,7 +197,8 @@ pub unsafe extern "C" fn onyx_process_modules(
             }
             let count = mods.len().min(max_count as usize);
             for i in 0..count {
-                *out_modules.add(i) = OnyxModuleEntry::new(mods[i].base, mods[i].size, &mods[i].name);
+                *out_modules.add(i) =
+                    OnyxModuleEntry::new(mods[i].base, mods[i].size, &mods[i].name);
             }
             count as i32
         }
@@ -365,7 +369,9 @@ pub unsafe extern "C" fn onyx_symbol_load_module(
         Ok(s) => s,
         Err(_) => return 0,
     };
-    (*engine).load_module(path_str, base, size).unwrap_or_default()
+    (*engine)
+        .load_module(path_str, base, size)
+        .unwrap_or_default()
 }
 
 #[no_mangle]
@@ -536,7 +542,11 @@ pub unsafe extern "C" fn onyx_kernel_connect(device_path: *const c_char) -> i32 
 #[no_mangle]
 pub extern "C" fn onyx_kernel_is_connected() -> i32 {
     if let Some(ref dbk) = get_global_dbk() {
-        if dbk.test() { 1 } else { 0 }
+        if dbk.test() {
+            1
+        } else {
+            0
+        }
     } else {
         0
     }
@@ -545,7 +555,11 @@ pub extern "C" fn onyx_kernel_is_connected() -> i32 {
 #[no_mangle]
 pub extern "C" fn onyx_kernel_hide_driver() -> i32 {
     if let Some(ref dbk) = get_global_dbk() {
-        if dbk.hide_driver().is_ok() { 1 } else { 0 }
+        if dbk.hide_driver().is_ok() {
+            1
+        } else {
+            0
+        }
     } else {
         0
     }
@@ -566,7 +580,11 @@ pub extern "C" fn onyx_kernel_strip_callbacks(restore: i32) -> i32 {
 #[no_mangle]
 pub extern "C" fn onyx_kernel_clean_traces() -> i32 {
     if let Some(ref dbk) = get_global_dbk() {
-        if dbk.clean_traces().is_ok() { 1 } else { 0 }
+        if dbk.clean_traces().is_ok() {
+            1
+        } else {
+            0
+        }
     } else {
         0
     }
@@ -575,7 +593,11 @@ pub extern "C" fn onyx_kernel_clean_traces() -> i32 {
 #[no_mangle]
 pub extern "C" fn onyx_kernel_set_protection(pid: u32, enable: i32) -> i32 {
     if let Some(ref dbk) = get_global_dbk() {
-        if dbk.set_protection(pid, enable != 0).is_ok() { 1 } else { 0 }
+        if dbk.set_protection(pid, enable != 0).is_ok() {
+            1
+        } else {
+            0
+        }
     } else {
         0
     }
@@ -584,7 +606,11 @@ pub extern "C" fn onyx_kernel_set_protection(pid: u32, enable: i32) -> i32 {
 #[no_mangle]
 pub extern "C" fn onyx_kernel_freeze_process(pid: u32, freeze: i32) -> i32 {
     if let Some(ref dbk) = get_global_dbk() {
-        if dbk.freeze_process(pid, freeze != 0).is_ok() { 1 } else { 0 }
+        if dbk.freeze_process(pid, freeze != 0).is_ok() {
+            1
+        } else {
+            0
+        }
     } else {
         0
     }
@@ -597,7 +623,11 @@ pub unsafe extern "C" fn onyx_kernel_cloak_symlink(new_symlink: *const c_char) -
     }
     if let Ok(c_str) = CStr::from_ptr(new_symlink).to_str() {
         if let Some(ref dbk) = get_global_dbk() {
-            if dbk.cloak_symlink(c_str).is_ok() { 1 } else { 0 }
+            if dbk.cloak_symlink(c_str).is_ok() {
+                1
+            } else {
+                0
+            }
         } else {
             0
         }
@@ -625,7 +655,8 @@ pub unsafe extern "C" fn onyx_kernel_enum_vad(
                 }
                 let write_count = mods.len().min(max_count as usize);
                 for i in 0..write_count {
-                    *out_modules.add(i) = OnyxModuleEntry::new(mods[i].base, mods[i].size, &mods[i].name);
+                    *out_modules.add(i) =
+                        OnyxModuleEntry::new(mods[i].base, mods[i].size, &mods[i].name);
                 }
                 write_count as i32
             }
