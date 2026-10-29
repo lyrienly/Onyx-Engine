@@ -1,205 +1,180 @@
+//! vehdebug_dll — VEH debugger unificado (Rust).
+//!
+//! Expoe uma superficie C-ABI estavel para a bridge em Pascal
+//! (`UI/VEHDebug/`) manter os workflows antigos funcionando:
+//!
+//! * `InitializeVEH` / `UninitializeVEH` / `UnloadVEH` — ligar/desligar o
+//!   dispatcher central.
+//! * `veh_set_sw_bp` / `veh_set_hw_bp` / `veh_remove_bp` — gerenciar
+//!   breakpoints.
+//! * `veh_poll_hit` — leitura polling para a janela Memory View consumir hits
+//!   sem precisar de IPC complexa (shared-mem fica para a camada Pascal).
+//!
+//! Design detalhado em `veh.rs` e `debugger.rs`.
 
-#![allow(non_snake_case, non_camel_case_types, dead_code, unsafe_op_in_unsafe_fn, static_mut_refs)]
+#![allow(non_snake_case, non_camel_case_types, dead_code, unsafe_op_in_unsafe_fn)]
+#![cfg(windows)]
 
-use std::ffi::c_void;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
+pub mod debugger;
+pub mod ffi;
+pub mod veh;
 
-type BOOL = i32;
-type DWORD = u32;
-type LONG = i32;
-type HANDLE = *mut c_void;
-type HMODULE = *mut c_void;
-type LPVOID = *mut c_void;
-type LPCVOID = *const c_void;
-type PVOID = *mut c_void;
+use crate::ffi::*;
+use crate::debugger::{BpHit, HwBpAccess, HwBpSize, VehDebugger};
+use crate::veh::BreakpointId;
 
-const DLL_PROCESS_ATTACH: DWORD = 1;
-const EXCEPTION_CONTINUE_EXECUTION: LONG = -1;
-const EXCEPTION_CONTINUE_SEARCH: LONG = 0;
+use std::collections::VecDeque;
+use std::sync::{Mutex, OnceLock};
 
-const EXCEPTION_SINGLE_STEP: DWORD = 0x80000004;
-const EXCEPTION_BREAKPOINT: DWORD = 0x80000003;
+// -------------------- Singleton do debugger --------------------
 
-#[repr(C)]
-pub struct EXCEPTION_RECORD {
-    pub ExceptionCode: DWORD,
-    pub ExceptionFlags: DWORD,
-    pub ExceptionRecord: *mut EXCEPTION_RECORD,
-    pub ExceptionAddress: PVOID,
-    pub NumberParameters: DWORD,
-    pub ExceptionInformation: [usize; 15],
+static DEBUGGER: OnceLock<Mutex<Option<VehDebugger>>> = OnceLock::new();
+static HIT_QUEUE: OnceLock<Mutex<VecDeque<BpHit>>> = OnceLock::new();
+
+fn debugger_slot() -> &'static Mutex<Option<VehDebugger>> {
+    DEBUGGER.get_or_init(|| Mutex::new(None))
+}
+fn hit_queue() -> &'static Mutex<VecDeque<BpHit>> {
+    HIT_QUEUE.get_or_init(|| Mutex::new(VecDeque::new()))
 }
 
-#[repr(C, align(16))]
-#[derive(Copy, Clone)]
-pub struct CONTEXT {
-    pub P1Home: u64,
-    pub P2Home: u64,
-    pub P3Home: u64,
-    pub P4Home: u64,
-    pub P5Home: u64,
-    pub P6Home: u64,
-    pub ContextFlags: DWORD,
-    pub MxCsr: DWORD,
-    pub SegCs: u16,
-    pub SegDs: u16,
-    pub SegEs: u16,
-    pub SegFs: u16,
-    pub SegGs: u16,
-    pub SegSs: u16,
-    pub EFlags: DWORD,
-    pub Dr0: u64,
-    pub Dr1: u64,
-    pub Dr2: u64,
-    pub Dr3: u64,
-    pub Dr6: u64,
-    pub Dr7: u64,
-    pub Rax: u64,
-    pub Rcx: u64,
-    pub Rdx: u64,
-    pub Rbx: u64,
-    pub Rsp: u64,
-    pub Rbp: u64,
-    pub Rsi: u64,
-    pub Rdi: u64,
-    pub R8: u64,
-    pub R9: u64,
-    pub R10: u64,
-    pub R11: u64,
-    pub R12: u64,
-    pub R13: u64,
-    pub R14: u64,
-    pub R15: u64,
-    pub Rip: u64,
-}
-
-#[repr(C)]
-pub struct EXCEPTION_POINTERS {
-    pub ExceptionRecord: *mut EXCEPTION_RECORD,
-    pub ContextRecord: *mut CONTEXT,
-}
-
-type PVECTORED_EXCEPTION_HANDLER = unsafe extern "system" fn(*mut EXCEPTION_POINTERS) -> LONG;
-
-#[link(name = "kernel32")]
-unsafe extern "system" {
-    fn DisableThreadLibraryCalls(hLibModule: HMODULE) -> BOOL;
-    fn AddVectoredExceptionHandler(First: u32, Handler: PVECTORED_EXCEPTION_HANDLER) -> PVOID;
-    fn RemoveVectoredExceptionHandler(Handle: PVOID) -> DWORD;
-    fn GetCurrentProcessId() -> DWORD;
-    fn GetCurrentThreadId() -> DWORD;
-    fn CreateNamedPipeA(
-        lpName: *const u8,
-        dwOpenMode: DWORD,
-        dwPipeMode: DWORD,
-        nMaxInstances: DWORD,
-        nOutBufferSize: DWORD,
-        nInBufferSize: DWORD,
-        nDefaultTimeOut: DWORD,
-        lpSecurityAttributes: LPVOID,
-    ) -> HANDLE;
-    fn ConnectNamedPipe(hNamedPipe: HANDLE, lpOverlapped: LPVOID) -> BOOL;
-    fn DisconnectNamedPipe(hNamedPipe: HANDLE) -> BOOL;
-    fn WriteFile(hFile: HANDLE, lpBuffer: LPCVOID, nNumberOfBytesToWrite: DWORD, lpNumberOfBytesWritten: *mut DWORD, lpOverlapped: LPVOID) -> BOOL;
-    fn CloseHandle(hObject: HANDLE) -> BOOL;
-}
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct VehHitReport {
-    pub process_id: u32,
-    pub thread_id: u32,
-    pub rip: u64,
-    pub rax: u64,
-    pub rbx: u64,
-    pub rcx: u64,
-    pub rdx: u64,
-    pub rsi: u64,
-    pub rdi: u64,
-    pub rsp: u64,
-    pub rbp: u64,
-    pub dr6: u64,
-}
-
-static VEH_INITIALIZED: AtomicBool = AtomicBool::new(false);
-static VEH_HANDLER_HANDLE: Mutex<Option<usize>> = Mutex::new(None);
-static LAST_HIT: Mutex<Option<VehHitReport>> = Mutex::new(None);
-
-unsafe extern "system" fn VectoredExceptionHandler(ex: *mut EXCEPTION_POINTERS) -> LONG {
-    if ex.is_null() {
-        return EXCEPTION_CONTINUE_SEARCH;
-    }
-
-    let p_rec = (*ex).ExceptionRecord;
-    let p_ctx = (*ex).ContextRecord;
-
-    if p_rec.is_null() || p_ctx.is_null() {
-        return EXCEPTION_CONTINUE_SEARCH;
-    }
-
-    let code = (*p_rec).ExceptionCode;
-
-    if code == EXCEPTION_SINGLE_STEP {
-        let report = VehHitReport {
-            process_id: GetCurrentProcessId(),
-            thread_id: GetCurrentThreadId(),
-            rip: (*p_ctx).Rip,
-            rax: (*p_ctx).Rax,
-            rbx: (*p_ctx).Rbx,
-            rcx: (*p_ctx).Rcx,
-            rdx: (*p_ctx).Rdx,
-            rsi: (*p_ctx).Rsi,
-            rdi: (*p_ctx).Rdi,
-            rsp: (*p_ctx).Rsp,
-            rbp: (*p_ctx).Rbp,
-            dr6: (*p_ctx).Dr6,
-        };
-
-        if let Ok(mut lock) = LAST_HIT.lock() {
-            *lock = Some(report);
+fn push_hit(hit: BpHit) {
+    if let Ok(mut q) = hit_queue().lock() {
+        if q.len() >= 1024 {
+            q.pop_front();
         }
-
-        (*p_ctx).Dr6 = 0;
-        (*p_ctx).EFlags |= 0x00010000;
-
-        return EXCEPTION_CONTINUE_EXECUTION;
+        q.push_back(hit);
     }
-
-    EXCEPTION_CONTINUE_SEARCH
 }
+
+fn make_sink() -> crate::debugger::HitSink {
+    Box::new(|hit| push_hit(hit))
+}
+
+// -------------------- C-ABI publica --------------------
 
 #[unsafe(no_mangle)]
 pub extern "system" fn InitializeVEH() -> BOOL {
-    if VEH_INITIALIZED.swap(true, Ordering::SeqCst) {
+    let mut slot = match debugger_slot().lock() {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    if slot.is_some() {
         return 1;
     }
-
-    unsafe {
-        let h = AddVectoredExceptionHandler(1, VectoredExceptionHandler);
-        if !h.is_null() {
-            let mut lock = VEH_HANDLER_HANDLE.lock().unwrap();
-            *lock = Some(h as usize);
+    match VehDebugger::new() {
+        Some(dbg) => {
+            *slot = Some(dbg);
             1
-        } else {
-            0
         }
+        None => 0,
     }
+}
+
+/// Encerra o dispatcher, limpa breakpoints e descarrega handlers.
+#[unsafe(no_mangle)]
+pub extern "system" fn UninitializeVEH() -> BOOL {
+    let mut slot = match debugger_slot().lock() {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    *slot = None;
+    1
+}
+
+/// Alias para compatibilidade com `UI/VEHDebug/vehdebug.lpr` que importa
+/// `UnloadVEH`.
+#[unsafe(no_mangle)]
+pub extern "system" fn UnloadVEH() -> BOOL {
+    UninitializeVEH()
+}
+
+/// Instala um software breakpoint. Retorna id > 0 em sucesso, 0 em falha.
+#[unsafe(no_mangle)]
+pub extern "system" fn veh_set_sw_bp(address: u64) -> u64 {
+    let slot = match debugger_slot().lock() {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    match slot.as_ref() {
+        Some(dbg) => dbg
+            .set_sw_bp(address as usize, Some(make_sink()))
+            .map(|id| id.0)
+            .unwrap_or(0),
+        None => 0,
+    }
+}
+
+/// Instala um hardware breakpoint. `access` segue `HwBpAccess` (0=Exec,1=Write,3=RW),
+/// `size` segue `HwBpSize` (0=1B,1=2B,3=4B,2=8B).
+#[unsafe(no_mangle)]
+pub extern "system" fn veh_set_hw_bp(address: u64, dr_index: u32, access: u32, size: u32) -> u64 {
+    let slot = match debugger_slot().lock() {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    let dbg = match slot.as_ref() {
+        Some(d) => d,
+        None => return 0,
+    };
+    let acc = match access {
+        0 => HwBpAccess::Execute,
+        1 => HwBpAccess::Write,
+        3 => HwBpAccess::ReadWrite,
+        _ => return 0,
+    };
+    let sz = match size {
+        0 => HwBpSize::One,
+        1 => HwBpSize::Two,
+        2 => HwBpSize::Eight,
+        3 => HwBpSize::Four,
+        _ => return 0,
+    };
+    dbg.set_hw_bp(address, dr_index as u8, acc, sz, Some(make_sink()))
+        .map(|id| id.0)
+        .unwrap_or(0)
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn UninitializeVEH() -> BOOL {
-    let mut lock = VEH_HANDLER_HANDLE.lock().unwrap();
-    if let Some(h) = lock.take() {
-        unsafe {
-            RemoveVectoredExceptionHandler(h as PVOID);
+pub extern "system" fn veh_remove_bp(id: u64) -> BOOL {
+    let slot = match debugger_slot().lock() {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    match slot.as_ref() {
+        Some(dbg) => {
+            if dbg.remove(BreakpointId(id)) {
+                1
+            } else {
+                0
+            }
         }
-        VEH_INITIALIZED.store(false, Ordering::SeqCst);
-        1
-    } else {
-        0
+        None => 0,
     }
 }
+
+/// Consome um unico hit da fila. Retorna 1 se preencheu `out`, 0 se vazio.
+#[unsafe(no_mangle)]
+pub extern "system" fn veh_poll_hit(out: *mut BpHit) -> BOOL {
+    if out.is_null() {
+        return 0;
+    }
+    let mut q = match hit_queue().lock() {
+        Ok(g) => g,
+        Err(e) => e.into_inner(),
+    };
+    match q.pop_front() {
+        Some(h) => {
+            unsafe {
+                std::ptr::write(out, h);
+            }
+            1
+        }
+        None => 0,
+    }
+}
+
+// -------------------- DllMain --------------------
 
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn DllMain(
@@ -209,8 +184,10 @@ pub unsafe extern "system" fn DllMain(
 ) -> BOOL {
     if fdwReason == DLL_PROCESS_ATTACH {
         DisableThreadLibraryCalls(hinstDLL);
-        InitializeVEH();
+        // Nao instala o VEH automaticamente aqui — a bridge Pascal chama
+        // `InitializeVEH` quando a janela do debugger abrir. Isso evita
+        // efeitos colaterais em processos onde a DLL e injetada mas o
+        // modulo VEH nao sera usado.
     }
     1
 }
-
