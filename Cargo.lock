@@ -1701,6 +1701,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "onyx_hook"
+version = "0.1.0"
+dependencies = [
+ "windows-sys 0.52.0",
+ "zydis",
+]
+
+[[package]]
 name = "onyx_pointer"
 version = "0.1.0"
 dependencies = [
