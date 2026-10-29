@@ -5,6 +5,7 @@ members = [
     "crates/backend",
     "crates/modules/pointer",
     "crates/modules/scanner",
+    "crates/modules/aa",
     "crates/modules/disasm",
     "crates/modules/freezer",
     "crates/dlls/allochook",
