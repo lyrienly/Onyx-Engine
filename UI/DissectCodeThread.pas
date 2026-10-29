@@ -12,7 +12,7 @@ uses
   windows,
   {$endif}
   LCLIntf,sysutils,syncobjs,Classes,disassembler, NewKernelHandler, math,
-  MemoryQuery, CEFuncProc, maps, LastDisassembleData, commonTypeDefs, AvgLvlTree, {$ifdef laztrunk}AVL_Tree{$else}laz_avl_Tree{$endif};
+  MemoryQuery, CEFuncProc, maps, LastDisassembleData, commonTypeDefs, AvgLvlTree;
 
 
 type
@@ -152,7 +152,7 @@ var dissectcode: tdissectcodethread;
 
 implementation
 
-uses ProcessHandlerUnit, parsers, symbolhandler, symbolhandlerstructs, {$ifdef laztrunk}AVL_Tree{$else}laz_avl_Tree{$endif};
+uses ProcessHandlerUnit, parsers, symbolhandler, symbolhandlerstructs;
 
 resourcestring
   rsInvalidDissectCodeFile = 'Invalid dissect code file';
@@ -203,8 +203,8 @@ begin
 end;
 
 procedure TDissectCodeThread.cleanModuleListRelocator;
-var n: TAVLTreeNode;
-  enum: TAVLTreeNodeEnumerator;
+var n: TAvgLvlTreeNode;
+  enum: TAvgLvlTreeNodeEnumerator;
 begin
   enum:=oldAddressToNewAddressTree.GetEnumerator;
 
@@ -255,7 +255,7 @@ end;
 function TDissectCodeThread.ConvertOldAddressToNew(address: ptruint): ptruint;
 var
   searcher: TAddressToNewAddressEntry;
-  n: TAvlTreeNode;
+  n: TAvgLvlTreeNode;
 begin
   result:=address;
   if oldAddressToNewAddressTree<>nil then
