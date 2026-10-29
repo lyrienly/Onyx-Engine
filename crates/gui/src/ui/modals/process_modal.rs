@@ -1,4 +1,3 @@
-
 use eframe::egui::{self, Color32, RichText, Rounding, Stroke, Vec2};
 use crate::app::OnyxEngineApp;
 
@@ -199,4 +198,3 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
         app.show_proc_modal = false;
     }
 }
-

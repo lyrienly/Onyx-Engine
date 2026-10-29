@@ -1,16 +1,8 @@
-/*
- * vmeventhandler_amd.h
- *
- *  Created on: May 22, 2013
- *      Author: eric
- */
-
 #ifndef VMEVENTHANDLER_AMD_H_
 #define VMEVENTHANDLER_AMD_H_
 
 #include "vmmhelper.h"
 
-//define Exit codes:
 #define VMEXIT_CR0_READ  0x00
 #define VMEXIT_CR1_READ  0x01
 #define VMEXIT_CR2_READ  0x02
@@ -157,14 +149,11 @@
 #define VMEXIT_MWAIT       0x8b
 #define VMEXIT_MWAIT_CONDITIONAL 0x8c
 #define VMEXIT_XSETBV      0x8d
-#define VMEXIT_NPF         0x400 //nested paging pagefault. (Note for future: Look up possible (ab)use for stealthedit)
+#define VMEXIT_NPF         0x400
 #define AVIC_INCOMPLETE_IPI 0x401
 #define AVIC_NOACCEL       0x402
 #define VMEXIT_INVALID     -1
 
-
-
 int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE64 *fxsave);
 
-
-#endif /* VMEVENTHANDLER_AMD_H_ */
+#endif

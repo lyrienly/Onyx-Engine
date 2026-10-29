@@ -1,14 +1,3 @@
-//! Despeja os registradores de depuração (DR0..DR3, DR6, DR7) de cada thread
-//! de um processo. Usado para validar fisicamente a Etapa 3 do CHECKLIST
-//! (guarda do clearDebugRegisters) e para diagnosticar conflito de slots.
-//!
-//! Uso:
-//!   dr_dump.exe <pid>
-//!
-//! Para cada thread imprime os quatro endereços, DR6 e DR7. Um slot só está
-//! ativo quando o bit de habilitação correspondente em DR7 está ligado
-//! (bits 0, 2, 4 e 6 para DR0..DR3).
-
 use onyx_core::debugger::read_thread_debug_registers;
 use onyx_core::process::Process;
 

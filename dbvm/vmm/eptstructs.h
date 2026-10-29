@@ -1,117 +1,107 @@
-/*
- * eptstructs.h
- *
- *  Created on: Mar 12, 2018
- *      Author: erich
- */
-
 #ifndef VMM_EPTSTRUCTS_H_
 #define VMM_EPTSTRUCTS_H_
 
 #include "common.h"
 #include "vmcallstructs.h"
 
-//the EPT fields are pretty much the same as normal paging fields, Read==Present, RW=write etc... BUT the A and D bits access fields used for other things that WILL cause bad effects.
-//so do NOT map them as page tables for easy editing
-
 typedef struct _EPT_PML4E
 {
-  unsigned RA        :  1; // Read Access
-  unsigned WA        :  1; // Write Access
-  unsigned XA        :  1; // Execute access (supervisor mode in mode-based execute control for EPT)
-  unsigned reserved  :  5; //
-  unsigned Accessed  :  1; // Accessed. (if EPTP[6]==1)
-  unsigned ignored   :  1; //
-  unsigned XA_UM     :  1; // Execute access (usermode in mode-based execute control fopr EPT)
-  unsigned ignored2  :  1; //
-  unsigned long long PFN       : 36; //physical address of EPT pagedirptr
-  unsigned reserved2 :  4;  //must be 0
+  unsigned RA        :  1;
+  unsigned WA        :  1;
+  unsigned XA        :  1;
+  unsigned reserved  :  5;
+  unsigned Accessed  :  1;
+  unsigned ignored   :  1;
+  unsigned XA_UM     :  1;
+  unsigned ignored2  :  1;
+  unsigned long long PFN       : 36;
+  unsigned reserved2 :  4;
   unsigned reserved3 : 12;
 
 } __attribute__((__packed__)) EPT_PML4E, *PEPT_PML4E;
 
 typedef struct _EPT_PDPTE
 {
-  unsigned RA        :  1; // 0: Read Access
-  unsigned WA        :  1; // 1: Write Access
-  unsigned XA        :  1; // 2: Execute access (supervisor mode in mode-based execute control for EPT)
-  unsigned MEMTYPE   :  3; // 3-5: BIG=1: EPT memory type (28.2.6)
-  unsigned PAT_IGNORE:  1; // 6: BIG=1: Ignore PAT type
-  unsigned BIG       :  1; // 7: 1 if it points to a 1 GB physical memory block, 0 if it points to a pagedir
-  unsigned Accessed  :  1; // Accessed. (if EPTP[6]==1)
-  unsigned Dirty     :  1; //
-  unsigned XA_UM     :  1; // Execute access (usermode in mode-based execute control fopr EPT)
-  unsigned ignored2  :  1; //
-  unsigned long long PFN       : 36; //physical address of EPT pagedir (if big==0) else available physical memory (bit 12-29 must be 0 if big==1)
-  unsigned reserved2 :  4;  //must be 0
+  unsigned RA        :  1;
+  unsigned WA        :  1;
+  unsigned XA        :  1;
+  unsigned MEMTYPE   :  3;
+  unsigned PAT_IGNORE:  1;
+  unsigned BIG       :  1;
+  unsigned Accessed  :  1;
+  unsigned Dirty     :  1;
+  unsigned XA_UM     :  1;
+  unsigned ignored2  :  1;
+  unsigned long long PFN       : 36;
+  unsigned reserved2 :  4;
   unsigned ignored3  : 11;
-  unsigned VESupress :  1; //disable #VE exception if EPT-violation #VE is 1 (if big==0)
+  unsigned VESupress :  1;
 } __attribute__((__packed__)) EPT_PDPTE, *PEPT_PDPTE;
 
 typedef struct _EPT_PDE
 {
-  unsigned RA        :  1; // 0: Read Access
-  unsigned WA        :  1; // 1: Write Access
-  unsigned XA        :  1; // 2: Execute access (supervisor mode in mode-based execute control for EPT)
-  unsigned MEMTYPE   :  3; // 3-5: BIG=1: EPT memory type (28.2.6)
-  unsigned PAT_IGNORE:  1; // 6: BIG=1: Ignore PAT type
-  unsigned BIG       :  1; // 7: 1 if it points to a 1 GB physical memory block, 0 if it points to a pagedir
-  unsigned Accessed  :  1; // 8: Accessed. (if EPTP[6]==1)
-  unsigned Dirty     :  1; // 9:
-  unsigned XA_UM     :  1; // 10: Execute access (usermode in mode-based execute control fopr EPT)
-  unsigned ignored2  :  1; // 11:
-  unsigned long long PFN       : 36; //physical address of EPT pagetable (if big==0) else available physical memory (bit 12-20 must be 0 if big==1)
-  unsigned reserved2 :  4; //must be 0
+  unsigned RA        :  1;
+  unsigned WA        :  1;
+  unsigned XA        :  1;
+  unsigned MEMTYPE   :  3;
+  unsigned PAT_IGNORE:  1;
+  unsigned BIG       :  1;
+  unsigned Accessed  :  1;
+  unsigned Dirty     :  1;
+  unsigned XA_UM     :  1;
+  unsigned ignored2  :  1;
+  unsigned long long PFN       : 36;
+  unsigned reserved2 :  4;
   unsigned ignored3  : 11;
-  unsigned VESupress :  1; //BIG=1: disable #VE exception if EPT-violation #VE is 1
+  unsigned VESupress :  1;
 } __attribute__((__packed__)) EPT_PDE, *PEPT_PDE;
 
 typedef struct _EPT_PTE
 {
-  unsigned RA        :  1; // 0: Read Access
-  unsigned WA        :  1; // 1: Write Access
-  unsigned XA        :  1; // 2: Execute access (supervisor mode in mode-based execute control for EPT)
-  unsigned MEMTYPE   :  3; // 3-5: EPT memory type (28.2.6)
-  unsigned PAT_IGNORE:  1; // 6: Ignore PAT type
-  unsigned ignored   :  1; // 7:
-  unsigned Accessed  :  1; // 8: Accessed. (if EPTP[6]==1)
-  unsigned Dirty     :  1; // 9:
-  unsigned XA_UM     :  1; // 10: Execute access (usermode in mode-based execute control fopr EPT)
-  unsigned ignored2  :  1; // 11:
-  unsigned long long PFN       : 36; //physical address of EPT pagetable (if big==0) else available physical memory (bit 12-20 must be 0 if big==1)
-  unsigned reserved2 :  4; //must be 0
+  unsigned RA        :  1;
+  unsigned WA        :  1;
+  unsigned XA        :  1;
+  unsigned MEMTYPE   :  3;
+  unsigned PAT_IGNORE:  1;
+  unsigned ignored   :  1;
+  unsigned Accessed  :  1;
+  unsigned Dirty     :  1;
+  unsigned XA_UM     :  1;
+  unsigned ignored2  :  1;
+  unsigned long long PFN       : 36;
+  unsigned reserved2 :  4;
   unsigned ignored3  : 11;
-  unsigned VESupress :  1; //disable #VE exception if EPT-violation #VE is 1
+  unsigned VESupress :  1;
 } __attribute__((__packed__)) EPT_PTE, *PEPT_PTE;
 
 typedef struct _EPTP
 {
-  unsigned MEMTYPE        :  3; // paging structure type
-  unsigned PAGEWALKLENGTH :  3; // ept page walk lenght-1
-  unsigned ACCESSFLAGS    :  1; // Support Accessed/Dirty flags
-  unsigned reserved       :  5; //
-  unsigned long long PFN            : 36; //physical address of PML4 table
-  unsigned reserved2      : 16; //must be 0
+  unsigned MEMTYPE        :  3;
+  unsigned PAGEWALKLENGTH :  3;
+  unsigned ACCESSFLAGS    :  1;
+  unsigned reserved       :  5;
+  unsigned long long PFN            : 36;
+  unsigned reserved2      : 16;
 } __attribute__((__packed__)) EPTP, *PEPTP;
 
 typedef union _EPT_VIOLATION_INFO
 {
   QWORD ExitQualification;
   struct{
-    unsigned R        :  1; // 0: Read Access
-    unsigned W        :  1; // 1: Write Access
-    unsigned X        :  1; // 2: Execute access (supervisor mode in mode-based execute control for EPT)
-    unsigned WasReadable   :  1; //
-    unsigned WasWritable   :  1; //
-    unsigned WasExecutable :  1; //
-    unsigned ANDb10   :  1; // if mode-based execute control else undefined
+    unsigned R        :  1;
+    unsigned W        :  1;
+    unsigned X        :  1;
+    unsigned WasReadable   :  1;
+    unsigned WasWritable   :  1;
+    unsigned WasExecutable :  1;
+    unsigned ANDb10   :  1;
     unsigned GuestLinearAddressValid: 1;
-    unsigned AddressAccess: 1; //if GuestLinearAddressValid then 1 if the access was to a page, 0 if it was in the paging system
-    //only defined if GuestLinearAddressValid & AddressAccess == 1 and advanced VM-exit information for EPT violations
-    unsigned supervisor     : 1; //1 if supervisor, 0 if usermode
-    unsigned pagingreadonly : 1; //1 if paged as read only, 0 if read/write
-    unsigned XD             : 1; //1 if execute disable, 0 if executable
-    unsigned NMIUnblockedDueToIRET : 1; //
+    unsigned AddressAccess: 1;
+
+    unsigned supervisor     : 1;
+    unsigned pagingreadonly : 1;
+    unsigned XD             : 1;
+    unsigned NMIUnblockedDueToIRET : 1;
     unsigned reserved1      : 19;
     DWORD reserved2;
   };
@@ -121,20 +111,16 @@ typedef union _NP_VIOLATION_INFO
 {
   QWORD ErrorCode;
   struct{
-    unsigned P        :  1; // 0: 0 if not present
-    unsigned W        :  1; // 1: 1 if it was a write access
-    unsigned US       :  1; // 2: 1 if it was a usermode execution
-    unsigned RSRVD    :  1; // 3: 1 if a reserved bit was set
-    unsigned ID       :  1; // 4: 1 if it was a code fetch
+    unsigned P        :  1;
+    unsigned W        :  1;
+    unsigned US       :  1;
+    unsigned RSRVD    :  1;
+    unsigned ID       :  1;
     unsigned reserved1: 27;
-    unsigned gfa      :  1; // 32:guest final addr ess
-    unsigned gpt      :  1; // 33:guest page table
+    unsigned gfa      :  1;
+    unsigned gpt      :  1;
   };
 } __attribute__((__packed__)) NP_VIOLATION_INFO, *PNP_VIOLATION_INFO;
-
-
-
-//pagewatch:
 
 typedef struct _fxsave64
 {
@@ -209,12 +195,11 @@ typedef struct _fxsave64
   QWORD res6_H;
 } FXSAVE64, *PFXSAVE64;
 
-
 typedef struct _pageevent_basic
 {
   QWORD VirtualAddress;
   QWORD PhysicalAddress;
-  QWORD CR3; //in case of kernel or other process
+  QWORD CR3;
   QWORD FSBASE;
   QWORD GSBASE;
   QWORD GSBASE_KERNEL;
@@ -248,7 +233,7 @@ typedef struct _pageevent_basic
   WORD SS;
   WORD FS;
   WORD GS;
-  DWORD Count; //number of times this block has been seen, or heartbeat when used for internal dbvm bp
+  DWORD Count;
 } PageEventBasic, *PPageEventBasic;
 
 typedef struct _pageevent_extended
@@ -280,8 +265,8 @@ typedef struct _pageeventlistdescriptor
   DWORD ID;
   DWORD maxNumberOfEntries;
   DWORD numberOfEntries;
-  DWORD missedEntries; //number of entries missed because the list was full
-  DWORD entryType; //0=PageEventBasic, 1=PageEventExtended, 2=PageEventBasicWithStack, 3=PageEventExtendedWithStack
+  DWORD missedEntries;
+  DWORD entryType;
   union
   {
     PageEventBasic basic[0];
@@ -296,33 +281,31 @@ typedef struct
 {
   QWORD PhysicalAddress;
   int Size;
-  int Type; //0=write, 1=access,2=execute
+  int Type;
   DWORD Options;
   QWORD LoopUserMode;
   QWORD LoopKernelMode;
   int Active;
-  int CopyInProgress; //if 1 events will be ignored
+  int CopyInProgress;
   PPageEventListDescriptor Log;
 } EPTWatchEntry, *PEPTWatchEntry;
 
 typedef struct
 {
-  QWORD PhysicalAddressExecutable; //the PA of the original page and used for execute
-  QWORD PhysicalAddressData; //the PA of the page shown when read/write operations happen
+  QWORD PhysicalAddressExecutable;
+  QWORD PhysicalAddressData;
   void *Data;
   void *Executable;
   QWORD CloakMode;
   union
   {
-    PEPT_PTE eptentry[0]; //for every cpu hold the ept entry (PTE_PAE entry on AMD)
+    PEPT_PTE eptentry[0];
     PPTE_PAE npentry[0];
   };
 
-  //debug info
   BYTE InvokingCPU;
   BYTE LastWritingCPU;
 } CloakedPageData, *PCloakedPageData;
-
 
 typedef struct
 {
@@ -335,19 +318,18 @@ typedef struct
 
 typedef struct
 {
-  int triggered; //set to true if it has been started
+  int triggered;
   QWORD triggeredcr3;
   QWORD triggeredfsbase;
   QWORD triggeredgsbase;
-  int count; //number of steps left to log
+  int count;
 
   int shouldquit;
   int finished;
   QWORD PhysicalAddress;
   unsigned char originalbyte;
-  PCloakedPageData cloakdata; //needed to disable it
+  PCloakedPageData cloakdata;
 
-  //copy from here to the client
   int datatype;
   int numberOfEntries;
   union
@@ -362,15 +344,14 @@ typedef struct
 
 typedef struct
 {
-  int inuse;//1 if this entry contains a thread
-  int continueMethod; //0=no, 1=single step, 2=run  (resets to 0 after taking a step.  if 2 then inuse turns false
-  int watchid; //the watchid that caused the break.  -1 if it's a single step
+  int inuse;
+  int continueMethod;
+  int watchid;
 
-  QWORD UserModeLoop; //where to go to after a step
+  QWORD UserModeLoop;
   QWORD KernelModeLoop;
 
-  PageEventExtended state; //contains CR3, FSBASE and GSBASE
+  PageEventExtended state;
 } BrokenThreadEntry, *PBrokenThreadEntry;
 
-
-#endif /* VMM_EPTSTRUCTS_H_ */
+#endif

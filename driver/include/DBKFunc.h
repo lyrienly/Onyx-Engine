@@ -34,7 +34,7 @@ typedef struct tagINT_VECTOR
 
 #pragma pack(2)
 typedef struct tagIDT
-{    
+{
     WORD wLimit;
 	PINT_VECTOR vector;
 } IDT, *PIDT;
@@ -48,7 +48,6 @@ void GetIDT(PIDT pIdt);
 
 int _fltused;
 
-
 typedef VOID F(UINT_PTR param);
 typedef F *PF;
 
@@ -56,17 +55,13 @@ typedef VOID PREDPC_CALLBACK(CCHAR cpunr, PKDEFERRED_ROUTINE Dpc, PVOID Deferred
 
 typedef PREDPC_CALLBACK *PPREDPC_CALLBACK;
 
-
 typedef struct _criticalSection
 {
   LONG locked;
-  int cpunr; //unique id for a cpu
+  int cpunr;
   int lockcount;
   int oldIFstate;
 } criticalSection, *PcriticalSection;
-
-
-//ntosp.h
 
 typedef
 _Function_class_(KNORMAL_ROUTINE)
@@ -98,7 +93,6 @@ KKERNEL_ROUTINE(
 );
 typedef KKERNEL_ROUTINE *PKKERNEL_ROUTINE;
 
-
 typedef
 _Function_class_(KRUNDOWN_ROUTINE)
 _IRQL_requires_max_(PASSIVE_LEVEL)
@@ -110,7 +104,6 @@ KRUNDOWN_ROUTINE(
 	_In_ struct _KAPC *Apc
 );
 typedef KRUNDOWN_ROUTINE *PKRUNDOWN_ROUTINE;
-
 
 typedef
 _IRQL_requires_same_
@@ -131,8 +124,6 @@ typedef enum _KAPC_ENVIRONMENT {
 	InsertApcEnvironment
 } KAPC_ENVIRONMENT;
 
-
-
 NTKERNELAPI
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_min_(PASSIVE_LEVEL)
@@ -144,7 +135,6 @@ KeEnumerateQueueApc(
 	_In_ PVOID Context,
 	_In_opt_ KPROCESSOR_MODE *ApcMode
 );
-
 
 NTKERNELAPI
 _IRQL_requires_same_
@@ -177,8 +167,6 @@ KeInsertQueueApc(
 	_In_ KPRIORITY Increment
 );
 
-
-
 NTSYSAPI
 NTSTATUS
 NTAPI
@@ -189,50 +177,39 @@ ZwOpenThread(
 	IN PCLIENT_ID           ClientId
 );
 
-
-
 struct PTEStruct
 {
-	unsigned P         :  1; // present (1 = present)
-	unsigned RW        :  1; // read/write
-	unsigned US        :  1; // user/supervisor
-	unsigned PWT       :  1; // page-level write-through
-	unsigned PCD       :  1; // page-level cache disabled
-	unsigned A         :  1; // accessed
-	unsigned Reserved  :  1; // dirty
-	unsigned PS        :  1; // page size (0 = 4-KB page)
-	unsigned G         :  1; // global page
-	unsigned A1		   :  1; // available 1 aka copy-on-write
-	unsigned A2		   :  1; // available 2/ is 1 when paged to disk
-	unsigned A3		   :  1; // available 3
-	unsigned PFN       : 20; // page-frame number
+	unsigned P         :  1;
+	unsigned RW        :  1;
+	unsigned US        :  1;
+	unsigned PWT       :  1;
+	unsigned PCD       :  1;
+	unsigned A         :  1;
+	unsigned Reserved  :  1;
+	unsigned PS        :  1;
+	unsigned G         :  1;
+	unsigned A1		   :  1;
+	unsigned A2		   :  1;
+	unsigned A3		   :  1;
+	unsigned PFN       : 20;
 };
-
-//typedef struct PTEStruct *PPDPTE;
-//typedef struct PTEStruct *PPDE;
-//typedef struct PTEStruct *PPTE;
 
 struct PTEStruct64
 {
-	unsigned long long P : 1; // present (1 = present)
-	unsigned long long RW : 1; // read/write
-	unsigned long long US : 1; // user/supervisor
-	unsigned long long PWT : 1; // page-level write-through
-	unsigned long long PCD : 1; // page-level cache disabled
-	unsigned long long A : 1; // accessed
-	unsigned long long Reserved : 1; // dirty
-	unsigned long long PS : 1; // page size (0 = 4-KB page)
-	unsigned long long G : 1; // global page
-	unsigned long long A1 : 1; // available 1 aka copy-on-write
-	unsigned long long A2 : 1; // available 2/ is 1 when paged to disk
-	unsigned long long A3 : 1; // available 3
-	unsigned long long PFN : 52; // page-frame number
+	unsigned long long P : 1;
+	unsigned long long RW : 1;
+	unsigned long long US : 1;
+	unsigned long long PWT : 1;
+	unsigned long long PCD : 1;
+	unsigned long long A : 1;
+	unsigned long long Reserved : 1;
+	unsigned long long PS : 1;
+	unsigned long long G : 1;
+	unsigned long long A1 : 1;
+	unsigned long long A2 : 1;
+	unsigned long long A3 : 1;
+	unsigned long long PFN : 52;
 };
-
-//typedef struct PTEStruct64 *PPDPTE_PAE;
-//typedef struct PTEStruct64 *PPDE_PAE;
-//typedef struct PTEStruct64 *PPTE_PAE;
-
 
 typedef struct tagDebugregs
 {
@@ -245,32 +222,30 @@ typedef struct tagDebugregs
 	ULONG DR7;
 } Debugregs;
 
-
-
-typedef struct 
+typedef struct
 {
-	unsigned CF			:1; // 0
-	unsigned reserved1	:1; // 1
-	unsigned PF			:1; // 2
-	unsigned reserved2	:1; // 3
-	unsigned AF			:1; // 4
-	unsigned reserved3	:1; // 5
-	unsigned ZF			:1; // 6
-	unsigned SF			:1; // 7
-	unsigned TF			:1; // 8
-	unsigned IF			:1; // 9
-	unsigned DF			:1; // 10
-	unsigned OF			:1; // 11
-	unsigned IOPL		:2; // 12+13
-	unsigned NT			:1; // 14
-	unsigned reserved4	:1; // 15
-	unsigned RF			:1; // 16
-	unsigned VM			:1; // 17
-	unsigned AC			:1; // 18
-	unsigned VIF		:1; // 19
-	unsigned VIP		:1; // 20
-	unsigned ID			:1; // 21
-	unsigned reserved5	:10; // 22-31
+	unsigned CF			:1;
+	unsigned reserved1	:1;
+	unsigned PF			:1;
+	unsigned reserved2	:1;
+	unsigned AF			:1;
+	unsigned reserved3	:1;
+	unsigned ZF			:1;
+	unsigned SF			:1;
+	unsigned TF			:1;
+	unsigned IF			:1;
+	unsigned DF			:1;
+	unsigned OF			:1;
+	unsigned IOPL		:2;
+	unsigned NT			:1;
+	unsigned reserved4	:1;
+	unsigned RF			:1;
+	unsigned VM			:1;
+	unsigned AC			:1;
+	unsigned VIF		:1;
+	unsigned VIP		:1;
+	unsigned ID			:1;
+	unsigned reserved5	:10;
 #ifdef AMD64
 	unsigned reserved6	:8;
 	unsigned reserved7	:8;
@@ -281,21 +256,21 @@ typedef struct
 
 typedef struct tagDebugReg7
 {
-	unsigned L0			:1; //			0
-	unsigned G0			:1; //			1
-	unsigned L1			:1; //			2
-	unsigned G1			:1; //			3
-	unsigned L2			:1; //			4
-	unsigned G2			:1; //			5
-	unsigned L3			:1; //			6
-	unsigned G3			:1; //			7
-	unsigned GL			:1; //			8
-	unsigned GE			:1; //			9
-	unsigned undefined_1: 1; //1       10
-	unsigned RTM		: 1; //        11
-	unsigned undefined_0: 1; //0       12
-	unsigned GD			:1; //		   13
-	unsigned undefined2	:2; // 00 
+	unsigned L0			:1;
+	unsigned G0			:1;
+	unsigned L1			:1;
+	unsigned G1			:1;
+	unsigned L2			:1;
+	unsigned G2			:1;
+	unsigned L3			:1;
+	unsigned G3			:1;
+	unsigned GL			:1;
+	unsigned GE			:1;
+	unsigned undefined_1: 1;
+	unsigned RTM		: 1;
+	unsigned undefined_0: 1;
+	unsigned GD			:1;
+	unsigned undefined2	:2;
 	unsigned RW0		:2;
 	unsigned LEN0		:2;
 	unsigned RW1		:2;
@@ -318,12 +293,12 @@ typedef struct DebugReg6
 	unsigned B1			:1;
 	unsigned B2			:1;
 	unsigned B3			:1;
-	unsigned undefined1	:9; // 011111111
+	unsigned undefined1	:9;
 	unsigned BD			:1;
 	unsigned BS			:1;
 	unsigned BT			:1;
-	unsigned RTM       : 1; //0=triggered
-	unsigned undefined2	:15; // 111111111111111
+	unsigned RTM       : 1;
+	unsigned undefined2	:15;
 #ifdef AMD64
 	unsigned undefined3	:8;
 	unsigned undefined4	:8;
@@ -332,18 +307,13 @@ typedef struct DebugReg6
 #endif
 } DebugReg6;
 
-
-
-
-#pragma pack(2) //allignment of 2 bytes
+#pragma pack(2)
 typedef struct tagGDT
-{    
+{
     WORD wLimit;
 	PVOID vector;
 } GDT, *PGDT;
 #pragma pack()
-
-//UCHAR BufferSize;
 
 void GetIDT(PIDT pIdt);
 
@@ -357,8 +327,6 @@ void GetGDT(PGDT pGdt);
 WORD GetLDT();
 WORD GetTR(void);
 #endif
-
-
 
 UINT64 readMSR(DWORD msr);
 UINT64 getDR7(void);
@@ -416,7 +384,6 @@ extern UINT64 getR15(void);
 extern UINT64 getAccessRights(UINT64 segment);
 extern UINT64 getSegmentLimit(UINT64 segment);
 
-
 int getCpuCount(void);
 
 BOOL loadedbydbvm;
@@ -440,7 +407,6 @@ EFLAGS getEflags(void);
 int cpunr(void);
 void disableInterrupts(void);
 void enableInterrupts(void);
-
 
 void csEnter(PcriticalSection CS);
 void csLeave(PcriticalSection CS);

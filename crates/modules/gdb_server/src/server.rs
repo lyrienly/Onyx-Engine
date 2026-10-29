@@ -1,9 +1,3 @@
-//! loop de servidor rsp sobre tcp.
-//!
-//! o metodo publico `GdbServer::listen` abre uma socket e aceita um cliente;
-//! `serve_connection` roda o loop de pacotes contra qualquer `Read + Write`
-//! (facilita teste in-process).
-
 use crate::protocol::{
     bytes_to_hex, encode_packet, hex_to_bytes, parse_hex_u64, parse_packet, Packet, ParseError,
 };
@@ -14,10 +8,9 @@ use std::net::{TcpListener, ToSocketAddrs};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
-/// resposta de alto nivel pros handlers.
 enum Resp {
     Reply(Vec<u8>),
-    Empty, // "" — comando desconhecido
+    Empty,
     Terminate,
 }
 
@@ -26,7 +19,7 @@ pub struct GdbServer {
 }
 
 impl GdbServer {
-    /// escuta em `addr`, aceita UM cliente, roda a sessao numa thread.
+
     pub fn listen<A, T>(addr: A, target: Arc<Mutex<T>>) -> io::Result<Self>
     where
         A: ToSocketAddrs,
@@ -43,7 +36,6 @@ impl GdbServer {
     }
 }
 
-/// loop principal: le pacotes de `reader`, responde em `writer`, delega ao `target`.
 pub fn serve_connection<R, W, T>(
     reader: &mut R,
     writer: &mut W,
@@ -58,12 +50,12 @@ where
     let mut tmp = [0u8; 4096];
 
     loop {
-        // tenta extrair um pacote inteiro antes de ler mais.
+
         loop {
             match parse_packet(&buf) {
                 Ok((pkt, used)) => {
                     buf.drain(..used);
-                    writer.write_all(b"+")?; // ack
+                    writer.write_all(b"+")?;
                     writer.flush()?;
                     let resp = handle_packet(&pkt, target);
                     match resp {
@@ -85,7 +77,7 @@ where
                 }
                 Err(ParseError::Incomplete) => break,
                 Err(ParseError::MissingStart) => {
-                    // descarta um byte de lixo e tenta de novo
+
                     if !buf.is_empty() {
                         buf.remove(0);
                     } else {
@@ -93,7 +85,7 @@ where
                     }
                 }
                 Err(ParseError::BadChecksum { .. }) | Err(ParseError::BadHex) => {
-                    // nack e descarta ate o fim do pacote
+
                     writer.write_all(b"-")?;
                     writer.flush()?;
                     if let Some(pos) = buf.iter().position(|&b| b == b'#') {
@@ -118,7 +110,6 @@ fn handle_packet<T: GdbTarget>(pkt: &Packet, target: &Arc<Mutex<T>>) -> Resp {
     let data = &pkt.data[..];
     let text = std::str::from_utf8(data).unwrap_or("");
 
-    // interrupcao enviada como byte 0x03 crua — nao chega aqui pois nao vem num pacote.
     if data.is_empty() {
         return Resp::Empty;
     }
@@ -146,7 +137,7 @@ fn handle_packet<T: GdbTarget>(pkt: &Packet, target: &Arc<Mutex<T>>) -> Resp {
             }
         }
         b'm' => {
-            // m<addr>,<len>
+
             let rest = &text[1..];
             let (addr_s, len_s) = match rest.split_once(',') {
                 Some(x) => x,
@@ -166,7 +157,7 @@ fn handle_packet<T: GdbTarget>(pkt: &Packet, target: &Arc<Mutex<T>>) -> Resp {
             }
         }
         b'M' => {
-            // M<addr>,<len>:<hex>
+
             let rest = &text[1..];
             let (head, data_hex) = match rest.split_once(':') {
                 Some(x) => x,
@@ -190,7 +181,7 @@ fn handle_packet<T: GdbTarget>(pkt: &Packet, target: &Arc<Mutex<T>>) -> Resp {
             }
         }
         b'p' => {
-            // p<n>
+
             let idx = match parse_hex_u64(&text[1..]) {
                 Ok(v) => v as usize,
                 Err(_) => return Resp::Reply(b"E22".to_vec()),
@@ -205,7 +196,7 @@ fn handle_packet<T: GdbTarget>(pkt: &Packet, target: &Arc<Mutex<T>>) -> Resp {
             }
         }
         b'P' => {
-            // P<n>=<val-hex-le>
+
             let rest = &text[1..];
             let (n_s, v_s) = match rest.split_once('=') {
                 Some(x) => x,
@@ -256,7 +247,7 @@ fn handle_packet<T: GdbTarget>(pkt: &Packet, target: &Arc<Mutex<T>>) -> Resp {
         }
         b'k' => Resp::Terminate,
         b'D' => Resp::Reply(b"OK".to_vec()),
-        b'H' => Resp::Reply(b"OK".to_vec()), // thread select — one-thread
+        b'H' => Resp::Reply(b"OK".to_vec()),
         b'Z' | b'z' => handle_breakpoint(text, target),
         b'q' => handle_query(text, target),
         b'v' => handle_v(text),
@@ -265,7 +256,7 @@ fn handle_packet<T: GdbTarget>(pkt: &Packet, target: &Arc<Mutex<T>>) -> Resp {
 }
 
 fn handle_breakpoint<T: GdbTarget>(text: &str, target: &Arc<Mutex<T>>) -> Resp {
-    // formato: {Z|z}<type>,<addr>,<kind>
+
     let add = text.starts_with('Z');
     let rest = &text[1..];
     let mut parts = rest.split(',');
@@ -300,7 +291,7 @@ fn handle_breakpoint<T: GdbTarget>(text: &str, target: &Arc<Mutex<T>>) -> Resp {
         (0, false) => t.remove_sw_breakpoint(addr, kind),
         (1, true) => t.add_hw_breakpoint(addr, kind),
         (1, false) => t.remove_hw_breakpoint(addr, kind),
-        _ => return Resp::Empty, // tipos nao suportados -> "" (deixa gdb saber)
+        _ => return Resp::Empty,
     };
     match r {
         Ok(()) => Resp::Reply(b"OK".to_vec()),

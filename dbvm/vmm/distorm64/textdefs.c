@@ -1,34 +1,9 @@
-/*
-textdefs.c
-
-Copyright (C) 2003-2008 Gil Dabah, http://ragestorm.net/distorm/
-This library is licensed under the BSD license. See the file COPYING.
-*/
-
-
 #include "textdefs.h"
 
 int8_t SEP_STR[] = ", ";
 
-/*
- * REMARK: The reason I use static table is to avoid dynamic allocation
- * and finally the manual call to "free all memory" which is irritating.
-
- * 8bits, unsigned text representation prebuilt made for optimizations.
- * The range it covers varies is from 0 to 256.
- */
-
 int8_t TextBTable[256][4] = {
-/*
-* !!NOTE!! str_hex_sp_b is based on this elements' length.
-* def prebuilt():
-* 	s = ""
-* 	for i in xrange(256):
-* 		if ((i % 0x10) == 0):
-* 			s += "\r\n"
-* 		s += "\" %02x\", " % (i)
-* 	return s
-*/
+
 " 00", " 01", " 02", " 03", " 04", " 05", " 06", " 07", " 08", " 09", " 0a", " 0b", " 0c", " 0d", " 0e", " 0f",
 " 10", " 11", " 12", " 13", " 14", " 15", " 16", " 17", " 18", " 19", " 1a", " 1b", " 1c", " 1d", " 1e", " 1f",
 " 20", " 21", " 22", " 23", " 24", " 25", " 26", " 27", " 28", " 29", " 2a", " 2b", " 2c", " 2d", " 2e", " 2f",
@@ -47,17 +22,8 @@ int8_t TextBTable[256][4] = {
 " f0", " f1", " f2", " f3", " f4", " f5", " f6", " f7", " f8", " f9", " fa", " fb", " fc", " fd", " fe", " ff"};
 
 int8_t TextHBTable[256][6] = {
-/*
- !!NOTE!! str_code_sp_hb is based on this elements' length.
-* def prebuilt():
-* 	s = ""
-* 	for i in xrange(256):
-* 		if ((i % 0x10) == 0):
-* 			s += "\r\n"
-* 		s += "\" 0x%x\", " % (i)
-* 	return s
-*/
-" 0x0", " 0x1", " 0x2", " 0x3", " 0x4", " 0x5", " 0x6", " 0x7", " 0x8", " 0x9", " 0xa", " 0xb", " 0xc", " 0xd", " 0xe", " 0xf", 
+
+" 0x0", " 0x1", " 0x2", " 0x3", " 0x4", " 0x5", " 0x6", " 0x7", " 0x8", " 0x9", " 0xa", " 0xb", " 0xc", " 0xd", " 0xe", " 0xf",
 " 0x10", " 0x11", " 0x12", " 0x13", " 0x14", " 0x15", " 0x16", " 0x17", " 0x18", " 0x19", " 0x1a", " 0x1b", " 0x1c", " 0x1d", " 0x1e", " 0x1f",
 " 0x20", " 0x21", " 0x22", " 0x23", " 0x24", " 0x25", " 0x26", " 0x27", " 0x28", " 0x29", " 0x2a", " 0x2b", " 0x2c", " 0x2d", " 0x2e", " 0x2f",
 " 0x30", " 0x31", " 0x32", " 0x33", " 0x34", " 0x35", " 0x36", " 0x37", " 0x38", " 0x39", " 0x3a", " 0x3b", " 0x3c", " 0x3d", " 0x3e", " 0x3f",
@@ -79,10 +45,7 @@ uint8_t Nibble2ChrTable[16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 
 void _FASTCALL_ str_hex_b(_WString* s, unsigned int x)
 {
-	/*
-	 * Skip first character (space).
-	 * Fixed length of 4 including null terminate character. Use one word copy.
-	 */
+
 	*(int16_t*)&s->p[s->pos] = *(int16_t*)(TextBTable[x & 255] + 1);
 	s->p[s->pos + sizeof(int16_t) + 1] = '\0';
 	s->pos += sizeof(int16_t);
@@ -91,12 +54,11 @@ void _FASTCALL_ str_hex_b(_WString* s, unsigned int x)
 void _FASTCALL_ str_code_hb(_WString* s, unsigned int x)
 {
 	x &= 255;
-	/* Skip first character (space). */
 
-	if (x < 0x10) {	/* < 0x10 has a fixed length of 4 including null terminate. */
+	if (x < 0x10) {
 		*(int32_t*)&s->p[s->pos] = *(int32_t*)(TextHBTable[x] + 1);
 		s->pos += sizeof(int32_t) - 1;
-	} else { /* >= 0x10 has a fixed length of 5 including null terminate. */
+	} else {
 		*(int32_t*)&s->p[s->pos] = *(int32_t*)(TextHBTable[x] + 1);
 		s->p[s->pos + sizeof(int32_t)] = '\0';
 		s->pos += sizeof(int32_t);
@@ -105,7 +67,7 @@ void _FASTCALL_ str_code_hb(_WString* s, unsigned int x)
 
 void _FASTCALL_ str_hex_sp_b(_WString* s, unsigned int x)
 {
-	/* Fixed length of 4 including null terminate character. Use one dword copy. */
+
 	*(int32_t*)&s->p[s->pos] = *(int32_t*)&TextBTable[x & 255];
 	s->pos += sizeof(int32_t) - 1;
 }
@@ -114,11 +76,11 @@ void _FASTCALL_ str_code_sp_hb(_WString* s, unsigned int x)
 {
 	x &= 255;
 
-	if (x < 0x10) {	/* < 0x10 has a fixed length of 5 including null terminate. */
+	if (x < 0x10) {
 		*(int32_t*)&s->p[s->pos] = *(int32_t*)&TextHBTable[x];
 		s->p[s->pos + sizeof(int32_t)] = '\0';
 		s->pos += sizeof(int32_t) - 1;
-	} else { /* >= 0x10 has a fixed length of 6 including null terminate. */
+	} else {
 		*(int32_t*)&s->p[s->pos] = *(int32_t*)&TextHBTable[x];
 		*(int16_t*)&s->p[s->pos + sizeof(int32_t)] = *(int16_t*)(TextHBTable[x] + sizeof(int32_t));
 		s->pos += sizeof(int32_t) + sizeof(int16_t) - 1;

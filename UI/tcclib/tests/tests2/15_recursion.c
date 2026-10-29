@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-int factorial(int i) 
+int factorial(int i)
 {
    if (i < 2)
       return i;
@@ -17,5 +17,3 @@ int main()
 
    return 0;
 }
-
-/* vim: set expandtab ts=4 sw=3 sts=3 tw=80 :*/

@@ -4,11 +4,8 @@
 #include "common.h"
 #include "vmmhelper.h"
 
-
-
 void reboot(int skipAPTermination);
 void apentryvmx();
-
 
 void startvmx(pcpuinfo currentcpuinfo);
 void CheckCRCValues(void);
@@ -16,7 +13,7 @@ void CheckCRCValues(void);
 extern void vmcall_amd(void);
 extern void vmcall_intel(void);
 
-extern void *vmcall_instr; //holds a pointer to either vmcall_amd or vmcall_intel
+extern void *vmcall_instr;
 extern int vmcalltest_asm(void);
 extern int vmcall_setintredirects(void);
 extern QWORD _vmcall(void* data);
@@ -62,7 +59,6 @@ extern UINT64 getGDTbase(void);
 extern WORD getIDTsize(void);
 extern WORD getGDTsize(void);
 
-//minor mistake fix and I hate renaming the function
 #define getGDTlimit getGDTsize
 
 extern UINT64 getRFLAGS(void);
@@ -82,7 +78,6 @@ extern void _invvpid(int type, PINVVPIDDESCRIPTOR datablock);
 extern int _invvpid2(int type, PINVVPIDDESCRIPTOR datablock);
 extern void _wbinvd(void);
 extern void _invd(void);
-
 
 extern UINT64 _rdtsc(void);
 extern void quickboot(void);
@@ -125,7 +120,6 @@ extern void changetask(void);
 extern void tasktest(void);
 extern void int3bptest(void);
 
-
 volatile void       *RealmodeRing0Stack;
 volatile PTSS64     ownTSS;
 volatile PTSS       VirtualMachineTSS_V8086;
@@ -139,17 +133,13 @@ int IDT_SIZE;
 
 void menu(void);
 
-//filled in by vmm.map parser
-QWORD        Password1; //edx : if the upper bits of the field is filled in, this will disable access for 32-bit targets
-ULONG        Password2; //memory
-QWORD        Password3; //ecx  ^ see password1
-
+QWORD        Password1;
+ULONG        Password2;
+QWORD        Password3;
 
 extern QWORD dbvmversion;
 
-//crc checksums
 unsigned int originalVMMcrc;
-
 
 int isAMD;
 int AMD_hasDecodeAssists;
@@ -174,4 +164,4 @@ extern pcpuinfo firstcpuinfo;
 
 void menu(void);
 
-#endif /*MAIN_H_*/
+#endif

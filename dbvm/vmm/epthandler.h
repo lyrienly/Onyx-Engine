@@ -1,12 +1,3 @@
-/*
- * epthandler.h
- *
- *  Created on: Feb 2, 2018
- *      Author: erich
- */
-
-
-
 #ifndef VMM_EPTHANDLER_H_
 #define VMM_EPTHANDLER_H_
 
@@ -23,10 +14,9 @@ typedef struct
   QWORD rip;
   QWORD data;
   QWORD cacheIssue;
-  QWORD skipped; //0=taken
+  QWORD skipped;
 
 } EPTWatchLogData;
-
 
 #define MTC_UC  0
 #define MTC_WC  1
@@ -34,30 +24,14 @@ typedef struct
 #define MTC_WP  5
 #define MTC_WB  6
 
-#define EPTO_MULTIPLERIP    (1<<0) //log the same RIP multiple times (if different registers)
-#define EPTO_LOG_ALL        (1<<1) //log every access in the page
-#define EPTO_SAVE_XSAVE     (1<<2) //logs contain the xsave state
-#define EPTO_SAVE_STACK     (1<<3) //logs contain a 4kb stack snapshot
-#define EPTO_PMI_WHENFULL   (1<<4) //triggers a PMI when full
-#define EPTO_GROW_WHENFULL  (1<<5) //grows the buffer when full
-#define EPTO_INTERRUPT      (1<<6) //raise interrupt on match instead of log
-#define EPTO_DBVMBP         (1<<7) /*similar to EPTO_INTERRUPT but push RIP onto the stack and change RIP to a designated
-                                     loop location(possibly cloaked) specified by the watch initiator and log this thread
-                                     as currently broken (the thread will have no communicating with pipes or events. It's
-                                     just a thread in a loop)
-
-                                     the loop will have to trigger DBVM exits for DBVM to resume it when the user wishes,
-                                     so just an ebfe won't do.
-
-                                     just a single cc (int3) should work.  It will trigger DBVM and might cause some
-                                     performance issues, so needs to be evaluated. Otherwise a longer loop might be preferred
-
-                                     Use a change reg on bp if you wish to let the usermode program deal with this
-                                   */
-
-
-
-
+#define EPTO_MULTIPLERIP    (1<<0)
+#define EPTO_LOG_ALL        (1<<1)
+#define EPTO_SAVE_XSAVE     (1<<2)
+#define EPTO_SAVE_STACK     (1<<3)
+#define EPTO_PMI_WHENFULL   (1<<4)
+#define EPTO_GROW_WHENFULL  (1<<5)
+#define EPTO_INTERRUPT      (1<<6)
+#define EPTO_DBVMBP         (1<<7)
 
 #define EPTW_WRITE 0
 #define EPTW_READWRITE 1
@@ -68,7 +42,6 @@ extern PMapInfo CloakedPagesMap;
 
 extern EPTWatchLogData lastSeenEPTWatch;
 extern EPTWatchLogData lastSeenEPTWatchVerySure;
-
 
 void initMemTypeRanges();
 
@@ -85,17 +58,13 @@ int ept_handleStepAndBreak(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FX
 int ept_watch_activate(QWORD PhysicalAddress, int Size, int Type, DWORD Options, int MaxEntryCount, int *outID, QWORD OptionalField1, QWORD OptionalField2);
 int ept_watch_deactivate(int ID);
 
-
 VMSTATUS ept_watch_retrievelog(int ID, QWORD results, DWORD *resultSize, DWORD *offset, QWORD *errorcode);
-//int ept_activateWatch(pcpuinfo currentcpuinfo, int ID);
-
 
 int ept_getBrokenThreadListCount(void);
 int ept_getBrokenThreadEntryShort(int id, int *WatchID, int *status, QWORD *CR3, QWORD *FSBASE, QWORD *GSBASE, QWORD *GSBASE_KERNEL, DWORD *CS, QWORD *RIP, QWORD *heartbeat);
 int ept_getBrokenThreadEntryFull(int id, int *watchid, int *status, PPageEventExtended entry);
 int ept_setBrokenThreadEntryFull(int id, PPageEventExtended entry);
 int ept_resumeBrokenThread(int id, int continueMethod);
-
 
 int ept_cloak_activate(QWORD physicalAddress, int mode);
 int ept_cloak_deactivate(QWORD physicalAddress);
@@ -119,4 +88,4 @@ void vpid_invalidate();
 void ept_hideDBVMPhysicalAddresses(pcpuinfo currentcpuinfo);
 void ept_hideDBVMPhysicalAddressesAllCPUs();
 
-#endif /* VMM_EPTHANDLER_H_ */
+#endif

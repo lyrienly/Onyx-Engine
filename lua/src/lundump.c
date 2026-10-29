@@ -1,9 +1,3 @@
-/*
-** $Id: lundump.c,v 2.7.1.4 2008/04/04 19:51:41 roberto Exp $
-** load precompiled Lua chunks
-** See Copyright Notice in lua.h
-*/
-
 #include <string.h>
 
 #define lundump_c
@@ -92,7 +86,7 @@ static TString* LoadString(LoadState* S)
  {
   char* s=luaZ_openspace(S->L,S->b,size);
   LoadBlock(S,s,size);
-  return luaS_newlstr(S->L,s,size-1);		/* remove trailing '\0' */
+  return luaS_newlstr(S->L,s,size-1);
  }
 }
 
@@ -129,7 +123,7 @@ static void LoadConstants(LoadState* S, Proto* f)
 	setnvalue(o,LoadNumber(S));
 	break;
 #ifdef LUA_TINT
-   case LUA_TINT:   /* Integer type saved in bytecode (see lcode.c) */
+   case LUA_TINT:
 	setivalue(o,LoadInteger(S));
 	break;
 #endif
@@ -203,9 +197,6 @@ static void LoadHeader(LoadState* S)
  IF (memcmp(h,s,LUAC_HEADERSIZE)!=0, "bad header");
 }
 
-/*
-** load precompiled chunk
-*/
 Proto* luaU_undump (lua_State* L, ZIO* Z, Mbuffer* buff, const char* name)
 {
  LoadState S;
@@ -222,9 +213,6 @@ Proto* luaU_undump (lua_State* L, ZIO* Z, Mbuffer* buff, const char* name)
  return LoadFunction(&S,luaS_newliteral(L,"=?"));
 }
 
-/*
-* make header
-*/
 void luaU_header (char* h)
 {
  int x=1;
@@ -232,21 +220,12 @@ void luaU_header (char* h)
  h+=sizeof(LUA_SIGNATURE)-1;
  *h++=(char)LUAC_VERSION;
  *h++=(char)LUAC_FORMAT;
- *h++=(char)*(char*)&x;				/* endianness */
+ *h++=(char)*(char*)&x;
  *h++=(char)sizeof(int);
  *h++=(char)sizeof(size_t);
  *h++=(char)sizeof(Instruction);
  *h++=(char)sizeof(lua_Number);
 
- /* 
-  * Last byte of header (0/1 in unpatched Lua 5.1.3):
-  *
-  * 0: lua_Number is float/double/ldouble (nonpatched only)
-  * 1: lua_Number is integer (nonpatched only)
-  * 4: LNUM_INT32: sizeof(lua_Integer)
-  * 8: LNUM_INT64: sizeof(lua_Integer)
-  * +0x80: LNUM_COMPLEX
-  */
  *h++ = (char)( sizeof(lua_Integer)
 #ifdef LNUM_COMPLEX
     | 0x80

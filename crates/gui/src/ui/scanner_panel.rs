@@ -1,4 +1,3 @@
-
 use eframe::egui::{self, Color32, RichText, Rounding, Stroke, Vec2};
 use crate::app::OnyxEngineApp;
 
@@ -301,4 +300,3 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, upper_height: f32) {
         });
     });
 }
-

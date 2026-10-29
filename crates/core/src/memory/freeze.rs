@@ -1,4 +1,3 @@
-
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -164,4 +163,3 @@ impl Freezer {
         lock.clear();
     }
 }
-

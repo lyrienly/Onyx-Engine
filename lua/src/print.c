@@ -1,9 +1,3 @@
-/*
-** $Id: print.c,v 1.55a 2006/05/31 13:30:05 lhf Exp $
-** print bytecodes
-** See Copyright Notice in lua.h
-*/
-
 #include <ctype.h>
 #include <stdio.h>
 
@@ -67,7 +61,7 @@ static void PrintConstant(const Proto* f, int i)
 #endif
   case LUA_TNUMBER:
 #ifdef LNUM_COMPLEX
-    { lua_Number b= nvalue_img_fast(o);    /* TBD: Do we get complex values here? */
+    { lua_Number b= nvalue_img_fast(o);
 	  printf( LUA_NUMBER_FMT "%s" LUA_NUMBER_FMT "i", nvalue_fast(o), b>=0 ? "+":"", b ); }
 #endif
 	printf(LUA_NUMBER_FMT,nvalue_fast(o));
@@ -75,7 +69,7 @@ static void PrintConstant(const Proto* f, int i)
   case LUA_TSTRING:
 	PrintString(rawtsvalue(o));
 	break;
-  default:				/* cannot happen */
+  default:
 	printf("? type=%d",ttype(o));
 	break;
  }

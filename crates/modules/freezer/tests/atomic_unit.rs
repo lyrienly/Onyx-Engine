@@ -1,5 +1,3 @@
-//! Testes unitarios do motor atomico de congelamento.
-
 use onyx_freezer::{AtomicFreezer, FreezeMode};
 
 #[test]

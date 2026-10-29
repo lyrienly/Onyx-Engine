@@ -1,4 +1,3 @@
-
 use std::ffi::c_void;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -112,4 +111,3 @@ pub extern "C" fn onyx_module_is_loaded(module_idx: u32) -> i32 {
         0
     }
 }
-

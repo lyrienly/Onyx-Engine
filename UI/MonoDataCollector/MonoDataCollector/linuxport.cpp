@@ -1,18 +1,8 @@
-/*
- * linuxport.cpp
- *
- *  Created on: Nov 5, 2022
- *      Author: eric heijnen
- *
- *
- */
-
 #include <syslog.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/types.h>
 #include <unistd.h>
-
 
 #include <chrono>
 #include <thread>
@@ -24,17 +14,11 @@
 
 #include <string.h>
 
-
-
-
-
-
 #ifdef __ANDROID__
 #include <android/log.h>
 
 # define SUN_LEN(ptr) ((size_t) (((struct sockaddr_un *) 0)->sun_path)        \
           + strlen ((ptr)->sun_path))
-
 
 #elif __linux__
 #include <syslog.h>
@@ -42,9 +26,7 @@
 
 #include "linuxport.h"
 
-
 #include "MonoDataCollector.h"
-
 
 char lastpath[255];
 
@@ -53,13 +35,9 @@ char lastpath[255];
   #define LOGD(fmt, args...) __android_log_vprint(ANDROID_LOG_DEBUG, LOG_TAG, fmt, ##args)
 #endif
 
-
-
-
 void InitializeCriticalSection(CRITICAL_SECTION *cs)
 {
     pthread_mutexattr_t attribs;
-
 
     pthread_mutexattr_settype(&attribs, PTHREAD_MUTEX_RECURSIVE);
     pthread_mutex_init(cs, &attribs);
@@ -75,7 +53,6 @@ void LeaveCriticalSection(CRITICAL_SECTION *cs)
 {
     pthread_mutex_unlock(cs);
 }
-
 
 BOOL TerminateThread(HANDLE hThread, DWORD dwExitCode)
 {
@@ -103,7 +80,6 @@ int OutputDebugString(const char * format , ...)
   int ret = vprintf(format,list);
   va_end(list);
 
-
   #ifdef __ANDROID__
   va_start(list,format);
   LOGD(format,list);
@@ -118,7 +94,6 @@ void ClosePipe(HANDLE h)
     close((int)h);
 }
 
-
 #define debug_log OutputDebugString
 
 ssize_t recvall (int s, void *buf, size_t size, int flags)
@@ -127,12 +102,9 @@ ssize_t recvall (int s, void *buf, size_t size, int flags)
   ssize_t sizeleft=size;
   unsigned char *buffer=(unsigned char*)buf;
 
-  //printf("enter recvall\n");
   #ifdef _WINDOWS
     flags=flags | MSG_WAITALL;
 #endif
-
-
 
   while (sizeleft>0)
   {
@@ -155,7 +127,7 @@ ssize_t recvall (int s, void *buf, size_t size, int flags)
       else
       {
         debug_log((char *)"Error during recvall ( %s ) ", strerror(errno));
-        return i; //read error, or disconnected
+        return i;
       }
 
     }
@@ -164,7 +136,6 @@ ssize_t recvall (int s, void *buf, size_t size, int flags)
     sizeleft-=i;
   }
 
-  //printf("leave recvall\n");
   return totalreceived;
 }
 
@@ -201,7 +172,6 @@ ssize_t sendall (int s, void *buf, size_t size, int flags)
   return totalsent;
 }
 
-
 BOOL ReadFilePipeWrapper(HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped)
 {
     int r=(int)recvall((int)hFile, (void *)lpBuffer, (size_t)nNumberOfBytesToRead,0);
@@ -226,11 +196,9 @@ BOOL WriteFilePipeWrapper(HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToW
         return FALSE;
 }
 
-
-
-HANDLE CreateNamedPipe(char *name) //createNamedPipe and wait
+HANDLE CreateNamedPipe(char *name)
 {
-    //single connect system
+
     int s;
     OutputDebugString("linuxport: CreateNamedPipeAndWait(\"%s\")\n",name);
     s=socket(AF_UNIX, SOCK_STREAM,0);
@@ -239,8 +207,6 @@ HANDLE CreateNamedPipe(char *name) //createNamedPipe and wait
         char path[100];
 
         sprintf(path," %s", name);
-
-
 
         struct sockaddr_un address;
         address.sun_family=AF_UNIX;
@@ -268,7 +234,6 @@ HANDLE CreateNamedPipe(char *name) //createNamedPipe and wait
                 socklen_t clisize;
                 int a=-1;
 
-
                 while (a==-1)
                 {
                   OutputDebugString((char*)"Calling accept\n");
@@ -278,7 +243,7 @@ HANDLE CreateNamedPipe(char *name) //createNamedPipe and wait
                   {
                       OutputDebugString((char*)"Connection accepted\n");
                       OutputDebugString((char*)"Closing the listener\n");
-                      close(s); //stop listening
+                      close(s);
                       return a;
                   }
                   else
@@ -315,4 +280,3 @@ __attribute__((constructor)) void moduleinit(void)
 
   pthread_create(&lpep, NULL, (void* (*)(void*)) LinuxPortEntryPoint,  NULL);
 }
-

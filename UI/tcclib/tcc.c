@@ -1,23 +1,3 @@
-/*
- *  TCC - Tiny C Compiler
- * 
- *  Copyright (c) 2001-2004 Fabrice Bellard
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
-
 #include "tcc.h"
 #if ONE_SOURCE
 # include "libtcc.c"
@@ -195,7 +175,7 @@ static void print_dirs(const char *msg, char **paths, int nb_paths)
 static void print_search_dirs(TCCState *s)
 {
     printf("install: %s\n", s->tcc_lib_path);
-    /* print_dirs("programs", NULL, 0); */
+
     print_dirs("include", s->sysinclude_paths, s->nb_sysinclude_paths);
     print_dirs("libraries", s->library_paths, s->nb_library_paths);
 #ifdef TCC_TARGET_PE
@@ -275,8 +255,6 @@ redo:
     s = s1 = tcc_new();
     opt = tcc_parse_args(s, &argc, &argv, 1);
 
-	//tcc_add_symbol(s, "test", (void*)0x0000007fffcece);
-
     if (n == 0) {
         if (opt == OPT_HELP) {
             fputs(help, stdout);
@@ -289,7 +267,7 @@ redo:
             return 0;
         }
         if (opt == OPT_M32 || opt == OPT_M64)
-            tcc_tool_cross(s, argv, opt); /* never returns */
+            tcc_tool_cross(s, argv, opt);
         if (s->verbose)
             printf(version);
         if (opt == OPT_AR)
@@ -301,7 +279,7 @@ redo:
         if (opt == OPT_V)
             return 0;
         if (opt == OPT_PRINT_DIRS) {
-            /* initialize search dirs */
+
             set_environment(s);
             tcc_set_output_type(s, TCC_OUTPUT_MEMORY);
             print_search_dirs(s);
@@ -336,7 +314,7 @@ redo:
 
     if ((s->output_type == TCC_OUTPUT_MEMORY
       || s->output_type == TCC_OUTPUT_PREPROCESS)
-        && (s->dflag & 16)) { /* -dt option */
+        && (s->dflag & 16)) {
         if (t)
             s->dflag |= 32;
         s->run_test = ++t;
@@ -344,7 +322,6 @@ redo:
             --n;
     }
 
-    /* compile or add each files or library */
     first_file = NULL, ret = 0;
     do {
         struct filespec *f = s->files[n];
@@ -386,9 +363,9 @@ redo:
         tcc_print_stats(s, getclock_ms() - start_time);
     tcc_delete(s);
     if (!done)
-        goto redo; /* compile more files with -c */
+        goto redo;
     if (t)
-        goto redo; /* run more tests with -dt -run */
+        goto redo;
     if (ppfp && ppfp != stdout)
         fclose(ppfp);
     return ret;

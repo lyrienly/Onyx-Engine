@@ -1,13 +1,3 @@
-//! Emulacao de breakpoints de hardware ilimitados via filtragem PAGE_GUARD.
-//!
-//! Processadores x86_64 so possuem 4 slots de debug (DR0..DR3). Para monitorar
-//! dezenas de enderecos simultaneamente, usamos a flag PAGE_GUARD do Windows:
-//! marcamos a pagina de 4KB que contem o endereco observado e capturamos
-//! `EXCEPTION_GUARD_PAGE` (0x80000001) no loop de eventos de debug. Como
-//! PAGE_GUARD e automaticamente removida pelo kernel ao disparar, usamos
-//! single-step (Trap Flag em EFLAGS) para reaplicar a protecao depois que a
-//! instrucao faltosa executar uma unica vez.
-
 use std::collections::HashMap;
 use std::mem::zeroed;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -28,8 +18,7 @@ pub enum AccessType {
 }
 
 impl AccessType {
-    /// Interpreta `ExceptionInformation[0]` para decidir o tipo do acesso.
-    /// 0 = read, 1 = write, 8 = execute.
+
     pub fn from_exception_info(code: ULONG_PTR) -> AccessType {
         match code {
             0 => AccessType::Read,
@@ -55,7 +44,7 @@ pub struct PageGuardBreakpoint {
     pub address: u64,
     pub size: usize,
     pub access: AccessType,
-    /// Protecao original da pagina, para restaurar em `remove`.
+
     pub original_protect: DWORD,
 }
 
@@ -68,13 +57,11 @@ pub struct BpHit {
     pub access_type: AccessType,
 }
 
-/// Retorna o inicio da pagina de 4KB que contem `addr`.
 #[inline]
 pub fn page_base(addr: u64) -> u64 {
     addr & !(PAGE_SIZE as u64 - 1)
 }
 
-/// Verifica se um fault_address cai dentro de algum range `[addr, addr+size)` registrado.
 pub fn match_bp(bps: &HashMap<BpId, PageGuardBreakpoint>, fault_address: u64, observed: AccessType) -> Option<BpId> {
     for bp in bps.values() {
         let start = bp.address;
@@ -86,7 +73,6 @@ pub fn match_bp(bps: &HashMap<BpId, PageGuardBreakpoint>, fault_address: u64, ob
     None
 }
 
-/// Agrupa breakpoints por pagina (varios BPs podem compartilhar a mesma pagina).
 pub fn pages_for(bps: &HashMap<BpId, PageGuardBreakpoint>) -> std::collections::HashSet<u64> {
     let mut s = std::collections::HashSet::new();
     for bp in bps.values() {
@@ -122,8 +108,7 @@ type HitCallback = Box<dyn FnMut(BpHit) + Send + 'static>;
 
 struct Inner {
     bps: HashMap<BpId, PageGuardBreakpoint>,
-    /// Threads que precisam reaplicar PAGE_GUARD apos o proximo single-step,
-    /// com a lista de paginas a re-armar.
+
     pending_rearm: HashMap<u32, Vec<u64>>,
     callback: Option<HitCallback>,
 }
@@ -137,18 +122,11 @@ pub struct PageGuardManager {
     debugger_thread: Option<JoinHandle<()>>,
 }
 
-// SAFETY: HANDLE e `*mut c_void` mas e um identificador opaco do kernel;
-// trafega entre threads sem UB desde que nao seja fechado de dois lados ao
-// mesmo tempo.
 unsafe impl Send for PageGuardManager {}
 unsafe impl Sync for PageGuardManager {}
 
 impl PageGuardManager {
-    /// Cria um manager que se attacha ao processo via `DebugActiveProcess`.
-    ///
-    /// IMPORTANTE: no Windows, apenas a thread que chamou `DebugActiveProcess`
-    /// (ou criou o processo com DEBUG_*) recebe eventos via `WaitForDebugEvent`.
-    /// Por isso o `DebugActiveProcess` e feito DENTRO da thread do worker.
+
     pub fn attach(pid: u32) -> Result<Self, PageGuardError> {
         let h_process = unsafe {
             OpenProcess(
@@ -187,8 +165,6 @@ impl PageGuardManager {
         let h_process = self.h_process as usize;
         let pid = self.pid;
 
-        // Canal sincrono pra confirmar que o DebugActiveProcess rolou antes
-        // de o `attach` retornar.
         let (tx, rx) = std::sync::mpsc::channel::<Result<(), PageGuardError>>();
 
         let handle = std::thread::spawn(move || {
@@ -223,7 +199,6 @@ impl PageGuardManager {
         inner.callback = Some(Box::new(callback));
     }
 
-    /// Registra um breakpoint PAGE_GUARD em `address`, cobrindo `size` bytes.
     pub fn set(&self, address: u64, size: usize, access: AccessType) -> Result<BpId, PageGuardError> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let page = page_base(address);
@@ -256,7 +231,7 @@ impl PageGuardManager {
     pub fn remove(&self, id: BpId) -> Result<(), PageGuardError> {
         let mut inner = self.inner.lock().unwrap();
         let bp = inner.bps.remove(&id).ok_or(PageGuardError::UnknownBp)?;
-        // So restaurar protecao se nao houver outros BPs na mesma pagina.
+
         let page = page_base(bp.address);
         let still_covered = inner.bps.values().any(|b| page_base(b.address) == page);
         drop(inner);
@@ -300,7 +275,6 @@ impl Drop for PageGuardManager {
     }
 }
 
-/// Reaplica PAGE_GUARD numa pagina especifica (chamado apos single-step).
 fn rearm_page(h_process: HANDLE, page: u64, protect: DWORD) -> bool {
     let mut old: DWORD = 0;
     let ok = unsafe {
@@ -358,7 +332,7 @@ fn run_event_loop(h_process: HANDLE, inner: Arc<Mutex<Inner>>, stop: Arc<AtomicB
 
                     if let Some(id) = matched {
                         let bp = bps_snapshot[&id];
-                        // Dispara callback.
+
                         if let Some(cb) = guard.callback.as_mut() {
                             cb(BpHit {
                                 id,
@@ -370,10 +344,6 @@ fn run_event_loop(h_process: HANDLE, inner: Arc<Mutex<Inner>>, stop: Arc<AtomicB
                         }
                     }
 
-                    // Independente de ter batido, agendamos re-armar as paginas
-                    // afetadas apos single-step e setamos TF para que a
-                    // instrucao faltosa execute uma unica vez. O kernel ja
-                    // removeu PAGE_GUARD da pagina na primeira falta.
                     let affected_pages: Vec<u64> = pages_for(&bps_snapshot)
                         .into_iter()
                         .filter(|p| *p == page_base(fault_addr))
@@ -384,7 +354,6 @@ fn run_event_loop(h_process: HANDLE, inner: Arc<Mutex<Inner>>, stop: Arc<AtomicB
                     }
                     drop(guard);
 
-                    // Seta Trap Flag no contexto da thread faltosa.
                     let h_thread = unsafe { OpenThread(THREAD_ALL_ACCESS, FALSE, tid) };
                     if !h_thread.is_null() && h_thread != INVALID_HANDLE_VALUE {
                         let mut ctx: CONTEXT = unsafe { zeroed() };
@@ -419,7 +388,7 @@ fn run_event_loop(h_process: HANDLE, inner: Arc<Mutex<Inner>>, stop: Arc<AtomicB
 
                     continue_status = DBG_CONTINUE;
                 } else if code == EXCEPTION_BREAKPOINT {
-                    // Primeiro-chance breakpoint inicial do loader; aceitamos.
+
                     continue_status = DBG_CONTINUE;
                 } else {
                     continue_status = DBG_EXCEPTION_NOT_HANDLED;
@@ -440,7 +409,6 @@ fn run_event_loop(h_process: HANDLE, inner: Arc<Mutex<Inner>>, stop: Arc<AtomicB
     }
 }
 
-// --- constantes locais para o OpenProcess ---
 const PROCESS_ALL_ACCESS: DWORD = 0x001F_0FFF;
 
 #[cfg(test)]
@@ -485,17 +453,15 @@ mod tests {
 
     #[test]
     fn match_bp_filtra_falso_positivo_na_mesma_pagina() {
-        // Dois BPs na mesma pagina de 4KB mas em offsets distantes:
-        // um hit no offset nao coberto deve ser rejeitado.
+
         let mut bps = HashMap::new();
         bps.insert(1, mk_bp(1, 0x4000_1000, 4, AccessType::Write));
         bps.insert(2, mk_bp(2, 0x4000_1800, 8, AccessType::Write));
 
-        // Dentro do range do BP 1.
         assert_eq!(match_bp(&bps, 0x4000_1002, AccessType::Write), Some(1));
-        // Dentro do range do BP 2.
+
         assert_eq!(match_bp(&bps, 0x4000_1804, AccessType::Write), Some(2));
-        // Fora de ambos mas na mesma pagina de 4KB.
+
         assert_eq!(match_bp(&bps, 0x4000_1400, AccessType::Write), None);
     }
 

@@ -1,4 +1,3 @@
-
 use eframe::egui::{self, ColorImage, TextureHandle, TextureOptions};
 
 pub const ICON_OPENPROCESS: &[u8] = include_bytes!("../../assets/openprocess.png");
@@ -40,4 +39,3 @@ impl CeIcons {
         }
     }
 }
-

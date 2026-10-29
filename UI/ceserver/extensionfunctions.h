@@ -1,10 +1,3 @@
-/*
- * extensionfunctions.h
- *
- *  Created on: Aug 25, 2013
- *      Author: eric
- */
-
 #ifndef EXTENSIONFUNCTIONS_H_
 #define EXTENSIONFUNCTIONS_H_
 
@@ -28,5 +21,4 @@ uint64_t ext_loadModule(HANDLE hProcess, char *modulepath);
 uint64_t ext_loadModuleEx(HANDLE hProcess, uint64_t dlopenaddress, char *modulepath);
 int ext_changememoryprotection(HANDLE hProcess, uint64_t address, uint32_t size, uint32_t protection);
 
-
-#endif /* EXTENSIONFUNCTIONS_H_ */
+#endif

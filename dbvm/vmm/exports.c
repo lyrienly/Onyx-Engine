@@ -1,16 +1,8 @@
-/*
- * exports.c
- *
- *  Created on: Apr 9, 2018
- *      Author: root
- */
-
 #include "exports.h"
 #include "common.h"
 #include "mm.h"
 #include "vmpaging.h"
 #include "vmxsetup.h"
-
 
 void InitExports()
 {

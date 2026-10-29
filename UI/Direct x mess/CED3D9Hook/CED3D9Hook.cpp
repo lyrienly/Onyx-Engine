@@ -1,22 +1,16 @@
-// CED3D9Hook.cpp : Defines the exported functions for the DLL application.
-//
-
 #include "stdafx.h"
-
 
 using namespace std;
 map<IDirect3DDevice9 *, DXMessD3D9Handler *> D3D9devices;
 
-PD3DHookShared shared=NULL; //set at first present
+PD3DHookShared shared=NULL;
 int insidehook;
 
-BOOL makeSnapshot=FALSE; //duplicate variable to be used as a hint that one of the devices is making a snapshot. (in case of multiple devices)
+BOOL makeSnapshot=FALSE;
 
-
-
-void DXMessD3D9Handler::PrepareForSnapshot() //just clears the screen
+void DXMessD3D9Handler::PrepareForSnapshot()
 {
-	if (!shared->progressiveSnapshot) //if this is true no erasing will be done
+	if (!shared->progressiveSnapshot)
 	{
 		if (!shared->alsoClearDepthBuffer)
 			dev->Clear(0, NULL, D3DCLEAR_TARGET, 0xFFFF00FF, 0.0f, 0);
@@ -31,17 +25,15 @@ void DXMessD3D9Handler::TakeSnapshot(char *functionname)
 	IDirect3DSurface9 *backbuffer;
 	dev->EndScene();
 
-
-	if (SUCCEEDED(d->GetRenderTarget(0, &backbuffer)))	
+	if (SUCCEEDED(d->GetRenderTarget(0, &backbuffer)))
 	{
 		BOOL savethis=FALSE;
 		D3DSURFACE_DESC desc;
 
-
 		if (smallSnapshot)
 		{
 			if (SUCCEEDED(backbuffer->GetDesc( &desc)))
-			{	
+			{
 				IDirect3DSurface9 *backbuffer2=NULL;
 				if (SUCCEEDED(d->CreateOffscreenPlainSurface(desc.Width, desc.Height, desc.Format, D3DPOOL_SYSTEMMEM, &backbuffer2, NULL)))
 				{
@@ -51,15 +43,14 @@ void DXMessD3D9Handler::TakeSnapshot(char *functionname)
 						if (SUCCEEDED(backbuffer2->LockRect(&r, NULL, D3DLOCK_READONLY)))
 						{
 							DWORD *color;
-							
+
 							int xpos, ypos;
-							
+
 							xpos=(int)floor(desc.Width * smallSnapshotPointRelative.x);
 							ypos=(int)floor(desc.Height * smallSnapshotPointRelative.y);
 
-							
 						    color=(DWORD *)((UINT_PTR)r.pBits+r.Pitch*ypos+xpos*4);
-							if ((*color & 0xffffff)!=0xff00ff)	//pixels got changed
+							if ((*color & 0xffffff)!=0xff00ff)
 								savethis=TRUE;
 						}
 
@@ -68,15 +59,10 @@ void DXMessD3D9Handler::TakeSnapshot(char *functionname)
 					backbuffer2->Release();
 				}
 
-
-				
 			}
 		}
 		else
 			savethis=TRUE;
-			
-
-		
 
 		if (savethis)
 		{
@@ -86,31 +72,29 @@ void DXMessD3D9Handler::TakeSnapshot(char *functionname)
 			int x;
 			DWORD bw;
 			LPD3DXBUFFER dest=NULL;
-		
 
 #ifdef _AMD64_
 			stackbase=(UINT64)&functionname;
 #else
-			
+
 			__asm
 			{
-				mov dword ptr [stackbase], ebp   //sure, it's a bit too far, but close enough
-			}			
+				mov dword ptr [stackbase], ebp
+			}
 #endif
 			snapshotCounter++;
 
-			
 			sprintf_s(s, MAX_PATH, "%ssnapshot%d.ce3dsnapshot", shared->SnapShotDir, snapshotCounter);
 
 			h=CreateFileA(s, GENERIC_WRITE,  0, NULL, CREATE_ALWAYS, 0, NULL);
-			x=9; //dx9
-			WriteFile(h, &x, sizeof(x), &bw, NULL); 
+			x=9;
+			WriteFile(h, &x, sizeof(x), &bw, NULL);
 
 			if (shared->savePNGSeperateAsWell)
-			{			
+			{
 				switch (shared->snapshotImageFormat)
 				{
-					case 0: 
+					case 0:
 						strcat_s(s,MAX_PATH, ".BMP");
 						break;
 
@@ -126,97 +110,72 @@ void DXMessD3D9Handler::TakeSnapshot(char *functionname)
 						strcat_s(s,MAX_PATH, ".WTF");
 						break;
 				}
-				
+
 				D3DXSaveSurfaceToFileA(s, (D3DXIMAGE_FILEFORMAT)shared->snapshotImageFormat, backbuffer, NULL, NULL);
 			}
-
 
 			if (SUCCEEDED(D3DXSaveSurfaceToFileInMemory(&dest, (D3DXIMAGE_FILEFORMAT)shared->snapshotImageFormat, backbuffer, NULL, NULL)))
 			{
 				x=shared->snapshotImageFormat;
 				WriteFile(h, &x, sizeof(x), &bw, NULL);
 				x=dest->GetBufferSize();
-				WriteFile(h, &x, sizeof(x), &bw, NULL); 													
-				WriteFile(h, dest->GetBufferPointer(), x, &bw, NULL); 
+				WriteFile(h, &x, sizeof(x), &bw, NULL);
+				WriteFile(h, dest->GetBufferPointer(), x, &bw, NULL);
 			}
 			else
 			{
 				x=0;
 				WriteFile(h, &x, sizeof(x), &bw, NULL);
-				WriteFile(h, &x, sizeof(x), &bw, NULL); 
+				WriteFile(h, &x, sizeof(x), &bw, NULL);
 			}
 
 			dest->Release();
 
 			WriteFile(h, &stackbase, sizeof(stackbase), &bw, NULL);
-			
+
 			MEMORY_BASIC_INFORMATION mbi;
 			int stacksize;
 
 			if (VirtualQuery((void *)stackbase, &mbi, sizeof(mbi))==sizeof(mbi))
-			{								
+			{
 				stacksize=min(mbi.RegionSize- ((uintptr_t)stackbase-(uintptr_t)mbi.BaseAddress), 8192);
 				WriteFile(h, &stacksize, sizeof(stacksize), &bw, NULL);
-				WriteFile(h, (void *)stackbase, stacksize, &bw, NULL); 
+				WriteFile(h, (void *)stackbase, stacksize, &bw, NULL);
 			}
 			else
 			{
 				stacksize=0;
 				stackbase=0;
-				WriteFile(h, &stacksize, sizeof(stacksize), &bw, NULL);								
+				WriteFile(h, &stacksize, sizeof(stacksize), &bw, NULL);
 			}
 
-			//no constant buffer	
 			{
 
-				//d->GetVertexDeclaration
-				/* perhaps something could be done with this, but no idea right now
-				IDirect3DVertexShader9 *vs;
-				
-				if (SUCCEEDED(d->GetVertexShader(&vs)))
-				{
-					vs->QueryInterface(
-				
-					vs->Release();
-				}*/
-
-				x=0;	
-				WriteFile(h, &x, sizeof(x), &bw, NULL);	
+				x=0;
+				WriteFile(h, &x, sizeof(x), &bw, NULL);
 			}
 
 			if (functionname)
 			{
 				int i=strlen(functionname);
-				WriteFile(h, &i, sizeof(i), &bw, NULL);	
-				WriteFile(h, functionname, i, &bw, NULL);	
+				WriteFile(h, &i, sizeof(i), &bw, NULL);
+				WriteFile(h, functionname, i, &bw, NULL);
 			}
 
-
 			CloseHandle(h);
-			
 
 		}
-		
 
-		
 		backbuffer->Release();
 
-
-		
 	}
 
 	dev->BeginScene();
-	
-	
+
 }
 
-
-
 void DXMessD3D9Handler::DrawString(D3DXVECTOR3 position, PTextureData9 pFontTexture, char *s, int strlen, float alphablend)
-/*
-Render the text using the sprite object (select a texture region and draw that specific character) .Coordinates are in normal x,y coordinates
-Pre: Sprite must be active
-*/
+
 {
 	int i;
 	D3DXVECTOR3 currentpos = position;
@@ -226,17 +185,13 @@ Pre: Sprite must be active
 	D3DXVECTOR3 scale;
 	D3DXMATRIX m;
 
-
-	//calculate the original size of the texture
-
 	scale.x=1.0f;
 	scale.y=1.0f;
 	scale.z=1.0f;
 
-
 	for (i=0; i<strlen; i++)
 	{
-		if( s[i] == '\n' ) //next line
+		if( s[i] == '\n' )
 		{
 			currentpos.x=position.x;
 			currentpos.y+=fGlyphSizeY;
@@ -245,7 +200,7 @@ Pre: Sprite must be active
 		}
 		else
 		if ((s[i] < 32) || (s[i] > 127))
-			continue;//invalid char
+			continue;
 
 		float offset=pFontTexture->DefinedFontMap->charinfo[s[i]-32].offset;
 		float width=pFontTexture->DefinedFontMap->charinfo[s[i]-32].charwidth;
@@ -254,25 +209,20 @@ Pre: Sprite must be active
 		charactertexture.left=(LONG)offset;
 		charactertexture.top=0;
 		charactertexture.bottom=(LONG)fGlyphSizeY;
-		charactertexture.right=(LONG)(offset+width);	
+		charactertexture.right=(LONG)(offset+width);
 
-		D3DXMatrixTransformation(&m, NULL, NULL, &scale, NULL, NULL, &currentpos);						
-		sprite->SetTransform(&m);					
-		
+		D3DXMatrixTransformation(&m, NULL, NULL, &scale, NULL, NULL, &currentpos);
+		sprite->SetTransform(&m);
 
-		
-		sprite->Draw(pFontTexture->pTexture, &charactertexture, NULL, NULL, D3DCOLOR_ARGB((int)floor(alphablend*255),255,255,255));		
+		sprite->Draw(pFontTexture->pTexture, &charactertexture, NULL, NULL, D3DCOLOR_ARGB((int)floor(alphablend*255),255,255,255));
 
 		currentpos.x+=width;
 
-
-
-	}	
+	}
 }
 
 void DXMessD3D9Handler::BeforeReset()
 {
-	
 
 	if (sprite)
 		sprite->OnLostDevice();
@@ -284,9 +234,8 @@ void DXMessD3D9Handler::AfterReset()
 	if (sprite)
 		sprite->OnResetDevice();
 
-	shared->lastHwnd=0; //reset that
+	shared->lastHwnd=0;
 }
-
 
 BOOL DXMessD3D9Handler::UpdateTextures()
 {
@@ -299,92 +248,81 @@ BOOL DXMessD3D9Handler::UpdateTextures()
 	if (shared->textureCount)
 	{
 		newTextureCount=shared->textureCount;
-		
 
 		if (shared->textureCount > TextureCount)
-		{				
-			//update the textures if needed
-	
+		{
 
-			if (textures==NULL) //initial alloc
-				textures=(TextureData9 *)malloc(sizeof(TextureData9)* shared->textureCount);			
-			else //realloc
-				textures=(TextureData9 *)realloc(textures, sizeof(TextureData9)* shared->textureCount);			
+			if (textures==NULL)
+				textures=(TextureData9 *)malloc(sizeof(TextureData9)* shared->textureCount);
+			else
+				textures=(TextureData9 *)realloc(textures, sizeof(TextureData9)* shared->textureCount);
 
 			if (textures==NULL)
 			{
 				OutputDebugStringA("Failure allocating memory for texturedata");
-				SetEvent((HANDLE)(shared->TextureLock)); //unlock
+				SetEvent((HANDLE)(shared->TextureLock));
 				return FALSE;
 			}
 
-			//initialize the new entries to NULL
 			for (i=TextureCount; i<shared->textureCount; i++)
 			{
-				textures[i].pTexture=NULL;				
+				textures[i].pTexture=NULL;
 				textures[i].DefinedFontMap=NULL;
-			}	
+			}
 
 			TextureCount=shared->textureCount;
-			
+
 		}
 
 		for (i=0; i<TextureCount; i++)
 		{
-			
+
 			if (tea[i].AddressOfTexture)
 			{
-				
-				
+
 				if ((tea[i].hasBeenUpdated) || (textures[i].pTexture==NULL))
 				{
 					if (textures[i].pTexture)
 					{
-						//already has a texture, so an update. Free the old one	first
+
 						textures[i].pTexture->Release();
-						textures[i].pTexture=NULL; //should always happen
+						textures[i].pTexture=NULL;
 					}
 
 					if (textures[i].DefinedFontMap)
 					{
-						//already has a fontmap. Free the old one
+
 						free(textures[i].DefinedFontMap);
 						textures[i].DefinedFontMap=NULL;
 					}
 
 					D3DXIMAGE_INFO imageinfo;
 					ZeroMemory(&imageinfo, sizeof(imageinfo));
-					
 
 					hr=D3DXCreateTextureFromFileInMemoryEx(dev, (void *)(tea[i].AddressOfTexture), tea[i].size, D3DX_DEFAULT, D3DX_DEFAULT, 1,0,D3DFMT_UNKNOWN, D3DPOOL_MANAGED,D3DX_FILTER_NONE,D3DX_DEFAULT, 0, &imageinfo, NULL, &textures[i].pTexture);
 					if( FAILED( hr ) )
-					{						
+					{
 						char s[255];
 
-						//OutputDebugStringA("Fail 1");
 						hr=D3DXCreateTextureFromFileInMemoryEx(dev, (void *)(tea[i].AddressOfTexture), tea[i].size, D3DX_DEFAULT, D3DX_DEFAULT, 1, 0, D3DFMT_UNKNOWN, D3DPOOL_MANAGED, D3DX_FILTER_NONE, D3DX_DEFAULT, 0,  &imageinfo, NULL, &textures[i].pTexture);
 
 						if (FAILED(hr))
 						{
-							//OutputDebugStringA("Fail 2");
-
 
 							hr=D3DXCreateTextureFromFileInMemoryEx(dev, (void *)(tea[i].AddressOfTexture), tea[i].size, D3DX_DEFAULT, D3DX_DEFAULT, 1, 0, D3DFMT_UNKNOWN, D3DPOOL_DEFAULT, D3DX_FILTER_NONE, D3DX_DEFAULT, 0, &imageinfo, NULL, &textures[i].pTexture);
 							if (FAILED(hr))
 							{
-								//OutputDebugStringA("Fail 3");
 
-								
 								hr=D3DXCreateTextureFromFileInMemory(dev, (void *)(tea[i].AddressOfTexture), tea[i].size, &textures[i].pTexture);
 								if (FAILED(hr))
 								{
-									//OutputDebugStringA("Fail 4");
+
 									textures[i].pTexture=NULL;
 									sprintf_s(s,254,"Failure creating a texture. (%x) AOT=%p size=%d", hr, (void *)(tea[i].AddressOfTexture), tea[i].size);
 
 									if (hr==D3DERR_NOTAVAILABLE)
 										sprintf_s(s,254,"%s - D3DERR_NOTAVAILABLE",s);
-									
+
 									if (hr==D3DERR_OUTOFVIDEOMEMORY)
 										sprintf_s(s,254,"%s - D3DERR_OUTOFVIDEOMEMORY",s);
 
@@ -398,15 +336,14 @@ BOOL DXMessD3D9Handler::UpdateTextures()
 										sprintf_s(s,254,"%s - D3DERR_NOTAVAILABLE",s);
 
 									OutputDebugStringA(s);
-								
-	
+
 									SetEvent((HANDLE)(shared->TextureLock));
 
 									return hr;
 								}
 								else
 								{
-									//just get the width and height from the texture
+
 									if (textures[i].pTexture)
 									{
 										D3DSURFACE_DESC d;
@@ -414,7 +351,7 @@ BOOL DXMessD3D9Handler::UpdateTextures()
 
 										imageinfo.Width=d.Width;
 										imageinfo.Height=d.Height;
-										
+
 									}
 
 								}
@@ -422,14 +359,13 @@ BOOL DXMessD3D9Handler::UpdateTextures()
 						}
 					}
 
-					if (textures[i].pTexture) //should be 100% true here
+					if (textures[i].pTexture)
 					{
 						D3DSURFACE_DESC d;
 						textures[i].pTexture->GetLevelDesc(0, &d);
 
 						textures[i].width=(float)imageinfo.Width;
-						textures[i].height=(float)imageinfo.Height;				
-						
+						textures[i].height=(float)imageinfo.Height;
 
 						if (tea[i].AddressOfFontmap)
 						{
@@ -441,14 +377,11 @@ BOOL DXMessD3D9Handler::UpdateTextures()
 							if (textures[i].DefinedFontMap==NULL)
 							{
 								OutputDebugStringA("Failure allocating memory for fontmap");
-								SetEvent((HANDLE)(shared->TextureLock)); //unlock
+								SetEvent((HANDLE)(shared->TextureLock));
 								return FALSE;
 							}
 
-							//now parse the fontmap provided by ce and fill in the gaps						
-							
-							
-							WORD *cefontmap=(WORD *)(tea[i].AddressOfFontmap);											
+							WORD *cefontmap=(WORD *)(tea[i].AddressOfFontmap);
 							textures[i].DefinedFontMap->charheight=(float)cefontmap[0];
 
 							for (j=0; j<96; j++)
@@ -457,7 +390,7 @@ BOOL DXMessD3D9Handler::UpdateTextures()
 								textures[i].DefinedFontMap->charinfo[j].charwidth=(float)cefontmap[j+1];
 
 								currentOffset+=cefontmap[j+1];
-							}						
+							}
 
 							textures[i].DefinedFontMap->fullwidth=currentOffset;
 						}
@@ -465,11 +398,11 @@ BOOL DXMessD3D9Handler::UpdateTextures()
 
 					tea[i].hasBeenUpdated=0;
 
-				}			
+				}
 			}
 			else
 			{
-				//It's NULL
+
 				if (textures[i].pTexture)
 				{
 					textures[i].pTexture->Release();
@@ -477,27 +410,26 @@ BOOL DXMessD3D9Handler::UpdateTextures()
 				}
 
 				if (textures[i].DefinedFontMap)
-				{				
+				{
 					free(textures[i].DefinedFontMap);
 					textures[i].DefinedFontMap=NULL;
 				}
 			}
-			
+
 		}
 	}
 	if (shared->texturelistHasUpdate)
-		InterlockedExchange((volatile LONG *)&shared->texturelistHasUpdate,0);		
-	
-	
+		InterlockedExchange((volatile LONG *)&shared->texturelistHasUpdate,0);
+
 	SetEvent((HANDLE)(shared->TextureLock));
 
-	return TRUE;	
+	return TRUE;
 }
 
 float tmp=0.01f;
 
 void DXMessD3D9Handler::RenderOverlay()
-{	
+{
 	int i;
 	HRESULT hr;
 	D3DVIEWPORT9 vp;
@@ -506,26 +438,23 @@ void DXMessD3D9Handler::RenderOverlay()
 	clientMousepos.x=-1;
 	clientMousepos.y=-1;
 
-
 	if (sprite)
 	{
 		if (shared->lastHwnd==0)
 		{
 			D3DDEVICE_CREATION_PARAMETERS cp;
 			dev->GetCreationParameters(&cp);
-			shared->lastHwnd=(DWORD)cp.hFocusWindow;			
+			shared->lastHwnd=(DWORD)cp.hFocusWindow;
 		}
 
 		if (shared->texturelistHasUpdate)
 			UpdateTextures();
-		
 
 		hr=dev->BeginScene();
 
 		if (SUCCEEDED(hr))
 		{
-			
-			
+
 			hr=sprite->Begin(D3DXSPRITE_ALPHABLEND);
 			if (!SUCCEEDED(hr))
 			{
@@ -534,8 +463,6 @@ void DXMessD3D9Handler::RenderOverlay()
 				hr=sprite->Begin(D3DXSPRITE_ALPHABLEND);
 			}
 
-			
-		
 			if (SUCCEEDED(hr))
 			{
 				BOOL hasLock=FALSE;
@@ -543,7 +470,6 @@ void DXMessD3D9Handler::RenderOverlay()
 
 				if (shared->UseCommandlistLock)
 					hasLock=WaitForSingleObject((HANDLE)shared->CommandlistLock, INFINITE)==WAIT_OBJECT_0;
-				
 
 				while (shared->RenderCommands[i].Command)
 				{
@@ -551,19 +477,16 @@ void DXMessD3D9Handler::RenderOverlay()
 					{
 						case rcDrawSprite:
 						{
-							D3DXVECTOR2 scale,position, rotation;							
+							D3DXVECTOR2 scale,position, rotation;
 							D3DXMATRIX m;
 							int tid=shared->RenderCommands[i].sprite.textureid;
 
 							if ((tid<TextureCount) && (textures[tid].pTexture))
 							{
 
-								//render a sprite
-
-								//set the dimensions
 								if (shared->RenderCommands[i].sprite.width==-1)
 								{
-									if (!vp.Width)									
+									if (!vp.Width)
 										dev->GetViewport(&vp);
 
 									scale.x=(float)vp.Width / (float)textures[tid].width;
@@ -572,29 +495,23 @@ void DXMessD3D9Handler::RenderOverlay()
 									scale.x=(float)shared->RenderCommands[i].sprite.width / (float)textures[tid].width;
 
 								scale.y=(float)shared->RenderCommands[i].sprite.height / (float)textures[tid].height;
-						
-								
 
-								//set the position
-								
-								//set x
 								if (shared->RenderCommands[i].x==-2)
 								{
-									//mouse position
+
 									if (clientMousepos.x==-1)
 									{
-										//get the mouse position
+
 										GetCursorPos(&clientMousepos);
-										ScreenToClient((HWND)shared->lastHwnd, &clientMousepos);	
+										ScreenToClient((HWND)shared->lastHwnd, &clientMousepos);
 									}
 
-									//set x to the x position of the mouse (center is origin)
-									position.x=(float)clientMousepos.x-((float)shared->RenderCommands[i].sprite.width / 2.0f);  //make the center of the texture the position of the mouse (to add crosshairs, and normal mousecursors just have to keep that in mind so only render in the bottom left quadrant
+									position.x=(float)clientMousepos.x-((float)shared->RenderCommands[i].sprite.width / 2.0f);
 								}
 								else
-								if (shared->RenderCommands[i].x==-1) //center
+								if (shared->RenderCommands[i].x==-1)
 								{
-									if (!vp.Width)									
+									if (!vp.Width)
 										dev->GetViewport(&vp);
 
 									position.x=((float)vp.Width / 2.0f) - ((float)shared->RenderCommands[i].sprite.width / 2.0f);
@@ -602,56 +519,46 @@ void DXMessD3D9Handler::RenderOverlay()
 								else
 									position.x=shared->RenderCommands[i].x;
 
-
-
-								//set y
 								if (shared->RenderCommands[i].y==-2)
 								{
-									//set to the position of the mouse (center is origin)
-								
+
 									if (clientMousepos.x==-1)
 									{
-										//get the mouse position
+
 										GetCursorPos(&clientMousepos);
-										ScreenToClient((HWND)shared->lastHwnd, &clientMousepos);										
-									}									
-									position.y=(float)clientMousepos.y-((float)shared->RenderCommands[i].sprite.height / 2.0f);		
+										ScreenToClient((HWND)shared->lastHwnd, &clientMousepos);
+									}
+									position.y=(float)clientMousepos.y-((float)shared->RenderCommands[i].sprite.height / 2.0f);
 								}
 								else
 								if (shared->RenderCommands[i].y==-1)
 								{
-									if (!vp.Width)									
+									if (!vp.Width)
 										dev->GetViewport(&vp);
 
 									position.y=((float)vp.Height / 2.0f) - ((float)shared->RenderCommands[i].sprite.height / 2.0f);
 								}
 								else
-									position.y=(float)shared->RenderCommands[i].y;	
-									
-		
+									position.y=(float)shared->RenderCommands[i].y;
 
-								
-								//truncate to a pixel exact position
 								position.x=(float)(int)position.x;
 								position.y=(float)(int)position.y;
-							
 
 								RECT texturepos;
 
 								texturepos.left=0;
 								texturepos.top=0;
-								texturepos.bottom=(LONG)textures[tid].height;  //shared->RenderCommands[i].sprite.height;
-								texturepos.right=(LONG)textures[tid].width; //shared->RenderCommands[i].sprite.width;
+								texturepos.bottom=(LONG)textures[tid].height;
+								texturepos.right=(LONG)textures[tid].width;
 
 								rotation.x=shared->RenderCommands[i].centerX;
 								rotation.y=shared->RenderCommands[i].centerY;
 
 								position.x-=shared->RenderCommands[i].centerX;
-								position.y-=shared->RenderCommands[i].centerY;							
-				
-			
-								D3DXMatrixTransformation2D(&m, NULL, NULL, &scale, &rotation, shared->RenderCommands[i].rotation, &position);						
-								sprite->SetTransform(&m);	
+								position.y-=shared->RenderCommands[i].centerY;
+
+								D3DXMatrixTransformation2D(&m, NULL, NULL, &scale, &rotation, shared->RenderCommands[i].rotation, &position);
+								sprite->SetTransform(&m);
 
 								hr=sprite->Draw(textures[tid].pTexture, &texturepos, NULL, NULL, D3DCOLOR_ARGB((int)(shared->RenderCommands[i].alphablend*255),255,255,255));
 							}
@@ -659,8 +566,8 @@ void DXMessD3D9Handler::RenderOverlay()
 						}
 
 						case rcDrawFont:
-						{							
-							int tid=shared->RenderCommands[i].font.fontid;							
+						{
+							int tid=shared->RenderCommands[i].font.fontid;
 
 							if ((tid<TextureCount) && (textures[tid].pTexture))
 							{
@@ -668,24 +575,22 @@ void DXMessD3D9Handler::RenderOverlay()
 								D3DXVECTOR3 position;
 								PTextureData9 td;
 
-								if (!vp.Width)									
+								if (!vp.Width)
 									dev->GetViewport(&vp);
-								
 
 								if (!hasLock)
-									hasLock=WaitForSingleObject((HANDLE)shared->CommandlistLock, INFINITE)==WAIT_OBJECT_0; //fonts demand a lock  (stringpointer)
+									hasLock=WaitForSingleObject((HANDLE)shared->CommandlistLock, INFINITE)==WAIT_OBJECT_0;
 
 								position.x=(float)shared->RenderCommands[i].x;
-								position.y=(float)shared->RenderCommands[i].y;	
+								position.y=(float)shared->RenderCommands[i].y;
 								position.z=0;
 
 								td=&textures[shared->RenderCommands[i].font.fontid];
-								s=(char *)shared->RenderCommands[i].font.addressoftext;	
+								s=(char *)shared->RenderCommands[i].font.addressoftext;
 
-								if (position.x==-1) 
+								if (position.x==-1)
 								{
-									//horizontal center
-									//calculate the width									
+
 									float width=0, maxwidth=0;
 									int slen=strlen(s);
 									int j;
@@ -697,30 +602,26 @@ void DXMessD3D9Handler::RenderOverlay()
 										else
 										if (s[j]=='\n')
 											width=0;
-										
+
 										if (width>maxwidth)
 											maxwidth=width;
 									}
 									position.x=((float)vp.Width / 2.0f) - ((float)maxwidth / 2.0f);
-									
+
 								}
 
 								if (position.y==-1)
-								{						
-									//vertical center						
+								{
+
 									position.y=((float)vp.Height / 2.0f) - ((float)td->DefinedFontMap->charheight / 2.0f);
 								}
 
 								position.x=(float)(int)position.x;
 								position.y=(float)(int)position.y;
 
-								//now draw the string
-								//truncate to a pixel exact position
-
 								DrawString(position, &textures[tid], s,strlen(s), shared->RenderCommands[i].alphablend);
 
 							}
-
 
 							break;
 						}
@@ -730,65 +631,19 @@ void DXMessD3D9Handler::RenderOverlay()
 					i++;
 				}
 
-				if (hasLock) //release the lock if it was obtained
+				if (hasLock)
 					SetEvent((HANDLE)shared->CommandlistLock);
-		
-				hr=sprite->Flush();			
+
+				hr=sprite->Flush();
 				hr=sprite->End();
 			}
-			
-			
+
 			dev->EndScene();
 		}
-		
-		
-		
-	}
-	
-}
 
-
-/*
-
-typedef ULONG (__stdcall *RELEASE)(IUnknown *self);
-typedef ULONG (__stdcall *ADDREF)(IUnknown *self);
-
-
-int careAboutRefcount=1;
-ADDREF origAddRef;
-RELEASE origRelease;
-
-
-ULONG __stdcall d3d9devAddRef(IUnknown *self)
-{
-	int i=0;
-	if (insidehook==0)
-	{
-		i=origAddRef(self);
-	}
-		
-	return i;
-}
-
-ULONG __stdcall d3d9devRelease(IUnknown *self)
-{
-	int i;
-	if (insidehook)
-		return 1;
-
-	origAddRef(self);
-	i=origRelease(self);
-
-	if (i==1)
-	{
-		//free the DXMess handler
-		MessageBoxA(0,"Going to free the handler","FREE Device", MB_OK);		
 	}
 
-	i=origRelease(self);		
-	return 0; //i;
 }
-*/
 
 DXMessD3D9Handler::DXMessD3D9Handler(IDirect3DDevice9 *dev, PD3DHookShared shared)
 {
@@ -799,28 +654,6 @@ DXMessD3D9Handler::DXMessD3D9Handler(IDirect3DDevice9 *dev, PD3DHookShared share
 	lastSnapshot=0;
 	makeSnapshot=FALSE;
 	smallSnapshot=FALSE;
-
-	
-	//Failed experiment. For some reason a[1] and a[2] get restored to their original address (which is the main reason why I use the deep hook method)
-	//If it is important, I can add Release and AddRef to the hooklist at a later date
-	/*
-	if (careAboutRefcount)
-	{
-		DWORD old;
-		//hook AddRef and Release for this object
-		uintptr_t *a=(uintptr_t *)*(uintptr_t *)dev;
-		VirtualProtect(dev, 8, PAGE_EXECUTE_READWRITE, &old);
-		
-		
-
-		origAddRef=(ADDREF)a[1];
-		origRelease=(RELEASE)a[2];
-		a[1]=(uintptr_t)&d3d9devAddRef;
-		a[2]=(uintptr_t)&d3d9devRelease;
-		VirtualProtect(dev, 8, old, &old);
-	}
-	*/
-
 
 	dev->AddRef();
 
@@ -833,9 +666,9 @@ DXMessD3D9Handler::DXMessD3D9Handler(IDirect3DDevice9 *dev, PD3DHookShared share
 	tea=(PTextureEntry)((uintptr_t)shared+shared->texturelist);
 	UpdateTextures();
 
-	hr=D3DXCreateSprite(dev, &sprite); //
+	hr=D3DXCreateSprite(dev, &sprite);
 	if( FAILED( hr ) )
-		OutputDebugStringA("D3DXCreateSprite FAILED");		
+		OutputDebugStringA("D3DXCreateSprite FAILED");
 
 }
 
@@ -843,35 +676,33 @@ DXMessD3D9Handler::~DXMessD3D9Handler()
 {
 	D3D9devices[dev]=NULL;
 }
-	
+
 void __stdcall D3D9Hook_Present_imp(IDirect3DDevice9 *device, PD3DHookShared s)
-{	
+{
 	insidehook=1;
 	DXMessD3D9Handler *currenthandler=D3D9devices[device];
 	if (currenthandler==NULL)
 	{
-		currenthandler=new DXMessD3D9Handler(device, s);//create a new devicehandler
+		currenthandler=new DXMessD3D9Handler(device, s);
 		D3D9devices[device]=currenthandler;
 		shared=s;
 	}
-	
-	currenthandler->RenderOverlay();	
+
+	currenthandler->RenderOverlay();
 	insidehook=0;
 
-	//check if a snapshot key is down
-	if (currenthandler->makeSnapshot) //possible threading issue if more than one render device
+	if (currenthandler->makeSnapshot)
 	{
-		//notify CE that all render operations have completed
+
 		shared->snapshotcount=currenthandler->snapshotCounter;
 		shared->canDoSnapshot=0;
-		SetEvent((HANDLE)shared->snapshotDone);		
+		SetEvent((HANDLE)shared->snapshotDone);
 		currenthandler->makeSnapshot=FALSE;
 	}
 
-	
 	if (shared->canDoSnapshot)
 	{
-		
+
 		if ((shared->snapshotKey) && (GetTickCount()>currenthandler->lastSnapshot+250))
 		{
 			SHORT ks=GetAsyncKeyState(shared->snapshotKey);
@@ -880,7 +711,7 @@ void __stdcall D3D9Hook_Present_imp(IDirect3DDevice9 *device, PD3DHookShared s)
 
 			if (currenthandler->makeSnapshot)
 				currenthandler->lastSnapshot=GetTickCount();
-			
+
 		}
 
 		if ((currenthandler->makeSnapshot==FALSE) && (shared->smallSnapshotKey) && (GetTickCount()>currenthandler->lastSnapshot+250) && (shared->lastHwnd))
@@ -894,51 +725,42 @@ void __stdcall D3D9Hook_Present_imp(IDirect3DDevice9 *device, PD3DHookShared s)
 				currenthandler->smallSnapshot=TRUE;
 				currenthandler->lastSnapshot=GetTickCount();
 
-				//get the pixel the mouse is hovering over
 				GetCursorPos(&p);
 				ScreenToClient((HWND)shared->lastHwnd, &p);
 				currenthandler->smallSnapshotPoint=p;
 
 				GetClientRect((HWND)shared->lastHwnd, &currenthandler->smallSnapshotClientRect);
 
-
-				//get the relative position (0.00 - 1.00) this position is in for the clientrect
 				currenthandler->smallSnapshotPointRelative.x=(float)currenthandler->smallSnapshotPoint.x/(float)(currenthandler->smallSnapshotClientRect.right-currenthandler->smallSnapshotClientRect.left);
 				currenthandler->smallSnapshotPointRelative.y=(float)currenthandler->smallSnapshotPoint.y/(float)(currenthandler->smallSnapshotClientRect.bottom-currenthandler->smallSnapshotClientRect.top);
 			}
-			
+
 		}
-
-
-		
 
 		if (currenthandler->makeSnapshot)
 		{
 
-			makeSnapshot=TRUE; //once true, always true
+			makeSnapshot=TRUE;
 
-			
-			//clear the render target with a specific color
 			currenthandler->dev->Clear(0, NULL, D3DCLEAR_TARGET, 0xFFFF00FF, 1.0f, 0);
-			
+
 			currenthandler->snapshotCounter=0;
-			
 
 		}
 	}
-	
+
 }
 
 HRESULT __stdcall D3D9Hook_Reset_imp(D3D9_RESET_ORIGINAL originalfunction, IDirect3DDevice9 *device, D3DPRESENT_PARAMETERS *pPresentationParameters)
 {
 	HRESULT hr;
 	DXMessD3D9Handler *currenthandler=D3D9devices[device];
-	if (currenthandler) 
+	if (currenthandler)
 	{
 		currenthandler->BeforeReset();
 		hr=originalfunction(device, pPresentationParameters);
 		if (SUCCEEDED(hr))
-			currenthandler->AfterReset();		
+			currenthandler->AfterReset();
 	}
 
 	return hr;
@@ -946,18 +768,16 @@ HRESULT __stdcall D3D9Hook_Reset_imp(D3D9_RESET_ORIGINAL originalfunction, IDire
 
 HRESULT __stdcall D3D9Hook_DrawPrimitive_imp(D3D9_DRAWPRIMITIVE_ORIGINAL originalfunction, IDirect3DDevice9 *device, D3DPRIMITIVETYPE PrimitiveType,UINT StartVertex,UINT PrimitiveCount)
 {
-	
+
 	if (((shared) && ((shared->wireframe) || (shared->disabledzbuffer) || (makeSnapshot) ) && (insidehook==0)))
 	{
-		//setup for wireframe	
 
 		DWORD oldfillmode;
 		DWORD oldzenable;
 		HRESULT hr,hr2;
-		
+
 		hr=device->GetRenderState(D3DRS_FILLMODE, &oldfillmode);
 		hr2=device->GetRenderState(D3DRS_ZENABLE, &oldzenable);
-
 
 		DXMessD3D9Handler *currentDevice=D3D9devices[device];
 
@@ -965,16 +785,15 @@ HRESULT __stdcall D3D9Hook_DrawPrimitive_imp(D3D9_DRAWPRIMITIVE_ORIGINAL origina
 			currentDevice->PrepareForSnapshot();
 
 		if (SUCCEEDED(hr) && SUCCEEDED(hr2))
-		{			
+		{
 			device->SetRenderState(D3DRS_FILLMODE,D3DFILL_WIREFRAME);
 			hr=originalfunction(device, PrimitiveType, StartVertex, PrimitiveCount);
 			device->SetRenderState(D3DRS_FILLMODE,oldfillmode);
 			device->SetRenderState(D3DRS_ZENABLE,oldzenable);
-			
+
 		}
 		else
 			hr=originalfunction(device, PrimitiveType, StartVertex, PrimitiveCount);
-
 
 		if ((currentDevice) && (currentDevice->makeSnapshot))
 			currentDevice->TakeSnapshot("D3D9Hook_DrawPrimitive_imp");
@@ -982,46 +801,41 @@ HRESULT __stdcall D3D9Hook_DrawPrimitive_imp(D3D9_DRAWPRIMITIVE_ORIGINAL origina
 		return hr;
 
 	}
-	return originalfunction(device, PrimitiveType, StartVertex, PrimitiveCount);	
+	return originalfunction(device, PrimitiveType, StartVertex, PrimitiveCount);
 }
 
 HRESULT __stdcall D3D9Hook_DrawIndexedPrimitive_imp(D3D9_DRAWINDEXEDPRIMITIVE_ORIGINAL originalfunction, IDirect3DDevice9 *device, D3DPRIMITIVETYPE PrimitiveType,INT BaseVertexIndex,UINT MinVertexIndex,UINT NumVertices,UINT startIndex,UINT primCount)
-{	
+{
 
 	if (((shared) && ((shared->wireframe) || (shared->disabledzbuffer) || (makeSnapshot) ) && (insidehook==0)))
 	{
-		//setup for wireframe and/or zbuffer	
 
 		DWORD oldfillmode;
 		DWORD oldzenable;
 		HRESULT hr,hr2;
-		
+
 		hr=device->GetRenderState(D3DRS_FILLMODE, &oldfillmode);
 		hr2=device->GetRenderState(D3DRS_ZENABLE, &oldzenable);
 
-		DXMessD3D9Handler *currentDevice=D3D9devices[device];		
-
+		DXMessD3D9Handler *currentDevice=D3D9devices[device];
 
 		if ((currentDevice) && (currentDevice->makeSnapshot))
 			currentDevice->PrepareForSnapshot();
 
 		if (SUCCEEDED(hr) && SUCCEEDED(hr2))
-		{			
+		{
 			if (shared->wireframe)
 				device->SetRenderState(D3DRS_FILLMODE,D3DFILL_WIREFRAME);
 
 			if (shared->disabledzbuffer)
 				device->SetRenderState(D3DRS_ZENABLE,FALSE);
 
-
-
-
 			hr=originalfunction(device, PrimitiveType, BaseVertexIndex, MinVertexIndex, NumVertices, startIndex, primCount);
 			device->SetRenderState(D3DRS_FILLMODE,oldfillmode);
 			device->SetRenderState(D3DRS_ZENABLE,oldzenable);
-			
+
 		}
-		else 
+		else
 			hr=originalfunction(device, PrimitiveType, BaseVertexIndex, MinVertexIndex, NumVertices, startIndex, primCount);
 
 		if ((currentDevice) && (currentDevice->makeSnapshot))
@@ -1034,41 +848,34 @@ HRESULT __stdcall D3D9Hook_DrawIndexedPrimitive_imp(D3D9_DRAWINDEXEDPRIMITIVE_OR
 }
 
 HRESULT __stdcall D3D9Hook_DrawPrimitiveUP_imp(D3D9_DRAWPRIMITIVEUP_ORIGINAL originalfunction, IDirect3DDevice9 *device, D3DPRIMITIVETYPE PrimitiveType,UINT PrimitiveCount,CONST void* pVertexStreamZeroData,UINT VertexStreamZeroStride)
-{	
+{
 	if (((shared) && ((shared->wireframe) || (shared->disabledzbuffer) || (makeSnapshot) ) && (insidehook==0)))
 	{
-		//setup for wireframe and/or zbuffer	
 
 		DWORD oldfillmode;
 		DWORD oldzenable;
 		HRESULT hr,hr2;
-		
+
 		hr=device->GetRenderState(D3DRS_FILLMODE, &oldfillmode);
 		hr2=device->GetRenderState(D3DRS_ZENABLE, &oldzenable);
-
 
 		DXMessD3D9Handler *currentDevice=D3D9devices[device];
 		if ((currentDevice) && (currentDevice->makeSnapshot))
 			currentDevice->PrepareForSnapshot();
 
 		if (SUCCEEDED(hr) && SUCCEEDED(hr2))
-		{			
+		{
 			if (shared->wireframe)
 				device->SetRenderState(D3DRS_FILLMODE,D3DFILL_WIREFRAME);
 
 			if (shared->disabledzbuffer)
-				device->SetRenderState(D3DRS_ZENABLE,FALSE);	
+				device->SetRenderState(D3DRS_ZENABLE,FALSE);
 
-
-			
-	
 			hr=originalfunction(device, PrimitiveType, PrimitiveCount, pVertexStreamZeroData, VertexStreamZeroStride);
-
-
 
 			device->SetRenderState(D3DRS_FILLMODE,oldfillmode);
 			device->SetRenderState(D3DRS_ZENABLE,oldzenable);
-			
+
 		}
 		else
 			hr=originalfunction(device, PrimitiveType, PrimitiveCount, pVertexStreamZeroData, VertexStreamZeroStride);
@@ -1083,40 +890,36 @@ HRESULT __stdcall D3D9Hook_DrawPrimitiveUP_imp(D3D9_DRAWPRIMITIVEUP_ORIGINAL ori
 }
 
 HRESULT __stdcall D3D9Hook_DrawIndexedPrimitiveUP_imp(D3D9_DRAWINDEXEDPRIMITIVEUP_ORIGINAL originalfunction, IDirect3DDevice9 *device, D3DPRIMITIVETYPE PrimitiveType,UINT MinVertexIndex,UINT NumVertices,UINT PrimitiveCount,CONST void* pIndexData,D3DFORMAT IndexDataFormat,CONST void* pVertexStreamZeroData,UINT VertexStreamZeroStride)
-{	
+{
 	if (((shared) && ((shared->wireframe) || (shared->disabledzbuffer) || (makeSnapshot) ) && (insidehook==0)))
 	{
-		//setup for wireframe and/or zbuffer	
 
 		DWORD oldfillmode;
 		DWORD oldzenable;
 		HRESULT hr,hr2;
-		
+
 		hr=device->GetRenderState(D3DRS_FILLMODE, &oldfillmode);
 		hr2=device->GetRenderState(D3DRS_ZENABLE, &oldzenable);
-
 
 		DXMessD3D9Handler *currentDevice=D3D9devices[device];
 		if ((currentDevice) && (currentDevice->makeSnapshot))
 			currentDevice->PrepareForSnapshot();
 
 		if (SUCCEEDED(hr) && SUCCEEDED(hr2))
-		{			
+		{
 			if (shared->wireframe)
 				device->SetRenderState(D3DRS_FILLMODE,D3DFILL_WIREFRAME);
 
 			if (shared->disabledzbuffer)
 				device->SetRenderState(D3DRS_ZENABLE,FALSE);
 
-		
 			hr=originalfunction(device, PrimitiveType, MinVertexIndex, NumVertices, PrimitiveCount, pIndexData, IndexDataFormat, pVertexStreamZeroData, VertexStreamZeroStride);
 			device->SetRenderState(D3DRS_FILLMODE,oldfillmode);
 			device->SetRenderState(D3DRS_ZENABLE,oldzenable);
-			
+
 		}
 		else
 			hr=originalfunction(device, PrimitiveType, MinVertexIndex, NumVertices, PrimitiveCount, pIndexData, IndexDataFormat, pVertexStreamZeroData, VertexStreamZeroStride);
-
 
 		if ((currentDevice) && (currentDevice->makeSnapshot))
 			currentDevice->TakeSnapshot("D3D9Hook_DrawIndexedPrimitiveUP_imp");
@@ -1127,16 +930,15 @@ HRESULT __stdcall D3D9Hook_DrawIndexedPrimitiveUP_imp(D3D9_DRAWINDEXEDPRIMITIVEU
 }
 
 HRESULT __stdcall D3D9Hook_DrawRectPatch_imp(D3D9_DRAWRECTPATCH_ORIGINAL originalfunction, IDirect3DDevice9 *device, UINT Handle,CONST float* pNumSegs,CONST D3DRECTPATCH_INFO* pRectPatchInfo)
-{	
-	
+{
+
 	if (((shared) && ((shared->wireframe) || (shared->disabledzbuffer) || (makeSnapshot) ) && (insidehook==0)))
 	{
-		//setup for wireframe and/or zbuffer	
 
 		DWORD oldfillmode;
 		DWORD oldzenable;
 		HRESULT hr,hr2;
-		
+
 		hr=device->GetRenderState(D3DRS_FILLMODE, &oldfillmode);
 		hr2=device->GetRenderState(D3DRS_ZENABLE, &oldzenable);
 
@@ -1144,9 +946,8 @@ HRESULT __stdcall D3D9Hook_DrawRectPatch_imp(D3D9_DRAWRECTPATCH_ORIGINAL origina
 		if ((currentDevice) && (currentDevice->makeSnapshot))
 			currentDevice->PrepareForSnapshot();
 
-
 		if (SUCCEEDED(hr) && SUCCEEDED(hr2))
-		{			
+		{
 			if (shared->wireframe)
 				device->SetRenderState(D3DRS_FILLMODE,D3DFILL_WIREFRAME);
 
@@ -1156,7 +957,7 @@ HRESULT __stdcall D3D9Hook_DrawRectPatch_imp(D3D9_DRAWRECTPATCH_ORIGINAL origina
 			hr=originalfunction(device, Handle, pNumSegs, pRectPatchInfo);
 			device->SetRenderState(D3DRS_FILLMODE,oldfillmode);
 			device->SetRenderState(D3DRS_ZENABLE,oldzenable);
-			
+
 		}
 		else
 			hr=originalfunction(device, Handle, pNumSegs, pRectPatchInfo);
@@ -1170,15 +971,14 @@ HRESULT __stdcall D3D9Hook_DrawRectPatch_imp(D3D9_DRAWRECTPATCH_ORIGINAL origina
 }
 
 HRESULT __stdcall D3D9Hook_DrawTriPatch_imp(D3D9_DRAWTRIPATCH_ORIGINAL originalfunction, IDirect3DDevice9 *device, UINT Handle,CONST float* pNumSegs,CONST D3DTRIPATCH_INFO* pTriPatchInfo)
-{	
+{
 	if (((shared) && ((shared->wireframe) || (shared->disabledzbuffer) || (makeSnapshot) ) && (insidehook==0)))
 	{
-		//setup for wireframe and/or zbuffer	
 
 		DWORD oldfillmode;
 		DWORD oldzenable;
 		HRESULT hr,hr2;
-		
+
 		hr=device->GetRenderState(D3DRS_FILLMODE, &oldfillmode);
 		hr2=device->GetRenderState(D3DRS_ZENABLE, &oldzenable);
 
@@ -1187,18 +987,17 @@ HRESULT __stdcall D3D9Hook_DrawTriPatch_imp(D3D9_DRAWTRIPATCH_ORIGINAL originalf
 			currentDevice->PrepareForSnapshot();
 
 		if (SUCCEEDED(hr) && SUCCEEDED(hr2))
-		{			
+		{
 			if (shared->wireframe)
 				device->SetRenderState(D3DRS_FILLMODE,D3DFILL_WIREFRAME);
 
 			if (shared->disabledzbuffer)
 				device->SetRenderState(D3DRS_ZENABLE,FALSE);
 
-
 			hr=originalfunction(device, Handle, pNumSegs, pTriPatchInfo);
 			device->SetRenderState(D3DRS_FILLMODE,oldfillmode);
 			device->SetRenderState(D3DRS_ZENABLE,oldzenable);
-	
+
 		}
 		else
 			hr=originalfunction(device, Handle, pNumSegs, pTriPatchInfo);
@@ -1211,7 +1010,3 @@ HRESULT __stdcall D3D9Hook_DrawTriPatch_imp(D3D9_DRAWTRIPATCH_ORIGINAL originalf
 	}
 	return originalfunction(device, Handle, pNumSegs, pTriPatchInfo);
 }
-
-
-	
-    //STDMETHOD(DrawTriPatch)(THIS_ UINT Handle,CONST float* pNumSegs,CONST D3DTRIPATCH_INFO* pTriPatchInfo) PURE;

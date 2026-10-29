@@ -1,4 +1,3 @@
-
 use onyx_core::process::Process;
 use onyx_core::debugger::commonality::{CommonalityAnalyzer, RegisterSnapshot};
 use crate::types::{OnyxRegisterSnapshot, OnyxRegisterComparison, OnyxStructureDifference};
@@ -104,4 +103,3 @@ pub unsafe extern "C" fn onyx_commonality_analyze_structures(
         Err(_) => -1,
     }
 }
-

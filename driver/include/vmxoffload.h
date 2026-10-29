@@ -23,128 +23,124 @@ typedef struct _DBVMOffloadMemInfo
 #pragma pack (1)
 typedef struct _PTE
 {
-        unsigned P         :  1; // present (1 = present)
-        unsigned RW        :  1; // read/write
-        unsigned US        :  1; // user/supervisor
-        unsigned PWT       :  1; // page-level write-through
-        unsigned PCD       :  1; // page-level cache disabled
-        unsigned A         :  1; // accessed
-        unsigned D         :  1; // dirty
-        unsigned PAT       :  1; // PAT
-        unsigned G         :  1; // global page
-        unsigned A1        :  1; // available 1 aka copy-on-write
-        unsigned A2        :  1; // available 2/ is 1 when paged to disk
-        unsigned A3        :  1; // available 3
-        unsigned PFN       : 20; // page-frame number		
+        unsigned P         :  1;
+        unsigned RW        :  1;
+        unsigned US        :  1;
+        unsigned PWT       :  1;
+        unsigned PCD       :  1;
+        unsigned A         :  1;
+        unsigned D         :  1;
+        unsigned PAT       :  1;
+        unsigned G         :  1;
+        unsigned A1        :  1;
+        unsigned A2        :  1;
+        unsigned A3        :  1;
+        unsigned PFN       : 20;
 } *PPTE;
 
 typedef struct _PDE
 {
-        unsigned P         :  1; // present (1 = present)
-        unsigned RW        :  1; // read/write
-        unsigned US        :  1; // user/supervisor
-        unsigned PWT       :  1; // page-level write-through
-        unsigned PCD       :  1; // page-level cache disabled
-        unsigned A         :  1; // accessed
-        unsigned D         :  1; // dirty
-        unsigned PS        :  1; // reserved (0)
-        unsigned G         :  1; // reserved (0)
-        unsigned A1        :  1; // available 1 aka copy-on-write
-        unsigned A2        :  1; // available 2/ is 1 when paged to disk
-        unsigned A3        :  1; // available 3
-        unsigned PFN       : 20; // page-frame number
+        unsigned P         :  1;
+        unsigned RW        :  1;
+        unsigned US        :  1;
+        unsigned PWT       :  1;
+        unsigned PCD       :  1;
+        unsigned A         :  1;
+        unsigned D         :  1;
+        unsigned PS        :  1;
+        unsigned G         :  1;
+        unsigned A1        :  1;
+        unsigned A2        :  1;
+        unsigned A3        :  1;
+        unsigned PFN       : 20;
 } *PPDE;
 
 typedef struct _PDE2MB
 {
-        unsigned P         :  1; // present (1 = present)
-        unsigned RW        :  1; // read/write
-        unsigned US        :  1; // user/supervisor
-        unsigned PWT       :  1; // page-level write-through
-        unsigned PCD       :  1; // page-level cache disabled
-        unsigned A         :  1; // accessed
-        unsigned reserved1 :  1; // reserved (0)
-        unsigned PS        :  1; // reserved (0)
-        unsigned reserved3 :  1; // reserved (0)
-        unsigned A1        :  1; // available 1 aka copy-on-write
-        unsigned A2        :  1; // available 2/ is 1 when paged to disk
-        unsigned A3        :  1; // available 3
-        unsigned PFN       : 20; // page-frame number (>> 13 instead of >>12);
+        unsigned P         :  1;
+        unsigned RW        :  1;
+        unsigned US        :  1;
+        unsigned PWT       :  1;
+        unsigned PCD       :  1;
+        unsigned A         :  1;
+        unsigned reserved1 :  1;
+        unsigned PS        :  1;
+        unsigned reserved3 :  1;
+        unsigned A1        :  1;
+        unsigned A2        :  1;
+        unsigned A3        :  1;
+        unsigned PFN       : 20;
 } *PPDE2MB;
-
-
 
 typedef struct _PTE_PAE
 {
-        unsigned P         :  1; // present (1 = present)
-        unsigned RW        :  1; // read/write
-        unsigned US        :  1; // user/supervisor
-        unsigned PWT       :  1; // page-level write-through
-        unsigned PCD       :  1; // page-level cache disabled
-        unsigned A         :  1; // accessed
-        unsigned D         :  1; // dirty
-        unsigned PAT       :  1; // 
-        unsigned G         :  1; // global page
-        unsigned A1        :  1; // available 1 aka copy-on-write
-        unsigned A2        :  1; // available 2/ is 1 when paged to disk
-        unsigned A3        :  1; // available 3
+        unsigned P         :  1;
+        unsigned RW        :  1;
+        unsigned US        :  1;
+        unsigned PWT       :  1;
+        unsigned PCD       :  1;
+        unsigned A         :  1;
+        unsigned D         :  1;
+        unsigned PAT       :  1;
+        unsigned G         :  1;
+        unsigned A1        :  1;
+        unsigned A2        :  1;
+        unsigned A3        :  1;
 		unsigned PFN_LOW : 20;
 		unsigned PFN_HIGH : 32;
 } PTE_PAE, *PPTE_PAE;
 
 typedef struct _PDE_PAE
 {
-        unsigned P         :  1; // present (1 = present)
-        unsigned RW        :  1; // read/write
-        unsigned US        :  1; // user/supervisor
-        unsigned PWT       :  1; // page-level write-through
-        unsigned PCD       :  1; // page-level cache disabled
-        unsigned A         :  1; // accessed
-        unsigned D         :  1; // dirty
-        unsigned PS        :  1; // pagesize
-        unsigned G         :  1; // reserved (0)
-        unsigned A1        :  1; // available 1 aka copy-on-write
-        unsigned A2        :  1; // available 2/ is 1 when paged to disk
-        unsigned A3        :  1; // available 3
+        unsigned P         :  1;
+        unsigned RW        :  1;
+        unsigned US        :  1;
+        unsigned PWT       :  1;
+        unsigned PCD       :  1;
+        unsigned A         :  1;
+        unsigned D         :  1;
+        unsigned PS        :  1;
+        unsigned G         :  1;
+        unsigned A1        :  1;
+        unsigned A2        :  1;
+        unsigned A3        :  1;
 		unsigned PFN_LOW : 20;
 		unsigned PFN_HIGH : 32;
 } PDE_PAE, *PPDE_PAE;
 
 typedef struct _PDE2MB_PAE
 {
-        unsigned P         :  1; // present (1 = present)
-        unsigned RW        :  1; // read/write
-        unsigned US        :  1; // user/supervisor
-        unsigned PWT       :  1; // page-level write-through
-        unsigned PCD       :  1; // page-level cache disabled
-        unsigned A         :  1; // accessed
-        unsigned reserved1 :  1; // reserved (0)
-        unsigned PS        :  1; // reserved (0)
-        unsigned reserved3 :  1; // reserved (0)
-        unsigned A1        :  1; // available 1 aka copy-on-write
-        unsigned A2        :  1; // available 2/ is 1 when paged to disk
-        unsigned A3        :  1; // available 3
-        unsigned PAT       :  1; //
+        unsigned P         :  1;
+        unsigned RW        :  1;
+        unsigned US        :  1;
+        unsigned PWT       :  1;
+        unsigned PCD       :  1;
+        unsigned A         :  1;
+        unsigned reserved1 :  1;
+        unsigned PS        :  1;
+        unsigned reserved3 :  1;
+        unsigned A1        :  1;
+        unsigned A2        :  1;
+        unsigned A3        :  1;
+        unsigned PAT       :  1;
 		unsigned PFN_LOW : 19;
 		unsigned PFN_HIGH : 32;
 } *PPDE2MB_PAE;
 
-
-
 typedef struct _PDPTE_PAE
 {
-        unsigned P         :  1; // present (1 = present)
-        unsigned RW        :  1; // Read Write
-        unsigned US        :  1; // User supervisor                
-        unsigned PWT       :  1; // page-level write-through
-        unsigned PCD       :  1; // page-level cache disabled
-		unsigned reserved0 : 1; // reserved
-		unsigned reserved1 : 1; // reserved
-		unsigned reserved2 : 1; // reserved
-		unsigned reserved3 : 1; // reserved
-        unsigned A1        :  1; // available 1 aka copy-on-write
-        unsigned A2        :  1; // available 2/ is 1 when paged to disk
-        unsigned A3        :  1; // available 3
+        unsigned P         :  1;
+        unsigned RW        :  1;
+        unsigned US        :  1;
+        unsigned PWT       :  1;
+        unsigned PCD       :  1;
+		unsigned reserved0 : 1;
+		unsigned reserved1 : 1;
+		unsigned reserved2 : 1;
+		unsigned reserved3 : 1;
+        unsigned A1        :  1;
+        unsigned A2        :  1;
+        unsigned A3        :  1;
 		unsigned PFN_LOW : 20;
 		unsigned PFN_HIGH : 32;
 } *PPDPTE_PAE;

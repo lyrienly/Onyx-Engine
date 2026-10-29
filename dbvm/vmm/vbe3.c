@@ -1,23 +1,8 @@
-/*
- * vbe3.c
- *
- *  Created on: Mar 2, 2018
- *      Author: eric heijnen
- *
- *      For displaying error messages on the screen and basic menu system in case of fatal error
- *
- *      todo: Font's and stuff
- *
- *      Mar6: Suspend work on this for now, it's too unpredictable with windows' gpu drivers.
- *      The mode gpu mode switches, but the memory seems locked
- *      Perhaps launching windows in VGA mode might work, but not useful for situations to explain to novice users what went wrong
- */
-
 #include "vbe3.h"
 #include "mm.h"
 #include "main.h"
 
-#define DISPLAYBASE 0xc0000000 //has to be below 0x100000000 as segments can only address 32-bit addresses
+#define DISPLAYBASE 0xc0000000
 #define EMULATEDBIOSBLOCK 0xc0010000
 #define STACK16 0xf0000000
 #define GRAPHICS_MEMORY 0xd0000000
@@ -30,13 +15,11 @@ int GraphicsPageSize;
 
 extern int doVBEINIT(void);
 
-//call functions:
 extern int VBEcall_ResetStart();
 extern int VBEcall_SaveRestoreState(BYTE operationmode,WORD stateflags, WORD dataselector,  WORD *size);
 extern int VBEcall_SetMode(WORD mode, WORD dataselector);
 extern int VBEcall_GetModeInfo(WORD mode, WORD dataselector);
 extern int VBEcall_GetControllerInfo(WORD dataselector);
-
 
 int VBE3Initialized=0;
 
@@ -63,7 +46,7 @@ typedef struct _LONGJMP64
   WORD cs;
 } __attribute__((__packed__)) LONGJMP64;
 
-LONGJMP16 vbe_initptr; //just don't use the rex prefix
+LONGJMP16 vbe_initptr;
 extern LONGJMP16 vbe_entry;
 
 void *VBEPtrToAddress(DWORD vbeptr)
@@ -84,7 +67,7 @@ void *VBEPtrToAddress(DWORD vbeptr)
 
 int initializeVBE3()
 {
-  //scan for VBE3
+
   if (VBE3Initialized)
     return 1;
 
@@ -92,7 +75,6 @@ int initializeVBE3()
   volatile unsigned char *biossource=(volatile unsigned char *)0xc0000;
   unsigned char *copy=malloc2(65536);
 
-  //map this to DISPLAYBASE
   sendstringf("initializeVBE3:\n");
   sendstringf("Copying memory and scanning for PMID (sizeof(VBE3_PM_InfoBlock)=%d) \n", sizeof(VBE3_PM_InfoBlock));
 
@@ -102,9 +84,9 @@ int initializeVBE3()
     PVBE3_PM_InfoBlock b=(PVBE3_PM_InfoBlock)&biossource[i];
     copy[i]=biossource[i];
 
-    if (b->ID==0x44494d50) //'PMID'
+    if (b->ID==0x44494d50)
     {
-      //check the signature
+
       sendstringf("Found a VBE3 Protected Mode Info Block at %8 ",0xc0000+i);
       unsigned char checksum=0;
       unsigned int j;
@@ -121,13 +103,11 @@ int initializeVBE3()
     }
   }
 
-  //map the copy to DISPLAYBASE
   if (PMInfoBlock)
   {
     mapMemory(displaybioscopy, copy, 65536);
     PVBE3_PM_InfoBlock pmib=(PVBE3_PM_InfoBlock)&displaybioscopy[PMInfoBlock];
 
-    //setup the segment registers
     PGDT_ENTRY currentgdt=(PGDT_ENTRY)getGDTbase();
 
     if (pmib->entrypoint==0)
@@ -155,8 +135,6 @@ int initializeVBE3()
 
     GDT_ENTRY desc_genericdata=Build16BitDataSegmentDescriptor(0, 65536);
 
-
-
     currentgdt[0x20]=desc_bios;
     currentgdt[0x21]=desc_a0000;
     currentgdt[0x22]=desc_b0000;
@@ -166,10 +144,8 @@ int initializeVBE3()
     currentgdt[0x26]=desc_stack;
     currentgdt[0x27]=desc_callsegment;
     currentgdt[0x28]=desc_callsegment16;
-    currentgdt[0x29]=desc_genericdata; //selector 148 is a generic segment for data access pointers
+    currentgdt[0x29]=desc_genericdata;
     currentgdt[0x30]=desc_stack32;
-
-
 
     pmib->BIOSDataSel=0x20*8;
     pmib->A0000Sel=0x21*8;
@@ -179,10 +155,6 @@ int initializeVBE3()
 
     pmib->InProtectMode=1;
 
-    //0x300+(cpunr*8) are 16-bit stack selectors
-
-    //call the initializer
-    //setup the init ptr
     vbe_initptr.cs=0x25*8;
     vbe_initptr.offset=pmib->PMInitialize;
 
@@ -202,13 +174,13 @@ int initializeVBE3()
   else
   {
     sendstringf("No VBE PMIB block found\n");
-    return 0; //no VBE3
+    return 0;
   }
 }
 
 int VBE_GetModeInfo(WORD mode, PVBE_ModeInfo info)
 {
-  //map info at 0xc0020000
+
   void *info32=mapMemory((void *)0xc0020000, info, sizeof(VBE_ModeInfo));
   PGDT_ENTRY currentgdt=(PGDT_ENTRY)getGDTbase();
   setGDTENTRYBase(&currentgdt[0x29], (QWORD)info32);
@@ -216,10 +188,9 @@ int VBE_GetModeInfo(WORD mode, PVBE_ModeInfo info)
   return VBEcall_GetModeInfo(mode, 0x29*8)==0x4f;
 }
 
-
 int VBE_GetControllerInfo(PVBE_ControllerInfo info)
 {
-  //map info at 0xc0020000
+
   void *info32=mapMemory((void *)0xc0020000, info, sizeof(VBE_ControllerInfo));
   PGDT_ENTRY currentgdt=(PGDT_ENTRY)getGDTbase();
   setGDTENTRYBase(&currentgdt[0x29], (QWORD)info32);
@@ -229,7 +200,7 @@ int VBE_GetControllerInfo(PVBE_ControllerInfo info)
 
 int VBE_SetMode(WORD mode, PVBE_CRTCInfo crtcinfo)
 {
-  //map info at 0xc0020000
+
   void *info32=mapMemory((void *)0xc0020000, crtcinfo, sizeof(VBE_CRTCInfo));
   PGDT_ENTRY currentgdt=(PGDT_ENTRY)getGDTbase();
   setGDTENTRYBase(&currentgdt[0x29], (QWORD)info32);
@@ -240,11 +211,11 @@ int VBE_SetMode(WORD mode, PVBE_CRTCInfo crtcinfo)
 
   if (r==0x4f)
   {
-    //save the details about this mode
+
     mode=mode & 0x1ff;
     if (VBE_GetModeInfo(mode, &currentMode))
     {
-      //map the physical memory for this mode
+
       sendstringf("VBE3: Changed resolution to: %dx%d %d bit\n",currentMode.XResolution, currentMode.YResolution, currentMode.BitsPerPixel);
 
       DWORD size=currentMode.LinBytesPerScanLine*currentMode.YResolution;
@@ -313,7 +284,7 @@ int VBE_ResetStart()
 
 int VBE_SetDrawPage(int i)
 {
-  if (i<=currentMode.LinNumberOfImagePages) //LinNumberOfImagePages is number of pages-1
+  if (i<=currentMode.LinNumberOfImagePages)
   {
     graphics=(void *)(QWORD)(0xd0000000+i*GraphicsPageSize);
     return 1;
@@ -322,19 +293,13 @@ int VBE_SetDrawPage(int i)
     return 0;
 }
 
-//-----
 DWORD VBE_ARGBToDispayColor(DWORD ARGB)
 {
-  //sendstringf("  LinBlueFieldPosition=%d (mask=%d)\n", currentMode.LinBlueFieldPosition, currentMode.LinBlueMaskSize);
-  //sendstringf("  LinGreenFieldPosition=%d (mask=%d)\n", currentMode.LinGreenFieldPosition, currentMode.LinGreenMaskSize);
-  //sendstringf("  LinRedFieldPosition=%d (mask=%d)\n", currentMode.LinRedFieldPosition, currentMode.LinRedMaskSize);
-  //sendstringf("  LinRsvdFieldPosition=%d (mask=%d)\n", currentMode.LinRsvdFieldPosition, currentMode.LinRsvdMaskSize);
 
   DWORD B=ARGB & 0xff;
   DWORD G=(ARGB >> 8) & 0xff;
   DWORD R=(ARGB >> 16) & 0xff;
   DWORD A=(ARGB >> 24) & 0xff;
-
 
   WORD maxValueB=1 << currentMode.LinBlueMaskSize;
   WORD maxValueG=1 << currentMode.LinGreenMaskSize;
@@ -343,7 +308,7 @@ DWORD VBE_ARGBToDispayColor(DWORD ARGB)
 
   if ((currentMode.DirectColorModeInfo & 2)==0)
   {
-    //sendstringf("No support for reserved bits\n");
+
     maxValueA=0;
   }
 
@@ -409,7 +374,7 @@ DWORD VBE_ARGBToDispayColor(DWORD ARGB)
 
 void VBE_SetPenColor(DWORD ARGB)
 {
-  //convert the ARGB to the format this mode uses
+
   currentColor=VBE_ARGBToDispayColor(ARGB);
 }
 
@@ -428,7 +393,7 @@ void VBE_DrawLine(int x1, int y1, int x2,int y2)
 
   if (x2<x1)
   {
-    //swap
+
     int s=x1;
     x1=x2;
     x2=s;
@@ -451,7 +416,7 @@ void VBE_DrawBox(int x1, int y1, int x2, int y2)
 
   if (x2<x1)
   {
-    //swap
+
     int s=x1;
     x1=x2;
     x2=s;
@@ -471,4 +436,3 @@ void VBE_DrawBox(int x1, int y1, int x2, int y2)
   }
 
 }
-

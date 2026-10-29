@@ -1,7 +1,3 @@
-/* this program will parse the vmm file and generate a vmminfo.dat file that will
- * contain the data needed for the memorymanager inside the vmm 
- * It can also be used to grow the vmm.bin to include 0's */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -16,7 +12,7 @@ int main(void)
 	FILE *fpVMLOADERBIN;
 	char temp[256000];
 
-	fpVMLOADERMAP=fopen("vmloader.map","r"); 
+	fpVMLOADERMAP=fopen("vmloader.map","r");
 	if (fpVMLOADERMAP)
 	{
 		unsigned int startofbss;
@@ -24,7 +20,6 @@ int main(void)
 		unsigned int memorylist=0;
 		temp[0]=0;
 
-		//find the line start starts with ".bss  "
 		while (strcmp(temp,".bss")!=0)
 			fscanf(fpVMLOADERMAP,"%s",temp);
 
@@ -32,10 +27,9 @@ int main(void)
 		fscanf(fpVMLOADERMAP,"%x",&sizeofbss);
 		fclose(fpVMLOADERMAP);
 
-
 		printf("startofbss=%x\n",startofbss);
 		printf("sizeofbss=%x\n",sizeofbss);
-		
+
 	  	fpVMLOADERBIN=fopen("vmloader.bin","r+");
 		if (fpVMLOADERBIN)
 		{
@@ -44,16 +38,14 @@ int main(void)
 			int count;
 			startoffreemem+=4096-(startoffreemem % 4096);
 
-
 			printf("startoffreemem=%x\n",startoffreemem);
 
-			//seek to the end
 			printf("Seeking to %x\n",startofbss-0x30000);
 			if (fseek(fpVMLOADERBIN,startofbss-0x30000,SEEK_SET)!=-1)
 			{
 				if (count=fwrite(buf,sizeofbss,1,fpVMLOADERBIN)<1)
 				{
-					printf("fwrite failed. Count=%d\n",count);				
+					printf("fwrite failed. Count=%d\n",count);
 					errorcode=1;
 				}
 			}
@@ -62,7 +54,7 @@ int main(void)
 				printf("Seek failed\n");
 				errorcode=1;
 			}
-				
+
 			fclose(fpVMLOADERBIN);
 			free(buf);
 		}
@@ -72,13 +64,12 @@ int main(void)
 			errorcode=1;
 		}
 
-		
-	}  
+	}
 	else
 	{
 		errorcode=1;
 		printf("Failed opening vmm.map\n");
 	}
-	
+
 	return errorcode;
 }

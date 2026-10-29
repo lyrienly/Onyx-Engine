@@ -2,7 +2,6 @@
 #include "extradefines.h"
 #include "extraimports.h"
 
-
 VOID CreateProcessNotifyRoutine(IN HANDLE ParentId, IN HANDLE ProcessId, IN BOOLEAN Create);
 VOID CreateProcessNotifyRoutineEx(IN HANDLE  ParentId, IN HANDLE  ProcessId, __in_opt PPS_CREATE_NOTIFY_INFO CreateInfo);
 
@@ -11,7 +10,7 @@ struct ThreadData
 	HANDLE ThreadID;
 	PETHREAD PEThread;
 	KAPC SuspendApc;
-	KSEMAPHORE SuspendSemaphore; //why not mutex?
+	KSEMAPHORE SuspendSemaphore;
 	int suspendcount;
 	struct ThreadData *previous;
 	struct ThreadData *next;
@@ -24,7 +23,6 @@ typedef struct
 	HANDLE ProcessHandle;
 	BOOLEAN Deleted;
 } ProcessListData, *PProcessListData;
-
 
 struct ProcessData
 {
@@ -44,11 +42,9 @@ UINT64 PEProcess;
 ProcessEventdta ProcessEventdata[50];
 UCHAR ProcessEventCount;
 PKEVENT ProcessEvent;
-//HANDLE  ProcessEventHandle;
 
 BOOLEAN CreateProcessNotifyRoutineEnabled;
 ERESOURCE ProcesslistR;
-
 
 VOID CreateThreadNotifyRoutine(IN HANDLE ProcessId, IN HANDLE ThreadId, IN BOOLEAN Create);
 typedef struct tagThreadEventData
@@ -60,7 +56,6 @@ UINT64 ThreadID;
 ThreadEventDta ThreadEventData[50];
 UCHAR ThreadEventCount;
 PKEVENT ThreadEvent;
-//HANDLE  ThreadEventHandle;
 
 extern HANDLE WatcherHandle;
 extern PEPROCESS WatcherProcess;

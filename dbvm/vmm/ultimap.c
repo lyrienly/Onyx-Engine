@@ -1,10 +1,3 @@
-/*
- * ultimap.c
- *
- *  Created on: May 28, 2011
- *      Author: erich
- */
-
 #include "common.h"
 #include "vmreadwrite.h"
 #include "ultimap.h"
@@ -15,15 +8,9 @@
 
 #ifdef ULTIMAPDEBUG
 
-
-
 void ultimap_debugoutput(pcpuinfo currentcpuinfo, PULTIMAPDEBUGINFO UltimapDebugInfo)
 {
 
-//	int error;
-	//UINT64 pagefaultaddress;
-
-	//if (!error)
 	{
 		UltimapDebugInfo->Active=currentcpuinfo->Ultimap.Active;
 		UltimapDebugInfo->CR3=currentcpuinfo->Ultimap.CR3;
@@ -79,50 +66,40 @@ void ultimap_setup(pcpuinfo currentcpuinfo, QWORD CR3, QWORD DEBUGCTL, QWORD DS_
 }
 
 void ultimap_handleCR3Change(pcpuinfo currentcpuinfo, QWORD oldcr3, QWORD newcr3)
-/*
- * Called when cr3 changes and ultimap is active
- */
-{
 
+{
 
 	currentcpuinfo->Ultimap.CR3_switchcount++;
 
     if (oldcr3 != newcr3)
     {
-      if (currentcpuinfo->Ultimap.CR3==newcr3) //if the new cr3 is the process to watch
+      if (currentcpuinfo->Ultimap.CR3==newcr3)
       {
     	currentcpuinfo->Ultimap.CR3_switchcount2++;
 
     	currentcpuinfo->Ultimap.LastOldCR3=oldcr3;
     	currentcpuinfo->Ultimap.LastNewCR3=newcr3;
 
-
-
-        //set the MSR values
         currentcpuinfo->Ultimap.OriginalDebugCTL=vmread(vm_guest_IA32_DEBUGCTL);
         currentcpuinfo->Ultimap.OriginalDS_AREA=readMSR(IA32_DS_AREA);
 
         vmwrite(vm_guest_IA32_DEBUGCTL, currentcpuinfo->Ultimap.DEBUGCTL);
         writeMSR(IA32_DS_AREA, currentcpuinfo->Ultimap.DS_AREA);
 
-
-        //and register a vm-exit event on MSR read/write for DEBUGCTL and DS_AREA
         MSRBitmap[IA32_DS_AREA/8]|=1 << (IA32_DS_AREA % 8);
         MSRBitmap[1024+IA32_DS_AREA/8]|=1 << (IA32_DS_AREA % 8);
 
         MSRBitmap[IA32_DEBUGCTL_MSR/8]|=1 << (IA32_DEBUGCTL_MSR % 8);
         MSRBitmap[1024+IA32_DEBUGCTL_MSR/8]|=1 << (IA32_DEBUGCTL_MSR % 8);
 
-
       }
       else
-      if (currentcpuinfo->Ultimap.CR3==currentcpuinfo->guestCR3) //if the old cr3 is the process to watch and is switched out to a different one
+      if (currentcpuinfo->Ultimap.CR3==currentcpuinfo->guestCR3)
       {
-        //unset the MSR values
+
         vmwrite(vm_guest_IA32_DEBUGCTL, currentcpuinfo->Ultimap.OriginalDebugCTL);
         writeMSR(IA32_DS_AREA, currentcpuinfo->Ultimap.OriginalDS_AREA);
 
-        //and unregister the vm-exit event on MSR read/write for DEBUGCTL and DS_AREA
         MSRBitmap[IA32_DS_AREA/8]&=~(1 << (IA32_DS_AREA % 8));
         MSRBitmap[1024+IA32_DS_AREA/8]&=~(1 << (IA32_DS_AREA % 8));
 
@@ -134,16 +111,14 @@ void ultimap_handleCR3Change(pcpuinfo currentcpuinfo, QWORD oldcr3, QWORD newcr3
 }
 
 void ultimap_handleDB(pcpuinfo currentcpuinfo)
-/*
- * Called when an int1 happens
- */
+
 {
-  currentcpuinfo->Ultimap.OriginalDebugCTL&=~1; //disable the LBR flag on bp
+  currentcpuinfo->Ultimap.OriginalDebugCTL&=~1;
 
   if (currentcpuinfo->guestCR3 != currentcpuinfo->Ultimap.CR3)
     vmwrite(vm_guest_IA32_DEBUGCTL, vmread(vm_guest_IA32_DEBUGCTL) & ~1);
   else
-    vmwrite(vm_guest_IA32_DEBUGCTL, currentcpuinfo->Ultimap.DEBUGCTL); //just write it again
+    vmwrite(vm_guest_IA32_DEBUGCTL, currentcpuinfo->Ultimap.DEBUGCTL);
 }
 
 void ultimap_handleMSRWrite(pcpuinfo currentcpuinfo, DWORD msr, QWORD value)
@@ -175,7 +150,6 @@ void ultimap_handleMSRWrite(pcpuinfo currentcpuinfo, DWORD msr, QWORD value)
       break;
     }
   }
-
 
 }
 

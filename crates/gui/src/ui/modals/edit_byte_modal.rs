@@ -1,4 +1,3 @@
-
 use eframe::egui::{self, Color32, RichText};
 use crate::app::OnyxEngineApp;
 
@@ -58,4 +57,3 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
         app.show_edit_byte_modal = false;
     }
 }
-

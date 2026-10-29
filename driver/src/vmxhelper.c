@@ -8,19 +8,19 @@
 #ifdef AMD64
 extern UINT_PTR dovmcall_intel(void *vmcallinfo, unsigned int level1pass);
 extern UINT_PTR dovmcall_amd(void *vmcallinfo, unsigned int level1pass);
-//dovmcall is defined in vmxhelpera.asm
+
 #else
 _declspec( naked ) UINT_PTR dovmcall_intel(void *vmcallinfo)
 {
 	__asm
 	{
 		push edx
-		mov eax,[esp+8]  //+8 because of push
+		mov eax,[esp+8]
 		mov edx, dword ptr vmx_password1
 		mov ecx, dword ptr vmx_password3
 		__emit 0x0f
 		__emit 0x01
-	    __emit 0xc1 //vmcall, eax will be edited, or a UD exception will be raised
+	    __emit 0xc1
 		pop edx
 		ret 8
 	}
@@ -31,12 +31,12 @@ _declspec( naked ) UINT_PTR dovmcall_amd(void *vmcallinfo)
 	__asm
 	{
 		push edx
-		mov eax,[esp+8]  
+		mov eax,[esp+8]
 		mov edx, dword ptr  vmx_password1
 		mov ecx, dword ptr  vmx_password3
 		__emit 0x0f
 		__emit 0x01
-	    __emit 0xd9 //vmmcall, eax will be edited, or a UD exception will be raised
+	    __emit 0xd9
 		pop edx
 		ret 8
 	}
@@ -45,7 +45,6 @@ _declspec( naked ) UINT_PTR dovmcall_amd(void *vmcallinfo)
 
 typedef UINT_PTR (DOVMCALL) (void *vmcallinfo);
 DOVMCALL *dovmcall;
-
 
 int vmx_hasredirectedint1()
 {
@@ -63,9 +62,7 @@ int vmx_hasredirectedint1()
 }
 
 unsigned int vmx_getversion()
-/*
-This will either raise a unhandled opcode exception, or return the used dbvm version
-*/
+
 {
 	struct
 	{
@@ -185,7 +182,6 @@ unsigned int vmx_redirect_interrupt3(VMXInterruptRedirectType redirecttype, unsi
 	return (unsigned int)dovmcall(&vmcallinfo);;
 }
 
-
 unsigned int vmx_redirect_interrupt14(VMXInterruptRedirectType redirecttype, unsigned int newintvector, unsigned int int14cs, UINT_PTR int14eip)
 {
 	#pragma pack(1)
@@ -221,7 +217,7 @@ unsigned int vmx_register_cr3_callback(unsigned int cs, unsigned int eip, unsign
 		unsigned int structsize;
 		unsigned int level2pass;
 		unsigned int command;
-		unsigned int callbacktype; //32-bit for this driver, so always 0
+		unsigned int callbacktype;
 		unsigned long long callback_eip;
 		unsigned int callback_cs;
 		unsigned long long callback_esp;
@@ -253,8 +249,6 @@ unsigned int vmx_exit_cr3_callback(unsigned int newcr3)
 	} vmcallinfo;
 	#pragma pack()
 
-	//DbgPrint("vmx_exit_cr3_callback(%x)\n",newcr3);
-
 	vmcallinfo.structsize=sizeof(vmcallinfo);
 	vmcallinfo.level2pass=vmx_password2;
 	vmcallinfo.command=VMCALL_RETURN_FROM_CR3_EDIT_CALLBACK;
@@ -263,7 +257,6 @@ unsigned int vmx_exit_cr3_callback(unsigned int newcr3)
 	return (unsigned int)dovmcall(&vmcallinfo);;
 }
 
-
 unsigned int vmx_watch_pagewrites(UINT64 PhysicalAddress, int Size, int Options, int MaxEntryCount)
 {
 #pragma pack(1)
@@ -271,18 +264,14 @@ unsigned int vmx_watch_pagewrites(UINT64 PhysicalAddress, int Size, int Options,
 	{
 		unsigned int structsize;
 		unsigned int level2pass;
-		unsigned int command; //VMCALL_FINDWHATWRITESPAGE
+		unsigned int command;
 		UINT64 PhysicalAddress;
 		int Size;
-		int Options; //binary.  
-		             //  Bit 0: 0=Log RIP once. 1=Log RIP multiple times (when different registers)
-					 //  Bit 1: 0=Only log given Physical Address. 1=Log everything in the page(s) that is/are affected
-		             //  Bit 2: 0=Do not save FPU/XMM data, 1=Also save FPU/XMM data
-					 //  Bit 3: 0=Do not save a stack snapshot, 1=Save stack snapshot
-		             //  Bit 4: 0=No PMI when full, 1=PMI when full
-		int MaxEntryCount; //how much memory should DBVM allocate for the buffer 		
-		int UsePMI; //trigger a PMI interrupt when full (so you don't lose info)
-		int ID; //ID describing this watcher for this CPU (keep track of this on a per cpu basis if you do more than 1)
+		int Options;
+
+		int MaxEntryCount;
+		int UsePMI;
+		int ID;
 	} vmcallinfo;
 #pragma pack()
 
@@ -291,9 +280,9 @@ unsigned int vmx_watch_pagewrites(UINT64 PhysicalAddress, int Size, int Options,
 	vmcallinfo.command = VMCALL_WATCH_WRITES;
 	vmcallinfo.PhysicalAddress = PhysicalAddress;
 
-	if (((PhysicalAddress + Size) & 0xfffffffffffff000ULL) > PhysicalAddress) //passes a pageboundary, strip of the excess
+	if (((PhysicalAddress + Size) & 0xfffffffffffff000ULL) > PhysicalAddress)
 		Size = 0x1000 - (PhysicalAddress & 0xfff);
-	
+
 	vmcallinfo.Size = Size;
 	vmcallinfo.Options = Options;
 	vmcallinfo.MaxEntryCount = MaxEntryCount;
@@ -310,18 +299,14 @@ unsigned int vmx_watch_pageaccess(UINT64 PhysicalAddress, int Size, int Options,
 	{
 		unsigned int structsize;
 		unsigned int level2pass;
-		unsigned int command; //VMCALL_FINDWHATWRITESPAGE
+		unsigned int command;
 		UINT64 PhysicalAddress;
 		int Size;
-		int Options; //binary.  
-		//  Bit 0: 0=Log RIP once. 1=Log RIP multiple times (when different registers)
-		//  Bit 1: 0=Only log given Physical Address. 1=Log everything in the page(s) that is/are affected
-		//  Bit 2: 0=Do not save FPU/XMM data, 1=Also save FPU/XMM data
-		//  Bit 3: 0=Do not save a stack snapshot, 1=Save stack snapshot
-		//  Bit 4: 0=No PMI when full, 1=PMI when full
-		int MaxEntryCount; //how much memory should DBVM allocate for the buffer 		
-		
-		int ID; //ID describing this watcher for this CPU (keep track of this on a per cpu basis if you do more than 1)
+		int Options;
+
+		int MaxEntryCount;
+
+		int ID;
 	} vmcallinfo;
 #pragma pack()
 
@@ -330,7 +315,7 @@ unsigned int vmx_watch_pageaccess(UINT64 PhysicalAddress, int Size, int Options,
 	vmcallinfo.command = VMCALL_WATCH_READS;
 	vmcallinfo.PhysicalAddress = PhysicalAddress;
 
-	if (((PhysicalAddress + Size) & 0xfffffffffffff000ULL) > PhysicalAddress) //passes a pageboundary, strip of the excess
+	if (((PhysicalAddress + Size) & 0xfffffffffffff000ULL) > PhysicalAddress)
 		Size = 0x1000 - (PhysicalAddress & 0xfff);
 
 	vmcallinfo.Size = Size;
@@ -343,9 +328,7 @@ unsigned int vmx_watch_pageaccess(UINT64 PhysicalAddress, int Size, int Options,
 }
 
 unsigned int vmx_watch_retreivelog(int ID, PPageEventListDescriptor result, int *resultsize)
-/*
-Used to retrieve both read and write watches
-*/
+
 {
 	unsigned int r;
 #pragma pack(1)
@@ -353,11 +336,11 @@ Used to retrieve both read and write watches
 	{
 		unsigned int structsize;
 		unsigned int level2pass;
-		unsigned int command; //VMCALL_FINDWHATWRITESPAGE
+		unsigned int command;
 		DWORD ID;
-		UINT64 results;		
+		UINT64 results;
 		int resultsize;
-		int copied; //the number of bytes copied so far (This is a repeating instruction)
+		int copied;
 	} vmcallinfo;
 #pragma pack()
 
@@ -370,18 +353,18 @@ Used to retrieve both read and write watches
 	vmcallinfo.resultsize = *resultsize;
 	r=(unsigned int)dovmcall(&vmcallinfo);;
 	*resultsize = vmcallinfo.resultsize;
-	return r; //returns 0 on success, 1 on too small buffer.  buffersize contains the size in both cases
+	return r;
 }
 
 unsigned int vmx_watch_delete(int ID)
 {
-	//disables the watch operation
+
 #pragma pack(1)
 	struct
 	{
 		unsigned int structsize;
 		unsigned int level2pass;
-		unsigned int command; //VMCALL_FINDWHATWRITESPAGE
+		unsigned int command;
 		DWORD ID;
 	} vmcallinfo;
 #pragma pack()
@@ -392,34 +375,19 @@ unsigned int vmx_watch_delete(int ID)
 
 	vmcallinfo.ID = ID;
 
-	return (unsigned int)dovmcall(&vmcallinfo);; //0 on success, anything else fail
+	return (unsigned int)dovmcall(&vmcallinfo);;
 }
 
 unsigned int vmx_cloak_activate(QWORD physicalPage)
-/*
- Copies a page to a shadow page and marks the original page as execute only (or no access at all if the cpu does not support it)
 
- On read/write the shadow page's contents are read/written, but execute will execute the original page
-
- To access the contents of the original(executing) page use vmx_cloak_readOriginal and vmx_cloak_writeOriginal
-
- possible issue: the read and execute operation can be in the same page at the same time, so when the page is swapped by the contents of the unmodified page to facilitate the read of unmodified memory
-                 the unmodified code will execute as well (integrity check checking itself)
-
- possible solutions:  do not cloak pages with integrity checks and then edit the integrity check willy nilly
-                      use single byte edits (e.g int3 bps to facilitate changes)
-					  make edits so integrity check routines are jumped over
-
- Note: Affects ALL cpu's so only needs to be called once
-*/
 {
-	//disables the watch operation
+
 #pragma pack(1)
 	struct
 	{
 		unsigned int structsize;
 		unsigned int level2pass;
-		unsigned int command; //VMCALL_CLOAK_ACTIVATE
+		unsigned int command;
 		QWORD physicalAddress;
 	} vmcallinfo;
 #pragma pack()
@@ -429,10 +397,8 @@ unsigned int vmx_cloak_activate(QWORD physicalPage)
 	vmcallinfo.command = VMCALL_CLOAK_ACTIVATE;
 	vmcallinfo.physicalAddress = physicalPage;
 
-	return (unsigned int)dovmcall(&vmcallinfo);; //0 on success, anything else fail
+	return (unsigned int)dovmcall(&vmcallinfo);;
 }
-
-//todo: vmx_cload_passthrougwrites() : lets you specify which write operation locations can be passed through to the execute page
 
 unsigned int vmx_cloak_deactivate(QWORD physicalPage)
 {
@@ -441,7 +407,7 @@ unsigned int vmx_cloak_deactivate(QWORD physicalPage)
 	{
 		unsigned int structsize;
 		unsigned int level2pass;
-		unsigned int command; //VMCALL_CLOAK_ACTIVATE
+		unsigned int command;
 		QWORD physicalAddress;
 	} vmcallinfo;
 #pragma pack()
@@ -451,20 +417,18 @@ unsigned int vmx_cloak_deactivate(QWORD physicalPage)
 	vmcallinfo.command = VMCALL_CLOAK_DEACTIVATE;
 	vmcallinfo.physicalAddress = physicalPage;
 
-	return (unsigned int)dovmcall(&vmcallinfo);; //0 on success, anything else fail
+	return (unsigned int)dovmcall(&vmcallinfo);;
 }
 
 unsigned int vmx_cloak_readOriginal(QWORD physicalPage, void *destination)
-/*
-reads 4096 bytes from the cloaked page and put it into original (original must be able to hold 4096 bytes, and preferably on a page boundary)
-*/
+
 {
 #pragma pack(1)
 	struct
 	{
 		unsigned int structsize;
 		unsigned int level2pass;
-		unsigned int command; 
+		unsigned int command;
 		QWORD physicalAddress;
 		QWORD destination;
 	} vmcallinfo;
@@ -476,20 +440,18 @@ reads 4096 bytes from the cloaked page and put it into original (original must b
 	vmcallinfo.physicalAddress = physicalPage;
 	vmcallinfo.destination = (QWORD)destination;
 
-	return (unsigned int)dovmcall(&vmcallinfo);; //0 on success, anything else fail
+	return (unsigned int)dovmcall(&vmcallinfo);;
 }
 
 unsigned int vmx_cloak_writeOriginal(QWORD physicalPage, void *source)
-/*
-reads 4096 bytes from the cloaked page and put it into original (original must be able to hold 4096 bytes, and preferably on a page boundary)
-*/
+
 {
 #pragma pack(1)
 	struct
 	{
 		unsigned int structsize;
 		unsigned int level2pass;
-		unsigned int command; //VMCALL_CLOAK_ACTIVATE
+		unsigned int command;
 		QWORD physicalAddress;
 		QWORD source;
 	} vmcallinfo;
@@ -501,27 +463,20 @@ reads 4096 bytes from the cloaked page and put it into original (original must b
 	vmcallinfo.physicalAddress = physicalPage;
 	vmcallinfo.source = (QWORD)source;
 
-	return (unsigned int)dovmcall(&vmcallinfo);; //0 on success, anything else fail
+	return (unsigned int)dovmcall(&vmcallinfo);;
 }
 
 unsigned int vmx_changeregonbp(QWORD physicalAddress, CHANGEREGONBPINFO *changereginfo)
-/*
-places an int3 bp at the given address, and on execution changes the state to the given state
-if a cloaked page is given, the BP will be set in the executing page
 
-if no cloaked page is given, cloak it (needed for the single step if no IP change is done)
-
-Note: effects ALL cpu's
-*/
 {
 #pragma pack(1)
 	struct
 	{
 		unsigned int structsize;
 		unsigned int level2pass;
-		unsigned int command; //VMCALL_CLOAK_CHANGEREGONBP
+		unsigned int command;
 		QWORD physicalAddress;
-		CHANGEREGONBPINFO changereginfo;		
+		CHANGEREGONBPINFO changereginfo;
 	} vmcallinfo;
 #pragma pack()
 
@@ -531,11 +486,8 @@ Note: effects ALL cpu's
 	vmcallinfo.physicalAddress = physicalAddress;
 	vmcallinfo.changereginfo = *changereginfo;
 
-	return (unsigned int)dovmcall(&vmcallinfo);; //0 on success, anything else fail
+	return (unsigned int)dovmcall(&vmcallinfo);;
 }
-
-
-
 
 unsigned int vmx_ultimap_getDebugInfo(PULTIMAPDEBUGINFO debuginfo)
 {
@@ -544,7 +496,7 @@ unsigned int vmx_ultimap_getDebugInfo(PULTIMAPDEBUGINFO debuginfo)
 	{
 		unsigned int structsize;
 		unsigned int level2pass;
-		unsigned int command;	
+		unsigned int command;
 		ULTIMAPDEBUGINFO debuginfo;
 	} vmcallinfo;
 	#pragma pack()
@@ -571,7 +523,7 @@ unsigned int vmx_ultimap(UINT_PTR cr3towatch, UINT64 debugctl_value, void *store
 		unsigned int command;
 		UINT64 cr3;
 		UINT64 debugctl;
-		UINT64 storeaddress;		
+		UINT64 storeaddress;
 	} vmcallinfo;
 	#pragma pack()
 
@@ -583,7 +535,6 @@ unsigned int vmx_ultimap(UINT_PTR cr3towatch, UINT64 debugctl_value, void *store
 	vmcallinfo.storeaddress=(UINT64)(UINT_PTR)storeaddress;
 
 	DbgPrint("vmx_ultimap(%I64x, %I64x, %I64x)\n", (UINT64)vmcallinfo.cr3, (UINT64)vmcallinfo.debugctl, vmcallinfo.storeaddress);
-	
 
 	return (unsigned int)dovmcall(&vmcallinfo);;
 }
@@ -711,7 +662,6 @@ unsigned int vmx_add_memory(UINT64 *list, int count)
 #pragma pack()
 	PAddMemoryInfoCall vmcallinfo=ExAllocatePool(NonPagedPool, sizeof(AddMemoryInfoCall) + count * sizeof(UINT64));
 
-
 	DbgPrint("vmx_add_memory(%p,%d)\n", list, count);
 	DbgPrint("vmx_add_memory(vmx_password1=%x,vmx_password2=%x)\n", vmx_password1, vmx_password2);
 
@@ -720,7 +670,6 @@ unsigned int vmx_add_memory(UINT64 *list, int count)
 	DbgPrint("command at offset %d\n", (UINT64)(&vmcallinfo->command) - (UINT64)vmcallinfo);
 	DbgPrint("PhysicalPages[0] at offset %d\n", (UINT64)(&vmcallinfo->PhysicalPages[0]) - (UINT64)vmcallinfo);
 	DbgPrint("PhysicalPages[1] at offset %d\n", (UINT64)(&vmcallinfo->PhysicalPages[1]) - (UINT64)vmcallinfo);
-
 
 	__try
 	{
@@ -737,18 +686,18 @@ unsigned int vmx_add_memory(UINT64 *list, int count)
 		j = 2;
 
 		r = (unsigned int)dovmcall(vmcallinfo);
-		j = 3; //never
+		j = 3;
 	}
 	__except (1)
 	{
-		DbgPrint("vmx_add_memory(%p,%d) gave an exception at part %d with exception code %x\n", list, count, j, GetExceptionCode());		
-		
+		DbgPrint("vmx_add_memory(%p,%d) gave an exception at part %d with exception code %x\n", list, count, j, GetExceptionCode());
+
 		r = 0x100;
 	}
 
 	ExFreePool(vmcallinfo);
 	return r;
-	
+
 }
 
 int vmx_causedCurrentDebugBreak()
@@ -777,6 +726,3 @@ void vmx_init_dovmcall(int isIntel)
 		(void *)dovmcall=(void *)dovmcall_amd;
 
 }
-
-
-//DBVMInterruptService

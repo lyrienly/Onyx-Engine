@@ -1,15 +1,3 @@
-//! Teste end-to-end do motor atomico contra um processo cobaia real
-//! (cmd.exe) com memoria alocada via `VirtualAllocEx`.
-//!
-//! Fluxo:
-//! 1. Spawn cmd.exe suspenso-like (modo pausado em prompt).
-//! 2. Aloca pagina remota, escreve valor inicial 100.
-//! 3. Liga o freezer com valor 42.
-//! 4. Thread externa tenta escrever 999 em 5 iteracoes.
-//! 5. Confirma que a memoria permaneceu em 42.
-//! 6. Desliga o freezer, escreve 999, confirma que fica em 999.
-//! 7. Mede a taxa de reescritas em 1 segundo.
-
 #![cfg(windows)]
 
 use onyx_freezer::{AtomicFreezer, FreezeMode};
@@ -95,8 +83,7 @@ fn read_i32(h: HANDLE, addr: usize) -> Option<i32> {
 
 #[test]
 fn e2e_freeze_mantem_valor_contra_sobrescrita_externa() {
-    // Spawn cmd.exe como cobaia; redireciona stdio para evitar poluir o terminal
-    // e manter o processo vivo o suficiente para a janela do teste.
+
     let mut child = Command::new("cmd.exe")
         .args(["/C", "ping -n 15 127.0.0.1 > nul"])
         .stdin(Stdio::null())
@@ -107,11 +94,9 @@ fn e2e_freeze_mantem_valor_contra_sobrescrita_externa() {
 
     let pid = child.id();
 
-    // Abre handle de teste com todos os direitos para alocar e verificar.
     let test_handle = unsafe { OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid) };
     assert!(!test_handle.is_null(), "OpenProcess cobaia falhou");
 
-    // Aloca pagina remota.
     let addr = unsafe {
         VirtualAllocEx(
             test_handle,
@@ -124,18 +109,15 @@ fn e2e_freeze_mantem_valor_contra_sobrescrita_externa() {
     assert!(!addr.is_null(), "VirtualAllocEx falhou");
     let addr_us = addr as usize;
 
-    // Valor inicial 100.
     assert!(write_i32(test_handle, addr_us, 100));
     assert_eq!(read_i32(test_handle, addr_us), Some(100));
 
-    // Liga o freezer em 42.
     let freezer = AtomicFreezer::new();
     freezer.attach(pid);
     freezer.set_interval(Duration::from_millis(5));
     let frozen = 42i32.to_le_bytes().to_vec();
     let id = freezer.freeze(addr_us, frozen.clone(), FreezeMode::Normal);
 
-    // Deixa o worker aplicar a primeira passada.
     thread::sleep(Duration::from_millis(100));
     assert_eq!(
         read_i32(test_handle, addr_us),
@@ -143,13 +125,11 @@ fn e2e_freeze_mantem_valor_contra_sobrescrita_externa() {
         "freezer deveria ter aplicado 42"
     );
 
-    // Loop externo tenta sobrescrever 5x com 999.
     for _ in 0..5 {
         write_i32(test_handle, addr_us, 999);
         thread::sleep(Duration::from_millis(80));
     }
 
-    // Aguarda o worker reequilibrar antes de medir.
     thread::sleep(Duration::from_millis(150));
     let final_val = read_i32(test_handle, addr_us);
     assert_eq!(
@@ -159,9 +139,8 @@ fn e2e_freeze_mantem_valor_contra_sobrescrita_externa() {
         final_val
     );
 
-    // Mede freeze rate em 1 segundo (reset -> amostra).
     freezer.reset_stats();
-    // Para forcar escritas, mantemos sobrescrita externa concorrente.
+
     let stop_sig = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let stop_c = stop_sig.clone();
     let addr_copy = addr_us;
@@ -189,15 +168,13 @@ fn e2e_freeze_mantem_valor_contra_sobrescrita_externa() {
         stats.reads > 0,
         "worker nao executou nenhuma leitura (reads=0)"
     );
-    // Em intervalo de 5ms esperamos facilmente >= 20 reescritas por segundo
-    // enquanto a thread barulhenta corrompe. Afrouxamos para evitar flakes de CI.
+
     assert!(
         stats.writes >= 10,
         "freeze rate muito baixo ({} writes/s)",
         rate
     );
 
-    // Desfaz o congelamento e confirma que a escrita externa passa a prevalecer.
     assert!(freezer.unfreeze(id));
     thread::sleep(Duration::from_millis(50));
     write_i32(test_handle, addr_us, 999);
@@ -208,7 +185,6 @@ fn e2e_freeze_mantem_valor_contra_sobrescrita_externa() {
         "apos unfreeze a sobrescrita deveria persistir"
     );
 
-    // Limpeza.
     freezer.stop();
     unsafe {
         VirtualFreeEx(test_handle, addr, 0, MEM_RELEASE);

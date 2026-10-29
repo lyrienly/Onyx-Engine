@@ -1,8 +1,6 @@
 #pragma once
 #include "pipe.h"
 
-//pipe for transmitting java events like method load/free
-
 #define EVENTCMD_METHODLOAD 0
 #define EVENTCMD_METHODUNLOAD 1
 #define EVENTCMD_DYNAMICCODEGENERATED 2

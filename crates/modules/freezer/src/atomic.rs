@@ -1,11 +1,3 @@
-//! Motor atomico de congelamento de valores.
-//!
-//! Mantem enderecos remotos reescritos continuamente por uma thread dedicada
-//! de alta prioridade, usando estrutura concorrente baseada em `DashMap` para
-//! insercao/remocao dinamica sem lock global, resolucao de temporizador de 1ms
-//! via `timeBeginPeriod` e cache do ultimo valor para evitar escritas
-//! redundantes.
-
 use dashmap::DashMap;
 use std::os::raw::c_void;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
@@ -58,14 +50,13 @@ unsafe extern "system" {
 
 pub type FreezeId = u64;
 
-/// Modo de evolucao do valor congelado.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FreezeMode {
-    /// Mantem o valor exato indefinidamente.
+
     Normal,
-    /// Incrementa o valor a cada tick do worker (little-endian com sinal).
+
     Increment(i64),
-    /// Decrementa o valor a cada tick do worker.
+
     Decrement(i64),
 }
 
@@ -84,7 +75,6 @@ struct EntrySlot {
     last_written: Option<Vec<u8>>,
 }
 
-/// Estatisticas acumuladas pelo worker.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct FreezerStats {
     pub writes: u64,
@@ -124,19 +114,16 @@ impl AtomicFreezer {
         }
     }
 
-    /// Define o processo alvo pelo PID.
     pub fn attach(&self, pid: u32) {
         self.pid.store(pid, Ordering::SeqCst);
     }
 
-    /// Ajusta o intervalo entre ticks do worker.
     pub fn set_interval(&self, interval: Duration) {
         let us = interval.as_micros() as u64;
         self.interval_us
             .store(us.max(1_000), Ordering::SeqCst);
     }
 
-    /// Congela um endereco; se o worker ainda nao estiver rodando, inicia-o.
     pub fn freeze(&self, address: usize, value: Vec<u8>, mode: FreezeMode) -> FreezeId {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         self.entries.insert(
@@ -346,7 +333,6 @@ fn worker_main(
                     }
                 }
 
-                // Avanca o valor para os modos incrementais.
                 match slot.value().mode {
                     FreezeMode::Normal => {}
                     FreezeMode::Increment(step) => {
@@ -374,8 +360,6 @@ fn compute_desired(current_stored: &[u8], _mode: FreezeMode) -> Vec<u8> {
     current_stored.to_vec()
 }
 
-/// Soma `step` ao valor little-endian em `bytes` (interpretado como inteiro
-/// com sinal da largura dada), devolvendo um buffer do mesmo tamanho.
 fn add_step(bytes: &[u8], step: i64) -> Vec<u8> {
     let width = bytes.len();
     let mut buf = [0u8; 8];

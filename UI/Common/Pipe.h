@@ -5,9 +5,8 @@
     #include "macport.h"
   #else
     #include "linuxport.h"
-  #endif //_APPLE_
-#endif //_WINDOWS
-
+  #endif
+#endif
 
 class Pipe
 {

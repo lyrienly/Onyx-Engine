@@ -1,10 +1,3 @@
-/*
- * luahandler.c
- *
- *  Created on: Feb 28, 2019
- *      Author: eric
- */
-
 #include "common.h"
 #include "mm.h"
 
@@ -133,9 +126,7 @@ int lua_readBytes(lua_State *L)
     lua_Integer address=lua_tointeger(L,1);
     int size=lua_tointeger(L,2);
 
-    //sendstringf("lua_readBytes(%6,%d)",address,size);
-
-    lua_newtable(L);   //4
+    lua_newtable(L);
     int i;
     unsigned char *b=(unsigned char *)address;
     for (i=0; i<size; i++)
@@ -190,7 +181,6 @@ int lua_psod(lua_State *L UNUSED)
 
 LUALIB_API void luaL_openlibs (lua_State *L);
 
-
 lua_State *initializeLua(void)
 {
   if (LuaVM==NULL)
@@ -204,8 +194,6 @@ lua_State *initializeLua(void)
        luaL_openlibs(LuaVM);
 
        lua_settop(LuaVM,0);
-
-
 
        lua_register(LuaVM,"print", lua_print);
 
@@ -223,14 +211,11 @@ lua_State *initializeLua(void)
 
        lua_register(LuaVM,"cpuid", lua_cpuid);
 
-
-
        lua_register(LuaVM,"psod", lua_psod);
     }
   }
   return LuaVM;
 }
-
 
 void enterLuaConsole(void)
 {
@@ -248,19 +233,16 @@ void enterLuaConsole(void)
   buffersize=4096;
   bufferpos=0;
 
-
   sendstringf("Welcome to DBVM's Lua console. Enter your code here (Ctrl+X executes the code)\n");
 
   script=(char *)malloc(8);
   scriptsize=8;
 
   c=waitforchar();
-  //getchar()
+
   i=0;
 
-
-
-  while (c!=24) //ctrl+x
+  while (c!=24)
   {
     buffer[bufferpos]=c;
     bufferpos++;
@@ -291,11 +273,6 @@ void enterLuaConsole(void)
 
     if ((c) && (c!=24)) continue;
 
-
-
-    //sendstring("|");
-
-    //c==0
     bi=0;
     for (bi=0; bi<bufferpos; bi++)
     {
@@ -312,7 +289,7 @@ void enterLuaConsole(void)
           script=addCharToString(10, script, i++, &scriptsize);
         }
 
-        if (c==10) //undo double linefeeds
+        if (c==10)
         {
           if (script[i--]==10)
             i--;
@@ -320,7 +297,7 @@ void enterLuaConsole(void)
       }
       else
       {
-        if (c==127) //backspace
+        if (c==127)
         {
           i=i-1;
           sendchar(c);
@@ -332,7 +309,6 @@ void enterLuaConsole(void)
     c=waitforchar();
   }
 
-  //c==24
   sendstring("\n");
   script[i]=0;
 
@@ -372,7 +348,6 @@ void enterLuaConsole(void)
     if (lua_istable(LuaVM,i))
     {
       sendstring("Table");
-      //todo: show info
 
     }
     else

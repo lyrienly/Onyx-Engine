@@ -1,10 +1,3 @@
-/*
-** $Id: ltm.c,v 2.8.1.1 2007/12/27 13:02:25 roberto Exp $
-** Tag methods
-** See Copyright Notice in lua.h
-*/
-
-
 #include <string.h>
 
 #define ltm_c
@@ -18,16 +11,14 @@
 #include "ltable.h"
 #include "ltm.h"
 
-
 const char *const luaT_typenames[] = {
   "nil", "boolean", "userdata", "number",
   "string", "table", "function", "userdata", "thread",
   "proto", "upval"
 };
 
-
 void luaT_init (lua_State *L) {
-  static const char *const luaT_eventname[] = {  /* ORDER TM */
+  static const char *const luaT_eventname[] = {
     "__index", "__newindex",
     "__gc", "__mode", "__eq",
     "__add", "__sub", "__mul", "__div", "__mod",
@@ -37,25 +28,19 @@ void luaT_init (lua_State *L) {
   int i;
   for (i=0; i<TM_N; i++) {
     G(L)->tmname[i] = luaS_new(L, luaT_eventname[i]);
-    luaS_fix(G(L)->tmname[i]);  /* never collect these names */
+    luaS_fix(G(L)->tmname[i]);
   }
 }
 
-
-/*
-** function to be used with macro "fasttm": optimized for absence of
-** tag methods
-*/
 const TValue *luaT_gettm (Table *events, TMS event, TString *ename) {
   const TValue *tm = luaH_getstr(events, ename);
   lua_assert(event <= TM_EQ);
-  if (ttisnil(tm)) {  /* no tag method? */
-    events->flags |= cast_byte(1u<<event);  /* cache this fact */
+  if (ttisnil(tm)) {
+    events->flags |= cast_byte(1u<<event);
     return NULL;
   }
   else return tm;
 }
-
 
 const TValue *luaT_gettmbyobj (lua_State *L, const TValue *o, TMS event) {
   Table *mt;
@@ -76,4 +61,3 @@ const TValue *luaT_gettmbyobj (lua_State *L, const TValue *o, TMS event) {
   }
   return (mt ? luaH_getstr(mt, G(L)->tmname[event]) : luaO_nilobject);
 }
-

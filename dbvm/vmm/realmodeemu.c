@@ -1,8 +1,3 @@
-/*
- * Basic emulation for the case where the system enters an invalid real mode situation
- * With luck enough is emulated till a valid state is entered for normal VM-x handling, if not, the state will be 'fixed', with all the trouble that brings
- */
-
 #include "common.h"
 #include "main.h"
 #include "realmodeemu.h"
@@ -41,14 +36,10 @@ int opcode_CALLE8(pcpuinfo currentcpuinfo, PINSTRUCTIONDATA id)
     sendstringf("%x:%x CALL near relative offset=%d\n\r",vmread(vm_guest_cs), vmread(vm_guest_rip), offset);
     id->size+=2;
 
-
-    //push current eip+id->size
     stack[0]=vmread(vm_guest_rip)+id->size;
 
     vmwrite(vm_guest_rsp, (vmread(vm_guest_rsp) & 0xffff0000) + (WORD)(vmread(vm_guest_rsp)-2));
 
-
-    //change eip
     newip=vmread(vm_guest_rip);
     newip+=id->size;
     newip+=offset;
@@ -58,18 +49,16 @@ int opcode_CALLE8(pcpuinfo currentcpuinfo, PINSTRUCTIONDATA id)
     id->size=0;
 
     unmapVMmemory(stack,2);
-    return 2; //handled, but don't change eip, I already did it
+    return 2;
   }
   else
-    return 1; //opperandsize of 32-bit is not supported yet
+    return 1;
 
 }
 
 int opcode_HLTF4(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIONDATA id)
 {
-	//realmode HLT emu
 
-	//handleHLT(currentcpuinfo);
 	sendstringf("opcode_HLTF4. HLT emu");
     vmwrite(vm_guest_rip,vmread(vm_guest_rip)+1);
     id->size=0;
@@ -86,14 +75,13 @@ int opcode_INTCD(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
   sendstringf("INT (CD).   Size=%d\n", id->size);
   if (id->size == 1)
   {
-    //emulate a realmode software interrupt call
+
     vmwrite(vm_guest_rip, vmread(vm_guest_rip)+id->size+1);
     emulateRMinterrupt(currentcpuinfo, vmregisters, *(BYTE*)(&id->instruction[id->size]));
     return 2;
   }
   else
-    return 1; //fail
-
+    return 1;
 
 }
 
@@ -102,13 +90,11 @@ int opcode_JMPE9(pcpuinfo currentcpuinfo UNUSED, PINSTRUCTIONDATA id)
   if (!id->opperandsize)
   {
 
-    //16 bit opperand-size
     WORD newip;
     WORD offset=*(WORD *)&id->instruction[id->size];
     sendstringf("%x:%x JMP near relative offset=%d\n\r",vmread(vm_guest_cs), vmread(vm_guest_rip), offset);
     id->size+=2;
 
-    //change eip
     newip=vmread(vm_guest_rip);
     newip+=id->size;
     newip+=offset;
@@ -116,10 +102,10 @@ int opcode_JMPE9(pcpuinfo currentcpuinfo UNUSED, PINSTRUCTIONDATA id)
     vmwrite(vm_guest_rip,newip);
 
     id->size=0;
-    return 2; //handled, but don't change eip, I already did it
+    return 2;
   }
   else
-    return 1; //operand size of 32-bit is not supported yet
+    return 1;
 
 }
 
@@ -131,14 +117,14 @@ int opcode_JMPEA(PINSTRUCTIONDATA id)
 
   if (!id->opperandsize)
   {
-    //16 bit operand-size
+
     neweip=*(WORD *)&id->instruction[id->size];
     newcodesegment=*(WORD *)&id->instruction[id->size+2];
     id->size+=4;
   }
   else
   {
-    //32-bit operand-size
+
     neweip=*(DWORD *)&id->instruction[id->size];
     newcodesegment=*(WORD *)&id->instruction[id->size+2];
     id->size+=6;
@@ -150,7 +136,7 @@ int opcode_JMPEA(PINSTRUCTIONDATA id)
   vmwrite(vm_guest_cs_limit, 0xffff);
 
   id->size=0;
-  return 2; //handled, but don't change eip
+  return 2;
 }
 
 int opcode_JMPEB(PINSTRUCTIONDATA id)
@@ -158,7 +144,6 @@ int opcode_JMPEB(PINSTRUCTIONDATA id)
   signed char offset=*(signed char *)&id->instruction[id->size];
   WORD newip;
 
-  //While interrupt handling is not implemented:
   sendstringf("%x:%x JMP short offset=%d\n\r",vmread(vm_guest_cs), vmread(vm_guest_rip), offset);
   id->size+=1;
   newip=vmread(vm_guest_rip);
@@ -168,7 +153,7 @@ int opcode_JMPEB(PINSTRUCTIONDATA id)
   vmwrite(vm_guest_rip,newip);
 
   id->size=0;
-  return 2; //handled, but don't change eip, I already did it
+  return 2;
 
 }
 
@@ -192,13 +177,9 @@ int opcode_LGDT(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIOND
   currentcpuinfo->RealMode.GDTBase=gdtbase;
   currentcpuinfo->RealMode.GDTLimit=gdtlimit;
 
-//  vmwrite(vm_guest_gdtr_base,gdtbase);
-//  vmwrite(vm_guest_gdt_limit,gdtlimit);
-
   unmapVMmemory(address,16);
   return 0;
 }
-
 
 int opcode_LIDT(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIONDATA id)
 {
@@ -226,7 +207,7 @@ int opcode_LIDT(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIOND
 
 int opcode_LMSW(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIONDATA id)
 {
-  //rm16
+
   int error;
   UINT64 pagefaultaddress;
 
@@ -238,11 +219,10 @@ int opcode_LMSW(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIOND
 
   if (id->opperand2==-1)
   {
-    //address     (opperandsize is fixed to 16 bit)
+
     WORD *address=(WORD *)mapVMmemory(currentcpuinfo, id->address, 16, &error, &pagefaultaddress);
 
     sendstringf("id->address=%x\n\r",id->address);
-
 
     if (error)
     {
@@ -257,7 +237,6 @@ int opcode_LMSW(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIOND
   }
   else
   {
-    //register, 16-bit opperand size
 
     switch (id->opperand2)
     {
@@ -271,16 +250,14 @@ int opcode_LMSW(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIOND
       case 7: return setVM_CR0(currentcpuinfo, (vmread(vm_cr0_read_shadow) & 0xffff0000) | ( vmregisters->rdi & 0xffff) );
     }
 
-
   }
 
-  return 1; //it got here, so error (Really, if it gets here, HUGE error)
+  return 1;
 }
-
 
 int opcode_MOV0F20(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIONDATA id)
 {
-  ////mov XX,CRx
+
   sendstring("MOV 0F 20\n\r");
 
   handleMODRM(vmregisters, id);
@@ -289,7 +266,7 @@ int opcode_MOV0F20(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTI
 
   switch (id->opperand)
   {
-    case 0: //CR0
+    case 0:
       switch (id->opperand2)
       {
         case 0:
@@ -327,9 +304,7 @@ int opcode_MOV0F20(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTI
 
       break;
 
-
-
-    case 3: //CR4
+    case 3:
       switch (id->opperand2)
       {
         case 0:
@@ -367,7 +342,7 @@ int opcode_MOV0F20(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTI
 
       break;
 
-    case 4: //CR4
+    case 4:
       switch (id->opperand2)
       {
         case 0:
@@ -412,10 +387,8 @@ int opcode_MOV0F20(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTI
 
 int opcode_MOV0F22(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIONDATA id)
 {
-  //mov CRx,XX
+
   sendstring("MOV 0F 22\n\r");
-
-
 
   handleMODRM(vmregisters, id);
   if (id->error)
@@ -423,7 +396,7 @@ int opcode_MOV0F22(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTI
 
   switch (id->opperand)
   {
-    case 0: //CR0
+    case 0:
       sendstringf("old CR0=%8\n\r", vmread(vm_guest_cr0));
       switch (id->opperand2)
       {
@@ -438,13 +411,13 @@ int opcode_MOV0F22(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTI
       }
       break;
 
-    case 1: //CR1 ?
+    case 1:
       break;
 
-    case 2: //CR2
+    case 2:
       break;
 
-    case 3: //CR3
+    case 3:
       switch (id->opperand2)
       {
         case 0: return setVM_CR3(currentcpuinfo, vmregisters, vmregisters->rax);
@@ -458,7 +431,7 @@ int opcode_MOV0F22(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTI
       }
       break;
 
-    case 4: //CR4
+    case 4:
       switch (id->opperand2)
       {
         case 0: return setVM_CR4(currentcpuinfo, vmregisters->rax);
@@ -473,9 +446,8 @@ int opcode_MOV0F22(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTI
       break;
 
   }
-  //
 
-  return 1; //not handled
+  return 1;
 }
 
 int opcode_MOV8B(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIONDATA id)
@@ -491,12 +463,11 @@ int opcode_MOV8B(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
 
   if (id->opperandsize==0)
   {
-    WORD value; //get the value from operand2
-
+    WORD value;
 
     switch (id->opperand2)
     {
-      case -1: //address
+      case -1:
       {
         int error=0;
         QWORD pagefaultaddress;
@@ -539,7 +510,7 @@ int opcode_MOV8B(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
         break;
 
       default:
-        return 0;//error
+        return 0;
     }
 
     sendstringf("Value = %8\n", value);
@@ -585,19 +556,15 @@ int opcode_MOV8B(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
     }
     return 0;
 
-
   }
 
-
   return 1;
-
 
 }
 
 int opcode_MOV8E(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIONDATA id)
 {
   sendstring("MOV 8E\n\r");
-
 
   handleMODRM(vmregisters, id);
   if (id->error)
@@ -614,7 +581,7 @@ int opcode_MOV8E(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
 	  return 2;
   }
 
-  if (id->opperand2==-1) //address it seems...
+  if (id->opperand2==-1)
   {
     int error=0;
     QWORD pagefaultaddress;
@@ -644,21 +611,10 @@ int opcode_MOVSA5(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIO
   if (moves==0)
     return 0;
 
-/*  sendstring("MOVSx A5\n");
-  if (id->rep)
-    sendstring("REP ");
-
-  if (id->repne)
-    sendstring("REPNE ");
-*/
   if (id->addresssize)
   {
-    //32-bit addressing, 2 byte operand
+
     int mapsize=bytespermove*moves;
-
-
-
-    //TODO: watch for breakpoints
 
     if (vmregisters->rdi < vmmstart)
     {
@@ -667,7 +623,6 @@ int opcode_MOVSA5(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIO
       {
         WORD *destination=(WORD *)mapVMmemory(currentcpuinfo, vmregisters->rdi, bytespermove*moves, &error, &pagefaultaddress);
         WORD *source=(WORD *)mapVMmemory(currentcpuinfo, vmregisters->rsi, bytespermove*moves, &error, &pagefaultaddress);
-
 
         copymem(destination,source,bytespermove*moves);
         vmregisters->rdi+=bytespermove*moves;
@@ -692,36 +647,29 @@ int opcode_MOVSA5(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIO
         unmapVMmemory(source,mapsize);
       }
 
-
     }
     else
     {
-      //NO ACCESS
+
       vmregisters->rsi+=vmregisters->rcx*bytespermove;
       vmregisters->rdi+=vmregisters->rcx*bytespermove;
       vmregisters->rcx=0;
     }
 
-
-
-
-
-    return 0; //handled
-
+    return 0;
 
   }
   else
   {
     sendstring("16-bit addressing not handled yet\n");
-    return 1; //not handled yet
+    return 1;
   }
-
 
 }
 
 int opcode_MOVB0toB7(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIONDATA id,int offset)
 {
-  //mov r8,imm8
+
   sendstring("MOV B0 to B7\n");
 
   if (id->lock)
@@ -732,50 +680,46 @@ int opcode_MOVB0toB7(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUC
 
   switch (offset)
   {
-    case 0: //al
+    case 0:
       vmregisters->rax=(vmregisters->rax & 0xffffffffffffff00ULL) + *(BYTE*)(&id->instruction[id->size]);
       break;
 
-    case 1: //cl
+    case 1:
       vmregisters->rcx=(vmregisters->rcx & 0xffffffffffffff00ULL) + *(BYTE*)(&id->instruction[id->size]);
       break;
 
-    case 2: //dl
+    case 2:
       vmregisters->rdx=(vmregisters->rdx & 0xffffffffffffff00ULL) + *(BYTE*)(&id->instruction[id->size]);
       break;
 
-    case 3: //bl
+    case 3:
       vmregisters->rbx=(vmregisters->rbx & 0xffffffffffffff00ULL) + *(BYTE*)(&id->instruction[id->size]);
       break;
 
-    case 4: //ah
+    case 4:
       vmregisters->rax=(vmregisters->rax & 0xffffffffffff00ffULL) + (*(BYTE*)(&id->instruction[id->size]) << 8);
       break;
 
-    case 5: //ch
+    case 5:
       vmregisters->rcx=(vmregisters->rcx & 0xffffffffffff00ffULL) + (*(BYTE*)(&id->instruction[id->size]) << 8);
       break;
 
-    case 6: //dh
+    case 6:
       vmregisters->rdx=(vmregisters->rdx & 0xffffffffffff00ffULL) + (*(BYTE*)(&id->instruction[id->size]) << 8);
       break;
 
-    case 7: //bh
+    case 7:
       vmregisters->rdx=(vmregisters->rbx & 0xffffffffffff00ffULL) + (*(BYTE*)(&id->instruction[id->size]) << 8);
       break;
   }
   id->size+=1;
 
-
-
-
   return 0;
 }
 
-
 int opcode_MOVB8toBF(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIONDATA id,int offset)
 {
-  //mov r16.imm16
+
   sendstring("MOV B8 to BF\n");
 
   if (id->lock)
@@ -786,7 +730,6 @@ int opcode_MOVB8toBF(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUC
 
   if (!id->opperandsize)
   {
-    //16-bit
 
     switch (offset)
     {
@@ -864,13 +807,12 @@ int opcode_MOVB8toBF(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUC
     id->size+=4;
   }
 
-
   return 0;
 }
 
 int opcode_MOVC6(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIONDATA id)
 {
-  //C6 /0 : MOV r/m8, imm8
+
   int error;
   UINT64 pagefaultaddress;
 
@@ -882,7 +824,7 @@ int opcode_MOVC6(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
 
   if (id->opperand2==-1)
   {
-    //address
+
     sendstringf("id->address=%x\n\r",id->address);
     sendstringf("id->size=%d\n\r", id->size);
 
@@ -894,7 +836,6 @@ int opcode_MOVC6(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
       return 1;
     }
 
-
     *address=id->instruction[id->size];
 
     id->size+=1;
@@ -902,39 +843,38 @@ int opcode_MOVC6(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
   }
   else
   {
-    //register
 
     switch (id->opperand2)
     {
-      case 0: //al
+      case 0:
         vmregisters->rax=(vmregisters->rax & 0xffffffffffffff00ULL) + id->instruction[id->size];
         break;
 
-      case 1: //cl
+      case 1:
         vmregisters->rcx=(vmregisters->rcx & 0xffffffffffffff00ULL) + id->instruction[id->size];
         break;
 
-      case 2: //dl
+      case 2:
         vmregisters->rdx=(vmregisters->rdx & 0xffffffffffffff00ULL) + id->instruction[id->size];
         break;
 
-      case 3: //bl
+      case 3:
         vmregisters->rbx=(vmregisters->rbx & 0xffffffffffffff00ULL) + id->instruction[id->size];
         break;
 
-      case 4: //ah
+      case 4:
         vmregisters->rax=(vmregisters->rax & 0xffffffffffff00ffULL) + id->instruction[id->size];
         break;
 
-      case 5: //ch
+      case 5:
         vmregisters->rcx=(vmregisters->rcx & 0xffffffffffff00ffULL) + ((int)id->instruction[id->size] << 8);
         break;
 
-      case 6: //dh
+      case 6:
         vmregisters->rdx=(vmregisters->rdx & 0xffffffffffff00ffULL) + ((int)id->instruction[id->size] << 8);
         break;
 
-      case 7: //bh
+      case 7:
         vmregisters->rbx=(vmregisters->rbx & 0xffffffffffff00ffULL) + ((int)id->instruction[id->size] << 8);
         break;
     }
@@ -943,16 +883,14 @@ int opcode_MOVC6(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
 
   }
 
-
   return 0;
 }
 
 int opcode_MOVC7(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIONDATA id)
 {
-  //rm16 , imm16
+
   int error;
   UINT64 pagefaultaddress;
-
 
   sendstring("MOV C7  (rm16,imm16 or rm32,imm32)\n\r");
   handleMODRM(vmregisters, id);
@@ -961,13 +899,13 @@ int opcode_MOVC7(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
 
   if (id->opperand2==-1)
   {
-    //address
+
     sendstringf("id->address=%x\n\r",id->address);
     sendstringf("id->size=%d\n\r", id->size);
 
     if (id->opperandsize)
     {
-      //32-bit
+
       DWORD *address=(DWORD *)mapVMmemory(currentcpuinfo, id->address, 16, &error, &pagefaultaddress);
 
       if (error)
@@ -976,7 +914,6 @@ int opcode_MOVC7(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
         return 1;
       }
 
-
       *address=*(DWORD *)&id->instruction[id->size];
 
       id->size+=4;
@@ -984,7 +921,7 @@ int opcode_MOVC7(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
     }
     else
     {
-      //64-bit
+
       WORD *address=(WORD *)mapVMmemory(currentcpuinfo, id->address, 16, &error, &pagefaultaddress);
 
       if (error)
@@ -992,7 +929,6 @@ int opcode_MOVC7(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
         sendstring("Failure mapping memory\n\r");
         return 1;
       }
-
 
       *address=*(WORD *)&id->instruction[id->size];
       unmapVMmemory(address,16);
@@ -1004,7 +940,6 @@ int opcode_MOVC7(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
   {
     if (!id->opperandsize)
     {
-      //16-bit
 
       switch (id->opperand2)
       {
@@ -1087,8 +1022,6 @@ int opcode_MOVC7(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
 
 }
 
-
-
 int opcode_POP58to5F(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIONDATA id,int offset)
 {
   int error;
@@ -1098,11 +1031,9 @@ int opcode_POP58to5F(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUC
 
   if (!id->opperandsize)
   {
-    //16 bit
-    //take the value from the stack
+
     WORD *stack=(WORD *)mapVMmemory(currentcpuinfo, vmread(vm_guest_ss_base)+(vmread(vm_guest_rsp) & 0xffff), 2, &error, &pagefaultaddress);
 
-    //write the value of *stack to the chosen register
     switch (offset)
     {
       case 0:
@@ -1138,17 +1069,15 @@ int opcode_POP58to5F(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUC
         break;
     }
 
-    //increase sp with 2
     vmwrite(vm_guest_rsp, (vmread(vm_guest_rsp) & 0xffffffffffff0000ULL) + (WORD)(vmread(vm_guest_rsp)+2));
 
     unmapVMmemory(stack,2);
   }
   else
   {
-    //32-bit
+
     DWORD *stack=(DWORD *)mapVMmemory(currentcpuinfo, vmread(vm_guest_ss_base)+(vmread(vm_guest_rsp) & 0xffff), 4, &error, &pagefaultaddress);
 
-    //write the value of *stack to the chosen register
     switch (offset)
     {
       case 0:
@@ -1184,13 +1113,11 @@ int opcode_POP58to5F(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUC
         break;
     }
 
-
-    //increase sp with 4
     vmwrite(vm_guest_rsp, (vmread(vm_guest_rsp) & 0xffffffffffff0000ULL) + (WORD)(vmread(vm_guest_rsp)+4));
     unmapVMmemory(stack,4);
   }
 
-  return 0; //all ok
+  return 0;
 }
 
 int opcode_POPSegment(pcpuinfo currentcpuinfo, VMRegisters *vmregisters UNUSED, PINSTRUCTIONDATA id,int segment)
@@ -1199,7 +1126,6 @@ int opcode_POPSegment(pcpuinfo currentcpuinfo, VMRegisters *vmregisters UNUSED, 
 
   UINT64 pagefaultaddress;
 
-  //ignore the extra 16-bit when in 32-bit opperand mode, it's useless anyhow
   WORD *sv=mapVMmemory(currentcpuinfo, vmread(vm_guest_ss_base)+vmread(vm_guest_rsp), 2, &error, &pagefaultaddress);
   WORD segmentvalue=*sv;
   unmapVMmemory(sv,2);
@@ -1208,13 +1134,13 @@ int opcode_POPSegment(pcpuinfo currentcpuinfo, VMRegisters *vmregisters UNUSED, 
 
   if (!id->opperandsize)
   {
-    //16-bit
+
     vmwrite(vm_guest_rsp, (WORD)(vmread(vm_guest_rsp)+2));
 
   }
   else
   {
-    //32-bit
+
     vmwrite(vm_guest_rsp, (WORD)(vmread(vm_guest_rsp)+4));
   }
 
@@ -1232,15 +1158,11 @@ int opcode_PUSH50to57(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRU
 
   if (!id->opperandsize)
   {
-    //16 bit
-    //push the value on the stack
 
-	//decrease sp with 2
 	vmwrite(vm_guest_rsp, (vmread(vm_guest_rsp) & 0xffffffffffff0000ULL) + (WORD)(vmread(vm_guest_rsp)-2));
 
     WORD *stack=(WORD *)mapVMmemory(currentcpuinfo, vmread(vm_guest_ss_base)+(vmread(vm_guest_rsp) & 0xffff), 2, &error, &pagefaultaddress);
 
-    //write the value of the register to *stack
     switch (offset)
     {
       case 0:
@@ -1260,7 +1182,7 @@ int opcode_PUSH50to57(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRU
         break;
 
       case 4:
-    	*stack=(WORD)vmread(vm_guest_rsp)+2; //old rsp value
+    	*stack=(WORD)vmread(vm_guest_rsp)+2;
         break;
 
       case 5:
@@ -1276,18 +1198,15 @@ int opcode_PUSH50to57(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRU
         break;
     }
 
-
     unmapVMmemory(stack, 2);
 
   }
   else
   {
-    //32-bit
-	  //decrease sp with 2
+
   	vmwrite(vm_guest_rsp, (vmread(vm_guest_rsp) & 0xffffffffffff0000ULL) + (WORD)(vmread(vm_guest_rsp)-4));
     DWORD *stack=(DWORD *)mapVMmemory(currentcpuinfo, vmread(vm_guest_ss_base)+(vmread(vm_guest_rsp) & 0xffff), 4, &error, &pagefaultaddress);
 
-    //write the value of *stack to the chosen register
     switch (offset)
     {
       case 0:
@@ -1307,7 +1226,7 @@ int opcode_PUSH50to57(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRU
         break;
 
       case 4:
-    	  *stack=(DWORD)vmread(vm_guest_rsp)+4; //old rsp value
+    	  *stack=(DWORD)vmread(vm_guest_rsp)+4;
         break;
 
       case 5:
@@ -1327,7 +1246,7 @@ int opcode_PUSH50to57(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRU
 
   }
 
-  return 0; //all ok
+  return 0;
 }
 
 int opcode_PUSHSegment(pcpuinfo currentcpuinfo, VMRegisters *vmregisters UNUSED, PINSTRUCTIONDATA id,int segment)
@@ -1335,11 +1254,10 @@ int opcode_PUSHSegment(pcpuinfo currentcpuinfo, VMRegisters *vmregisters UNUSED,
   int error;
   UINT64 pagefaultaddress;
   WORD segmentValue=vmread(vm_guest_es+(segment << 1));
-  //push the segment value into the stack
 
   if (!id->opperandsize)
   {
-    //16-bit
+
     WORD sp=vmread(vm_guest_rsp)-2;
     WORD *stack=mapVMmemory(currentcpuinfo, vmread(vm_guest_ss_base)+sp, 2, &error, &pagefaultaddress);
 
@@ -1351,7 +1269,7 @@ int opcode_PUSHSegment(pcpuinfo currentcpuinfo, VMRegisters *vmregisters UNUSED,
   }
   else
   {
-    //32-bit
+
     WORD sp=vmread(vm_guest_rsp)-4;
     DWORD *stack=mapVMmemory(currentcpuinfo, vmread(vm_guest_ss_base)+sp, 4, &error, &pagefaultaddress);
     *stack=segmentValue;
@@ -1363,8 +1281,6 @@ int opcode_PUSHSegment(pcpuinfo currentcpuinfo, VMRegisters *vmregisters UNUSED,
   return 0;
 }
 
-
-
 int opcode_PUSH68(pcpuinfo currentcpuinfo, VMRegisters *vmregisters UNUSED, PINSTRUCTIONDATA id)
 {
   int error;
@@ -1375,7 +1291,7 @@ int opcode_PUSH68(pcpuinfo currentcpuinfo, VMRegisters *vmregisters UNUSED, PINS
 
   if (!id->opperandsize)
   {
-    //16-bit push
+
     WORD sp=vmread(vm_guest_rsp)-2;
     WORD *stack=(WORD *)mapVMmemory(currentcpuinfo, vmread(vm_guest_ss_base)+sp, 2, &error, &pagefaultaddress);
 
@@ -1390,7 +1306,7 @@ int opcode_PUSH68(pcpuinfo currentcpuinfo, VMRegisters *vmregisters UNUSED, PINS
   }
   else
   {
-    //32-bit push
+
     WORD sp=vmread(vm_guest_rsp)-4;
     DWORD *stack=(DWORD *)mapVMmemory(currentcpuinfo, vmread(vm_guest_ss_base)+sp, 4, &error, &pagefaultaddress);
 
@@ -1402,7 +1318,7 @@ int opcode_PUSH68(pcpuinfo currentcpuinfo, VMRegisters *vmregisters UNUSED, PINS
     unmapVMmemory(stack, 4);
   }
 
-  return 0; //handled
+  return 0;
 }
 
 int opcode_RDMSR0F32(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
@@ -1443,15 +1359,7 @@ int opcode_RETC3(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
 {
   int error;
   UINT64 pagefaultaddress;
-	/*
-	 * IF top 2 bytes of stack not within stack limits
-THEN #SS(0); FI;
-tempEIP  Pop();
-tempEIP  tempEIP AND 0000FFFFH;
-IF tempEIP not within code segment limits
-THEN #GP(0); FI;
-EIP  tempEIP;
-	 */
+
   if (!id->opperandsize)
   {
     WORD retaddress;
@@ -1471,34 +1379,28 @@ EIP  tempEIP;
     vmwrite(vm_guest_rsp, sp);
     sendstringf("sp becomes %8\n", sp);
 
-
-    if (sp<=1) //overflow in the stack segment
+    if (sp<=1)
     {
       sendstringf("sp (%8) causes an stack error\n", sp);
       emulateRMinterrupt(currentcpuinfo, vmregisters, 12);
       return 2;
     }
 
-    //calculate what rip is for this segment base
-
     retaddress=vmread(vm_guest_cs_base)+retaddress;
 
     vmwrite(vm_guest_rip, retaddress & 0xffff);
 
-
-    return 2; //handled (and I changed rip myself)
+    return 2;
   }
 
   return 1;
 }
 
-
 int opcode_CLI(void)
 {
-  //get current eflags register
+
   UINT64 guestrflags=vmread(vm_guest_rflags);
   PRFLAGS pguestrflags=(PRFLAGS)&guestrflags;
-
 
   pguestrflags->IF=0;
   vmwrite(0x6820,(UINT64)guestrflags);
@@ -1506,21 +1408,19 @@ int opcode_CLI(void)
   return 0;
 }
 
-
 int opcode_STI(void)
 {
-  //get current eflags register
+
   UINT64 guestrflags=vmread(vm_guest_rflags);
   PRFLAGS pguestrflags=(PRFLAGS)&guestrflags;
 
-  //check if IF==0
   if (pguestrflags->IF==0)
   {
-    //if so, set interruptability state bit 1 to true (when applicable, bits 0 and 1 can't be 1 at the same time)
+
     int is=vmread(vm_guest_interruptability_state);
     if ((is & 1)==0)
     {
-      is=is | 1; //set bit 0
+      is=is | 1;
       vmwrite(vm_guest_interruptability_state,is);
     }
   }
@@ -1530,7 +1430,6 @@ int opcode_STI(void)
 
   sendstringf("After STI. vm_guest_interruptability_state=%d", vmread(vm_guest_interruptability_state));
 
-  //currentcpuinfo->hasIF=1;
   return 0;
 }
 
@@ -1553,15 +1452,14 @@ int opcode_UD(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
 
 int opcode_WBINVD(void)
 {
-  asm("WBINVD"); //just for the fun of it
+  asm("WBINVD");
 
   return 0;
 }
 
 int opcode_XOR31(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIONDATA id)
 {
-  //xor r/m16, r16
-  //      2  ,  1
+
   int error;
   DWORD result=0;
   UINT64 guestrflags=vmread(vm_guest_rflags);
@@ -1585,12 +1483,12 @@ int opcode_XOR31(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
 
   if (id->opperand2==-1)
   {
-    //address
+
     sendstringf("id->address=%x\n\r",id->address);
     sendstringf("id->size=%d\n\r", id->size);
     if (id->opperandsize)
     {
-      //32-bit
+
       DWORD *address=(DWORD *)mapVMmemory(currentcpuinfo, id->address, 16, &error, &pagefaultaddress);
       if (error)
       {
@@ -1605,14 +1503,13 @@ int opcode_XOR31(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
     }
     else
     {
-      //16 bit
+
       WORD *address=(WORD *)mapVMmemory(currentcpuinfo, id->address, 16, &error, &pagefaultaddress);
       if (error)
       {
         sendstring("Failure mapping memory\n\r");
         return 1;
       }
-
 
       result=*address ^ opperandvalue;
       *address=result;
@@ -1621,10 +1518,10 @@ int opcode_XOR31(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
   }
   else
   {
-    //register
+
     if (id->opperandsize)
     {
-      //32-bit
+
       switch (id->opperand2)
       {
         case 0:
@@ -1674,7 +1571,7 @@ int opcode_XOR31(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
     }
     else
     {
-      //16-bit
+
       opperandvalue=opperandvalue & 0xffff;
       switch (id->opperand2)
       {
@@ -1720,7 +1617,6 @@ int opcode_XOR31(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
           break;
       }
 
-
       sendstring("Stripping extra bits 16-bit\n");
       result=(WORD)result;
     }
@@ -1728,15 +1624,15 @@ int opcode_XOR31(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTION
 
   sendstringf("result=%x\n",result);
 
-  pguestrflags->OF=0; //clear
-  pguestrflags->CF=0; //clear
+  pguestrflags->OF=0;
+  pguestrflags->CF=0;
 
   pguestrflags->SF=0;
   pguestrflags->ZF=result==0;
   pguestrflags->PF=getparityflag((unsigned char)result);
   sendstringf("Setting rflags to %x\n",guestrflags);
 
-  vmwrite(vm_guest_rflags,guestrflags); //apply flag changes
+  vmwrite(vm_guest_rflags,guestrflags);
 
   return 0;
 }
@@ -1757,9 +1653,7 @@ int getparityflag(unsigned char value)
 }
 
 int emulateRMinterrupt(pcpuinfo currentcpuinfo, VMRegisters *vmregisters UNUSED, int intnr)
-/*
- * Pre: If software bp then CS:EIP points to the instruction AFTER the software breakpoint
- */
+
 {
   WORD neweip,newcs;
   DWORD *idtvector=(DWORD *)currentcpuinfo->RealMode.IDTBase;
@@ -1771,48 +1665,37 @@ int emulateRMinterrupt(pcpuinfo currentcpuinfo, VMRegisters *vmregisters UNUSED,
   neweip=(WORD)idtvector[intnr];
   newcs=(WORD)(idtvector[intnr] >> 16);
 
+  stack[0]=(WORD)(vmread(vm_guest_rip));
+  stack[1]=(WORD)(vmread(vm_guest_cs));
+  stack[2]=(WORD)(vmread(vm_guest_rflags));
 
-  stack[0]=(WORD)(vmread(vm_guest_rip)); //push eip
-  stack[1]=(WORD)(vmread(vm_guest_cs));  //push cs
-  stack[2]=(WORD)(vmread(vm_guest_rflags)); //push eflags
+  vmwrite(vm_guest_rsp,(WORD)(vmread(vm_guest_rsp)-6));
+  vmwrite(vm_guest_rip, neweip);
+  vmwrite(vm_guest_cs, newcs);
+  vmwrite(vm_guest_cs_base, newcs<<4);
 
-  vmwrite(vm_guest_rsp,(WORD)(vmread(vm_guest_rsp)-6)); //update esp
-  vmwrite(vm_guest_rip, neweip); //new eip
-  vmwrite(vm_guest_cs, newcs); //new cs
-  vmwrite(vm_guest_cs_base, newcs<<4); //base
-
-  //set/clear flags
   pguestrflags->IF=0;
   pguestrflags->TF=0;
   pguestrflags->AC=0;
   pguestrflags->RF=0;
-  vmwrite(vm_guest_rflags,(ULONG)guestrflags); //rflags
-
-
+  vmwrite(vm_guest_rflags,(ULONG)guestrflags);
 
   sendstring("Emulating realmode interrupt");
 
- // while (1) outportb(0x80,0x77);
-
-
-
-  return 0; //return that I changed the eip
+  return 0;
 
 }
-
 
 int setSegment(int segmentnr, WORD value)
 {
   sendstringf("Setting segment id %d to value %x\n\r",segmentnr,value);
   sendstringf("vm_guest_es+(segmentnr<<1)=%x\n\r",vm_guest_es+(segmentnr<<1));
 
-  //set segment and base and limit and access rights
   vmwrite(vm_guest_es+(segmentnr<<1),value);
   vmwrite(vm_guest_es_base+(segmentnr<<1),value << 4);
   vmwrite(vm_guest_es_limit+(segmentnr<<1),0xffff);
   vmwrite(vm_guest_es_access_rights+(segmentnr<<1),0xf3);
 
-  //if ss was written then set the blocking by mov ss interuptability state
   if (segmentnr==2)
     vmwrite(vm_guest_interruptability_state, vmread(vm_guest_interruptability_state) | (1<<1));
 
@@ -1826,42 +1709,42 @@ UINT64 getOpperandValue(VMRegisters *vmregisters, int opperand, _registerType re
     case Register8Bit:
       switch (opperand)
       {
-        case 0: return vmregisters->rax & 0xff; //al
-        case 1: return vmregisters->rcx & 0xff; //cl
-        case 2: return vmregisters->rdx & 0xff; //dl
-        case 3: return vmregisters->rbx & 0xff; //bl
-        case 4: return (vmregisters->rax >> 8) & 0xff; //ah
-        case 5: return (vmregisters->rcx >> 8) & 0xff; //ch
-        case 6: return (vmregisters->rdx >> 8) & 0xff; //dh
-        case 7: return (vmregisters->rbx >> 8) & 0xff; //bh
+        case 0: return vmregisters->rax & 0xff;
+        case 1: return vmregisters->rcx & 0xff;
+        case 2: return vmregisters->rdx & 0xff;
+        case 3: return vmregisters->rbx & 0xff;
+        case 4: return (vmregisters->rax >> 8) & 0xff;
+        case 5: return (vmregisters->rcx >> 8) & 0xff;
+        case 6: return (vmregisters->rdx >> 8) & 0xff;
+        case 7: return (vmregisters->rbx >> 8) & 0xff;
       }
       break;
 
     case Register16Bit:
       switch (opperand)
       {
-        case 0: return vmregisters->rax & 0xffff; //ax
-        case 1: return vmregisters->rcx & 0xffff; //cx
-        case 2: return vmregisters->rdx & 0xffff; //dx
-        case 3: return vmregisters->rbx & 0xffff; //bx
-        case 4: return vmread(vm_guest_rsp) & 0xffff; //sp
-        case 5: return vmregisters->rbp & 0xffff; //bp
-        case 6: return vmregisters->rsi & 0xffff; //si
-        case 7: return vmregisters->rdi & 0xffff; //di
+        case 0: return vmregisters->rax & 0xffff;
+        case 1: return vmregisters->rcx & 0xffff;
+        case 2: return vmregisters->rdx & 0xffff;
+        case 3: return vmregisters->rbx & 0xffff;
+        case 4: return vmread(vm_guest_rsp) & 0xffff;
+        case 5: return vmregisters->rbp & 0xffff;
+        case 6: return vmregisters->rsi & 0xffff;
+        case 7: return vmregisters->rdi & 0xffff;
       }
       break;
 
     case Register32Bit:
       switch (opperand)
       {
-        case 0: return vmregisters->rax & 0xffffffff; //ax
-        case 1: return vmregisters->rcx & 0xffffffff; //cx
-        case 2: return vmregisters->rdx & 0xffffffff; //dx
-        case 3: return vmregisters->rbx & 0xffffffff; //bx
-        case 4: return vmread(vm_guest_rsp) & 0xffffffff; //sp
-        case 5: return vmregisters->rbp & 0xffffffff; //bp
-        case 6: return vmregisters->rsi & 0xffffffff; //si
-        case 7: return vmregisters->rdi & 0xffffffff; //di
+        case 0: return vmregisters->rax & 0xffffffff;
+        case 1: return vmregisters->rcx & 0xffffffff;
+        case 2: return vmregisters->rdx & 0xffffffff;
+        case 3: return vmregisters->rbx & 0xffffffff;
+        case 4: return vmread(vm_guest_rsp) & 0xffffffff;
+        case 5: return vmregisters->rbp & 0xffffffff;
+        case 6: return vmregisters->rsi & 0xffffffff;
+        case 7: return vmregisters->rdi & 0xffffffff;
       }
       break;
 
@@ -1871,9 +1754,9 @@ UINT64 getOpperandValue(VMRegisters *vmregisters, int opperand, _registerType re
         case 0: return vmread(vm_guest_es);
         case 1: return vmread(vm_guest_cs);
         case 2: return vmread(vm_guest_ss);
-        case 3: return vmread(vm_guest_ds); //bx
-        case 4: return vmread(vm_guest_fs); //sp
-        case 5: return vmread(vm_guest_gs); //bp
+        case 3: return vmread(vm_guest_ds);
+        case 4: return vmread(vm_guest_fs);
+        case 5: return vmread(vm_guest_gs);
       }
       break;
 
@@ -1883,9 +1766,8 @@ UINT64 getOpperandValue(VMRegisters *vmregisters, int opperand, _registerType re
 
   }
 
-  return 1; //not handled
+  return 1;
 }
-
 
 int getOpperand(PINSTRUCTIONDATA id)
 {
@@ -1904,16 +1786,16 @@ ULONG getSIBBase(VMRegisters *vmregisters, PINSTRUCTIONDATA id, int MOD, int SIB
     case 5:
       switch (MOD)
       {
-        case 0: //disp32
+        case 0:
           id->address=(*(DWORD*)(&id->instruction[id->size]));
           id->size+=4;
           return id->address;
 
-        case 1: //disp8+ebp (the disp8 comes from the modrm handler)
+        case 1:
           id->address=(vmregisters->rbp & 0xffffffff);
           return id->address;
 
-        case 2: //disp32+ebp
+        case 2:
           id->address=(vmregisters->rbp & 0xffffffff);
           return id->address;
       }
@@ -1932,10 +1814,9 @@ ULONG handleSIB(VMRegisters *vmregisters, PINSTRUCTIONDATA id, int MOD)
 {
   PSIB sib= (PSIB)&id->instruction[id->size];
   ULONG SIBBase;
-  id->size++; //sib byte
+  id->size++;
 
   SIBBase=getSIBBase(vmregisters, id, MOD, sib->Base);
-
 
   switch (sib->Scale)
   {
@@ -2001,11 +1882,11 @@ ULONG handleMODRM(VMRegisters *vmregisters, PINSTRUCTIONDATA id)
 {
   PMODRM modrm = (PMODRM)&id->instruction[id->size];
   id->opperand=modrm->RegOpcode;
-  id->size++; //modrm byte
+  id->size++;
 
   switch (id->addresssize)
   {
-    case 0: //16 bit
+    case 0:
       switch (modrm->MOD)
       {
         case 0:
@@ -2030,7 +1911,7 @@ ULONG handleMODRM(VMRegisters *vmregisters, PINSTRUCTIONDATA id)
           break;
 
         case 1:
-          id->size++; //8-bit value
+          id->size++;
           switch (modrm->RM)
           {
             case 0: return id->address=id->segmentbase+(((vmregisters->rbx+vmregisters->rsi) + *(char*)(&id->instruction[id->size-1])) & 0xffff);
@@ -2049,7 +1930,7 @@ ULONG handleMODRM(VMRegisters *vmregisters, PINSTRUCTIONDATA id)
           break;
 
         case 2:
-          id->size+=2; //16-bit value
+          id->size+=2;
           switch (modrm->RM)
           {
             case 0: return id->address=(id->segmentbase+((vmregisters->rbx+vmregisters->rsi) + *(short int*)(&id->instruction[id->size-2]))) & 0xffff;
@@ -2072,7 +1953,7 @@ ULONG handleMODRM(VMRegisters *vmregisters, PINSTRUCTIONDATA id)
       }
       break;
 
-    case 1: //32 bit addressing
+    case 1:
       switch (modrm->MOD)
       {
         case 0:
@@ -2193,20 +2074,15 @@ ULONG handleMODRM(VMRegisters *vmregisters, PINSTRUCTIONDATA id)
       break;
   }
 
-  id->error=1; //still here
+  id->error=1;
   sendstring("MODRM error\n\r");
-  return 1; //not handled
+  return 1;
 }
 
-/*
- * Emulates one instruction
- * returns 0 on success and any other return value on failure
- */
 int emulateRMinstruction2(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PINSTRUCTIONDATA id)
 {
   unsigned char buf[30];
   unsigned int i=0;
-
 
   UINT64 address=(vmread(vm_guest_cs_base))+vmread(vm_guest_rip);
 
@@ -2218,8 +2094,6 @@ int emulateRMinstruction2(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PIN
     sendstringf("Unable to read address %x\n\r",address);
     return 1;
   }
-
-  //skip prefixes
 
   int skip=0;
   id->segmentbase=vmread(vm_guest_ds_base);
@@ -2264,27 +2138,27 @@ int emulateRMinstruction2(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PIN
         break;
 
       case 0x66:
-        id->opperandsize=1; //!id->opperandsize;
+        id->opperandsize=1;
         skip=1;
         break;
 
       case 0x67:
-        id->addresssize=1; //!id->addresssize;
+        id->addresssize=1;
         skip=1;
         break;
 
       case 0xf0:
-        id->lock=1; //!id->lock;
+        id->lock=1;
         skip=1;
         break;
 
       case 0xf2:
-        id->repne=1; //!id->repne;
+        id->repne=1;
         skip=1;
         break;
 
       case 0xf3:
-        id->rep=1; //!id->rep;
+        id->rep=1;
         skip=1;
         break;
 
@@ -2304,14 +2178,12 @@ int emulateRMinstruction2(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PIN
   switch (buf[i])
   {
 
-
-    case 0x0f: //extended opcode, has an instruction
+    case 0x0f:
       id->size++;
-
 
       switch (buf[i+1])
       {
-        case 0x01: //LGDT(2) LIDT (3)
+        case 0x01:
           sendstring("0f 01\n\r");
 
           switch (getOpperand(id))
@@ -2332,41 +2204,40 @@ int emulateRMinstruction2(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PIN
         case 0x09:
           return opcode_WBINVD();
 
-        case 0x20: //mov x,CR0 (0) mov x,CR2 (2) mov x,CR3 (3) mov x,CR4 (4)
+        case 0x20:
           return opcode_MOV0F20(currentcpuinfo, vmregisters, id);
 
-        case 0x22: //MOV CR0,x (0) MOV CR2,x (2) MOV CR3,x (3) MOV CR4,x (4)
+        case 0x22:
           return opcode_MOV0F22(currentcpuinfo, vmregisters, id);
 
-        case 0x30: //wrmsr
+        case 0x30:
           return opcode_WRMSR0F30(currentcpuinfo, vmregisters);
 
-        case 0x32: //rdmsr
+        case 0x32:
           return opcode_RDMSR0F32(currentcpuinfo, vmregisters);
 
-        case 0xa0: //PUSH FS
+        case 0xa0:
           return opcode_PUSHSegment(currentcpuinfo, vmregisters, id, 4);
 
-        case 0xa1: //POP FS
+        case 0xa1:
           return opcode_POPSegment(currentcpuinfo, vmregisters, id, 4);
 
-        case 0xa8: //PUSH GS
+        case 0xa8:
           return opcode_PUSHSegment(currentcpuinfo, vmregisters, id, 5);
 
-
-        case 0xa9: //POP GS
+        case 0xa9:
           return opcode_POPSegment(currentcpuinfo, vmregisters, id, 5);
 
       }
       break;
 
-    case 0x06: return opcode_PUSHSegment(currentcpuinfo, vmregisters, id, 0); //push es
-    case 0x07: return opcode_POPSegment(currentcpuinfo, vmregisters, id, 0); //pop es
-    case 0x0e: return opcode_PUSHSegment(currentcpuinfo, vmregisters, id, 1); //push cs
-    case 0x16: return opcode_PUSHSegment(currentcpuinfo, vmregisters, id, 2); //push ss
-    case 0x17: return opcode_POPSegment(currentcpuinfo, vmregisters, id, 2); //pop ss
-    case 0x1e: return opcode_PUSHSegment(currentcpuinfo, vmregisters, id, 3); //push ds
-    case 0x1f: return opcode_POPSegment(currentcpuinfo, vmregisters, id, 3); //pop ds
+    case 0x06: return opcode_PUSHSegment(currentcpuinfo, vmregisters, id, 0);
+    case 0x07: return opcode_POPSegment(currentcpuinfo, vmregisters, id, 0);
+    case 0x0e: return opcode_PUSHSegment(currentcpuinfo, vmregisters, id, 1);
+    case 0x16: return opcode_PUSHSegment(currentcpuinfo, vmregisters, id, 2);
+    case 0x17: return opcode_POPSegment(currentcpuinfo, vmregisters, id, 2);
+    case 0x1e: return opcode_PUSHSegment(currentcpuinfo, vmregisters, id, 3);
+    case 0x1f: return opcode_POPSegment(currentcpuinfo, vmregisters, id, 3);
 
     case 0x31: return opcode_XOR31(currentcpuinfo, vmregisters, id);
     case 0x50: return opcode_PUSH50to57(currentcpuinfo, vmregisters, id,0);
@@ -2390,7 +2261,7 @@ int emulateRMinstruction2(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PIN
 
     case 0x8b: return opcode_MOV8B(currentcpuinfo, vmregisters, id);
     case 0x8e: return opcode_MOV8E(currentcpuinfo, vmregisters, id);
-    case 0x90: return 0; //nop
+    case 0x90: return 0;
     case 0xa5: return opcode_MOVSA5(currentcpuinfo, vmregisters, id);
     case 0xb0: return opcode_MOVB0toB7(currentcpuinfo, vmregisters, id,0);
     case 0xb1: return opcode_MOVB0toB7(currentcpuinfo, vmregisters, id,1);
@@ -2434,17 +2305,14 @@ int emulateRMinstruction2(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, PIN
     case 0xeb: return opcode_JMPEB(id);
     case 0xf4: return opcode_HLTF4(currentcpuinfo, vmregisters, id);
 
-
     case 0xfa: return opcode_CLI();
     case 0xfb: return opcode_STI();
     case 0xfc: return opcode_CLD(currentcpuinfo);
   }
 
-
-  //still here so not a known instruction
   sendstringf("Unhandled instruction\n\r",i,buf[i]);
   return 1;
-  //In the future when ALL instructions are handled(probably never): return opcode_UD(currentcpuinfo, vmregisters);
+
 }
 
 int emulateRMinstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
@@ -2454,10 +2322,9 @@ int emulateRMinstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
   zeromemory(&id,sizeof(INSTRUCTIONDATA));
   id.opperand2=-1;
 
-
   int result=emulateRMinstruction2(currentcpuinfo, vmregisters, &id);
 
-  if (result==0) //no error, id->size is set to 0 on interrupt
+  if (result==0)
     vmwrite(vm_guest_rip,vmread(vm_guest_rip)+id.size);
 
   if (result==2)
@@ -2466,21 +2333,18 @@ int emulateRMinstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
   if (result==0)
   {
 
-    //clear the old interruptability flag
-
     if (old_vm_guest_interruptability_state)
     {
       sendstringf("Clearing the interuptability state.  old_vm_guest_interruptability_state=%d and vm_guest_interruptability_state=%d\n", old_vm_guest_interruptability_state, vmread(vm_guest_interruptability_state) );
     }
 
-    vmwrite(vm_guest_interruptability_state, (~(old_vm_guest_interruptability_state & 3)) & vmread(vm_guest_interruptability_state)); //the old interuptability state gets set to 0, a new bit will stay
+    vmwrite(vm_guest_interruptability_state, (~(old_vm_guest_interruptability_state & 3)) & vmread(vm_guest_interruptability_state));
 
     sendstringf("new interuptability state=%d\n", vmread(vm_guest_interruptability_state));
   }
 
   return result==0;
 }
-
 
 #pragma GCC push_options
 #pragma GCC optimize ("O0")
@@ -2491,26 +2355,24 @@ int emulateHLT(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
   UINT64 guestrflags=vmread(vm_guest_rflags);
   PRFLAGS pguestrflags=(PRFLAGS)&guestrflags;
 
-
   if (pguestrflags->IF)
   {
-	  currentcpuinfo->OnInterrupt.RIP=(QWORD)(volatile void *)(&&InterruptFired); //set interrupt location
+	  currentcpuinfo->OnInterrupt.RIP=(QWORD)(volatile void *)(&&InterruptFired);
 	  currentcpuinfo->OnInterrupt.RSP=getRSP();
 	  currentcpuinfo->OnInterrupt.RBP=getRBP();
 	  asm volatile ("": : :"memory");
 
-	  __asm("sti"); //enable interrupts
-	  __asm("hlt"); //this nop is ignored
-	  __asm("cli"); //disable interrupts
+	  __asm("sti");
+	  __asm("hlt");
+	  __asm("cli");
 
-	  //nothing happened (weird)
 	  sendstringf("emulateHLT returned without an interrupt! WTF!");
 	  currentcpuinfo->OnInterrupt.RIP=0;
 	  result=-1;
 	  asm volatile ("": : :"memory");
 
 InterruptFired:
-    currentcpuinfo->OnInterrupt.RIP=0; //set interrupt location
+    currentcpuinfo->OnInterrupt.RIP=0;
     currentcpuinfo->OnInterrupt.RSP=0;
     currentcpuinfo->OnInterrupt.RBP=0;
 
@@ -2530,8 +2392,6 @@ InterruptFired:
 
   return result;
 
-
-
 }
 
 int testRMinterrupt(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
@@ -2543,25 +2403,21 @@ int testRMinterrupt(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
     UINT64 guestrflags=vmread(vm_guest_rflags);
     PRFLAGS pguestrflags=(PRFLAGS)&guestrflags;
 
-
-    //check if IF is enabled in the guest state
-    //and check the interruptability state
     if ((pguestrflags->IF) && (vmread(vm_guest_interruptability_state)==0))
     {
 
       sendstringf("testRMinterrupt: Checking for interrupts. IF==%d and interuptabilitystate=%d\n", pguestrflags->IF, vmread(vm_guest_interruptability_state));
 
-
       bochsbp();
 
-      currentcpuinfo->OnInterrupt.RIP=(QWORD)(volatile void *)(&&InterruptFired); //set interrupt location
+      currentcpuinfo->OnInterrupt.RIP=(QWORD)(volatile void *)(&&InterruptFired);
       currentcpuinfo->OnInterrupt.RSP=getRSP();
 
-      __asm("sti"); //enable interrupts
-      __asm("nop"); //this nop is ignored
-      __asm("nop"); //this nop captures the interrupt
-      __asm("cli"); //disable interrupts
-      //nothing happened
+      __asm("sti");
+      __asm("nop");
+      __asm("nop");
+      __asm("cli");
+
       currentcpuinfo->OnInterrupt.RIP=0;
       result=0;
 
@@ -2569,9 +2425,8 @@ int testRMinterrupt(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
 
 InterruptFired:
 
-      if (result==2) //need to do this method because otherwise &&InterruptFired would point to testRMinterrupt
+      if (result==2)
       {
-
 
         bochsbp();
         sendstringf("testRMinterrupt: Interruptnr=%d\n\r", currentcpuinfo->LastInterrupt);
@@ -2599,24 +2454,20 @@ InterruptFired:
     else
     {
       sendstringf("testRMinterrupt: Inside real-mode but IF==%d and interuptabilitystate=%d\n", pguestrflags->IF, vmread(vm_guest_interruptability_state));
-      return 0; //no error
+      return 0;
     }
 
   }
   else
   {
     sendstring("testRMinterrupt: Not inside real-mode\n");
-    return 0; //no error
+    return 0;
   }
 
 }
 
 #pragma GCC pop_options
 
-/*
- * Emulates RealMode instructions. Returns true if at least one instruction got executed
- * Currently only tries one instruction at a time
- */
 BOOL emulateRealMode(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
 {
   unsigned char buf[30];
@@ -2627,25 +2478,17 @@ BOOL emulateRealMode(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
   int result=TRUE;
   int success=FALSE;
 
-
   int skip;
 
-
-
-
-
-  //handle hw interrupts and instructions
 #ifdef RMEMUONLYONE
   int i;
   for (i=0; i<=0; i++)
 #else
-  while ((ISREALMODE(currentcpuinfo)) && (result) ) //test: only one at a time
+  while ((ISREALMODE(currentcpuinfo)) && (result) )
 #endif
   {
     #ifdef DEBUG
     skip=0;
-    //if (currentcpuinfo->cpunr==0)
-    //	skip=1;
 
     #else
     skip=1;
@@ -2662,25 +2505,15 @@ BOOL emulateRealMode(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
 
 #ifdef DEBUG
 
-
-
     switch (address)
     {
-
 
       case 0xffff1:
         skip=1;
         break;
     }
 
-
-
-//    if (currentcpuinfo->cpunr==0)
-//      skip=1;
 #endif
-
-
-
 
     if (skip)
     {
@@ -2695,9 +2528,8 @@ BOOL emulateRealMode(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
     }
     else
     {
-     // enableserial();
-      distorm_decode(address,buf, 30, Decode16Bits, disassembled, 16, &used);
 
+      distorm_decode(address,buf, 30, Decode16Bits, disassembled, 16, &used);
 
       nosendchar[getAPICID()]=0;
       sendstringf("inside emulateRealMode for cpu %d\n\r", currentcpuinfo->cpunr );
@@ -2712,16 +2544,15 @@ BOOL emulateRealMode(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
       result=FALSE;
 
       c=waitforchar();
-      //c='1';
-      sendstringf("%c\n\r",c);
 
+      sendstringf("%c\n\r",c);
 
       switch (c)
       {
         case '1':
           result=emulateRMinstruction(currentcpuinfo,vmregisters);
           if (result)
-            success=TRUE; //at least one instruction got emulated
+            success=TRUE;
           break;
 
         case '3':
@@ -2752,13 +2583,11 @@ BOOL emulateRealMode(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
 
     if (result)
     {
-      //successful emulation of the last instruction, test for interrupt
+
       nosendchar[getAPICID()]=1;
       testRMinterrupt(currentcpuinfo,vmregisters);
 
-
     }
-
 
   }
 
@@ -2773,7 +2602,6 @@ BOOL emulateRealMode(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
   {
     sendstring("Because of an error\n\r");
   }
-
 
   return success;
 }

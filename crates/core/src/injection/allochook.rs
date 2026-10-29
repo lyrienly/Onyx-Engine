@@ -1,4 +1,3 @@
-
 use crate::process::{MemoryRegion, Process};
 
 #[derive(Debug, Clone)]
@@ -47,4 +46,3 @@ impl AllocHookMonitor {
         Ok(new_allocs)
     }
 }
-

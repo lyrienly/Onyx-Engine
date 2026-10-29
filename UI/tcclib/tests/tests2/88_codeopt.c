@@ -1,5 +1,3 @@
-/* Check some way in where code suppression caused various
-   miscompilations.  */
 extern int printf (const char *, ...);
 typedef __SIZE_TYPE__ size_t;
 
@@ -47,8 +45,7 @@ void bla(void)
 _Bool chk(unsigned long addr, unsigned long limit, unsigned long size)
 {
   _Bool ret;
-  /* This just needs to compile, no runtime test.  (And it doesn't compile
-     only with certain internal checking added that's not committed).  */
+
   if (0)
     ret = 0 != (!!(addr > limit - size));
   return 0;

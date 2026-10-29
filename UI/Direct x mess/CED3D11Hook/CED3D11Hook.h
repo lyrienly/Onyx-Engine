@@ -4,9 +4,9 @@
 #include "stdafx.h"
 
 typedef struct
-{	
+{
 	ID3D11ShaderResourceView *pTexture;
-	PFONTMAP DefinedFontMap; //Optional pointer to a fontmaparray if it's a font texture
+	PFONTMAP DefinedFontMap;
 } TextureData11, *PTextureData11;
 
 class DXMessD3D11Handler
@@ -16,19 +16,16 @@ private:
 
 	CRITICAL_SECTION cs;
 
-	IDXGISwapChain *swapchain;	
+	IDXGISwapChain *swapchain;
 	ID3D11Buffer *pSpriteVB;
 
-	int currentMaxCharacterCount; //holds the number of vertices in pSpriteVB divided by 6
+	int currentMaxCharacterCount;
 	ID3D11Buffer *pFontVB;
-	
 
 	int TextureCount;
 	TextureData11 *textures;
 
-	PTextureEntry tea; //texture entry area
-
-
+	PTextureEntry tea;
 
 	ID3D11PixelShader *pPixelShaderNormal;
 	ID3D11VertexShader *pVertexShader;
@@ -45,26 +42,23 @@ private:
 
 	ID3D11DeviceContext *RenderContext;
 
-
-
-
 	BOOL Valid;
 	BOOL UpdateTextures();
 
 	void SetupFontVertexBuffer(int count);
 	void DrawString(D3D11_VIEWPORT vp, PTextureData11 pFontTexture, char *s, int strlen);
 
-public:	
+public:
 	int snapshotCounter;
-	DWORD lastSnapshot; //tickcount when the last snapshot was made (so there's at least 250 ms between snapshots)	
+	DWORD lastSnapshot;
 	BOOL makeSnapshot;
 	BOOL smallSnapshot;
 	POINT smallSnapshotPoint;
 	POINTF smallSnapshotPointRelative;
-	RECT smallSnapshotClientRect; //in case the render target has a different size than the clientrect (e.g in games that fake a high fps by actually lowering the resolution without the user seeing the res change)
+	RECT smallSnapshotClientRect;
 
 	ID3D11Device *dev;
-	//ID3D11DeviceContext *dc;
+
 	ID3D11RasterizerState *pWireframeRasterizer;
 	ID3D11DepthStencilState *pDisabledDepthStencilState;
 
@@ -79,7 +73,6 @@ public:
 
 };
 
-
 typedef HRESULT		(__stdcall *D3D11_DRAWINDEXED_ORIGINAL)(ID3D11DeviceContext *dc, UINT IndexCount, UINT StartIndexLocation, INT BaseVertexLocation);
 typedef HRESULT		(__stdcall *D3D11_DRAW_ORIGINAL)(ID3D11DeviceContext *dc, UINT VertexCount, UINT StartVertexLocation);
 typedef HRESULT		(__stdcall *D3D11_DRAWINDEXEDINSTANCED_ORIGINAL)(ID3D11DeviceContext *dc, UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
@@ -91,7 +84,6 @@ HRESULT __stdcall D3D11Hook_Draw_imp(D3D11_DRAW_ORIGINAL originalfunction, ID3D1
 HRESULT __stdcall D3D11Hook_DrawIndexedInstanced_imp(D3D11_DRAWINDEXEDINSTANCED_ORIGINAL originalfunction, ID3D11DeviceContext *dc, UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation);
 HRESULT __stdcall D3D11Hook_DrawInstanced_imp(D3D11_DRAWINSTANCED_ORIGINAL originalfunction, ID3D11DeviceContext *dc, UINT VertexCountPerInstance, UINT InstanceCount, UINT StartVertexLocation, UINT StartInstanceLocation);
 HRESULT __stdcall D3D11Hook_DrawAuto_imp(D3D11_DRAWAUTO_ORIGINAL originalfunction, ID3D11DeviceContext *dc);
-            
 
 void __stdcall D3D11Hook_SwapChain_Present_imp(IDXGISwapChain *swapchain, ID3D11Device *device, PD3DHookShared shared);
 void __stdcall D3D11Hook_SwapChain_ResizeBuffers_imp(IDXGISwapChain *swapchain, ID3D11Device *device, PD3DHookShared shared);

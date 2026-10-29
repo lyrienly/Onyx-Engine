@@ -8,22 +8,6 @@ typedef UINT64 QWORD;
 
 #pragma pack(push)
 #pragma pack(1)
-/*
-typedef struct
-{
-  DWORD BTS_BufferBaseAddress;
-  DWORD BTS_IndexBaseAddress;
-  DWORD BTS_AbsoluteMaxAddress;
-  DWORD BTS_InterruptThresholdAddress;
-  DWORD PEBS_BufferBaseAddress;
-  DWORD PEBS_IndexBaseAddress;
-  DWORD PEBS_AbsoluteMaxAddress;
-  DWORD PEBS_InterruptThresholdAddress;
-  QWORD PEBS_CounterReset;
-  QWORD Reserved;
-  DWORD Reserved2;
-} DS_AREA_MANAGEMENT32,*PDS_AREA_MANAGEMENT32;
-*/
 
 typedef struct
 {
@@ -49,14 +33,8 @@ typedef struct
   QWORD Extra;
 } BTS,*PBTS;
 
-
-//#ifdef AMD64	
 typedef DS_AREA_MANAGEMENT64 DS_AREA_MANAGEMENT;
 typedef PDS_AREA_MANAGEMENT64 PDS_AREA_MANAGEMENT;
-//#else
-//typedef DS_AREA_MANAGEMENT32 DS_AREA_MANAGEMENT;	
-//typedef PDS_AREA_MANAGEMENT32 PDS_AREA_MANAGEMENT;	
-//#endif
 
 typedef struct
 {
@@ -71,7 +49,7 @@ typedef struct
 	UINT64 Block;
 	UINT64 CpuID;
 	UINT64 KernelAddress;
-	UINT64 Mdl; //go ahead, scream
+	UINT64 Mdl;
 } ULTIMAPDATAEVENT, *PULTIMAPDATAEVENT;
 
 NTSTATUS ultimap_continue(PULTIMAPDATAEVENT data);
@@ -83,10 +61,8 @@ void ultimap_resume();
 void ultimap_disable(void);
 void ultimap_flushBuffers(void);
 
-
-PDS_AREA_MANAGEMENT DS_AREA[256]; //used to store the addresses. (reading the msr that holds the DS_AREA is impossible with dbvm active)
+PDS_AREA_MANAGEMENT DS_AREA[256];
 int DS_AREA_SIZE;
-
 
 #pragma pack(pop)
 

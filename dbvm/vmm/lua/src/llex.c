@@ -1,14 +1,7 @@
-/*
-** $Id: llex.c,v 2.96.1.1 2017/04/19 17:20:42 roberto Exp $
-** Lexical Analyzer
-** See Copyright Notice in lua.h
-*/
-
 #define llex_c
 #define LUA_CORE
 
 #include "lprefix.h"
-
 
 #include <locale.h>
 #include <string.h>
@@ -27,16 +20,10 @@
 #include "ltable.h"
 #include "lzio.h"
 
-
-
 #define next(ls) (ls->current = zgetc(ls->z))
-
-
 
 #define currIsNewline(ls)	(ls->current == '\n' || ls->current == '\r')
 
-
-/* ORDER RESERVED */
 static const char *const luaX_tokens [] = {
     "and", "break", "do", "else", "elseif",
     "end", "false", "for", "function", "goto", "if",
@@ -47,12 +34,9 @@ static const char *const luaX_tokens [] = {
     "<number>", "<integer>", "<name>", "<string>"
 };
 
-
 #define save_and_next(ls) (save(ls, ls->current), next(ls))
 
-
 static l_noret lexerror (LexState *ls, const char *msg, int token);
-
 
 static void save (LexState *ls, int c) {
   Mbuffer *b = ls->buff;
@@ -66,33 +50,30 @@ static void save (LexState *ls, int c) {
   b->buffer[luaZ_bufflen(b)++] = cast(char, c);
 }
 
-
 void luaX_init (lua_State *L) {
   int i;
-  TString *e = luaS_newliteral(L, LUA_ENV);  /* create env name */
-  luaC_fix(L, obj2gco(e));  /* never collect this name */
+  TString *e = luaS_newliteral(L, LUA_ENV);
+  luaC_fix(L, obj2gco(e));
   for (i=0; i<NUM_RESERVED; i++) {
     TString *ts = luaS_new(L, luaX_tokens[i]);
-    luaC_fix(L, obj2gco(ts));  /* reserved words are never collected */
-    ts->extra = cast_byte(i+1);  /* reserved word */
+    luaC_fix(L, obj2gco(ts));
+    ts->extra = cast_byte(i+1);
   }
 }
 
-
 const char *luaX_token2str (LexState *ls, int token) {
-  if (token < FIRST_RESERVED) {  /* single-byte symbols? */
+  if (token < FIRST_RESERVED) {
     lua_assert(token == cast_uchar(token));
     return luaO_pushfstring(ls->L, "'%c'", token);
   }
   else {
     const char *s = luaX_tokens[token - FIRST_RESERVED];
-    if (token < TK_EOS)  /* fixed format (symbols and reserved words)? */
+    if (token < TK_EOS)
       return luaO_pushfstring(ls->L, "'%s'", s);
-    else  /* names, strings, and numerals */
+    else
       return s;
   }
 }
-
 
 static const char *txtToken (LexState *ls, int token) {
   switch (token) {
@@ -105,7 +86,6 @@ static const char *txtToken (LexState *ls, int token) {
   }
 }
 
-
 static l_noret lexerror (LexState *ls, const char *msg, int token) {
   msg = luaG_addinfo(ls->L, msg, ls->source, ls->linenumber);
   if (token)
@@ -113,75 +93,52 @@ static l_noret lexerror (LexState *ls, const char *msg, int token) {
   luaD_throw(ls->L, LUA_ERRSYNTAX);
 }
 
-
 l_noret luaX_syntaxerror (LexState *ls, const char *msg) {
   lexerror(ls, msg, ls->t.token);
 }
 
-
-/*
-** creates a new string and anchors it in scanner's table so that
-** it will not be collected until the end of the compilation
-** (by that time it should be anchored somewhere)
-*/
 TString *luaX_newstring (LexState *ls, const char *str, size_t l) {
   lua_State *L = ls->L;
-  TValue *o;  /* entry for 'str' */
-  TString *ts = luaS_newlstr(L, str, l);  /* create new string */
-  setsvalue2s(L, L->top++, ts);  /* temporarily anchor it in stack */
+  TValue *o;
+  TString *ts = luaS_newlstr(L, str, l);
+  setsvalue2s(L, L->top++, ts);
   o = luaH_set(L, ls->h, L->top - 1);
-  if (ttisnil(o)) {  /* not in use yet? */
-    /* boolean value does not need GC barrier;
-       table has no metatable, so it does not need to invalidate cache */
-    setbvalue(o, 1);  /* t[string] = true */
+  if (ttisnil(o)) {
+
+    setbvalue(o, 1);
     luaC_checkGC(L);
   }
-  else {  /* string already present */
-    ts = tsvalue(keyfromval(o));  /* re-use value previously stored */
+  else {
+    ts = tsvalue(keyfromval(o));
   }
-  L->top--;  /* remove string from stack */
+  L->top--;
   return ts;
 }
 
-
-/*
-** increment line number and skips newline sequence (any of
-** \n, \r, \n\r, or \r\n)
-*/
 static void inclinenumber (LexState *ls) {
   int old = ls->current;
   lua_assert(currIsNewline(ls));
-  next(ls);  /* skip '\n' or '\r' */
+  next(ls);
   if (currIsNewline(ls) && ls->current != old)
-    next(ls);  /* skip '\n\r' or '\r\n' */
+    next(ls);
   if (++ls->linenumber >= MAX_INT)
     lexerror(ls, "chunk has too many lines", 0);
 }
-
 
 void luaX_setinput (lua_State *L, LexState *ls, ZIO *z, TString *source,
                     int firstchar) {
   ls->t.token = 0;
   ls->L = L;
   ls->current = firstchar;
-  ls->lookahead.token = TK_EOS;  /* no look-ahead token */
+  ls->lookahead.token = TK_EOS;
   ls->z = z;
   ls->fs = NULL;
   ls->linenumber = 1;
   ls->lastline = 1;
   ls->source = source;
-  ls->envn = luaS_newliteral(L, LUA_ENV);  /* get env name */
-  luaZ_resizebuffer(ls->L, ls->buff, LUA_MINBUFFER);  /* initialize buffer */
+  ls->envn = luaS_newliteral(L, LUA_ENV);
+  luaZ_resizebuffer(ls->L, ls->buff, LUA_MINBUFFER);
 }
-
-
-
-/*
-** =======================================================
-** LEXICAL ANALYZER
-** =======================================================
-*/
-
 
 static int check_next1 (LexState *ls, int c) {
   if (ls->current == c) {
@@ -191,11 +148,6 @@ static int check_next1 (LexState *ls, int c) {
   else return 0;
 }
 
-
-/*
-** Check whether current char is in set 'set' (with two chars) and
-** saves it
-*/
 static int check_next2 (LexState *ls, const char *set) {
   lua_assert(set[2] == '\0');
   if (ls->current == set[0] || ls->current == set[1]) {
@@ -205,23 +157,17 @@ static int check_next2 (LexState *ls, const char *set) {
   else return 0;
 }
 
-
-/* LUA_NUMBER */
-/*
-** this function is quite liberal in what it accepts, as 'luaO_str2num'
-** will reject ill-formed numerals.
-*/
 static int read_numeral (LexState *ls, SemInfo *seminfo) {
   TValue obj;
   const char *expo = "Ee";
   int first = ls->current;
   lua_assert(lisdigit(ls->current));
   save_and_next(ls);
-  if (first == '0' && check_next2(ls, "xX"))  /* hexadecimal? */
+  if (first == '0' && check_next2(ls, "xX"))
     expo = "Pp";
   for (;;) {
-    if (check_next2(ls, expo))  /* exponent part? */
-      check_next2(ls, "-+");  /* optional exponent sign */
+    if (check_next2(ls, expo))
+      check_next2(ls, "-+");
     if (lisxdigit(ls->current))
       save_and_next(ls);
     else if (ls->current == '.')
@@ -229,7 +175,7 @@ static int read_numeral (LexState *ls, SemInfo *seminfo) {
     else break;
   }
   save(ls, '\0');
-  if (luaO_str2num(luaZ_buffer(ls->buff), &obj) == 0)  /* format error? */
+  if (luaO_str2num(luaZ_buffer(ls->buff), &obj) == 0)
     lexerror(ls, "malformed number", TK_FLT);
   if (ttisinteger(&obj)) {
     seminfo->i = ivalue(&obj);
@@ -242,12 +188,6 @@ static int read_numeral (LexState *ls, SemInfo *seminfo) {
   }
 }
 
-
-/*
-** skip a sequence '[=*[' or ']=*]'; if sequence is well formed, return
-** its number of '='s; otherwise, return a negative number (-1 iff there
-** are no '='s after initial bracket)
-*/
 static int skip_sep (LexState *ls) {
   int count = 0;
   int s = ls->current;
@@ -260,24 +200,23 @@ static int skip_sep (LexState *ls) {
   return (ls->current == s) ? count : (-count) - 1;
 }
 
-
 static void read_long_string (LexState *ls, SemInfo *seminfo, int sep) {
-  int line = ls->linenumber;  /* initial line (for error message) */
-  save_and_next(ls);  /* skip 2nd '[' */
-  if (currIsNewline(ls))  /* string starts with a newline? */
-    inclinenumber(ls);  /* skip it */
+  int line = ls->linenumber;
+  save_and_next(ls);
+  if (currIsNewline(ls))
+    inclinenumber(ls);
   for (;;) {
     switch (ls->current) {
-      case EOZ: {  /* error */
+      case EOZ: {
         const char *what = (seminfo ? "string" : "comment");
         const char *msg = luaO_pushfstring(ls->L,
                      "unfinished long %s (starting at line %d)", what, line);
         lexerror(ls, msg, TK_EOS);
-        break;  /* to avoid warnings */
+        break;
       }
       case ']': {
         if (skip_sep(ls) == sep) {
-          save_and_next(ls);  /* skip 2nd ']' */
+          save_and_next(ls);
           goto endloop;
         }
         break;
@@ -285,7 +224,7 @@ static void read_long_string (LexState *ls, SemInfo *seminfo, int sep) {
       case '\n': case '\r': {
         save(ls, '\n');
         inclinenumber(ls);
-        if (!seminfo) luaZ_resetbuffer(ls->buff);  /* avoid wasting space */
+        if (!seminfo) luaZ_resetbuffer(ls->buff);
         break;
       }
       default: {
@@ -299,15 +238,13 @@ static void read_long_string (LexState *ls, SemInfo *seminfo, int sep) {
                                      luaZ_bufflen(ls->buff) - 2*(2 + sep));
 }
 
-
 static void esccheck (LexState *ls, int c, const char *msg) {
   if (!c) {
     if (ls->current != EOZ)
-      save_and_next(ls);  /* add current to buffer for error message */
+      save_and_next(ls);
     lexerror(ls, msg, TK_STRING);
   }
 }
-
 
 static int gethexa (LexState *ls) {
   save_and_next(ls);
@@ -315,68 +252,63 @@ static int gethexa (LexState *ls) {
   return luaO_hexavalue(ls->current);
 }
 
-
 static int readhexaesc (LexState *ls) {
   int r = gethexa(ls);
   r = (r << 4) + gethexa(ls);
-  luaZ_buffremove(ls->buff, 2);  /* remove saved chars from buffer */
+  luaZ_buffremove(ls->buff, 2);
   return r;
 }
 
-
 static unsigned long readutf8esc (LexState *ls) {
   unsigned long r;
-  int i = 4;  /* chars to be removed: '\', 'u', '{', and first digit */
-  save_and_next(ls);  /* skip 'u' */
+  int i = 4;
+  save_and_next(ls);
   esccheck(ls, ls->current == '{', "missing '{'");
-  r = gethexa(ls);  /* must have at least one digit */
+  r = gethexa(ls);
   while ((save_and_next(ls), lisxdigit(ls->current))) {
     i++;
     r = (r << 4) + luaO_hexavalue(ls->current);
     esccheck(ls, r <= 0x10FFFF, "UTF-8 value too large");
   }
   esccheck(ls, ls->current == '}', "missing '}'");
-  next(ls);  /* skip '}' */
-  luaZ_buffremove(ls->buff, i);  /* remove saved chars from buffer */
+  next(ls);
+  luaZ_buffremove(ls->buff, i);
   return r;
 }
-
 
 static void utf8esc (LexState *ls) {
   char buff[UTF8BUFFSZ];
   int n = luaO_utf8esc(buff, readutf8esc(ls));
-  for (; n > 0; n--)  /* add 'buff' to string */
+  for (; n > 0; n--)
     save(ls, buff[UTF8BUFFSZ - n]);
 }
 
-
 static int readdecesc (LexState *ls) {
   int i;
-  int r = 0;  /* result accumulator */
-  for (i = 0; i < 3 && lisdigit(ls->current); i++) {  /* read up to 3 digits */
+  int r = 0;
+  for (i = 0; i < 3 && lisdigit(ls->current); i++) {
     r = 10*r + ls->current - '0';
     save_and_next(ls);
   }
   esccheck(ls, r <= UCHAR_MAX, "decimal escape too large");
-  luaZ_buffremove(ls->buff, i);  /* remove read digits from buffer */
+  luaZ_buffremove(ls->buff, i);
   return r;
 }
 
-
 static void read_string (LexState *ls, int del, SemInfo *seminfo) {
-  save_and_next(ls);  /* keep delimiter (for error messages) */
+  save_and_next(ls);
   while (ls->current != del) {
     switch (ls->current) {
       case EOZ:
         lexerror(ls, "unfinished string", TK_EOS);
-        break;  /* to avoid warnings */
+        break;
       case '\n':
       case '\r':
         lexerror(ls, "unfinished string", TK_STRING);
-        break;  /* to avoid warnings */
-      case '\\': {  /* escape sequences */
-        int c;  /* final character to be saved */
-        save_and_next(ls);  /* keep '\\' for error messages */
+        break;
+      case '\\': {
+        int c;
+        save_and_next(ls);
         switch (ls->current) {
           case 'a': c = '\a'; goto read_save;
           case 'b': c = '\b'; goto read_save;
@@ -391,10 +323,10 @@ static void read_string (LexState *ls, int del, SemInfo *seminfo) {
             inclinenumber(ls); c = '\n'; goto only_save;
           case '\\': case '\"': case '\'':
             c = ls->current; goto read_save;
-          case EOZ: goto no_save;  /* will raise an error next loop */
-          case 'z': {  /* zap following span of spaces */
-            luaZ_buffremove(ls->buff, 1);  /* remove '\\' */
-            next(ls);  /* skip the 'z' */
+          case EOZ: goto no_save;
+          case 'z': {
+            luaZ_buffremove(ls->buff, 1);
+            next(ls);
             while (lisspace(ls->current)) {
               if (currIsNewline(ls)) inclinenumber(ls);
               else next(ls);
@@ -403,67 +335,66 @@ static void read_string (LexState *ls, int del, SemInfo *seminfo) {
           }
           default: {
             esccheck(ls, lisdigit(ls->current), "invalid escape sequence");
-            c = readdecesc(ls);  /* digital escape '\ddd' */
+            c = readdecesc(ls);
             goto only_save;
           }
         }
        read_save:
          next(ls);
-         /* go through */
+
        only_save:
-         luaZ_buffremove(ls->buff, 1);  /* remove '\\' */
+         luaZ_buffremove(ls->buff, 1);
          save(ls, c);
-         /* go through */
+
        no_save: break;
       }
       default:
         save_and_next(ls);
     }
   }
-  save_and_next(ls);  /* skip delimiter */
+  save_and_next(ls);
   seminfo->ts = luaX_newstring(ls, luaZ_buffer(ls->buff) + 1,
                                    luaZ_bufflen(ls->buff) - 2);
 }
-
 
 static int llex (LexState *ls, SemInfo *seminfo) {
   luaZ_resetbuffer(ls->buff);
   for (;;) {
     switch (ls->current) {
-      case '\n': case '\r': {  /* line breaks */
+      case '\n': case '\r': {
         inclinenumber(ls);
         break;
       }
-      case ' ': case '\f': case '\t': case '\v': {  /* spaces */
+      case ' ': case '\f': case '\t': case '\v': {
         next(ls);
         break;
       }
-      case '-': {  /* '-' or '--' (comment) */
+      case '-': {
         next(ls);
         if (ls->current != '-') return '-';
-        /* else is a comment */
+
         next(ls);
-        if (ls->current == '[') {  /* long comment? */
+        if (ls->current == '[') {
           int sep = skip_sep(ls);
-          luaZ_resetbuffer(ls->buff);  /* 'skip_sep' may dirty the buffer */
+          luaZ_resetbuffer(ls->buff);
           if (sep >= 0) {
-            read_long_string(ls, NULL, sep);  /* skip long comment */
-            luaZ_resetbuffer(ls->buff);  /* previous call may dirty the buff. */
+            read_long_string(ls, NULL, sep);
+            luaZ_resetbuffer(ls->buff);
             break;
           }
         }
-        /* else short comment */
+
         while (!currIsNewline(ls) && ls->current != EOZ)
-          next(ls);  /* skip until end of line (or end of file) */
+          next(ls);
         break;
       }
-      case '[': {  /* long string or simply '[' */
+      case '[': {
         int sep = skip_sep(ls);
         if (sep >= 0) {
           read_long_string(ls, seminfo, sep);
           return TK_STRING;
         }
-        else if (sep != -1)  /* '[=...' missing second bracket */
+        else if (sep != -1)
           lexerror(ls, "invalid long string delimiter", TK_STRING);
         return '[';
       }
@@ -499,16 +430,16 @@ static int llex (LexState *ls, SemInfo *seminfo) {
         if (check_next1(ls, ':')) return TK_DBCOLON;
         else return ':';
       }
-      case '"': case '\'': {  /* short literal strings */
+      case '"': case '\'': {
         read_string(ls, ls->current, seminfo);
         return TK_STRING;
       }
-      case '.': {  /* '.', '..', '...', or number */
+      case '.': {
         save_and_next(ls);
         if (check_next1(ls, '.')) {
           if (check_next1(ls, '.'))
-            return TK_DOTS;   /* '...' */
-          else return TK_CONCAT;   /* '..' */
+            return TK_DOTS;
+          else return TK_CONCAT;
         }
         else if (!lisdigit(ls->current)) return '.';
         else return read_numeral(ls, seminfo);
@@ -521,7 +452,7 @@ static int llex (LexState *ls, SemInfo *seminfo) {
         return TK_EOS;
       }
       default: {
-        if (lislalpha(ls->current)) {  /* identifier or reserved word? */
+        if (lislalpha(ls->current)) {
           TString *ts;
           do {
             save_and_next(ls);
@@ -529,13 +460,13 @@ static int llex (LexState *ls, SemInfo *seminfo) {
           ts = luaX_newstring(ls, luaZ_buffer(ls->buff),
                                   luaZ_bufflen(ls->buff));
           seminfo->ts = ts;
-          if (isreserved(ts))  /* reserved word? */
+          if (isreserved(ts))
             return ts->extra - 1 + FIRST_RESERVED;
           else {
             return TK_NAME;
           }
         }
-        else {  /* single-char tokens (+ - / ...) */
+        else {
           int c = ls->current;
           next(ls);
           return c;
@@ -545,21 +476,18 @@ static int llex (LexState *ls, SemInfo *seminfo) {
   }
 }
 
-
 void luaX_next (LexState *ls) {
   ls->lastline = ls->linenumber;
-  if (ls->lookahead.token != TK_EOS) {  /* is there a look-ahead token? */
-    ls->t = ls->lookahead;  /* use this one */
-    ls->lookahead.token = TK_EOS;  /* and discharge it */
+  if (ls->lookahead.token != TK_EOS) {
+    ls->t = ls->lookahead;
+    ls->lookahead.token = TK_EOS;
   }
   else
-    ls->t.token = llex(ls, &ls->t.seminfo);  /* read next token */
+    ls->t.token = llex(ls, &ls->t.seminfo);
 }
-
 
 int luaX_lookahead (LexState *ls) {
   lua_assert(ls->lookahead.token == TK_EOS);
   ls->lookahead.token = llex(ls, &ls->lookahead.seminfo);
   return ls->lookahead.token;
 }
-

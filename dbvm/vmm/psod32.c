@@ -1,13 +1,3 @@
-/*
- * psod32.c
- *
- *  Created on: Feb 27, 2018
- *      Author: eric heijnen
- *
- *  A small test of mixing 32-bit code in with the 64-bit DBVM
- */
-
-//todo: instead of using reboot implement a call32() stub that switches to 32-bit, calls the function, and then return to the caller in 64-bit
 int PSOD32BitHandler()
 {
   int PMInfoBlock=0;
@@ -17,7 +7,7 @@ int PSOD32BitHandler()
   for (i=0; i<65536; i++)
   {
     bioscopy[i]=biossource[i];
-    //PMID
+
     if ((biossource[i]=='P') && (biossource[i]=='M') &&  (biossource[i]=='I') && (biossource[i]=='D'))
       PMInfoBlock=i;
   }
@@ -27,4 +17,3 @@ int PSOD32BitHandler()
 
   return 12;
 }
-

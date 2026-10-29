@@ -12,7 +12,6 @@
 
 #include "PipeServer.h"
 
-
 HANDLE DataCollectorThread;
 HANDLE SuicideThread;
 HINSTANCE g_hInstance;
@@ -33,7 +32,7 @@ typedef enum _THREADINFOCLASS {
     ThreadAmILastThread,
     ThreadIdealProcessor,
     ThreadPriorityBoost,
-    ThreadSetTlsArrayAddress,   // Obsolete
+    ThreadSetTlsArrayAddress,
     ThreadIsIoPending,
     ThreadHideFromDebugger,
     ThreadBreakOnTermination,
@@ -45,11 +44,11 @@ typedef enum _THREADINFOCLASS {
     ThreadPagePriority,
     ThreadActualBasePriority,
     ThreadTebInformation,
-    ThreadCSwitchMon,          // Obsolete
+    ThreadCSwitchMon,
     ThreadCSwitchPmu,
     ThreadWow64Context,
     ThreadGroupInformation,
-    ThreadUmsInformation,      // UMS
+    ThreadUmsInformation,
     ThreadCounterProfiling,
     ThreadIdealProcessorEx,
     MaxThreadInfoClass
@@ -79,8 +78,7 @@ FILE* CreateAndTestDebugConsole()
 DWORD WINAPI DataCollectorEntry(LPVOID lpThreadParameter)
 {
 	CPipeServer *pw;
-    
-    
+
 #ifdef _WINDOWS
 #ifdef NDEBUG
 	ZWSETINFORMATIONTHREAD ZwSetInformationThread=(ZWSETINFORMATIONTHREAD)GetProcAddress(GetModuleHandleA("ntdll.dll"), "ZwSetInformationThread");
@@ -89,12 +87,11 @@ DWORD WINAPI DataCollectorEntry(LPVOID lpThreadParameter)
 		int r=ZwSetInformationThread(GetCurrentThread(), ThreadHideFromDebugger, NULL, 0);
 		if (r!=0)
 		{
-			//OutputDebugStringA("No debug safety");
+
 		}
 	}
 #endif
 #endif
-
 
 	OutputDebugString("DataCollectorEntry\n");
 
@@ -112,7 +109,7 @@ DWORD WINAPI DataCollectorEntry(LPVOID lpThreadParameter)
 
     OutputDebugString("Destroying PipeServer\n");
 	DataCollectorThread=0;
-	delete pw;	
+	delete pw;
 
 #ifdef CUSTOM_DEBUG
     if (console)
@@ -124,7 +121,7 @@ DWORD WINAPI DataCollectorEntry(LPVOID lpThreadParameter)
 
 	if (SuicideThread)
 		TerminateThread(SuicideThread, 0);
-	
+
 	Sleep(1000);
 
 #ifdef _WINDOWS
@@ -139,15 +136,15 @@ DWORD WINAPI DataCollectorEntry(LPVOID lpThreadParameter)
 int logenabled=0;
 void MacPortEntryPoint(void *param)
 {
-    
+
     pthread_setname_np("MonoDataCollector Thread");
-    
+
     openlog((char*)"CEMDC", 0, LOG_USER);
     setlogmask(LOG_UPTO(LOG_DEBUG));
     logenabled=1;
-    
+
     DataCollectorEntry(param);
-    
+
 }
 #endif
 
@@ -162,32 +159,28 @@ DWORD WINAPI SuicideCheck(LPVOID lpThreadParameter)
 {
 
 	Sleep(5000);
-    
+
 #ifdef _WINDOWS
 
-	//todo: Figure out a way to detect how to close.
-	//if (shouldKillMyself())
-	
 	{
 
-	//pipe:=CreateFile(pchar('\\.\pipe\'+pipename), GENERIC_READ or GENERIC_WRITE, FILE_SHARE_READ or FILE_SHARE_WRITE, nil, OPEN_EXISTING, 0, 0);  
 		WCHAR datapipename[256];
 		swprintf(datapipename, 256,L"\\\\.\\pipe\\cemonodc_pid%d", GetCurrentProcessId());
 
 		HANDLE pipe;
-		pipe=CreateFileW(datapipename, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, 0);  
+		pipe=CreateFileW(datapipename, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, 0);
 		if ((pipe) && (pipe!=INVALID_HANDLE_VALUE))
 		{
 			unsigned char command=MONOCMD_TERMINATE;
 			DWORD bw;
-			WriteFile(pipe, &command, 1, &bw, NULL); 
+			WriteFile(pipe, &command, 1, &bw, NULL);
 			return 0;
 		}
 		else
 		{
 			TerminateThread(DataCollectorThread, -1);
 			FreeLibraryAndExitThread(g_hInstance, -1);
-		}		
+		}
 	}
 #endif
     return 0;

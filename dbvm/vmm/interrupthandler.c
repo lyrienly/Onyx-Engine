@@ -1,10 +1,3 @@
-/*
- * interrupthandler.c
- *
- *  Created on: May 10, 2020
- *      Author: eric
- */
-
 #include "interrupthandler.h"
 #include "distorm.h"
 #include "main.h"
@@ -21,10 +14,8 @@ criticalSection cinthandlerMenuCS={.name="cinthandlerMenuCS", .debuglevel=2};
 int IntHandlerDebug=0;
 int ClearDR6OnInterrupt=0;
 
-
 #define SETINT(INTNR) intvector[INTNR].wLowOffset=(WORD)(UINT64)inthandler##INTNR; \
                       intvector[INTNR].wHighOffset=(WORD)((UINT64)inthandler##INTNR >> 16);
-
 
 void setints(void)
 {
@@ -41,18 +32,17 @@ void setints(void)
     while(1);
   }
 
-
   zeromemory(intvector, 256*sizeof(INT_VECTOR));
   for (i=0; i<256; i++)
   {
     intvector[i].wSelector=80;
     intvector[i].bUnused=0;
-    intvector[i].bAccess=0x8e; //10001110
+    intvector[i].bAccess=0x8e;
   }
 
-  intvector[8].bUnused=1; //double fault
-  intvector[11].bUnused=1; //segment fault
-  intvector[12].bUnused=1; //stack fault
+  intvector[8].bUnused=1;
+  intvector[11].bUnused=1;
+  intvector[12].bUnused=1;
 
   SETINT(0);
   SETINT(1);
@@ -314,9 +304,7 @@ void setints(void)
   cLIDT(&tidt);
 }
 
-
-
-int cinthandler(unsigned long long *stack, int intnr) //todo: move to it's own sourcefile
+int cinthandler(unsigned long long *stack, int intnr)
 {
   PRFLAGS rflags;
   int errorcode=0;
@@ -326,7 +314,6 @@ int cinthandler(unsigned long long *stack, int intnr) //todo: move to it's own s
   int cpunr=0;
 
   thisAPICID=getAPICID();
- // nosendchar[getAPICID()]=0;
 
   enableserial();
 
@@ -342,7 +329,6 @@ int cinthandler(unsigned long long *stack, int intnr) //todo: move to it's own s
   {
 
     sendstringf("Invalid FS base during exception %d  CR2=%6!!\n",intnr, getCR2());
-
 
     if (intnr==13)
     {
@@ -372,31 +358,17 @@ int cinthandler(unsigned long long *stack, int intnr) //todo: move to it's own s
     if (cpuinfo->eptUpdated)
       ept_invalidate();
 
-
     return 0;
   }
 #endif
-
-
-  //debug, remove:
-  //if PIC_StillEnabled
-  //outportb(0x20,0x20);
-  //outportb(0xa0,0x20);
-
-
-  //apic_eoi();
-  //^^^
-
 
   UINT64 originalDR7=getDR7();
 
   if (intnr==1)
   {
-    //disable breakpoints
+
     setDR7(0ULL);
   }
-
-
 
 #ifdef CHECKAPICID
   if (thisAPICID!=cpuinfo->apicid)
@@ -408,25 +380,18 @@ int cinthandler(unsigned long long *stack, int intnr) //todo: move to it's own s
   }
 #endif
 
-
-
-
-
- // sendstringf("interrupt fired : %d (%x)\n\r", intnr,intnr);
-
   sendstringf("cpunr=%d (apicid=%d)\n\r",cpunr, thisAPICID);
   sendstringf("intnr=%d\n\r",intnr);
   sendstringf("rsp=%6\n\r",getRSP());
   sendstringf("cr2=%6\n\r",getCR2());
   errorcode=0;
 
-
   if ((stack[17]==80) && (stack[18]==80))
   {
-    //not sure...
+
     if ((stack[16]>=0x00400000) && (stack[16]<0x00800000))
     {
-      //in the region of the code of the vmm, so I guess it's no errorcode (and cs and eflags=80)
+
       errorcode=0;
     }
     else
@@ -465,15 +430,13 @@ int cinthandler(unsigned long long *stack, int intnr) //todo: move to it's own s
   }
   else
   {
-    //sendstringf("Interrupt has no errorcode\n\r");
+
   }
 
   sendstringf("rip=%x\n\r",stack[16+errorcode]);
   sendstringf("rflags=%x\n\r",stack[16+2+errorcode]);
 
-
   rflags=(PRFLAGS)&stack[16+2+errorcode];
-
 
   if ((intnr==2) && (rflags->IF==0))
   {
@@ -481,16 +444,7 @@ int cinthandler(unsigned long long *stack, int intnr) //todo: move to it's own s
     NMIcount++;
 
     cpuinfo->NMIOccured=2;
-    /*
 
-    //set up NMI window exiting
-
-    if (vmx_enableNMIWindowExiting()==0) //todo: test this code. I think it enters an invalid state
-    {
-      sendstringf("NMI handling: failed to set PBEF_NMI_WINDOW_EXITING.  Raising NMI like a retard\n");
-      cpuinfo->NMIOccured=2;
-    }
-    */
     ddDrawRectangle(0,DDVerticalResolution-100,100,100,0xff0000);
 
     return 0;
@@ -502,8 +456,8 @@ int cinthandler(unsigned long long *stack, int intnr) //todo: move to it's own s
 
   if (cpuinfo->OnException[0].RIP)
   {
-    //nosendchar[thisAPICID]=0;
-    sendstringf("OnException is set. Passing it to longjmp\n");  //no need to set rflags back, the original state contains that info
+
+    sendstringf("OnException is set. Passing it to longjmp\n");
 
     longjmp(cpuinfo->OnException, 0x100 | intnr);
 
@@ -521,8 +475,7 @@ int cinthandler(unsigned long long *stack, int intnr) //todo: move to it's own s
     stack[16+errorcode]=(QWORD)(cpuinfo->OnInterrupt.RIP);
     stack[19+errorcode]=(QWORD)(cpuinfo->OnInterrupt.RSP);
 
-    rflags->IF=0; //disable the IF flag in the eflags register stored on the stack (when called during checks if an int was pending)
-
+    rflags->IF=0;
 
     cpuinfo->LastInterrupt=(unsigned char)intnr;
     if (errorcode)
@@ -532,7 +485,7 @@ int cinthandler(unsigned long long *stack, int intnr) //todo: move to it's own s
     }
     cpuinfo->LastInterruptHasErrorcode=0;
 
-    cpuinfo->OnInterrupt.RIP=0; //clear exception handler
+    cpuinfo->OnInterrupt.RIP=0;
     cpuinfo->OnInterrupt.RBP=0;
     cpuinfo->OnInterrupt.RSP=0;
 
@@ -546,8 +499,6 @@ int cinthandler(unsigned long long *stack, int intnr) //todo: move to it's own s
   sendstring("not expected\n\r");
 
   ddDrawRectangle(0,DDVerticalResolution-100,100,100,0xff0000);
-
-
 
   sendstring("Status:\n\r");
   sendstringf("r15=%6\n\r",stack[0]);
@@ -577,15 +528,9 @@ int cinthandler(unsigned long long *stack, int intnr) //todo: move to it's own s
   {
     sendstringf("DR2=%6\n\r",getDR2());
   }
-  //16=errorcode/eip
-  //17=eip/cs
-  //18=cs/eflags
 
   sendstringf("eip=%6\n\r",stack[16+errorcode]);
   sendstringf("cs=%6\n\r",stack[17+errorcode]);
-
-
-
 
   sendDissectedFlags(rflags);
 
@@ -626,25 +571,19 @@ int cinthandler(unsigned long long *stack, int intnr) //todo: move to it's own s
                     disassembled[i].operands.p);
   }
 
-
-
   autostart=0;
   setDR7(originalDR7);
 
-
   sendstring("End of interrupt\n\r");
-
 
   if ((intnr==1) && (ClearDR6OnInterrupt))
     setDR6(0xffff0ff0);
 
-
 #ifdef DEBUGINTHANDLER
 
   csEnter(&cinthandlerMenuCS);
- // inthandleroverride=1;
-  IntHandlerDebug=1;
 
+  IntHandlerDebug=1;
 
   unsigned char key;
   while (1)
@@ -659,10 +598,8 @@ int cinthandler(unsigned long long *stack, int intnr) //todo: move to it's own s
 
     sendstring("p: Previous vmstates\n\r");
 
-
-
     key=waitforchar();
-    if (key==0xff) //serial port borked
+    if (key==0xff)
       key='1';
 
     switch (key)
@@ -690,8 +627,6 @@ int cinthandler(unsigned long long *stack, int intnr) //todo: move to it's own s
         break;
     }
   }
-
-
 
 #else
   return errorcode;

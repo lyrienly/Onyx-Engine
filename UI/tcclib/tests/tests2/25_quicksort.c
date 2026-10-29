@@ -2,7 +2,6 @@
 
 int array[16];
 
-//Swap integer values by array indexes
 void swap(int a, int b)
 {
    int tmp  = array[a];
@@ -10,8 +9,6 @@ void swap(int a, int b)
    array[b] = tmp;
 }
 
-//Partition the array into two halves and return the
-//index about which the array is partitioned
 int partition(int left, int right)
 {
    int pivotIndex = left;
@@ -33,7 +30,6 @@ int partition(int left, int right)
    return index;
 }
 
-//Quicksort the array
 void quicksort(int left, int right)
 {
    if(left >= right)
@@ -79,5 +75,3 @@ int main()
 
    return 0;
 }
-
-/* vim: set expandtab ts=4 sw=3 sts=3 tw=80 :*/

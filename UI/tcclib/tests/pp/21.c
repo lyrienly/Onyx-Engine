@@ -1,5 +1,3 @@
-/* accept 'defined' as result of substitution */
-
 ----- 1 ------
 #define AAA 2
 #define BBB

@@ -5,31 +5,19 @@
 #include "DBKFunc.h"
 #include "vmxhelper.h"
 
-/*
-#include "vmxhelper.h"
-#include "interruptHook.h"
-*/
-
 #ifdef TESTCOMPILE
-//small bypass to make test compiles function (this compiler doesn't have CLI/STI )
+
 void _enable() {}
 void _disable() {}
 #endif
 
-
 void forEachCpuPassive(PF f, UINT_PTR param)
-/*
-calls a specific function for each cpu that runs in passive mode
-*/
+
 {
 	CCHAR cpunr;
 	KAFFINITY cpus, original;
 	ULONG cpucount;
 
-	
-	//KeIpiGenericCall is not present in xp
-	
-	//count cpus first KeQueryActiveProcessorCount is not present in xp)
 	cpucount=0;
 	cpus=KeQueryActiveProcessors();
 	original=cpus;
@@ -38,7 +26,7 @@ calls a specific function for each cpu that runs in passive mode
 		if (cpus % 2)
 			cpucount++;
 
-		cpus=cpus / 2;		
+		cpus=cpus / 2;
 	}
 
 	cpus=KeQueryActiveProcessors();
@@ -47,35 +35,27 @@ calls a specific function for each cpu that runs in passive mode
 	{
 		if (cpus % 2)
 		{
-			//bit is set
+
 #if (NTDDI_VERSION >= NTDDI_VISTA)
 			KAFFINITY oldaffinity;
 #endif
 			KAFFINITY newaffinity;
-
-
-			
-			//DbgPrint("Calling passive function for cpunr %d\n", cpunr);
-			//set affinity
 
 			newaffinity=(KAFFINITY)(1 << cpunr);
 
 #if (NTDDI_VERSION >= NTDDI_VISTA)
 			oldaffinity=KeSetSystemAffinityThreadEx(newaffinity);
 #else
-			//XP and earlier (this routine is not called often, only when the user asks explicitly
+
 			{
 				LARGE_INTEGER delay;
-				delay.QuadPart=-50; //short wait just to be sure... (the docs do not say that a switch happens imeadiatly for the no Ex version)
-				
+				delay.QuadPart=-50;
+
 				KeSetSystemAffinityThread(newaffinity);
 				KeDelayExecutionThread(UserMode, FALSE, &delay);
 			}
 #endif
 
-
-
-			//call function
 			f(param);
 
 #if (NTDDI_VERSION >= NTDDI_VISTA)
@@ -97,9 +77,8 @@ void forOneCpu(CCHAR cpunr, PKDEFERRED_ROUTINE dpcfunction, PVOID DeferredContex
 {
 	PKDPC dpc;
 
-	if (preDPCCallback) //if preDPCCallback is set call it which may change the system arguments
+	if (preDPCCallback)
 		preDPCCallback(cpunr, dpcfunction, DeferredContext, &SystemArgument1, &SystemArgument2);
-	
 
 	dpc = ExAllocatePool(NonPagedPool, sizeof(KDPC));
 	KeInitializeDpc(dpc, dpcfunction, DeferredContext);
@@ -111,9 +90,7 @@ void forOneCpu(CCHAR cpunr, PKDEFERRED_ROUTINE dpcfunction, PVOID DeferredContex
 }
 
 void forEachCpu(PKDEFERRED_ROUTINE dpcfunction,  PVOID DeferredContext, PVOID  SystemArgument1, PVOID  SystemArgument2, OPTIONAL PPREDPC_CALLBACK preDPCCallback)
-/*
-calls a specified dpcfunction for each cpu on the system
-*/
+
 {
 	CCHAR cpunr;
 	KAFFINITY cpus;
@@ -121,10 +98,6 @@ calls a specified dpcfunction for each cpu on the system
 	PKDPC dpc;
 	int dpcnr;
 
-
-	//KeIpiGenericCall is not present in xp
-	
-	//count cpus first KeQueryActiveProcessorCount is not present in xp)
 	cpucount=0;
 	cpus=KeQueryActiveProcessors();
 	while (cpus)
@@ -132,12 +105,10 @@ calls a specified dpcfunction for each cpu on the system
 		if (cpus % 2)
 			cpucount++;
 
-		cpus=cpus / 2;		
+		cpus=cpus / 2;
 	}
 
 	dpc=ExAllocatePool(NonPagedPool, sizeof(KDPC)*cpucount);
-
-		
 
 	cpus=KeQueryActiveProcessors();
 	cpunr=0;
@@ -146,9 +117,6 @@ calls a specified dpcfunction for each cpu on the system
 	{
 		if (cpus % 2)
 		{
-			//bit is set
-			
-			//DbgPrint("Calling dpc routine for cpunr %d (dpc=%p)\n", cpunr, &dpc[dpcnr]);
 
 			if (preDPCCallback)
 				preDPCCallback(cpunr, dpcfunction, DeferredContext, &SystemArgument1, &SystemArgument2);
@@ -164,15 +132,11 @@ calls a specified dpcfunction for each cpu on the system
 		cpunr++;
 	}
 
-
 	ExFreePool(dpc);
 }
 
-
 void forEachCpuAsync(PKDEFERRED_ROUTINE dpcfunction, PVOID DeferredContext, PVOID  SystemArgument1, PVOID  SystemArgument2, OPTIONAL PPREDPC_CALLBACK preDPCCallback)
-/*
-calls a specified dpcfunction for each cpu on the system
-*/
+
 {
 	CCHAR cpunr;
 	KAFFINITY cpus;
@@ -180,11 +144,6 @@ calls a specified dpcfunction for each cpu on the system
 	PKDPC dpc;
 	int dpcnr;
 
-
-
-	//KeIpiGenericCall is not present in xp
-
-	//count cpus first KeQueryActiveProcessorCount is not present in xp)
 	cpucount = 0;
 	cpus = KeQueryActiveProcessors();
 	while (cpus)
@@ -204,15 +163,13 @@ calls a specified dpcfunction for each cpu on the system
 	{
 		if (cpus % 2)
 		{
-			//bit is set
 
-			//DbgPrint("Calling dpc routine for cpunr %d\n", cpunr);
-			if (preDPCCallback) //if preDPCCallback is set call it which may change the system arguments
+			if (preDPCCallback)
 				preDPCCallback(cpunr, dpcfunction, DeferredContext, &SystemArgument1, &SystemArgument2);
 
 			KeInitializeDpc(&dpc[dpcnr], dpcfunction, DeferredContext);
 			KeSetTargetProcessorDpc(&dpc[dpcnr], cpunr);
-			KeInsertQueueDpc(&dpc[dpcnr], SystemArgument1, SystemArgument2);			
+			KeInsertQueueDpc(&dpc[dpcnr], SystemArgument1, SystemArgument2);
 			dpcnr++;
 		}
 
@@ -222,22 +179,16 @@ calls a specified dpcfunction for each cpu on the system
 
 	KeFlushQueuedDpcs();
 
-
 	ExFreePool(dpc);
 }
 
-
-
-//own critical section implementation for use when the os is pretty much useless (dbvm tech)
 void spinlock(volatile LONG *lockvar)
 {
 	while (1)
 	{
 
-		//it was 0, let's see if we can set it to 1
-		//race who can set it to 1:
 		if (_InterlockedExchange((volatile LONG *)lockvar, 1)==0)
-			return; //lock aquired, else continue loop
+			return;
 
 		_mm_pause();
 
@@ -246,23 +197,22 @@ void spinlock(volatile LONG *lockvar)
 }
 
 void csEnter(PcriticalSection CS)
-{ 
+{
 	EFLAGS oldstate=getEflags();
-	
-	if ((CS->locked) && (CS->cpunr==cpunr())) 
-	{
-	    //already locked but the locker is this cpu, so allow, just increase lockcount
-	    CS->lockcount++;
-	    return; 
-	} 
 
-	disableInterrupts(); //disable interrupts to prevent taskswitch in same cpu
-	
-	spinlock(&(CS->locked)); //sets CS->locked to 1
-  
-	//here so the lock is aquired and locked is 1
+	if ((CS->locked) && (CS->cpunr==cpunr()))
+	{
+
+	    CS->lockcount++;
+	    return;
+	}
+
+	disableInterrupts();
+
+	spinlock(&(CS->locked));
+
 	CS->lockcount=1;
-	CS->cpunr=cpunr();  
+	CS->cpunr=cpunr();
 	CS->oldIFstate=oldstate.IF;
 }
 
@@ -273,17 +223,16 @@ void csLeave(PcriticalSection CS)
 	    CS->lockcount--;
 	    if (CS->lockcount==0)
 	    {
-			//unlock    
+
 			if (CS->oldIFstate)
-				enableInterrupts();				
+				enableInterrupts();
 
-			CS->cpunr=-1; //set to an cpunr
+			CS->cpunr=-1;
 			CS->locked=0;
-		} 
+		}
 	}
-	
-}
 
+}
 
 int getCpuCount(void)
 {
@@ -306,14 +255,14 @@ int isPrefix(unsigned char b)
 		case 0x26:
 		case 0x2e:
 		case 0x36:
-		case 0x3e:		
+		case 0x3e:
 		case 0x64:
 		case 0x65:
 		case 0x66:
 		case 0x67:
-		case 0xf0: //lock
-		case 0xf2: //repne
-		case 0xf3: //rep
+		case 0xf0:
+		case 0xf2:
+		case 0xf3:
 			return 1;
 
 		default:
@@ -330,10 +279,10 @@ UINT64 getDR7(void)
 }
 
 int cpunr(void)
-{	
+{
 	DWORD x[4];
 	__cpuid(&x[0],1);
-	
+
 	return (x[1] >> 24)+1;
 
 }
@@ -365,8 +314,6 @@ UINT64 getCR2(void)
 	return __readcr2();
 }
 
-
-
 void setCR3(UINT64 newCR3)
 {
 	__writecr3((UINT_PTR)newCR3);
@@ -376,8 +323,6 @@ UINT64 getCR3(void)
 {
 	return __readcr3();
 }
-
-
 
 void setCR4(UINT64 newcr4)
 {
@@ -418,7 +363,7 @@ UINT64 getTSC(void)
 }
 
 #ifndef AMD64
-//function declarations that can be done inline without needing an .asm file
+
 _declspec( naked ) WORD getSS(void)
 {
 	__asm
@@ -473,13 +418,12 @@ _declspec( naked ) WORD getGS(void)
 	}
 }
 
-
-_declspec( naked ) ULONG getRSP(void) //...
+_declspec( naked ) ULONG getRSP(void)
 {
 	__asm
 	{
 		mov eax,esp
-		add eax,4 //don't add this call
+		add eax,4
 		ret
 	}
 }
@@ -547,9 +491,8 @@ _declspec( naked ) unsigned short GetTR(void)
 	__asm{
 		STR AX
 		ret
-	}	
+	}
 }
-
 
 void GetGDT(PGDT pGdt)
 {
@@ -557,20 +500,19 @@ void GetGDT(PGDT pGdt)
     {
 		MOV EAX, [pGdt]
 	    SGDT [EAX]
-    }       
+    }
 }
 
 _declspec( naked )WORD GetLDT()
-{	
+{
 	__asm
-	{		
+	{
 		SLDT ax
 		ret
 	}
 }
 
 #endif
-
 
 typedef struct _KLDR_DATA_TABLE_ENTRY {
 	LIST_ENTRY InLoadOrderLinks;
@@ -708,38 +650,32 @@ ULONG64 TranslateVirtualToPhysicalWithCr3(ULONG64 cr3, ULONG64 VirtualAddress)
 	ULONG64 pt_idx    = (VirtualAddress >> 12) & 0x1FF;
 	ULONG64 offset    = VirtualAddress & 0xFFF;
 
-	// Level 4: PML4
 	ULONG64 pml4e = 0;
 	if (!ReadPhysicalChunk(pml4_base + (pml4_idx * 8), &pml4e, sizeof(pml4e)) || !(pml4e & 1))
 		return 0;
 
-	// Level 3: PDPT
 	ULONG64 pdpt_base = pml4e & 0x000FFFFFFFFFF000ULL;
 	ULONG64 pdpte = 0;
 	if (!ReadPhysicalChunk(pdpt_base + (pdpt_idx * 8), &pdpte, sizeof(pdpte)) || !(pdpte & 1))
 		return 0;
 
-	// 1 GB Large Page Check (PS = Bit 7)
 	if (pdpte & 0x80)
 	{
 		ULONG64 phys1gb = (pdpte & 0x000FFFFFC0000000ULL) | (VirtualAddress & 0x3FFFFFFFULL);
 		return IsPhysicalAddressSafe(phys1gb, 1) ? phys1gb : 0;
 	}
 
-	// Level 2: PD
 	ULONG64 pd_base = pdpte & 0x000FFFFFFFFFF000ULL;
 	ULONG64 pde = 0;
 	if (!ReadPhysicalChunk(pd_base + (pd_idx * 8), &pde, sizeof(pde)) || !(pde & 1))
 		return 0;
 
-	// 2 MB Large Page Check (PS = Bit 7)
 	if (pde & 0x80)
 	{
 		ULONG64 phys2mb = (pde & 0x000FFFFFFFE00000ULL) | (VirtualAddress & 0x1FFFFFULL);
 		return IsPhysicalAddressSafe(phys2mb, 1) ? phys2mb : 0;
 	}
 
-	// Level 1: PT
 	ULONG64 pt_base = pde & 0x000FFFFFFFFFF000ULL;
 	ULONG64 pte = 0;
 	if (!ReadPhysicalChunk(pt_base + (pt_idx * 8), &pte, sizeof(pte)))
@@ -747,13 +683,13 @@ ULONG64 TranslateVirtualToPhysicalWithCr3(ULONG64 cr3, ULONG64 VirtualAddress)
 
 	if (pte & 1)
 	{
-		// 4 KB Present Page
+
 		ULONG64 phys4kb = (pte & 0x000FFFFFFFFFF000ULL) | offset;
 		return IsPhysicalAddressSafe(phys4kb, 1) ? phys4kb : 0;
 	}
 	else
 	{
-		// Transition PTE Resolution (Bit 11 = 1, Bit 10 = 0) - Bypass Themida / VMProtect trap
+
 		if ((pte & (1ULL << 11)) && !(pte & (1ULL << 10)))
 		{
 			ULONG64 pfn = (pte >> 12) & 0x000000FFFFFFFFFFULL;
@@ -793,7 +729,7 @@ ULONG ResolveDirectoryTableBaseOffset(void)
 		}
 	}
 
-	g_DirectoryTableBaseOffset = 0x28; // Standard x64 KPROCESS.DirectoryTableBase
+	g_DirectoryTableBaseOffset = 0x28;
 	return 0x28;
 }
 
@@ -813,7 +749,6 @@ ULONG ResolveUserDirectoryTableBaseOffset(PEPROCESS Process)
 	ULONG dtbOffset = ResolveDirectoryTableBaseOffset();
 	UINT64 kernelCr3 = *(PUINT64)(p + dtbOffset) & 0x000FFFFFFFFFF000ULL;
 
-	// Search range for UserDirectoryTableBase (Win10 1803+ and Win11)
 	for (ULONG off = 0x270; off <= 0x450; off += sizeof(ULONG_PTR))
 	{
 		if (off == dtbOffset)
@@ -830,7 +765,7 @@ ULONG ResolveUserDirectoryTableBaseOffset(PEPROCESS Process)
 		}
 	}
 
-	g_UserDirectoryTableBaseOffset = 0x388; // Windows 10 2004+ / Windows 11 default
+	g_UserDirectoryTableBaseOffset = 0x388;
 	return 0x388;
 }
 
@@ -907,7 +842,7 @@ static ULONG ResolveVadRootOffset(PEPROCESS Process)
 	if (g_VadRootOffset != 0)
 		return g_VadRootOffset;
 
-	ULONG defaultOffset = 0x7d8; // Windows 10 (19041-19045) & Windows 11 (21H2-24H2)
+	ULONG defaultOffset = 0x7d8;
 	PVOID base = PsGetProcessSectionBaseAddress(Process);
 	if (!base)
 	{
@@ -1109,7 +1044,7 @@ BOOLEAN ReadProcessMemoryPhysicalCR3(PEPROCESS Process, ULONG64 VirtualAddress, 
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
 	{
-		// Intercept hardware fault, prevent BSOD
+
 	}
 
 	if (BytesRead)
@@ -1159,7 +1094,7 @@ BOOLEAN BulkDumpProcessMemoryPhysicalCR3(PEPROCESS Process, ULONG64 VirtualAddre
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
 	{
-		// Fault intercepted, do not BugCheck
+
 	}
 
 	if (BytesDumped)
@@ -1196,7 +1131,6 @@ BOOLEAN StealthReadProcessMemoryPTE(PEPROCESS Process, ULONG64 VirtualAddress, P
 			SIZE_T chunkSize = (bytesRemaining < bytesInPage) ? bytesRemaining : bytesInPage;
 			ULONG64 offset = currentVa & 0xFFF;
 
-			// Try direct translation first (including Transition PTE)
 			ULONG64 phys = TranslateVirtualToPhysicalCR3(Process, currentVa);
 			if (phys && IsPhysicalAddressSafe(phys, chunkSize))
 			{
@@ -1207,7 +1141,6 @@ BOOLEAN StealthReadProcessMemoryPTE(PEPROCESS Process, ULONG64 VirtualAddress, P
 				}
 			}
 
-			// Advanced Stealth: Walk page tables to locate PTE and perform transient flip
 			ULONG64 pml4_base = cr3 & 0x000FFFFFFFFFF000ULL;
 			ULONG64 pml4_idx  = (currentVa >> 39) & 0x1FF;
 			ULONG64 pdpt_idx  = (currentVa >> 30) & 0x1FF;
@@ -1279,13 +1212,12 @@ BOOLEAN StealthReadProcessMemoryPTE(PEPROCESS Process, ULONG64 VirtualAddress, P
 				{
 					if (!(original_pte & 1))
 					{
-						// Transient PTE flip: force Present (Bit 0 = 1)
+
 						ULONG64 patched_pte = original_pte | 1ULL;
 						WritePhysicalChunk(pte_entry_phys, &patched_pte, sizeof(patched_pte));
 
 						BOOLEAN readOk = ReadPhysicalChunk(candidatePhys, dest + totalRead, chunkSize);
 
-						// Revert PTE immediately
 						WritePhysicalChunk(pte_entry_phys, &original_pte, sizeof(original_pte));
 
 						if (readOk)
@@ -1311,7 +1243,7 @@ BOOLEAN StealthReadProcessMemoryPTE(PEPROCESS Process, ULONG64 VirtualAddress, P
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
 	{
-		// Fault intercepted
+
 	}
 
 	if (BytesRead)
@@ -1430,7 +1362,7 @@ ULONG StripProcessCallbacks(BOOLEAN Restore)
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
 	{
-		// Fault intercepted
+
 	}
 
 	return affected;
@@ -1526,7 +1458,7 @@ ULONG PatternScanProcessCR3(
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
 	{
-		// Fault intercepted
+
 	}
 
 	ExFreePoolWithTag(chunk, 'kbaS');
@@ -1647,7 +1579,7 @@ BOOLEAN WriteProcessMemoryPhysicalCR3(PEPROCESS Process, ULONG64 VirtualAddress,
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
 	{
-		// Intercept hardware fault, prevent BSOD
+
 	}
 
 	if (BytesWritten)
@@ -1659,38 +1591,38 @@ BOOLEAN WriteProcessMemoryPhysicalCR3(PEPROCESS Process, ULONG64 VirtualAddress,
 static DWORD ConvertVadProtection(ULONG VadProtection)
 {
 	static const DWORD ProtectionMap[32] = {
-		PAGE_NOACCESS,          // 0
-		PAGE_READONLY,          // 1
-		PAGE_EXECUTE,           // 2
-		PAGE_EXECUTE_READ,      // 3
-		PAGE_READWRITE,         // 4
-		PAGE_WRITECOPY,         // 5
-		PAGE_EXECUTE_READWRITE, // 6
-		PAGE_EXECUTE_WRITECOPY, // 7
-		PAGE_NOACCESS,          // 8
-		PAGE_NOCACHE | PAGE_READONLY,          // 9
-		PAGE_NOCACHE | PAGE_EXECUTE,           // 10
-		PAGE_NOCACHE | PAGE_EXECUTE_READ,      // 11
-		PAGE_NOCACHE | PAGE_READWRITE,         // 12
-		PAGE_NOCACHE | PAGE_WRITECOPY,         // 13
-		PAGE_NOCACHE | PAGE_EXECUTE_READWRITE, // 14
-		PAGE_NOCACHE | PAGE_EXECUTE_WRITECOPY, // 15
-		PAGE_NOACCESS,                         // 16
-		PAGE_GUARD | PAGE_READONLY,            // 17
-		PAGE_GUARD | PAGE_EXECUTE,             // 18
-		PAGE_GUARD | PAGE_EXECUTE_READ,        // 19
-		PAGE_GUARD | PAGE_READWRITE,           // 20
-		PAGE_GUARD | PAGE_WRITECOPY,           // 21
-		PAGE_GUARD | PAGE_EXECUTE_READWRITE,   // 22
-		PAGE_GUARD | PAGE_EXECUTE_WRITECOPY,   // 23
-		PAGE_NOACCESS,                         // 24
-		PAGE_WRITECOMBINE | PAGE_READONLY,     // 25
-		PAGE_WRITECOMBINE | PAGE_EXECUTE,      // 26
-		PAGE_WRITECOMBINE | PAGE_EXECUTE_READ, // 27
-		PAGE_WRITECOMBINE | PAGE_READWRITE,    // 28
-		PAGE_WRITECOMBINE | PAGE_WRITECOPY,    // 29
-		PAGE_WRITECOMBINE | PAGE_EXECUTE_READWRITE, // 30
-		PAGE_WRITECOMBINE | PAGE_EXECUTE_WRITECOPY  // 31
+		PAGE_NOACCESS,
+		PAGE_READONLY,
+		PAGE_EXECUTE,
+		PAGE_EXECUTE_READ,
+		PAGE_READWRITE,
+		PAGE_WRITECOPY,
+		PAGE_EXECUTE_READWRITE,
+		PAGE_EXECUTE_WRITECOPY,
+		PAGE_NOACCESS,
+		PAGE_NOCACHE | PAGE_READONLY,
+		PAGE_NOCACHE | PAGE_EXECUTE,
+		PAGE_NOCACHE | PAGE_EXECUTE_READ,
+		PAGE_NOCACHE | PAGE_READWRITE,
+		PAGE_NOCACHE | PAGE_WRITECOPY,
+		PAGE_NOCACHE | PAGE_EXECUTE_READWRITE,
+		PAGE_NOCACHE | PAGE_EXECUTE_WRITECOPY,
+		PAGE_NOACCESS,
+		PAGE_GUARD | PAGE_READONLY,
+		PAGE_GUARD | PAGE_EXECUTE,
+		PAGE_GUARD | PAGE_EXECUTE_READ,
+		PAGE_GUARD | PAGE_READWRITE,
+		PAGE_GUARD | PAGE_WRITECOPY,
+		PAGE_GUARD | PAGE_EXECUTE_READWRITE,
+		PAGE_GUARD | PAGE_EXECUTE_WRITECOPY,
+		PAGE_NOACCESS,
+		PAGE_WRITECOMBINE | PAGE_READONLY,
+		PAGE_WRITECOMBINE | PAGE_EXECUTE,
+		PAGE_WRITECOMBINE | PAGE_EXECUTE_READ,
+		PAGE_WRITECOMBINE | PAGE_READWRITE,
+		PAGE_WRITECOMBINE | PAGE_WRITECOPY,
+		PAGE_WRITECOMBINE | PAGE_EXECUTE_READWRITE,
+		PAGE_WRITECOMBINE | PAGE_EXECUTE_WRITECOPY
 	};
 
 	ULONG index = VadProtection & 0x1F;
@@ -1833,7 +1765,7 @@ NTSTATUS QueryProcessMemoryVad(PEPROCESS Process, ULONG64 VirtualAddress, PMEMOR
 			MemoryInfo->BaseAddress = startVpn << 12;
 			MemoryInfo->AllocationBase = MemoryInfo->BaseAddress;
 			MemoryInfo->RegionSize = ((endVpn - startVpn) + 1) << 12;
-			MemoryInfo->State = 0x1000; // MEM_COMMIT
+			MemoryInfo->State = 0x1000;
 
 			ULONG flags = *(PULONG)((PUCHAR)found + 0x30);
 			ULONG vadProt = flags & 0x1F;
@@ -1843,15 +1775,15 @@ NTSTATUS QueryProcessMemoryVad(PEPROCESS Process, ULONG64 VirtualAddress, PMEMOR
 			PVOID subsection = *(PVOID*)((PUCHAR)found + 0x48);
 			if (subsection && (ULONG_PTR)subsection > 0xFFFF800000000000ULL && MmIsAddressValid(subsection))
 			{
-				MemoryInfo->Type = 0x1000000; // MEM_IMAGE
+				MemoryInfo->Type = 0x1000000;
 			}
 			else if (flags & (1 << 7))
 			{
-				MemoryInfo->Type = 0x20000;   // MEM_PRIVATE
+				MemoryInfo->Type = 0x20000;
 			}
 			else
 			{
-				MemoryInfo->Type = 0x40000;   // MEM_MAPPED
+				MemoryInfo->Type = 0x40000;
 			}
 		}
 		else
@@ -1859,7 +1791,7 @@ NTSTATUS QueryProcessMemoryVad(PEPROCESS Process, ULONG64 VirtualAddress, PMEMOR
 			MemoryInfo->BaseAddress = VirtualAddress & ~0xFFFULL;
 			MemoryInfo->AllocationBase = 0;
 			MemoryInfo->AllocationProtect = 0;
-			MemoryInfo->State = 0x10000;    // MEM_FREE
+			MemoryInfo->State = 0x10000;
 			MemoryInfo->Protect = PAGE_NOACCESS;
 			MemoryInfo->Type = 0;
 
@@ -1881,7 +1813,6 @@ NTSTATUS QueryProcessMemoryVad(PEPROCESS Process, ULONG64 VirtualAddress, PMEMOR
 	return STATUS_SUCCESS;
 }
 
-
 static ULONG g_ProtectionOffset = 0;
 
 ULONG ResolveProcessProtectionOffset(VOID)
@@ -1900,7 +1831,7 @@ ULONG ResolveProcessProtectionOffset(VOID)
 	{
 		for (ULONG i = 0; i < 48; i++)
 		{
-			// Pattern 1: test byte ptr [rcx + disp32], 7 (F6 81 xx xx xx xx 07)
+
 			if (pfn[i] == 0xF6 && pfn[i + 1] == 0x81 && pfn[i + 6] == 0x07)
 			{
 				ULONG offset = *(PULONG)(pfn + i + 2);
@@ -1910,7 +1841,7 @@ ULONG ResolveProcessProtectionOffset(VOID)
 					return offset;
 				}
 			}
-			// Pattern 2: mov al, byte ptr [rcx + disp32] (8A 81 xx xx xx xx)
+
 			else if (pfn[i] == 0x8A && pfn[i + 1] == 0x81)
 			{
 				ULONG offset = *(PULONG)(pfn + i + 2);
@@ -1920,7 +1851,7 @@ ULONG ResolveProcessProtectionOffset(VOID)
 					return offset;
 				}
 			}
-			// Pattern 3: movzx eax, byte ptr [rcx + disp32] (0F B6 81 xx xx xx xx)
+
 			else if (pfn[i] == 0x0F && pfn[i + 1] == 0xB6 && pfn[i + 2] == 0x81)
 			{
 				ULONG offset = *(PULONG)(pfn + i + 3);
@@ -1961,7 +1892,7 @@ NTSTATUS SetProcessProtection(PEPROCESS Process, BOOLEAN Enable)
 		PUCHAR targetByte = (PUCHAR)Process + offset;
 		if (Enable)
 		{
-			// 0x72: Type = PsProtectedTypeProtectedLight (2), Signer = PsProtectedSignerWinTcb (7)
+
 			*targetByte = 0x72;
 		}
 		else
@@ -1976,9 +1907,6 @@ NTSTATUS SetProcessProtection(PEPROCESS Process, BOOLEAN Enable)
 
 	return STATUS_SUCCESS;
 }
-
-
-// --- Higienização de Rastros de Kernel (PiDDBCacheTable e MmUnloadedDrivers) ---
 
 typedef struct _PIDDB_CACHE_ENTRY
 {
@@ -2030,7 +1958,7 @@ static PVOID GetNtoskrnlBase(VOID)
 		return NULL;
 
 	ULONG size = 0;
-	pfnZwQuery(11, NULL, 0, &size); // 11 = SystemModuleInformation
+	pfnZwQuery(11, NULL, 0, &size);
 	if (size == 0)
 		return NULL;
 
@@ -2053,7 +1981,6 @@ static NTSTATUS CleanPiDDBCache(PVOID NtosBase)
 	if (!NtosBase)
 		return STATUS_NOT_FOUND;
 
-	// Inspeciona seções .text e PAGE de ntoskrnl para localizar a assinatura PiDDB
 	PUCHAR base = (PUCHAR)NtosBase;
 	PIMAGE_DOS_HEADER dos = (PIMAGE_DOS_HEADER)base;
 	if (dos->e_magic != IMAGE_DOS_SIGNATURE)
@@ -2068,7 +1995,7 @@ static NTSTATUS CleanPiDDBCache(PVOID NtosBase)
 
 	for (USHORT i = 0; i < nt->FileHeader.NumberOfSections; i++)
 	{
-		// Procura na seção PAGE
+
 		if (RtlEqualMemory(sec[i].Name, "PAGE", 4))
 		{
 			PUCHAR start = base + sec[i].VirtualAddress;
@@ -2076,10 +2003,10 @@ static NTSTATUS CleanPiDDBCache(PVOID NtosBase)
 
 			for (ULONG j = 0; j < size - 60; j++)
 			{
-				// ba 49 6f 43 70 (mov edx, 'pCoI')
+
 				if (start[j] == 0xBA && start[j + 1] == 0x49 && start[j + 2] == 0x6F && start[j + 3] == 0x43 && start[j + 4] == 0x70)
 				{
-					// Verifica presenca de lea rcx e call
+
 					if (start[j + 20] == 0x48 && start[j + 21] == 0x8D && start[j + 22] == 0x0D &&
 					    start[j + 37] == 0x48 && start[j + 38] == 0x8D && start[j + 39] == 0x0D)
 					{
@@ -2095,7 +2022,6 @@ static NTSTATUS CleanPiDDBCache(PVOID NtosBase)
 	if (!piddbSite)
 		return STATUS_NOT_FOUND;
 
-	// Extrai PiDDBLock e PiDDBCacheTable a partir dos deslocamentos RIP
 	LONG dispLock = *(PLONG)(piddbSite + 20 + 3);
 	PERESOURCE pLock = (PERESOURCE)(piddbSite + 20 + 7 + dispLock);
 
@@ -2114,7 +2040,6 @@ static NTSTATUS CleanPiDDBCache(PVOID NtosBase)
 	if (!pfnLookup || !pfnDelete)
 		return STATUS_NOT_SUPPORTED;
 
-	// Drivers para higienizar do cache
 	UNICODE_STRING targets[4];
 	RtlInitUnicodeString(&targets[0], L"lydumen.sys");
 	RtlInitUnicodeString(&targets[1], L"dbk64.sys");
@@ -2136,7 +2061,7 @@ static NTSTATUS CleanPiDDBCache(PVOID NtosBase)
 			PPIDDB_CACHE_ENTRY found = (PPIDDB_CACHE_ENTRY)pfnLookup(pTable, &lookupEntry);
 			if (found)
 			{
-				// Remove da lista encadeada interna se aplicável
+
 				if (found->List.Flink && found->List.Blink)
 				{
 					RemoveEntryList(&found->List);
@@ -2147,7 +2072,7 @@ static NTSTATUS CleanPiDDBCache(PVOID NtosBase)
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
 	{
-		// Blindagem SEH total
+
 	}
 
 	ExReleaseResourceLite(pLock);
@@ -2179,7 +2104,7 @@ static NTSTATUS CleanMmUnloadedDrivers(PVOID NtosBase)
 
 			for (ULONG j = 0; j < size - 40; j++)
 			{
-				// 48 8B 0D (....) 48 85 C9 0F 84 .... 8B 05 (....) 83 F8 32
+
 				if (start[j] == 0x48 && start[j + 1] == 0x8B && start[j + 2] == 0x0D &&
 				    start[j + 7] == 0x48 && start[j + 8] == 0x85 && start[j + 9] == 0xC9 &&
 				    start[j + 10] == 0x0F && start[j + 11] == 0x84 &&
@@ -2201,7 +2126,7 @@ static NTSTATUS CleanMmUnloadedDrivers(PVOID NtosBase)
 	PUNLOADED_DRIVER_ENTRY* pMmUnloadedDrivers = (PUNLOADED_DRIVER_ENTRY*)(unloadedSite + 7 + dispUnloaded);
 
 	if (!MmIsAddressValid(pMmUnloadedDrivers) || !*pMmUnloadedDrivers)
-		return STATUS_SUCCESS; // Array ainda não alocado
+		return STATUS_SUCCESS;
 
 	PUNLOADED_DRIVER_ENTRY driverArray = *pMmUnloadedDrivers;
 	if (!MmIsAddressValid(driverArray))
@@ -2225,7 +2150,7 @@ static NTSTATUS CleanMmUnloadedDrivers(PVOID NtosBase)
 			{
 				if (RtlCompareUnicodeString(&entry->Name, &targets[t], TRUE) == 0)
 				{
-					// Apaga o nome e zera a entrada
+
 					RtlZeroMemory(entry->Name.Buffer, entry->Name.MaximumLength);
 					RtlZeroMemory(entry, sizeof(UNLOADED_DRIVER_ENTRY));
 				}
@@ -2258,9 +2183,6 @@ NTSTATUS CleanKernelTraces(VOID)
 	return STATUS_UNSUCCESSFUL;
 }
 
-
-// --- Camuflagem Dinâmica de Dispositivo / Symbolic Link Cloaking ---
-
 extern UNICODE_STRING uszDeviceString;
 static WCHAR g_CloakedSymlinkBuffer[128] = { 0 };
 
@@ -2274,7 +2196,7 @@ NTSTATUS CloakDeviceSymlink(PCWSTR NewSymlinkName)
 
 	__try
 	{
-		// 1. Constrói o novo link simbólico em formato completo \DosDevices\<Nome>
+
 		UNICODE_STRING uNewLink;
 		WCHAR fullDosDevicesPath[128];
 		RtlZeroMemory(fullDosDevicesPath, sizeof(fullDosDevicesPath));
@@ -2291,18 +2213,15 @@ NTSTATUS CloakDeviceSymlink(PCWSTR NewSymlinkName)
 
 		RtlInitUnicodeString(&uNewLink, fullDosDevicesPath);
 
-		// 2. Localiza o DeviceObject de destino a partir do link atual ou alvo
 		UNICODE_STRING uTargetDevice;
 		RtlInitUnicodeString(&uTargetDevice, L"\\Device\\lydumen");
 
-		// Cria o novo link simbólico apontando para o DeviceObject do driver
 		NTSTATUS status = IoCreateSymbolicLink(&uNewLink, &uTargetDevice);
 		if (!NT_SUCCESS(status))
 		{
 			return status;
 		}
 
-		// 3. Remove o link simbólico antigo se for válido e diferente do novo
 		if (uszDeviceString.Buffer && uszDeviceString.Length > 0)
 		{
 			if (RtlCompareUnicodeString(&uszDeviceString, &uNewLink, TRUE) != 0)
@@ -2311,7 +2230,6 @@ NTSTATUS CloakDeviceSymlink(PCWSTR NewSymlinkName)
 			}
 		}
 
-		// 4. Atualiza uszDeviceString para o novo link para permitir unload limpo
 		RtlStringCchCopyW(g_CloakedSymlinkBuffer, 128, fullDosDevicesPath);
 		RtlInitUnicodeString(&uszDeviceString, g_CloakedSymlinkBuffer);
 
@@ -2322,9 +2240,6 @@ NTSTATUS CloakDeviceSymlink(PCWSTR NewSymlinkName)
 		return STATUS_UNSUCCESSFUL;
 	}
 }
-
-
-// --- Direct Physical RAM Scavenger (Zero CR3 Dependency) ---
 
 ULONG PhysicalRamScavenge(
 	ULONG64 StartPhysAddr,
@@ -2350,7 +2265,6 @@ ULONG PhysicalRamScavenge(
 	if (g_SafePhysicalRangeCount == 0)
 		return 0;
 
-	// Aloca buffer de varredura seguro de 64 KB
 	const SIZE_T CHUNK_SIZE = 64 * 1024;
 	PUCHAR chunk = (PUCHAR)ExAllocatePoolWithTag(DBK_POOL_NX, CHUNK_SIZE, 'vaCS');
 	if (!chunk)
@@ -2369,7 +2283,6 @@ ULONG PhysicalRamScavenge(
 			ULONG64 rangeBase = g_SafePhysicalRanges[r].BaseAddress;
 			ULONG64 rangeEnd  = g_SafePhysicalRanges[r].EndAddress;
 
-			// Pula faixas anteriores ao ponto de início
 			if (rangeEnd <= currentPhys)
 				continue;
 
@@ -2409,7 +2322,7 @@ ULONG PhysicalRamScavenge(
 				SIZE_T limit = toRead - PatternLength + 1;
 				for (SIZE_T i = 0; i < limit; i++)
 				{
-					// Pré-filtro rápido no primeiro byte
+
 					if ((chunk[i] & firstMask) != (firstByte & firstMask))
 						continue;
 
@@ -2451,7 +2364,7 @@ ULONG PhysicalRamScavenge(
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
 	{
-		// Intercepta qualquer falha de hardware / MMIO
+
 	}
 
 	ExFreePoolWithTag(chunk, 'vaCS');
@@ -2461,9 +2374,6 @@ ULONG PhysicalRamScavenge(
 
 	return matchCount;
 }
-
-
-// --- Automação Multi-Page de EPT Shadow Paging ---
 
 NTSTATUS CloakRegionMemory(PEPROCESS Process, ULONG64 VirtualAddress, PVOID Buffer, ULONG Size)
 {
@@ -2489,15 +2399,13 @@ NTSTATUS CloakRegionMemory(PEPROCESS Process, ULONG64 VirtualAddress, PVOID Buff
 			ULONG bytesRemaining = Size - written;
 			ULONG chunkSize = (bytesRemaining < bytesInPage) ? bytesRemaining : bytesInPage;
 
-			// 1. Ativa a camuflagem EPT na página se ainda não estiver ativa
 			NTSTATUS status = CloakProcessPage(Process, currentVa);
 			if (!NT_SUCCESS(status) && status != STATUS_IMAGE_ALREADY_LOADED)
 			{
-				// Se falhar a ativação EPT da página, aborta
+
 				break;
 			}
 
-			// 2. Grava o payload/patch diretamente na página de execução física (Execute View)
 			status = WriteCloakedPageMemory(Process, currentVa, src + written, chunkSize);
 			if (!NT_SUCCESS(status))
 			{
@@ -2542,7 +2450,7 @@ ULONG ResolveActiveProcessLinksOffset(void)
 		}
 	}
 
-	g_ActiveProcessLinksOffset = 0x448; // Default Win10/Win11 x64
+	g_ActiveProcessLinksOffset = 0x448;
 	return 0x448;
 }
 

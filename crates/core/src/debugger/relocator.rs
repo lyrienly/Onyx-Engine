@@ -1,4 +1,3 @@
-
 use crate::debugger::disasm::{DecodedInsn, Disassembler};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

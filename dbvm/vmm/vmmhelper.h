@@ -7,7 +7,6 @@
 #include "eptstructs.h"
 #include "exports.h"
 
-
 extern int vmxstartup;
 extern int vmxstartup_end;
 
@@ -20,8 +19,6 @@ extern PPDPTE_PAE pagedirlvl4;
 int debugmode,breakpointset;
 int globals_have_been_configured;
 
-
-//global int 1 redirection vars
 int int1redirection;
 int int1redirection_idtbypass;
 UINT64 int1redirection_idtbypass_cs;
@@ -37,8 +34,7 @@ int int14redirection_idtbypass;
 UINT64 int14redirection_idtbypass_cs;
 UINT64 int14redirection_idtbypass_rip;
 
-
-typedef struct _vmregisters /* DO NOT CHANGE THIS ORDER */
+typedef struct _vmregisters
 {
   UINT64         r15;
   UINT64         r14;
@@ -54,8 +50,8 @@ typedef struct _vmregisters /* DO NOT CHANGE THIS ORDER */
   UINT64         rdx;
   UINT64         rcx;
   UINT64         rbx;
-  UINT64         rax; //not valid in AMD
-  //UINT64         amd_savedfsbase;
+  UINT64         rax;
+
 } VMRegisters;
 
 #ifdef DEBUG
@@ -91,7 +87,6 @@ typedef struct _vmstate
   DWORD idtvector_information;
   DWORD idtvector_error;
 
-  //exit
   WORD exit_cs;
   WORD exit_ss;
   UINT64 exit_cs_base;
@@ -107,44 +102,43 @@ int vmstates_pos;
 
 #endif
 
-typedef struct _vmxhoststate //structure for easy management of hoststates
+typedef struct _vmxhoststate
 {
-  WORD ES; //0xc00
-  WORD CS; //0xc02
-  WORD SS; //0xc04
-  WORD DS; //0xc06
-  WORD FS; //0xc08
-  WORD GS; //0xc0a
-  WORD TR; //0xc0c
+  WORD ES;
+  WORD CS;
+  WORD SS;
+  WORD DS;
+  WORD FS;
+  WORD GS;
+  WORD TR;
 
-  QWORD IA32_PAT; //0x2C00
-  QWORD IA32_EFER; //0x2C02
-  QWORD IA32_PERF_GLOBAL_CTRL;//0x2c04
+  QWORD IA32_PAT;
+  QWORD IA32_EFER;
+  QWORD IA32_PERF_GLOBAL_CTRL;
 
-  DWORD IA32_SYSENTER_CS; //0x4c00
+  DWORD IA32_SYSENTER_CS;
 
-  QWORD CR0; //0x6c00
-  QWORD CR3; //0x6c02
-  QWORD CR4; //0x6c04
+  QWORD CR0;
+  QWORD CR3;
+  QWORD CR4;
 
-  QWORD FS_BASE; //0x6c06
-  QWORD GS_BASE; //0x6c08
-  QWORD TR_BASE; //0x6c0a
-  QWORD GDTR_BASE; //0x6c0c ( limit will be 0xffff)
-  QWORD IDTR_BASE; //0x6c0e
+  QWORD FS_BASE;
+  QWORD GS_BASE;
+  QWORD TR_BASE;
+  QWORD GDTR_BASE;
+  QWORD IDTR_BASE;
 
-  QWORD IA32_SYSENTER_ESP; //0x6c10
-  QWORD IA32_SYSENTER_EIP; //0x6c12
+  QWORD IA32_SYSENTER_ESP;
+  QWORD IA32_SYSENTER_EIP;
 
-  QWORD RSP; //0x6c14
-  QWORD RIP; //0x6c16
+  QWORD RSP;
+  QWORD RIP;
 
-  QWORD IA32_S_CET; //0x6c18
-  QWORD SSP; //0x6c1a
-  QWORD IA32_INTERRUPT_SSP_TABLE_ADDR; //0x6c1c
-  QWORD IA32_PKRS; //0x2c06
+  QWORD IA32_S_CET;
+  QWORD SSP;
+  QWORD IA32_INTERRUPT_SSP_TABLE_ADDR;
+  QWORD IA32_PKRS;
 } vmxhoststate, *pvmxhoststate;
-
 
 typedef struct _EXITINTINFO
 {
@@ -224,15 +218,15 @@ typedef volatile struct _vmcb
 	};
 
 	BYTE reserved1[40];
-	WORD  PauseFilterThreshold; //3c = correct
+	WORD  PauseFilterThreshold;
 	WORD  PauseFilterCount;
-	QWORD IOPM_BASE_PA; //physical base address of IOPM
+	QWORD IOPM_BASE_PA;
 	QWORD MSRPM_BASE_PA;
 	QWORD TSC_OFFSET;
-	DWORD GuestASID; //58=correct
+	DWORD GuestASID;
 	BYTE  TLB_CONTROL;
 	BYTE  reserved2[3];
-	BYTE  V_TPR;  //60=correct
+	BYTE  V_TPR;
 	unsigned V_IRQ : 1;
 	unsigned V_GIF : 1;
 	unsigned reserved4: 6;
@@ -243,9 +237,8 @@ typedef volatile struct _vmcb
 	unsigned V_GIF_ENABLED : 1;
 	unsigned reserved6: 5;
 	unsigned AVIC_ENABLED: 1;
-	BYTE  V_INTR_VECTOR; //64=correct
+	BYTE  V_INTR_VECTOR;
 	unsigned reserved6_1: 24;
-
 
 	union{
 	  QWORD InterruptShadow;
@@ -254,13 +247,13 @@ typedef volatile struct _vmcb
 	  };
 	};
 
-	QWORD EXITCODE; //70 correct
-	QWORD EXITINFO1;  //78
-	QWORD EXITINFO2;  //80
+	QWORD EXITCODE;
+	QWORD EXITINFO1;
+	QWORD EXITINFO2;
 	QWORD EXITINTINFO;
 
 	union{
-	  QWORD Enable_Nested_Paging;  //90 correct
+	  QWORD Enable_Nested_Paging;
 	  struct {
 	    unsigned NP_ENABLE :1;
 	  };
@@ -268,7 +261,6 @@ typedef volatile struct _vmcb
 
 	BYTE reserved7[16];
 
-	//a8
 	union {
 	  QWORD EVENTINJ;
 	  struct {
@@ -280,7 +272,7 @@ typedef volatile struct _vmcb
 	    DWORD    inject_ERRORCODE;
 	  };
 	};
-	QWORD N_CR3; //nested paging
+	QWORD N_CR3;
 
 	union{
 	  QWORD Enable_LBR_Virtualization;
@@ -292,14 +284,12 @@ typedef volatile struct _vmcb
 	DWORD VMCB_CLEAN_BITS;
 	DWORD reserved8;
 
-	QWORD nRIP;  //c8
+	QWORD nRIP;
 	BYTE NumberOfBytesFetched;
 	BYTE GuestInstructionBytes[15];
-	//E0
+
 	BYTE reserved9[800];
 
-	//400:
-    //State Save Area
     WORD  es_selector;
     WORD  es_attrib;
     DWORD es_limit;
@@ -362,57 +352,52 @@ typedef volatile struct _vmcb
     QWORD DR7;
     QWORD DR6;
     QWORD RFLAGS;
-    QWORD RIP; //0x578
+    QWORD RIP;
 
     BYTE reserved13[88];
-    QWORD RSP; //5d8
+    QWORD RSP;
 
-    BYTE reserved14[24];  //5e0
-    QWORD RAX; //5f8
-    QWORD STAR; //600
-    QWORD LSTAR; //608
-    QWORD CSTAR; //610
-    QWORD SFMASK; //618
-    QWORD KernelGsBase; //620
-    QWORD SYSENTER_CS; //628
-    QWORD SYSENTER_ESP; //630
-    QWORD SYSENTER_EIP; //638
-    QWORD CR2; //640
+    BYTE reserved14[24];
+    QWORD RAX;
+    QWORD STAR;
+    QWORD LSTAR;
+    QWORD CSTAR;
+    QWORD SFMASK;
+    QWORD KernelGsBase;
+    QWORD SYSENTER_CS;
+    QWORD SYSENTER_ESP;
+    QWORD SYSENTER_EIP;
+    QWORD CR2;
 
-    BYTE reserved15[32]; //648
-    QWORD G_PAT;  //0x668
+    BYTE reserved15[32];
+    QWORD G_PAT;
     QWORD DBGCTL;
     QWORD BR_FROM;
     QWORD BR_TO;
     QWORD LASTEXCPFROM;
-    QWORD LASTEXCPTO; //690
-
+    QWORD LASTEXCPTO;
 
 } __attribute__((__packed__)) vmcb, *pvmcb;
 
 typedef struct _singlestepreason
 {
   int Reason;
-      //1=EPT watch event single step (Restore page back to non write/ non  read)
-      //2=EPT cloak event (Put the old executable page back and mark as non read/write)
-      //3=change reg on bp event (restored the int3 bp (0xcc))
 
+  int ID;
 
-  int ID; //index of the array used for this reason (watchlist, cloaklist, changeregonbplist) (About to become obsolete and replaced by the data pointer)
-
-  void* Data; //pointer to the object for this reason (watchlist, cloaklist, changeregonbplist)
+  void* Data;
 } SingleStepReason, *PSingleStepReason;
 
 typedef void(*NMICallBack)(void* self);
 
 typedef volatile struct tcpuinfo
 {
-  volatile struct tcpuinfo *self; //pointer to itself (must be offset 0)
-  volatile struct tcpuinfo *next; //must be offset 0x8
-  DWORD guest_error; //must be offset 0x10
-  DWORD cpunr; //must be offset 0x14
-  QWORD lasttsc; //must be offset 0x18
-  QWORD totaltsctaken; //must be offset 0x20
+  volatile struct tcpuinfo *self;
+  volatile struct tcpuinfo *next;
+  DWORD guest_error;
+  DWORD cpunr;
+  QWORD lasttsc;
+  QWORD totaltsctaken;
   QWORD lastTSCTouch;
   QWORD lowestTSC;
   DWORD active;
@@ -420,47 +405,40 @@ typedef volatile struct tcpuinfo
 
   DWORD hasIF;
   UINT64 guestCR0;
-  UINT64 guestCR3; //realmode emu
+  UINT64 guestCR3;
   char  isboot;
   char  command;
   char  vmxsetup;
   char  invalidcs;
 
+  int   int1happened;
+  int   int3happened;
+  int   int14happened;
 
-  int   int1happened; //set if it has just redirected a interrupt, cleared by vmcall query command
-  int   int3happened; //'  '  '
-  int   int14happened; //'  '  '
-
-  /* the TS elements are used for transition from protected mode to real and back, since that changes the TS temporarily */
   WORD  TSsegment;
   UINT64 TSbase;
   DWORD TSlimit;
   DWORD TSaccessRights;
 
-
-
-  unsigned long long sysenter_CS; //what the guest sees
+  unsigned long long sysenter_CS;
   unsigned long long sysenter_EIP;
   unsigned long long sysenter_ESP;
 
   int   hidden_sysenter_modification;
-  unsigned long long actual_sysenter_CS; //what is actually is
+  unsigned long long actual_sysenter_CS;
   unsigned long long actual_sysenter_EIP;
   unsigned long long actual_sysenter_ESP;
   unsigned long long efer;
 
-
   void *vmcb_host;
-  UINT64 vmcb_host_pa; //separate storage for host info (not vmcb_host)
+  UINT64 vmcb_host_pa;
 
-  pvmcb vmcb; //AMD's virtual machine control_block. Give the physical address of this to VMRUN
+  pvmcb vmcb;
   UINT64 vmcb_PA;
 
-  UINT64 guest_VM_HSAVE_PA; //the current VM_HSAVE_PA according to the guest
+  UINT64 guest_VM_HSAVE_PA;
   int vmcb_GIF;
   unsigned char vmcb_pending[16];
-
-
 
   void* vmxon_region;
   void* vmcs_region;
@@ -468,10 +446,8 @@ typedef volatile struct tcpuinfo
 
   PPTE_PAE mappagetables;
 
-  UINT64 Previous_Interuptability_State; //used for the block/unblock interrupts vmcall
+  UINT64 Previous_Interuptability_State;
   int    Previous_CLI;
-
-
 
   struct {
     UINT64 IDTBase;
@@ -481,7 +457,7 @@ typedef volatile struct tcpuinfo
   } RealMode;
 
   struct {
-    int cr3_change_callback; //=1 when a callback has been registered
+    int cr3_change_callback;
     int called_callback;
 
     int calling_convention;
@@ -492,7 +468,6 @@ typedef volatile struct tcpuinfo
 
     UINT64 rip;
 
-    //saved state before the callback as made
     UINT64 rax;
     UINT64 rbx;
     UINT64 rcx;
@@ -549,12 +524,12 @@ typedef volatile struct tcpuinfo
 
   struct
   {
-    int Active; //set to 1 when active
-    QWORD CR3; //Holds the CR3 value to watch taskswitch to and from
-    QWORD DEBUGCTL; //Holds the DebugCTL value to set when inside the target process
-    QWORD DS_AREA; //Holds the DS_AREA to set when
-    QWORD OriginalDebugCTL; //When inside the target process this holds the debugctl that was set before entering. Return this on readMSR (and set with writeMSR when inside the process)
-    QWORD OriginalDS_AREA; //When inside the target process this holds the DS_AREA that was set before entering. Return this with readMSR ('''')
+    int Active;
+    QWORD CR3;
+    QWORD DEBUGCTL;
+    QWORD DS_AREA;
+    QWORD OriginalDebugCTL;
+    QWORD OriginalDS_AREA;
 
 #ifdef ULTIMAPDEBUG
     QWORD CR3_switchcount;
@@ -570,79 +545,66 @@ typedef volatile struct tcpuinfo
       QWORD LastIgnoredPageFault;
   } IgnorePageFaults;
 
-
-  //Host-only fields:
-  //field for exception handling
   struct
   {
-      QWORD RIP;  //if set go to this address on return from any interrupt
+      QWORD RIP;
       QWORD RBP;
       QWORD RSP;
-  } OnInterrupt; //obsolete , switch over to OnException
+  } OnInterrupt;
 
   jmp_buf OnException;
   QWORD LastExceptionRIP;
-
 
   unsigned char LastInterrupt;
   unsigned char LastInterruptHasErrorcode;
   WORD LastInterruptErrorcode;
 
-  int NMIOccured; //set to not 0 if an NMI triggered while inside the VMX event handler (this means that before vmresume, raise the NMI interrupt)
+  int NMIOccured;
 
-  struct //extra data about guest state VMX features (every cpu gets their own)
+  struct
   {
     int insideVMXRootMode;
     QWORD guest_vmxonaddress;
-    QWORD guest_activeVMCS; //the VMCS the guest thinks it is. (usually the same with some modification)
-
+    QWORD guest_activeVMCS;
 
     struct
     {
       QWORD VMCS_PhysicalAddress;
       DWORD *VMCS_VirtualAddress;
-      //actual address in case I make a real shadow copy
+
     } mappedVMCSBlocks[10];
-    int mappedVMCSBlocks_nextIndex; //index % 10.  If not found and no free one is left, use this entry to pick one to free and then increment with 1
+    int mappedVMCSBlocks_nextIndex;
 
-
-
-
-    int currenterrorcode; //if not 0, return this errorcode on vmread
-    vmxhoststate originalhoststate;  //saved hoststate (used by emulateVMExit)
+    int currenterrorcode;
+    vmxhoststate originalhoststate;
     vmxhoststate dbvmhoststate;
-    int runningvmx; //1 if the previous call was a vmlaunch/vmresume and no vmexit happened yet
+    int runningvmx;
 
   } vmxdata;
 
   QWORD EPTPML4;
-  criticalSection EPTPML4CS; // since other cpu's can map in pages for other cpu's as well, use a CS
-  /*
-  PEPT_PTE *eptCloakList; //pointer to the EPT entry of the index related to CloakedPages
-  int eptCloakListLength;
-  */
+  criticalSection EPTPML4CS;
+
   int eptCloak_LastOperationWasWrite;
   QWORD eptCloak_LastWriteOffset;
 
-  PEPT_PTE *eptWatchList; //pointer to the EPT entry of the index related to the WatchList
+  PEPT_PTE *eptWatchList;
   int eptWatchListLength;
   int eptUpdated;
 
+  struct
+  {
+    CloakedPageData *ActiveRegion;
+    QWORD LastCloakedVirtualBase;
+  } NP_Cloak;
 
   struct
   {
-    CloakedPageData *ActiveRegion; //if not null this contains the current page that is executable
-    QWORD LastCloakedVirtualBase;
-  } NP_Cloak; //AMD cloaking
-
-
-  struct //single stepping data
-  {
     int Method;
     int PreviousTFState;
-    QWORD PreviousEFER; //AMD single step
+    QWORD PreviousEFER;
     QWORD PreviousFMASK;
-    int LastInstructionWasSyscall;//AMD single step
+    int LastInstructionWasSyscall;
 
     SingleStepReason *Reasons;
     int ReasonsPos;
@@ -651,7 +613,7 @@ typedef volatile struct tcpuinfo
   } singleStepping;
 
   int BPAfterStep;
-  int BPCausedByDBVM; //gets read out by ce's driver to see if the bp was because of DBVM or not
+  int BPCausedByDBVM;
 
 #ifdef STATISTICS
   int eventcounter[56];
@@ -675,7 +637,7 @@ typedef volatile struct tcpuinfo
   int WaitingTillDone;
 #endif
 
-} tcpuinfo, *pcpuinfo; //allocated when the number of cpu's is known
+} tcpuinfo, *pcpuinfo;
 
 typedef struct
 {
@@ -690,26 +652,25 @@ typedef struct
 	};
 } Selector_Field, *PSelector_Field;
 
-
 typedef struct _regCR0
 {
   union{
     unsigned long long CR0;
     struct {
-      unsigned PE         :1; //0
-      unsigned MP         :1; //1
-      unsigned EM         :1; //2
-      unsigned TS         :1; //3
-      unsigned ET         :1; //4
-      unsigned NE         :1; //5
-      unsigned reserved1  :10; //6-15
-      unsigned WP         :1; //16
-      unsigned reserved2  :1; //17
-      unsigned AM         :1; //18
-      unsigned reserved   :10; //19-28
-      unsigned NW         :1; //29
-      unsigned CD         :1; //30
-      unsigned PG         :1; //31
+      unsigned PE         :1;
+      unsigned MP         :1;
+      unsigned EM         :1;
+      unsigned TS         :1;
+      unsigned ET         :1;
+      unsigned NE         :1;
+      unsigned reserved1  :10;
+      unsigned WP         :1;
+      unsigned reserved2  :1;
+      unsigned AM         :1;
+      unsigned reserved   :10;
+      unsigned NW         :1;
+      unsigned CD         :1;
+      unsigned PG         :1;
     };
   };
 } __attribute__((__packed__)) regCR0,*PregCR0;
@@ -737,7 +698,6 @@ typedef struct _regCR4
   };
 } __attribute__((__packed__)) regCR4,*PregCR4;
 
-//PAE setting bits(when used without regCR4)
 #define CR4_VME         (1<<0)
 #define CR4_PVI         (1<<1)
 #define CR4_TSD         (1<<2)
@@ -763,21 +723,15 @@ typedef struct _regCR4
 #define CR0_WP          (1<<16)
 #define CR0_PG          (1<<31)
 
-
 #define EFER_LME        (1<<8)
 #define EFER_LMA        (1<<10)
 
-
-
-//AMD VMCB_CLEAN fields
 #define CLEAN_CR2       (1<<9)
 #define CLEAN_DRx       (1<<6)
 #define CLEAN_NP        (1<<4)
 #define CLEAN_TPR       (1<<3)
 #define CLEAN_ASID      (1<<2)
 #define CLEAN_I         (1<<1)
-
-
 
 typedef struct _regDR6
 {
@@ -802,19 +756,19 @@ typedef struct _regDR7
   union{
     unsigned long long DR7;
     struct {
-      unsigned L0        :1; //0
-      unsigned G0        :1; //1
-      unsigned L1        :1; //2
-      unsigned G1        :1; //3
-      unsigned L2        :1; //4
-      unsigned G2        :1; //5
-      unsigned L3        :1; //6
-      unsigned G3        :1; //7
-      unsigned LE        :1; //8
-      unsigned GE        :1; //9
-      unsigned reserved  :3; //001  //10-11-12
-      unsigned GD        :1; //13...
-      unsigned reserved2 :2; //00
+      unsigned L0        :1;
+      unsigned G0        :1;
+      unsigned L1        :1;
+      unsigned G1        :1;
+      unsigned L2        :1;
+      unsigned G2        :1;
+      unsigned L3        :1;
+      unsigned G3        :1;
+      unsigned LE        :1;
+      unsigned GE        :1;
+      unsigned reserved  :3;
+      unsigned GD        :1;
+      unsigned reserved2 :2;
       unsigned RW0       :2;
       unsigned LEN0      :2;
       unsigned RW1       :2;
@@ -828,22 +782,20 @@ typedef struct _regDR7
   };
 } __attribute__((__packed__)) regDR7,*PregDR7;
 
-
-typedef struct _pferrorcode /* errorcode returned for pagefaults */
+typedef struct _pferrorcode
 {
   union{
     unsigned long long errorcode;
     struct {
-      unsigned P          :1;  /* 0=non present page, 1=page level protection violation */
-      unsigned W          :1;  /* 0=read exception, 1=write exception */
-      unsigned US         :1;  /* 0=processor was in supervisor mode, 1=processor was in usermode */
-      unsigned RSVD       :1;  /* 0=Not caused by reserved bits set, 1=Caused because reserved bits are set */
-      unsigned ID         :1;  /* 0=Not caused by an instruction fetch, 1=Caused by an instruction fetch */
+      unsigned P          :1;
+      unsigned W          :1;
+      unsigned US         :1;
+      unsigned RSVD       :1;
+      unsigned ID         :1;
       unsigned reserved   :27;
     };
   };
 } __attribute__((__packed__)) PFerrorcode,*PPFerrorcode;
-
 
 UINT64 IA32_VMX_CR0_FIXED0,IA32_VMX_CR0_FIXED1;
 UINT64 IA32_VMX_CR4_FIXED0,IA32_VMX_CR4_FIXED1;
@@ -880,7 +832,6 @@ void ShowPendingInterrupts();
 
 int isDebugFault(QWORD dr6, QWORD dr7);
 
-
 int ISREALMODE(pcpuinfo currentcpuinfo);
 int IS64BITPAGING(pcpuinfo currentcpuinfo);
 int IS64BITCODE(pcpuinfo currentcpuinfo);
@@ -892,15 +843,10 @@ extern volatile DWORD initcs;
 int APStartsInSIPI;
 extern pcpuinfo getcpuinfo();
 
-
-
 typedef BOOL DBVM_PLUGIN_EXIT_PRE(PDBVMExports exports, pcpuinfo currentcpuinfo, void *registers, void *fxsave);
 typedef void DBVM_PLUGIN_EXIT_POST(PDBVMExports exports, pcpuinfo currentcpuinfo, void *registers, void *fxsave, int *DBVMResult);
 
 extern DBVM_PLUGIN_EXIT_PRE *dbvm_plugin_exit_pre;
 extern DBVM_PLUGIN_EXIT_POST *dbvm_plugin_exit_post;
 
-
-
-
-#endif /*VMMHELPER_H_*/
+#endif

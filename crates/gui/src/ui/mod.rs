@@ -1,4 +1,3 @@
-
 pub mod assets;
 pub mod menu_bar;
 pub mod scanner_panel;
@@ -7,4 +6,3 @@ pub mod modals;
 
 pub use assets::CeIcons;
 pub use menu_bar::*;
-

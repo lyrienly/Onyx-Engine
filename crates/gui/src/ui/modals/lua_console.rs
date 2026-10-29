@@ -1,4 +1,3 @@
-
 use eframe::egui::{self, Color32, RichText, Vec2};
 use crate::app::OnyxEngineApp;
 
@@ -71,4 +70,3 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
         app.show_lua_console = false;
     }
 }
-

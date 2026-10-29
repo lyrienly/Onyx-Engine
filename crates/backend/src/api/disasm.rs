@@ -1,4 +1,3 @@
-
 use onyx_core::process::Process;
 use onyx_core::disasm::Disassembler;
 use onyx_core::debugger::dissect_code::{DissectCodeEngine, BranchKind};
@@ -209,4 +208,3 @@ pub unsafe extern "C" fn onyx_scan_string_references(
         Err(_) => -1,
     }
 }
-

@@ -1,8 +1,3 @@
-/**
- * This file has no copyright assigned and is placed in the Public Domain.
- * This file is part of the w64 mingw-runtime package.
- * No warranty is given; refer to the file DISCLAIMER within this package.
- */
 #ifndef _INC_STDLIB
 #define _INC_STDLIB
 
@@ -302,8 +297,8 @@ extern "C" {
 #define _CRT_TERMINATE_DEFINED
   void __cdecl __MINGW_NOTHROW exit(int _Code) __MINGW_ATTRIB_NORETURN;
   _CRTIMP void __cdecl __MINGW_NOTHROW _exit(int _Code) __MINGW_ATTRIB_NORETURN;
-#if !defined __NO_ISOCEXT /* extern stub in static libmingwex.a */
-  /* C99 function name */
+#if !defined __NO_ISOCEXT
+
   void __cdecl _Exit(int) __MINGW_ATTRIB_NORETURN;
   __CRT_INLINE __MINGW_ATTRIB_NORETURN void  __cdecl _Exit(int status)
   {  _exit(status); }
@@ -343,7 +338,7 @@ extern "C" {
   void __cdecl qsort(void *_Base,size_t _NumOfElements,size_t _SizeOfElements,int (__cdecl *_PtFuncCompare)(const void *,const void *));
 #endif
   unsigned short __cdecl _byteswap_ushort(unsigned short _Short);
-  /*unsigned long __cdecl _byteswap_ulong (unsigned long _Long); */
+
 #if _INTEGRAL_MAX_BITS >= 64
   unsigned __int64 __cdecl _byteswap_uint64(unsigned __int64 _Int64);
 #endif
@@ -377,10 +372,10 @@ extern "C" {
   void __cdecl srand(unsigned int _Seed);
   double __cdecl strtod(const char *_Str,char **_EndPtr);
   float __cdecl strtof(const char *nptr, char **endptr);
-#if !defined __NO_ISOCEXT  /* in libmingwex.a */
+#if !defined __NO_ISOCEXT
   float __cdecl strtof (const char * __restrict__, char ** __restrict__);
   long double __cdecl strtold(const char * __restrict__, char ** __restrict__);
-#endif /* __NO_ISOCEXT */
+#endif
   _CRTIMP double __cdecl _strtod_l(const char *_Str,char **_EndPtr,_locale_t _Locale);
   long __cdecl strtol(const char *_Str,char **_EndPtr,int _Radix);
   _CRTIMP long __cdecl _strtol_l(const char *_Str,char **_EndPtr,int _Radix,_locale_t _Locale);
@@ -403,8 +398,7 @@ extern "C" {
   void *__cdecl malloc(size_t _Size);
   void *__cdecl realloc(void *_Memory,size_t _NewSize);
   _CRTIMP void *__cdecl _recalloc(void *_Memory,size_t _Count,size_t _Size);
-  //_CRTIMP void __cdecl _aligned_free(void *_Memory);
-  //_CRTIMP void *__cdecl _aligned_malloc(size_t _Size,size_t _Alignment);
+
   _CRTIMP void *__cdecl _aligned_offset_malloc(size_t _Size,size_t _Alignment,size_t _Offset);
   _CRTIMP void *__cdecl _aligned_realloc(void *_Memory,size_t _Size,size_t _Alignment);
   _CRTIMP void *__cdecl _aligned_recalloc(void *_Memory,size_t _Count,size_t _Size,size_t _Alignment);
@@ -420,10 +414,10 @@ extern "C" {
   _CRTIMP wchar_t *__cdecl _ultow(unsigned long _Value,wchar_t *_Dest,int _Radix);
   double __cdecl wcstod(const wchar_t *_Str,wchar_t **_EndPtr);
   float __cdecl wcstof(const wchar_t *nptr, wchar_t **endptr);
-#if !defined __NO_ISOCEXT /* in libmingwex.a */
+#if !defined __NO_ISOCEXT
   float __cdecl wcstof( const wchar_t * __restrict__, wchar_t ** __restrict__);
   long double __cdecl wcstold(const wchar_t * __restrict__, wchar_t ** __restrict__);
-#endif /* __NO_ISOCEXT */
+#endif
   _CRTIMP double __cdecl _wcstod_l(const wchar_t *_Str,wchar_t **_EndPtr,_locale_t _Locale);
   long __cdecl wcstol(const wchar_t *_Str,wchar_t **_EndPtr,int _Radix);
   _CRTIMP long __cdecl _wcstol_l(const wchar_t *_Str,wchar_t **_EndPtr,int _Radix,_locale_t _Locale);
@@ -501,7 +495,7 @@ extern "C" {
 #endif
 
   _CRTIMP void __cdecl _beep(unsigned _Frequency,unsigned _Duration) __MINGW_ATTRIB_DEPRECATED;
-  /* Not to be confused with  _set_error_mode (int).  */
+
   _CRTIMP void __cdecl _seterrormode(int _Mode) __MINGW_ATTRIB_DEPRECATED;
   _CRTIMP void __cdecl _sleep(unsigned long _Duration) __MINGW_ATTRIB_DEPRECATED;
 #endif
@@ -536,7 +530,7 @@ extern "C" {
 #endif
 #endif
 
-#if !defined __NO_ISOCEXT /* externs in static libmingwex.a */
+#if !defined __NO_ISOCEXT
 
   typedef struct { long long quot, rem; } lldiv_t;
 
@@ -547,7 +541,6 @@ extern "C" {
   long long  __cdecl strtoll(const char* __restrict__, char** __restrict, int);
   unsigned long long  __cdecl strtoull(const char* __restrict__, char** __restrict__, int);
 
-  /* these are stubs for MS _i64 versions */
   long long  __cdecl atoll (const char *);
 
 #ifndef __STRICT_ANSI__
@@ -557,16 +550,15 @@ extern "C" {
   wchar_t *__cdecl lltow (long long, wchar_t *, int);
   wchar_t *__cdecl ulltow (unsigned long long, wchar_t *, int);
 
-  /* __CRT_INLINE using non-ansi functions */
   __CRT_INLINE long long  __cdecl atoll (const char * _c) { return _atoi64 (_c); }
   __CRT_INLINE char *__cdecl lltoa (long long _n, char * _c, int _i) { return _i64toa (_n, _c, _i); }
   __CRT_INLINE char *__cdecl ulltoa (unsigned long long _n, char * _c, int _i) { return _ui64toa (_n, _c, _i); }
   __CRT_INLINE long long  __cdecl wtoll (const wchar_t * _w) { return _wtoi64 (_w); }
   __CRT_INLINE wchar_t *__cdecl lltow (long long _n, wchar_t * _w, int _i) { return _i64tow (_n, _w, _i); }
   __CRT_INLINE wchar_t *__cdecl ulltow (unsigned long long _n, wchar_t * _w, int _i) { return _ui64tow (_n, _w, _i); }
-#endif /* (__STRICT_ANSI__)  */
+#endif
 
-#endif /* !__NO_ISOCEXT */
+#endif
 
 #ifdef __cplusplus
 }

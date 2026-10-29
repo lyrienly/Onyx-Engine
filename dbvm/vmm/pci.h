@@ -1,10 +1,3 @@
-/*
- * pci.h
- *
- *  Created on: Jun 8, 2009
- *      Author: erich
- */
-
 #ifndef PCI_H_
 #define PCI_H_
 
@@ -13,4 +6,4 @@ WORD pciConfigReadWord (unsigned short bus, unsigned short slot, unsigned short 
 
 void pciConfigEnumPci(void);
 
-#endif /* PCI_H_ */
+#endif

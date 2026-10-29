@@ -1,11 +1,3 @@
-/*
-common.c: 32-bit version Contains several functions that might be useful and can be shared by
-multiple sources. (e.g vmm and vmloader)
-
-edit: yeah, not vmm anymore as it's 64-bit, so vmloader only
-
-*/
-
 #include "common.h"
 
 criticalSection sendstringfCS;
@@ -26,7 +18,6 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
 
   strpos=0;
 
-  // work on the copy of string, not the original
   for (i=0; i<strlen(string); i++)
     workstring[i]=string[i];
 
@@ -35,50 +26,48 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
   for (i=0; i<64; i++)
     varlist[i]=255;
 
-
-  // parse the string for known operators
   for (i=0; i<l; i++)
   {
     if (workstring[i]=='%')
     {
       workstring[i]=0;
 
-      if (workstring[i+1]=='d') //decimal
+      if (workstring[i+1]=='d')
       {
         varlist[vlc]=0;
       }
       else
-      if (workstring[i+1]=='x') //hex
+      if (workstring[i+1]=='x')
       {
         varlist[vlc]=1;
       }
       else
-      if (workstring[i+1]=='8') //8 char hex (%8)
+      if (workstring[i+1]=='8')
       {
         varlist[vlc]=3;
       }
       else
-      if (workstring[i+1]=='p') //8 char hex (%8)
+      if (workstring[i+1]=='p')
       {
         varlist[vlc]=3;
       }
       else
-      if (workstring[i+1]=='6') //16 char hex (%8)
+      if (workstring[i+1]=='6')
       {
         varlist[vlc]=4;
       }
       else
-      if (workstring[i+1]=='2') //2 char hex (%2)
+      if (workstring[i+1]=='2')
       {
         varlist[vlc]=6;
       }
       else
-      if (workstring[i+1]=='s') //string
+      if (workstring[i+1]=='s')
       {
         varlist[vlc]=2;
       }
       else
-      if (workstring[i+1]=='c') //char
+      if (workstring[i+1]=='c')
       {
         varlist[vlc]=5;
       }
@@ -90,7 +79,6 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
 
   i=0;
   vlc=0;
-
 
   while ((i<l) && (strpos<size))
   {
@@ -104,7 +92,7 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
 
       switch (varlist[vlc])
       {
-        case 0: //decimal
+        case 0:
         {
           unsigned int x;
           x=__builtin_va_arg(arglist,unsigned int);
@@ -119,7 +107,7 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
           break;
         }
 
-        case 1: //hex
+        case 1:
         {
           unsigned int x;
           x=__builtin_va_arg(arglist,unsigned int);
@@ -135,7 +123,7 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
           break;
         }
 
-        case 3: //%8, DWORD
+        case 3:
         {
           unsigned int x;
           x=__builtin_va_arg(arglist,unsigned int);
@@ -152,12 +140,11 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
           break;
         }
 
-        case 6: //%2, char
+        case 6:
         {
 
           unsigned char x;
           x=__builtin_va_arg(arglist,int);
-
 
           itoa(x,16,temps,100);
           appendzero(temps,2,100);
@@ -174,9 +161,7 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
 
         case 255:
           printstring("UNDEFINED VARLIST",40,21,2,4);
-          /*printstring(string,40,22,2,4);
-          printstring(temps,40,23,2,4);
-          printstring(str,40,24,2,4);*/\
+          \
 
           if (strpos>=size)
             strpos=size-1;
@@ -188,8 +173,7 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
 
       }
 
-
-      if (varlist[vlc]==2) //string
+      if (varlist[vlc]==2)
       {
         char *s=__builtin_va_arg(arglist,char *);
 
@@ -200,10 +184,9 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
         copymem(&str[strpos],s,_i);
         strpos+=_i;
 
-
       }
 
-      if (varlist[vlc]==4) //16 char hex
+      if (varlist[vlc]==4)
       {
         unsigned long long i=__builtin_va_arg(arglist,unsigned long long);
         unsigned int p1=i;
@@ -222,7 +205,7 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
         if (strpos>=size)
         {
           str[size-1]=0;
-          return size; //enough
+          return size;
         }
 
         itoa(p1,16,temps,100);
@@ -237,7 +220,7 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
 
       }
 
-      if (varlist[vlc]==5) //char
+      if (varlist[vlc]==5)
       {
         int c=__builtin_va_arg(arglist,int);
 
@@ -247,30 +230,27 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
       }
 
       i+=2;
-      vlc++; //next paramtype
+      vlc++;
       continue;
     }
     else
     {
-      //else a normal char
+
       str[strpos]=workstring[i];
       strpos++;
 
       if (strpos>=size)
       {
         str[size-1]=0;
-        return size; //enough
+        return size;
       }
       i++;
     }
 
   }
 
-
-
   if (strpos>=size)
     strpos=size-1;
-
 
   str[strpos]=0;
   return strpos;
@@ -325,36 +305,32 @@ int getAPICID(void)
 
 void csEnter(PcriticalSection CS)
 {
-  int apicid=getAPICID()+1; //+1 so it never returns 0
-
-
-  //get current apicid (from cpuid)
+  int apicid=getAPICID()+1;
 
   if ((CS->locked) && (CS->apicid==apicid))
   {
-    //already locked but the locker is this cpu, so allow, just increase lockcount
+
     CS->lockcount++;
     return;
   }
 
-  spinlock(&(CS->locked)); //sets CS->locked to 1
+  spinlock(&(CS->locked));
 
-  //here so the lock is aquired and locked is 1
   CS->lockcount=1;
   CS->apicid=apicid;
 }
 
 void csLeave(PcriticalSection CS)
 {
-  int apicid=getAPICID()+1; //+1 so it never returns 0
+  int apicid=getAPICID()+1;
 
   if ((CS->locked) && (CS->apicid==apicid))
   {
     CS->lockcount--;
     if (CS->lockcount==0)
     {
-      //unlock
-      CS->apicid=-1; //set to a invalid apicid
+
+      CS->apicid=-1;
       CS->locked=0;
     }
   }
@@ -383,7 +359,6 @@ void zeromemoryd(void *address, unsigned int size)
     a[i]=0;
   }
 }
-
 
 void copymem(void *dest, void *src,int size)
 {
@@ -426,18 +401,16 @@ char* strcpy(char *dest, char *src)
 
 void appendzero(char *string, int wantedsize,int maxstringsize)
 {
-/* basicly to be used after itoa */
+
   int i=0;
   int zerostoadd=wantedsize-strlen(string);
   char newstring[wantedsize+1];
 
   if ((zerostoadd+strlen(string))>=maxstringsize)
-    return; //not enough memory
-
+    return;
 
   for (i=0; i<zerostoadd; i++)
     newstring[i]='0';
-
 
   newstring[zerostoadd]=0;
   newstring[wantedsize]=0;
@@ -469,7 +442,6 @@ unsigned int atoi(char* input, int base, int *err)
 	unsigned int result=0;
 	int negative=0;
 
-	//parse the string according to the used base
 	if (base<2)
 	{
 		if (err)
@@ -484,8 +456,6 @@ unsigned int atoi(char* input, int base, int *err)
 		return 0;
 	}
 
-  //some override checks
-	//if it starts with 0x or $ make it base16 and set start to 2 or 1 respectivly
 	while (input[start])
 	{
 		if (input[start]=='-')
@@ -506,35 +476,33 @@ unsigned int atoi(char* input, int base, int *err)
 			start+=2;
 		}
 		else
-			break; //nothing to parse
+			break;
 	}
-
 
 	for (i=strlen(input)-1; i>=start ; i--,j++)
   {
-    if ((input[i] >='0') && (input[i] <= '9')) //check if it's in the range of 0 to 9
+    if ((input[i] >='0') && (input[i] <= '9'))
       c=input[i]-'0';
 		else
-    if ((input[i] >='a') && (input[i] <= 'z')) //check if it's in the range of 0 to 9
+    if ((input[i] >='a') && (input[i] <= 'z'))
       c=10+input[i]-'a';
 		else
-    if ((input[i] >='A') && (input[i] <= 'Z')) //check if it's in the range of 0 to 9
+    if ((input[i] >='A') && (input[i] <= 'Z'))
       c=10+input[i]-'A';
 		else
 		{
 			if (err)
-				*err=i; //not a valid character
+				*err=i;
 			return result;
 		}
 
 		if (c>=base)
 		{
 			if (err)
-				*err=i; //not a valid character
+				*err=i;
 			return result;
 		}
 
-		/* c now contains the value in numerical state, now adjust it for i and the base given) */
 		result=result+c*(power(base,j));
 
 		if (negative)
@@ -547,9 +515,9 @@ unsigned int atoi(char* input, int base, int *err)
 }
 
 int itoa(unsigned int value,int base, char *output,int maxsize)
-/* base: 10=decimal, 16=hexadecimal, 8 = octal, 2=binary , 1=youraloser, 0=diebitch */
+
 {
-  char tempbuf[maxsize]; /* will get the string but in reverse */
+  char tempbuf[maxsize];
   int i,j,t;
 
 	if (base<2)
@@ -565,7 +533,6 @@ int itoa(unsigned int value,int base, char *output,int maxsize)
 	  return 2;
 	}
 
-
 	for (i=0; (value>0) && (i<maxsize); i++)
 	{
 		t=value % base;
@@ -577,8 +544,6 @@ int itoa(unsigned int value,int base, char *output,int maxsize)
 	  value=value / base;
 	}
 
-
-  /* we now have the string in reverse order, so put it in output reverse... */
   t=i-1;
   for (j=0;t>=0;t--,j++)
     output[j]=tempbuf[t];
@@ -588,7 +553,7 @@ int itoa(unsigned int value,int base, char *output,int maxsize)
 	else
     output[maxsize-1]=0;
 
-	return i; //return how many bytes are used
+	return i;
 }
 
 void sendchar(char c)
@@ -606,7 +571,7 @@ void sendchar(char c)
     return;
 
   x=inportb(SERIALPORT+5);
- //while ((x & 0x20) != 0x20)
+
   while ((x & 0x40) != 0x40)
 	  x=inportb(SERIALPORT+5);
 
@@ -621,7 +586,6 @@ void sendchar(char c)
 	  outportb(SERIALPORT,'\r');
 	}
 
-
 }
 
 void waitforkeypress(void)
@@ -633,8 +597,7 @@ void waitforkeypress(void)
 
 char getchar(void)
 {
-/* returns 0 when no char is pressed
-	 use readstring to wait for keypresses */
+
 #if (!defined SERIALPORT) || (SERIALPORT == 0)
 	return 1;
 #else
@@ -643,7 +606,6 @@ char getchar(void)
 	else
 		return 0;
 #endif
-
 
 }
 
@@ -656,11 +618,10 @@ char waitforchar(void)
   return c;
 }
 
-
 int readstring(char *s, int minlength, int maxlength)
 {
 	int i=0;
-	//keeps reading till it hits minlength, but can go over till maxlength (depending on the size of the uart buffer)
+
 	while (i<minlength)
 	{
     s[i]=waitforchar();
@@ -676,7 +637,6 @@ int readstring(char *s, int minlength, int maxlength)
 
   s[i]=0;
 
-  //minlength reached
   while ((i<maxlength) && (s[i]))
 	{
 	  s[i]=getchar();
@@ -687,7 +647,6 @@ int readstring(char *s, int minlength, int maxlength)
 
 	return i;
 }
-
 
 void printchar(char c, int x, int y, char foreground, char background)
 {
@@ -703,7 +662,6 @@ void getdisplaychar(int x, int y, PTEXTVIDEO charinfo)
   *charinfo=tv[y*80+x];
 }
 
-
 void printstring(char *s, int x, int y, char foreground, char background)
 {
   int i;
@@ -717,11 +675,11 @@ void movelinesup(void)
   TEXTVIDEO thischar;
 
   int x,y;
-  for (y=0; y<25; y++)  //change y=0 to y=7 for a nice effect
+  for (y=0; y<25; y++)
   {
     for (x=0; x<80; x++)
     {
-      //move this char to the one at top
+
       getdisplaychar(x,y,&thischar);
       tv[(y-1)*80+x]=thischar;
     }
@@ -737,16 +695,14 @@ void movelinesup(void)
 }
 
 void nextline(void)
-/*
- * move the 'cursor' down one line
- */
+
 {
-  currentdisplayrow=0; //all the way to the left
+  currentdisplayrow=0;
 
   if (currentdisplayline>=24)
   {
-    movelinesup(); //all other lines go up one line and currentdisplayline stays the same
-    currentdisplayline=24; //just set it in case 'something' sets it different
+    movelinesup();
+    currentdisplayline=24;
   }
   else
     currentdisplayline++;
@@ -757,7 +713,6 @@ void updateCursor(void)
   int cursorpos;
   cursorpos=currentdisplayline*80+currentdisplayrow;
 
-
   outportb(0x3D4, 14);
   outportb(0x3D5, (cursorpos>>8));
   outportb(0x3D4, 15);
@@ -765,8 +720,7 @@ void updateCursor(void)
 }
 
 void displayline(char *s, ...)
-/* Displays a line on the screen and sets the 'currentline' down one pos
- */
+
 {
 
   __builtin_va_list arglist;
@@ -776,7 +730,6 @@ void displayline(char *s, ...)
   __builtin_va_start(arglist,s);
   sl=vbuildstring(temps,200,s,arglist);
   __builtin_va_end(arglist);
-
 
   if (sl>0)
   {
@@ -791,9 +744,8 @@ void displayline(char *s, ...)
         continue;
       }
 
-      if (temps[i]=='\r') //not handled
+      if (temps[i]=='\r')
         continue;
-
 
       printchar(temps[i],currentdisplayrow,currentdisplayline,15,0);
       currentdisplayrow++;
@@ -823,20 +775,10 @@ int generateCRC(unsigned char *ptr, int size)
 }
 
 void showstatec(ULONG *stack)
-/* send the state of the registers to the serial port */
+
 {
   sendstringf("idtbase=%8 gdtbase=%8\n\r",stack[0],stack[1]);
   sendstringf("cr3=%8 cr2=%8 cr1=%8 cr0=%8\n\r",stack[2],stack[3],stack[4],stack[5]);
   sendstringf("eflags=%8\n\r",stack[6]);
-
-
-  /*
-  sendstringf("cr0=%8\n\r",getCR0());
-  sendstringf("cr3=%8\n\r",getCR3());
-  sendstringf("cr4=%8\n\r",getCR4());
-  sendstringf("GDT base=%8\n\r",getGDTbase());
-  sendstringf("IDT base=%8\n\r",getIDTbase());
-  */
-
 
 }

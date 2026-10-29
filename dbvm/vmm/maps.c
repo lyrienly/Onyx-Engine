@@ -1,13 +1,3 @@
-/*
- * maps.c
- *
- *  Created on: Jun 23, 2019
- *      Author: eric
- */
-
-//a rudimentary pointer map implementation for storing 64-bit pointers
-
-
 #include "maps.h"
 PMapInfo createMap(int maxlevel)
 {
@@ -27,14 +17,6 @@ PMapInfo createMap(int maxlevel)
 
 PMapInfo createPhysicalMemoryMap()
 {
-  /* calculate the maxlevel needed for MAXPHYADDR
-   * 32: (32-12)/9=2.2222 (3)
-   * 36 :(36-12)/9=2,666666667 (3)
-   * 48: (48-12)/9=4
-   * 56: (56-12)/9=5
-   * 64: (64-12)/9=4.333 (5)
-   */
-
 
   int neededbits = MAXPHYADDR - 12;
   int levelneeded = neededbits / 9;
@@ -51,18 +33,13 @@ int map_setEntry(PMapInfo map, QWORD address, void *data)
   int entrynr;
   address = address >> 12;
 
-  //address: XXXXXXXXXXXXX(XXX)
-  //binary XXXXXXX XXXXXXXXX XXXXXXXXX XXXXXXXXX XXXXXXXXX XXXXXXXXX (XXXXXXXXXXXX)
-  //binary: XXXXXXXXX XXXXXXXXX XXXXXXXXX XXXXXXXXX (XXXXXXXXXXXX)
-
-
   while (level > 0)
   {
     entrynr = (address >> (level * 9)) & 0x1ff;
 
     if (m[entrynr].Map == NULL)
     {
-      //create the map entry
+
       void *nm = malloc(4096);
       if (nm == NULL)
         return 1;
@@ -76,7 +53,7 @@ int map_setEntry(PMapInfo map, QWORD address, void *data)
   }
 
   entrynr = address & 0x1ff;
-  m[entrynr].Data = data;  //EPT cloak: data is a pointer to an array of cpu's
+  m[entrynr].Data = data;
 
   return 0;
 }
@@ -103,14 +80,11 @@ void *map_getEntry(PMapInfo map, QWORD address)
   return m[entrynr].Data;
 }
 
-
-
 void map_iterate(PMapData mapdata, QWORD baseaddress, int level, MAPCALLBACK cb)
 {
   int i;
 
   int addresspart = level * 9;
-
 
   for (i = 0; i < 512; i++)
   {

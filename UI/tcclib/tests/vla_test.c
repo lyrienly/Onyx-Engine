@@ -1,8 +1,3 @@
-/*
- * Test that allocating a variable length array in a loop
- * does not use up a linear amount of memory
- */
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -10,7 +5,6 @@
 #define LOOP_COUNT 1000
 #define ARRAY_SIZE 100
 
-/* Overwrite a VLA. This will overwrite the return address if SP is incorrect */
 void smash(char *p, int n) {
   memset(p, 0, n);
 }
@@ -18,17 +12,16 @@ void smash(char *p, int n) {
 int test1(int n) {
   int i;
   char *array_ptrs[LOOP_COUNT];
-  
+
   for (i = 0; i < LOOP_COUNT; ++i) {
     char test[n];
     smash(test, n);
     array_ptrs[i] = test;
   }
-  
+
   return (array_ptrs[0]-array_ptrs[LOOP_COUNT-1] < n) ? 0 : 1;
 }
 
-/* ensure goto does not circumvent array free */
 int test2(int n) {
   char *array_ptrs[LOOP_COUNT];
 

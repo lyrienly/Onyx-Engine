@@ -1,10 +1,3 @@
-/*
- * symbols.h
- *
- *  Created on: Aug 7, 2013
- *      Author: eric
- */
-
 #ifndef SYMBOLS_H_
 #define SYMBOLS_H_
 
@@ -17,4 +10,4 @@ unsigned long long GetModuleSize(char *filename, uint32_t fileoffset, unsigned l
 
 int FindSymbol(HANDLE hProcess, char *symbolname, symcallback cb, void* context);
 
-#endif /* SYMBOLS_H_ */
+#endif

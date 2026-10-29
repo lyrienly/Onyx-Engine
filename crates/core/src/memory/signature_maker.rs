@@ -1,4 +1,3 @@
-
 use crate::process::Process;
 use crate::debugger::disasm::Disassembler;
 use crate::memory::scanner::AobByte;
@@ -144,4 +143,3 @@ mod tests {
         assert_eq!(exact_count, 1);
     }
 }
-

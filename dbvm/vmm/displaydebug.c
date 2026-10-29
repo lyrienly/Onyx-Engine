@@ -1,10 +1,3 @@
-/*
- * displaydebug.c
- *
- *  Created on: Aug 18, 2019
- *      Author: eric
- */
-
 #include "common.h"
 #include "displaydebug.h"
 
@@ -58,8 +51,6 @@ int ddGetCharWidth(char c UNUSED)
 
 void ddCharOut(int x, int y, char c)
 {
-  //todo :Draw a char
-
 
 }
 
@@ -70,7 +61,6 @@ void ddDrawRectangle(int x, int y, int width, int height, DWORD color)
   {
     DWORD *pixels=ddGetPixelPointer(x,y);
 
-
     int cy;
     for (cy=0; cy<height; cy++)
     {
@@ -78,27 +68,21 @@ void ddDrawRectangle(int x, int y, int width, int height, DWORD color)
       for (cx=0; cx<width; cx++)
         pixels[cx]=color;
 
-      pixels=(DWORD *)(((QWORD)pixels)+DDPixelsPerScanLine*4); //next line
+      pixels=(DWORD *)(((QWORD)pixels)+DDPixelsPerScanLine*4);
     }
   }
 #endif
 }
-
 
 void ddTextOut(char* text)
 {
   if (DDFrameBuffer)
   {
     int i=0;
-    //while (text[i])
+
     {
       int charwidth=ddGetCharWidth(text[i]);
-      //if ((x+charwidth)>(textWindowLeft+textWindowWidth))
-      //{
-      //  x=textWindowLeft;
-       // y+=ddGetLineHeight();
-      //}
-      //ddCharOut(x,y, text[i]);
+
     }
   }
 }

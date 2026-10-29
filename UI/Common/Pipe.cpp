@@ -1,5 +1,3 @@
-
-
 #ifdef _WINDOWS
 #include <Windows.h>
 #else
@@ -15,8 +13,6 @@
 
 #include "Pipe.h"
 
-//superclass to make pipe handling easier to work with
-
 Pipe::Pipe(void)
 {
 	pipehandle=0;
@@ -25,7 +21,7 @@ Pipe::Pipe(void)
 
 Pipe::~Pipe(void)
 {
-	//check if someone forgot to clean it up
+
 	if ((pipehandle!=0) && (pipehandle!=INVALID_HANDLE_VALUE))
 	{
 #ifdef _WINDOWS
@@ -35,8 +31,7 @@ Pipe::~Pipe(void)
 #endif
 		pipehandle=0;
 	}
-	
-    
+
 }
 
 void Pipe::Lock(void)

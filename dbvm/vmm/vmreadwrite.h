@@ -80,11 +80,9 @@
 
 #define vm_cr0_guest_host_mask      0x6000
 #define vm_cr4_guest_host_mask      0x6002
-#define vm_cr0_read_shadow          0x6004 //what the guest sees when he reads CR3
+#define vm_cr0_read_shadow          0x6004
 #define vm_cr4_read_shadow          0x6006
 #define vm_cr3_targetvalue0			    0x6008
-
-
 
 #define vm_exit_qualification       0x6400
 #define vm_io_rcx                   0x6402
@@ -93,9 +91,8 @@
 #define vm_io_rip                   0x6408
 #define vm_guest_linear_address     0x640a
 
-
-#define vm_guest_cr0                0x6800 //actual cr0
-#define vm_guest_cr3                0x6802 //the actual CR3 value for the guest
+#define vm_guest_cr0                0x6800
+#define vm_guest_cr3                0x6802
 #define vm_guest_cr4                0x6804
 #define vm_guest_es_base            0x6806
 #define vm_guest_cs_base            0x6808
@@ -119,7 +116,6 @@
 #define vm_guest_SSP                0x682a
 #define vm_guest_IA32_INTERRUPT_SSP_TABLE_ADDR 0x682c
 
-//host 0x*c**
 #define vm_host_es                    0xc00
 #define vm_host_cs                    0xc02
 #define vm_host_ss                    0xc04
@@ -151,5 +147,4 @@
 #define vm_host_SSP                   0x6c1a
 #define vm_host_IA32_INTERRUPT_SSP_TABLE_ADDR 0x6c1c
 
-
-#endif /*VMREADWRITE_H_*/
+#endif

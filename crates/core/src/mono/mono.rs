@@ -1,4 +1,3 @@
-
 use crate::process::Process;
 use crate::symbol::SymbolResolver;
 
@@ -1189,4 +1188,3 @@ pub mod tests {
         assert!(script.contains("TakeDamage"));
     }
 }
-

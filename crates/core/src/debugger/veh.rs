@@ -1,4 +1,3 @@
-
 use std::mem::zeroed;
 use crate::debugger::{
     clear_hw_breakpoint_from_threads, read_thread_debug_registers, set_hw_breakpoint_for_threads,
@@ -7,7 +6,6 @@ use crate::debugger::{
 use crate::process::Process;
 use crate::win32::*;
 
-/// One of the four x86-64 hardware breakpoint slots (DR0..DR3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HwBreakpointSlot {
     pub address: usize,
@@ -17,19 +15,18 @@ pub struct HwBreakpointSlot {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HwBpError {
-    /// All four DR slots are already assigned.
+
     NoFreeSlot,
-    /// Slot index outside `0..HW_BREAKPOINT_SLOTS`.
+
     InvalidSlot,
-    /// Target process has no threads to configure.
+
     NoThreads,
-    /// A thread could not be opened, suspended or have its context updated.
+
     ThreadFailure,
 }
 
 impl HwBpError {
-    /// Stable code shared with the Pascal frontend (`OnyxBackend.pas`).
-    /// Keep in sync with `TOnyxVehSlotError` there.
+
     pub fn code(self) -> i32 {
         match self {
             HwBpError::NoFreeSlot => -2,
@@ -93,8 +90,6 @@ impl VehDebugger {
         self.slots.iter().position(|slot| slot.is_none())
     }
 
-    /// Marks a slot as used without touching any thread. Used by callers that
-    /// drive the debug registers themselves, such as `HardwareBreakpointMonitor`.
     pub fn reserve_slot(
         &mut self,
         address: usize,
@@ -110,7 +105,6 @@ impl VehDebugger {
         Ok(index)
     }
 
-    /// Releases a slot without touching any thread.
     pub fn release_slot(&mut self, index: usize) -> Result<(), HwBpError> {
         if index >= HW_BREAKPOINT_SLOTS {
             return Err(HwBpError::InvalidSlot);
@@ -131,7 +125,6 @@ impl VehDebugger {
             return Err(HwBpError::NoThreads);
         }
 
-        // Report exhaustion before doing any work on the target.
         let index = self.find_free_slot().ok_or(HwBpError::NoFreeSlot)?;
 
         set_hw_breakpoint_for_threads(&threads, index, address, bp_type, size)
@@ -155,7 +148,6 @@ impl VehDebugger {
             return Err(HwBpError::InvalidSlot);
         }
 
-        // Already free: clearing is idempotent so a stale Lua handle is harmless.
         if self.slots[index].is_none() {
             return Ok(());
         }
@@ -164,8 +156,6 @@ impl VehDebugger {
         let cleared = clear_hw_breakpoint_from_threads(&threads, index)
             .map_err(|_| HwBpError::ThreadFailure)?;
 
-        // Every thread failed to update: keep the slot marked as used so the
-        // registry never claims a slot is free while DR still references it.
         if cleared == 0 && !threads.is_empty() {
             return Err(HwBpError::ThreadFailure);
         }
@@ -174,7 +164,6 @@ impl VehDebugger {
         Ok(())
     }
 
-    /// Clears every slot this instance owns. Used when the debug session ends.
     pub fn clear_all(&mut self, proc: &Process) {
         let threads = proc.threads().unwrap_or_default();
         for index in 0..HW_BREAKPOINT_SLOTS {
@@ -185,10 +174,6 @@ impl VehDebugger {
         }
     }
 
-    /// Compara o registro interno com DR0..DR3/DR7 reais de cada thread.
-    /// Retorna vazio quando o hardware reflete exatamente os slots gerenciados.
-    /// Divergência indica que outro debugger (por exemplo o do CE) reescreveu
-    /// os registradores depois que configuramos os breakpoints.
     pub fn verify_slots(&self, proc: &Process) -> Result<Vec<HwSlotMismatch>, HwBpError> {
         let threads = proc.threads().map_err(|_| HwBpError::ThreadFailure)?;
         let mut mismatches = Vec::new();

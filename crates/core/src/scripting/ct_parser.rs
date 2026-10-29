@@ -1,4 +1,3 @@
-
 use std::fs::File;
 use std::io::{Read, Write};
 use crate::scanner::ValType;
@@ -183,4 +182,3 @@ fn parse_ct_address(s: &str) -> (Option<String>, usize) {
         (None, parse_offset_str(trimmed).unwrap_or(0))
     }
 }
-

@@ -12,13 +12,13 @@ void kdb_readycommand(void)
 		inportb(dataport);
 		x=(inportb(commandport) >> 1) & 1;
 	}
-	
+
 	x=inportb(commandport) & 1;;
 	while (x)
 	{
 		inportb(dataport);
 		x=inportb(commandport) & 1;;
-	}	
+	}
 }
 
 unsigned char kbd_getstatus(void)
@@ -28,49 +28,48 @@ unsigned char kbd_getstatus(void)
 
 unsigned char kdb_getoutputport(void)
 {
-	kdb_readycommand();	
-	outportb(commandport,0xd0);	
-	return inportb(dataport);	
+	kdb_readycommand();
+	outportb(commandport,0xd0);
+	return inportb(dataport);
 }
 
 void kdb_setoutputport(unsigned char bt)
 {
-	kdb_readycommand();	
-	outportb(commandport,0xd1);	
+	kdb_readycommand();
+	outportb(commandport,0xd1);
 	outportb(dataport,bt);
 }
 
 unsigned char kdb_getinputport(void)
 {
-	kdb_readycommand();	
-	outportb(commandport,0xc0);	
-	return inportb(dataport);		
+	kdb_readycommand();
+	outportb(commandport,0xc0);
+	return inportb(dataport);
 }
 
 unsigned char kdb_getcommandbyte(void)
 {
-	kdb_readycommand();	
-	outportb(commandport,0x20);	
-	return inportb(dataport);		
+	kdb_readycommand();
+	outportb(commandport,0x20);
+	return inportb(dataport);
 }
 
 void kdb_setcommandbyte(unsigned char bt)
 {
-	kdb_readycommand();	
-	outportb(commandport,0x60);	
+	kdb_readycommand();
+	outportb(commandport,0x60);
 	outportb(dataport,bt);
 }
 
 int kdb_iskeypressed(void)
 {
-	return inportb(commandport) & 1;	
+	return inportb(commandport) & 1;
 }
-
 
 void kdb_waitforkeypress(void)
 {
   while (!kdb_iskeypressed())
-  	resync();  
+  	resync();
 }
 
 unsigned char kbd_getkey(void)
@@ -81,12 +80,12 @@ unsigned char kbd_getkey(void)
 
 char kbd_convertscancodetochar(unsigned char scancode, int scancodeset )
 {
-  //displayline(" -%x- ", scancode);
+
 	if (scancodeset==1)
 	{
 		switch (scancode)
 		{
-			case 1: return 27; //escape
+			case 1: return 27;
 			case 2: return '1';
 			case 3: return '2';
 			case 4: return '3';
@@ -99,8 +98,8 @@ char kbd_convertscancodetochar(unsigned char scancode, int scancodeset )
 			case 0xb: return '0';
 			case 0xc: return '-';
 			case 0xd: return '+';
-			case 0xe: return 8; //backspace
-			case 0xf: return 9; //tab
+			case 0xe: return 8;
+			case 0xf: return 9;
 			case 0x10: return 'q';
 			case 0x11: return 'w';
 			case 0x12: return 'e';
@@ -138,26 +137,23 @@ char kbd_convertscancodetochar(unsigned char scancode, int scancodeset )
 			case 0x34: return '.';
 			case 0x35: return '/';
 			case 0x39: return ' ';
-			
 
-			case 0x47: return 1; //home
-			case 0x49: return 3; //page up
-			case 0x4f: return 2; //end
-			case 0x51: return 4; //page down
+			case 0x47: return 1;
+			case 0x49: return 3;
+			case 0x4f: return 2;
+			case 0x51: return 4;
 
 			default:  return 0;
 		}
 	} else return 0;
 }
 
-
-
 char kbd_getchar(void)
 {
-	//kbd_getkey returns the scancode of the keyboard, which will need to be converted to a pressed char
+
 	char k=kbd_convertscancodetochar(kbd_getkey(),1);
   while (!k)
-    k=kbd_convertscancodetochar(kbd_getkey(),1); 
-  
-  return k; //todo, check which scancoce set is currently being used
+    k=kbd_convertscancodetochar(kbd_getkey(),1);
+
+  return k;
 }

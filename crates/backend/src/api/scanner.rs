@@ -1,4 +1,3 @@
-
 use std::ffi::CStr;
 use std::os::raw::c_char;
 use onyx_core::process::Process;
@@ -426,7 +425,6 @@ pub unsafe extern "C" fn onyx_generate_aob_signature(
         Err(_) => -1,
     }
 }
-
 
 fn build_aob_validation(pattern: &str, buffer: &[u8]) -> OnyxAobValidation {
     let v = AobValidator::validate(pattern, buffer);

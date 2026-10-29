@@ -1042,4 +1042,3 @@ impl eframe::App for OnyxEngineApp {
         ui::modals::render_all_modals(self, ctx);
     }
 }
-

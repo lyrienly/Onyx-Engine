@@ -7,5 +7,3 @@ KeAddSystemServiceTable(
     IN PUCHAR Number,
     IN ULONG Index
     );
-
-

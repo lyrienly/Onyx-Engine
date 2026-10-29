@@ -12,13 +12,6 @@ fn seeded_rand(seed: u64, len: usize) -> Vec<u8> {
     out
 }
 
-/// Monta um buffer determinista com valores conhecidos:
-///   offset 0x100: i32 = 42
-///   offset 0x200: f32 = 2.5
-///   offset 0x300: i64 = 1234567890123
-///   offset 0x400: f64 = 3.14159
-///   offset 0x500: pointer = 0x1000_1000
-///   offset 0x600: ascii "hello\0"
 fn build_known_buffer() -> Vec<u8> {
     let mut buf = vec![0u8; 0x1000];
     buf[0x100..0x104].copy_from_slice(&42i32.to_le_bytes());
@@ -90,9 +83,9 @@ fn exact_bytes_match() {
 
 #[test]
 fn single_pass_vs_four_passes_benchmark() {
-    // 10 MB.
+
     let mut buf = seeded_rand(0xC0FFEE, 10 * 1024 * 1024);
-    // Inserimos alvos conhecidos.
+
     buf[0x1_000..0x1_004].copy_from_slice(&12345i32.to_le_bytes());
     buf[0x2_000..0x2_004].copy_from_slice(&12345.0f32.to_le_bytes());
     buf[0x3_000..0x3_008].copy_from_slice(&12345i64.to_le_bytes());
@@ -111,7 +104,6 @@ fn single_pass_vs_four_passes_benchmark() {
         assert!(hits.iter().any(|h| h.scan_type == ScanType::I64 && h.address == 0x3_000));
         assert!(hits.iter().any(|h| h.scan_type == ScanType::F64 && h.address == 0x4_000));
 
-        // 4 passagens tipadas separadas sobre o mesmo buffer.
         let t1 = std::time::Instant::now();
         let _ = scan_typed_i32(&buf, 12345);
         let _ = scan_typed_i64(&buf, 12345);
@@ -124,9 +116,6 @@ fn single_pass_vs_four_passes_benchmark() {
     let typed_ms = typed_total.as_secs_f64() * 1000.0 / n as f64;
     let single_typed_ms = typed_ms / 4.0;
 
-    // Nota: um scan tipado faz 1 comparacao de bytes por offset com stride igual
-    // ao tamanho do tipo; o smart_scan faz 5 inferencias (i32/f32/i64/f64/ptr)
-    // por offset alinhado. O criterio justo e vs o custo total das 4 passagens.
     eprintln!(
         "BENCHMARK smart_scan: {:.2} ms | 4 typed passes: {:.2} ms | 1 typed pass: {:.2} ms | ratio smart/4typed: {:.2}x | ratio smart/1typed: {:.2}x",
         smart_ms,
@@ -136,8 +125,6 @@ fn single_pass_vs_four_passes_benchmark() {
         smart_ms / single_typed_ms
     );
 
-    // smart_scan em uma passagem substitui as 4 passagens tipadas; exigimos que
-    // seu custo nao ultrapasse 1.5x o custo total das 4 passagens equivalentes.
     assert!(
         smart_ms <= typed_ms * 1.5,
         "smart_scan ({:.2}ms) excedeu 1.5x das 4 passagens tipadas ({:.2}ms)",
@@ -314,7 +301,7 @@ mod e2e_windows {
     }
 
     fn spawn_cobaia() -> Option<TestProc> {
-        // cmd.exe /K pause -> fica rodando ate ser morto
+
         let mut cmd: Vec<u8> = b"cmd.exe /c pause\0".to_vec();
         let mut si: StartupInfoA = unsafe { MaybeUninit::zeroed().assume_init() };
         si.cb = std::mem::size_of::<StartupInfoA>() as u32;
@@ -361,7 +348,6 @@ mod e2e_windows {
         };
         assert!(!region.is_null(), "VirtualAllocEx falhou");
 
-        // Struct conhecida: i32 42 @ +0x00, f32 2.5 @ +0x10, pointer @ +0x20, string "hello" @ +0x40
         let mut payload = vec![0u8; region_size];
         payload[0x00..0x04].copy_from_slice(&42i32.to_le_bytes());
         payload[0x10..0x14].copy_from_slice(&2.5f32.to_le_bytes());
@@ -382,7 +368,6 @@ mod e2e_windows {
         assert_ne!(ok, 0, "WriteProcessMemory falhou");
         assert_eq!(written, region_size);
 
-        // Le de volta e roda smart_scan.
         let mut readback = vec![0u8; region_size];
         let mut read: SIZE_T = 0;
         let ok = unsafe {
@@ -399,14 +384,12 @@ mod e2e_windows {
 
         let base = region as u64;
 
-        // Numeric(42) encontra o i32.
         let hits = smart_scan(&readback, base, SmartTarget::Numeric(42.0));
         assert!(
             hits.iter().any(|h| h.scan_type == ScanType::I32 && h.address == base + 0x00),
             "nao encontrou i32=42 em +0x00"
         );
 
-        // Any enumera tudo relevante.
         let hits_any = smart_scan(&readback, base, SmartTarget::Any);
         assert!(
             hits_any.iter().any(|h| h.scan_type == ScanType::F32 && h.address == base + 0x10),

@@ -1,4 +1,3 @@
-
 use crate::process::ModuleEntry;
 
 #[derive(Debug, Clone)]
@@ -920,4 +919,3 @@ mod tests {
         assert_eq!(insns[0].target_addr, Some(0x1015));
     }
 }
-

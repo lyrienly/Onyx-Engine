@@ -1,8 +1,3 @@
-/**
- * This file has no copyright assigned and is placed in the Public Domain.
- * This file is part of the w64 mingw-runtime package.
- * No warranty is given; refer to the file DISCLAIMER within this package.
- */
 #ifndef _MALLOC_H_
 #define _MALLOC_H_
 
@@ -28,7 +23,6 @@ extern "C" {
 #define _STATIC_ASSERT(expr) extern void __static_assert_t(int [(expr)?1:-1])
 #endif
 
-/* Return codes for _heapwalk()  */
 #define _HEAPEMPTY (-1)
 #define _HEAPOK (-2)
 #define _HEAPBADBEGIN (-3)
@@ -36,13 +30,12 @@ extern "C" {
 #define _HEAPEND (-5)
 #define _HEAPBADPTR (-6)
 
-/* Values for _heapinfo.useflag */
 #define _FREEENTRY 0
 #define _USEDENTRY 1
 
 #ifndef _HEAPINFO_DEFINED
 #define _HEAPINFO_DEFINED
- /* The structure used to walk through the heap with _heapwalk.  */
+
   typedef struct _heapinfo {
     int *_pentry;
     size_t _size;
@@ -62,8 +55,7 @@ extern "C" {
   void *__cdecl malloc(size_t _Size);
   void *__cdecl realloc(void *_Memory,size_t _NewSize);
   _CRTIMP void *__cdecl _recalloc(void *_Memory,size_t _Count,size_t _Size);
-  /*	_CRTIMP void __cdecl _aligned_free(void *_Memory);
-  _CRTIMP void *__cdecl _aligned_malloc(size_t _Size,size_t _Alignment); */
+
   _CRTIMP void *__cdecl _aligned_offset_malloc(size_t _Size,size_t _Alignment,size_t _Offset);
   _CRTIMP void *__cdecl _aligned_realloc(void *_Memory,size_t _Size,size_t _Alignment);
   _CRTIMP void *__cdecl _aligned_recalloc(void *_Memory,size_t _Count,size_t _Size,size_t _Alignment);
@@ -82,9 +74,7 @@ extern "C" {
 #undef _alloca
 #define _alloca(x) __builtin_alloca((x))
 #else
-  /* tcc implements alloca internally and exposes it (since commit d778bde7).
-  /* alloca is declared at include/stddef.h (which is distributed with tcc).
-   */
+
 #ifdef _alloca
 #undef _alloca
 #endif
@@ -147,7 +137,7 @@ extern "C" {
 #endif
     }
   }
-#endif /* RC_INVOKED */
+#endif
 
 #ifndef	NO_OLDNAMES
 #ifdef __GNUC__
@@ -178,4 +168,4 @@ extern "C" {
 
 #pragma pack(pop)
 
-#endif /* _MALLOC_H_ */
+#endif

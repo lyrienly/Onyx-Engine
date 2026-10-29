@@ -1,10 +1,7 @@
-//! Gerenciador simples de hooks: evita hookar o mesmo alvo duas vezes.
-
 use std::collections::HashMap;
 
 use crate::detour::{Hook, HookError};
 
-/// `HookEngine` mantem referencias nomeadas aos hooks ativos.
 pub struct HookEngine {
     hooks: HashMap<String, Hook>,
     targets: HashMap<usize, String>,
@@ -60,8 +57,6 @@ impl HookEngine {
 }
 
 fn hook_target_addr(hook: &Hook) -> usize {
-    // O trampolim por si so nao expoe o alvo, mas usamos o endereco do
-    // ponteiro de retorno `original()` como estavel para distincao e
-    // reutilizamos o nome como chave principal.
+
     hook.original() as usize
 }

@@ -1,42 +1,17 @@
-/*
- *  CIL code generator for TCC
- * 
- *  Copyright (c) 2002 Fabrice Bellard
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
-
 #error this code has bit-rotted since 2003
 
-/* number of available registers */
 #define NB_REGS             3
 
-/* a register can belong to several classes. The classes must be
-   sorted from more general to more precise (see gv2() code which does
-   assumptions on it). */
-#define RC_ST      0x0001  /* any stack entry */
-#define RC_ST0     0x0002  /* top of stack */
-#define RC_ST1     0x0004  /* top - 1 */
+#define RC_ST      0x0001
+#define RC_ST0     0x0002
+#define RC_ST1     0x0004
 
 #define RC_INT     RC_ST
 #define RC_FLOAT   RC_ST
-#define RC_IRET    RC_ST0 /* function return: integer register */
-#define RC_LRET    RC_ST0 /* function return: second integer register */
-#define RC_FRET    RC_ST0 /* function return: float register */
+#define RC_IRET    RC_ST0
+#define RC_LRET    RC_ST0
+#define RC_FRET    RC_ST0
 
-/* pretty names for the registers */
 enum {
     REG_ST0 = 0,
     REG_ST1,
@@ -44,37 +19,23 @@ enum {
 };
 
 const int reg_classes[NB_REGS] = {
-    /* ST0 */ RC_ST | RC_ST0,
-    /* ST1 */ RC_ST | RC_ST1,
-    /* ST2 */ RC_ST,
+     RC_ST | RC_ST0,
+     RC_ST | RC_ST1,
+     RC_ST,
 };
 
-/* return registers for function */
-#define REG_IRET REG_ST0 /* single word int return register */
-#define REG_LRET REG_ST0 /* second word return register (for long long) */
-#define REG_FRET REG_ST0 /* float return register */
+#define REG_IRET REG_ST0
+#define REG_LRET REG_ST0
+#define REG_FRET REG_ST0
 
-/* defined if function parameters must be evaluated in reverse order */
-/* #define INVERT_FUNC_PARAMS */
-
-/* defined if structures are passed as pointers. Otherwise structures
-   are directly pushed on stack. */
-/* #define FUNC_STRUCT_PARAM_AS_PTR */
-
-/* pointer size, in bytes */
 #define PTR_SIZE 4
 
-/* long double size and alignment, in bytes */
 #define LDOUBLE_SIZE  8
 #define LDOUBLE_ALIGN 8
 
-/* function call context */
 typedef struct GFuncContext {
-    int func_call; /* func call type (FUNC_STDCALL or FUNC_CDECL) */
+    int func_call;
 } GFuncContext;
-
-/******************************************************/
-/* opcode definitions */
 
 #define IL_OP_PREFIX 0xFE
 
@@ -90,9 +51,6 @@ char *il_opcodes_str[] = {
 #undef OP
 };
 
-/******************************************************/
-
-/* arguments variable numbers start from there */
 #define ARG_BASE 0x70000000
 
 static FILE *il_outfile;
@@ -114,7 +72,7 @@ static void init_outfile(void)
 {
     if (!il_outfile) {
         il_outfile = stdout;
-        fprintf(il_outfile, 
+        fprintf(il_outfile,
                 ".assembly extern mscorlib\n"
                 "{\n"
                 ".ver 1:0:2411:0\n"
@@ -129,7 +87,6 @@ static void out_op1(int op)
     out_byte(op & 0xff);
 }
 
-/* output an opcode with prefix */
 static void out_op(int op)
 {
     out_op1(op);
@@ -150,8 +107,7 @@ static void out_opi(int op, int c)
     fprintf(il_outfile, " %s 0x%x\n", il_opcodes_str[op], c);
 }
 
-/* XXX: not complete */
-static void il_type_to_str(char *buf, int buf_size, 
+static void il_type_to_str(char *buf, int buf_size,
                            int t, const char *varstr)
 {
     int bt;
@@ -226,18 +182,14 @@ static void il_type_to_str(char *buf, int buf_size,
  no_var: ;
 }
 
-
-/* patch relocation entry with value 'val' */
 void greloc_patch1(Reloc *p, int val)
 {
 }
 
-/* output a symbol and patch all calls to it */
 void gsym_addr(t, a)
 {
 }
 
-/* output jump and return symbol */
 static int out_opj(int op, int c)
 {
     out_op1(op);
@@ -254,7 +206,6 @@ void gsym(int t)
     fprintf(il_outfile, "L%d:\n", t);
 }
 
-/* load 'r' from value 'sv' */
 void load(int r, SValue *sv)
 {
     int v, fc, ft;
@@ -284,7 +235,7 @@ void load(int r, SValue *sv)
                 }
             }
         } else if (v == VT_CONST) {
-                /* XXX: handle globals */
+
                 out_opi(IL_OP_LDSFLD, 0);
         } else {
             if ((ft & VT_BTYPE) == VT_FLOAT) {
@@ -303,12 +254,12 @@ void load(int r, SValue *sv)
                 out_op(IL_OP_LDIND_U2);
             else
                 out_op(IL_OP_LDIND_I4);
-        } 
+        }
     } else {
         if (v == VT_CONST) {
-            /* XXX: handle globals */
+
             if (fc >= -1 && fc <= 8) {
-                out_op(IL_OP_LDC_I4_M1 + fc + 1); 
+                out_op(IL_OP_LDC_I4_M1 + fc + 1);
             } else {
                 out_opi(IL_OP_LDC_I4, fc);
             }
@@ -328,12 +279,11 @@ void load(int r, SValue *sv)
                 }
             }
         } else {
-            /* XXX: do it */
+
         }
     }
 }
 
-/* store register 'r' in lvalue 'v' */
 void store(int r, SValue *sv)
 {
     int v, fc, ft;
@@ -344,7 +294,7 @@ void store(int r, SValue *sv)
     if (v == VT_LOCAL) {
         if (fc >= ARG_BASE) {
             fc -= ARG_BASE;
-            /* XXX: check IL arg store semantics */
+
             if (fc <= 0xff) {
                 out_opb(IL_OP_STARG_S, fc);
             } else {
@@ -360,7 +310,7 @@ void store(int r, SValue *sv)
             }
         }
     } else if (v == VT_CONST) {
-        /* XXX: handle globals */
+
         out_opi(IL_OP_STSFLD, 0);
     } else {
         if ((ft & VT_BTYPE) == VT_FLOAT)
@@ -378,37 +328,32 @@ void store(int r, SValue *sv)
     }
 }
 
-/* start function call and return function call context */
 void gfunc_start(GFuncContext *c, int func_call)
 {
     c->func_call = func_call;
 }
 
-/* push function parameter which is in (vtop->t, vtop->c). Stack entry
-   is then popped. */
 void gfunc_param(GFuncContext *c)
 {
     if ((vtop->t & VT_BTYPE) == VT_STRUCT) {
         tcc_error("structures passed as value not handled yet");
     } else {
-        /* simply push on stack */
+
         gv(RC_ST0);
     }
     vtop--;
 }
 
-/* generate function call with address in (vtop->t, vtop->c) and free function
-   context. Stack entry is popped */
 void gfunc_call(GFuncContext *c)
 {
     char buf[1024];
 
     if ((vtop->r & (VT_VALMASK | VT_LVAL)) == VT_CONST) {
-        /* XXX: more info needed from tcc */
+
         il_type_to_str(buf, sizeof(buf), vtop->t, "xxx");
         fprintf(il_outfile, " call %s\n", buf);
     } else {
-        /* indirect call */
+
         gv(RC_INT);
         il_type_to_str(buf, sizeof(buf), vtop->t, NULL);
         fprintf(il_outfile, " calli %s\n", buf);
@@ -416,7 +361,6 @@ void gfunc_call(GFuncContext *c)
     vtop--;
 }
 
-/* generate function prolog of type 't' */
 void gfunc_prolog(int t)
 {
     int addr, u, func_call;
@@ -425,30 +369,28 @@ void gfunc_prolog(int t)
 
     init_outfile();
 
-    /* XXX: pass function name to gfunc_prolog */
     il_type_to_str(buf, sizeof(buf), t, funcname);
     fprintf(il_outfile, ".method static %s il managed\n", buf);
     fprintf(il_outfile, "{\n");
-    /* XXX: cannot do better now */
+
     fprintf(il_outfile, " .maxstack %d\n", NB_REGS);
     fprintf(il_outfile, " .locals (int32, int32, int32, int32, int32, int32, int32, int32)\n");
-    
+
     if (!strcmp(funcname, "main"))
         fprintf(il_outfile, " .entrypoint\n");
-        
+
     sym = sym_find((unsigned)t >> VT_STRUCT_SHIFT);
     func_call = sym->r;
 
     addr = ARG_BASE;
-    /* if the function returns a structure, then add an
-       implicit pointer parameter */
+
     func_vt = sym->t;
     func_var = (sym->c == FUNC_ELLIPSIS);
     if ((func_vt & VT_BTYPE) == VT_STRUCT) {
         func_vc = addr;
         addr++;
     }
-    /* define parameters */
+
     while ((sym = sym->next) != NULL) {
         u = sym->t;
         sym_push(sym->v & ~SYM_FIELD, u,
@@ -457,27 +399,23 @@ void gfunc_prolog(int t)
     }
 }
 
-/* generate function epilog */
 void gfunc_epilog(void)
 {
     out_op(IL_OP_RET);
     fprintf(il_outfile, "}\n\n");
 }
 
-/* generate a jump to a label */
 int gjmp(int t)
 {
     return out_opj(IL_OP_BR, t);
 }
 
-/* generate a jump to a fixed address */
 void gjmp_addr(int a)
 {
-    /* XXX: handle syms */
+
     out_opi(IL_OP_BR, a);
 }
 
-/* generate a test. set 'inv' to invert test. Stack entry is popped */
 int gtst(int inv, int t)
 {
     int v, *p, c;
@@ -519,9 +457,9 @@ int gtst(int inv, int t)
         }
         t = out_opj(c, t);
     } else if (v == VT_JMP || v == VT_JMPI) {
-        /* && or || optimization */
+
         if ((v & 1) == inv) {
-            /* insert vtop->c jump list in t */
+
             p = &vtop->c.i;
             while (*p != 0)
                 p = (int *)*p;
@@ -536,7 +474,6 @@ int gtst(int inv, int t)
     return t;
 }
 
-/* generate an integer binary operation */
 void gen_opi(int op)
 {
     gv2(RC_ST1, RC_ST0);
@@ -601,16 +538,12 @@ void gen_opi(int op)
     }
 }
 
-/* generate a floating point operation 'v = t1 op t2' instruction. The
-   two operands are guaranteed to have the same floating point type */
 void gen_opf(int op)
 {
-    /* same as integer */
+
     gen_opi(op);
 }
 
-/* convert integers to fp 't' type. Must handle 'int', 'unsigned int'
-   and 'long long' cases. */
 void gen_cvt_itof(int t)
 {
     gv(RC_ST0);
@@ -620,8 +553,6 @@ void gen_cvt_itof(int t)
         out_op(IL_OP_CONV_R8);
 }
 
-/* convert fp to int 't' type */
-/* XXX: handle long long case */
 void gen_cvt_ftoi(int t)
 {
     gv(RC_ST0);
@@ -641,7 +572,6 @@ void gen_cvt_ftoi(int t)
     }
 }
 
-/* convert from one floating point type to another */
 void gen_cvt_ftof(int t)
 {
     gv(RC_ST0);
@@ -651,7 +581,3 @@ void gen_cvt_ftof(int t)
         out_op(IL_OP_CONV_R8);
     }
 }
-
-/* end of CIL code generator */
-/*************************************************************/
-

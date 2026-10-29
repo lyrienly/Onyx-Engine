@@ -1,11 +1,3 @@
-/*
-wstring.c
-
-Copyright (C) 2003-2008 Gil Dabah, http://ragestorm.net/distorm/
-This library is licensed under the BSD license. See the file COPYING.
-*/
-
-
 #include "wstring.h"
 
 void _FASTCALL_ strcpy_WS(_WString* s, const int8_t* buf)
@@ -25,4 +17,3 @@ void _FASTCALL_ strcatlen_WS(_WString* s, const int8_t* buf, unsigned int len)
 	memcpy((int8_t*)&s->p[s->pos], buf, len + 1);
 	s->pos += len;
 }
-

@@ -1,4 +1,3 @@
-
 use std::collections::{HashMap, HashSet};
 use crate::process::Process;
 use crate::debugger::disasm::Disassembler;
@@ -184,4 +183,3 @@ mod tests {
         assert_eq!(calls[0].to_address, 0x1015);
     }
 }
-

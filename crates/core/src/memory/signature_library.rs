@@ -1,4 +1,3 @@
-
 use crate::memory::aob_validator::{AobValidation, AobValidator};
 
 const HEADER: &str = "# onyx-aob-library v1";

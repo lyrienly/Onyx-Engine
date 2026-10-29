@@ -1,8 +1,3 @@
-/* This will contain all routines to handle os specific routines, like getPID, 
- * 
- */
-
-
 #include "osspecific.h"
 #include "main.h"
 #include "common.h"
@@ -11,11 +6,8 @@
 
 int getpid(pcpuinfo currentcpuinfo)
 {
-  
-  //if xp sp2-32bit
-  //[[kernel fs:124]+1ec]=pid
 
-  ULONG fsbase=vmread(0x680e);  
+  ULONG fsbase=vmread(0x680e);
 
   ULONG *part1=mapVMmemory(currentcpuinfo, fsbase+0x124, 4, NULL, NULL);
 
@@ -33,4 +25,3 @@ int getpid(pcpuinfo currentcpuinfo)
 
   return 0;
 }
-

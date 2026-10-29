@@ -1,17 +1,3 @@
-/*
-* The code below can be used to make a Lua core that does not contain the
-* parsing modules (lcode, llex, lparser), which represent 35% of the total core.
-* You'll only be able to load binary files and strings, precompiled with luac.
-* (Of course, you'll have to build luac with the original parsing modules!)
-*
-* To use this module, simply compile it ("make noparser" does that) and list
-* its object file before the Lua libraries. The linker should then not load
-* the parsing modules. To try it, do "make luab".
-*
-* If you also want to avoid the dump module (ldump.o), define NODUMP.
-* #define NODUMP
-*/
-
 #define LUA_CORE
 
 #include "llex.h"

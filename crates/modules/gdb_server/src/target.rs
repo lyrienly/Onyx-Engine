@@ -1,14 +1,7 @@
-//! abstracao do alvo de depuracao: registradores + memoria.
-//!
-//! o servidor nao conhece a implementacao concreta — pode ser um processo
-//! usuario (ReadProcessMemory), o driver ow_mem ou um mock pra teste.
-
 use std::collections::BTreeMap;
 use std::io;
 use std::sync::Mutex;
 
-/// 17 registradores gerais x86_64 na ordem que o gdb espera:
-/// rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp, r8..r15, rip.
 #[derive(Debug, Clone, Default)]
 pub struct Registers {
     pub rax: u64,
@@ -82,7 +75,6 @@ impl Registers {
         true
     }
 
-    /// serializa como g packet: 17 u64 little-endian em hex ascii.
     pub fn to_g_hex(&self) -> String {
         let mut buf = [0u8; Self::BYTES];
         for i in 0..Self::COUNT {
@@ -96,7 +88,6 @@ impl Registers {
         s
     }
 
-    /// faz parse do payload de um G packet.
     pub fn from_g_hex(s: &str) -> Option<Self> {
         if s.len() < Self::BYTES * 2 {
             return None;
@@ -112,12 +103,11 @@ impl Registers {
     }
 }
 
-/// razao do halt — reportada ao cliente via `?` e apos `c`/`s`.
 #[derive(Debug, Clone, Copy)]
 pub enum StopReason {
-    Trap,       // S05 — breakpoint/single-step
-    Interrupt,  // S02
-    Exited,     // W00
+    Trap,
+    Interrupt,
+    Exited,
 }
 
 impl StopReason {
@@ -130,8 +120,6 @@ impl StopReason {
     }
 }
 
-/// trait implementada pelos alvos reais (processo win32, driver, veh)
-/// e pelo mock de teste.
 pub trait GdbTarget: Send {
     fn read_registers(&self) -> io::Result<Registers>;
     fn write_registers(&mut self, regs: &Registers) -> io::Result<()>;
@@ -157,11 +145,10 @@ pub trait GdbTarget: Send {
     }
 }
 
-/// alvo falso em memoria para testes e desenvolvimento.
 pub struct MockTarget {
     pub regs: Registers,
     pub mem: BTreeMap<u64, u8>,
-    pub breakpoints: Vec<(u64, u32, bool)>, // (addr, kind, is_hw)
+    pub breakpoints: Vec<(u64, u32, bool)>,
 }
 
 impl MockTarget {
@@ -228,7 +215,6 @@ impl GdbTarget for MockTarget {
     }
 }
 
-/// wrapper que coloca um alvo atras de mutex para compartilhar entre threads.
 pub struct SharedTarget<T: GdbTarget> {
     inner: Mutex<T>,
 }

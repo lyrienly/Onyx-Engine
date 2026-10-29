@@ -1,13 +1,6 @@
 #ifndef ONYX_PLUGIN_H
 #define ONYX_PLUGIN_H
 
-/**
- * OnyxEngine Native Plugin SDK (C-ABI)
- * Compatible with Visual Studio 2022+ (MSVC), GCC, Clang, and Rust cdylib
- * 
- * Header Version: 1.0.0
- */
-
 #include <stdint.h>
 #include <stddef.h>
 
@@ -25,7 +18,6 @@ extern "C" {
   #define ONYX_PLUGIN_CALL
 #endif
 
-/* Result / Error Codes */
 #define ONYX_PLUGIN_OK                 0
 #define ONYX_PLUGIN_ERR_INVALID_PARAM -1
 #define ONYX_PLUGIN_ERR_NOT_FOUND     -2
@@ -33,31 +25,28 @@ extern "C" {
 #define ONYX_PLUGIN_ERR_EXECUTION     -4
 #define ONYX_PLUGIN_ERR_NOT_SUPPORTED -5
 
-/* Plugin Metadata Structure */
 #pragma pack(push, 8)
 typedef struct OnyxPluginInfo {
-    uint32_t api_version;       /* Must be ONYX_PLUGIN_API_VERSION */
-    const char* name;           /* Plugin Name (UTF-8) */
-    const char* version;        /* Plugin Version string, e.g. "1.0.0" */
-    const char* author;         /* Plugin Author */
-    const char* description;    /* Short description */
+    uint32_t api_version;
+    const char* name;
+    const char* version;
+    const char* author;
+    const char* description;
 } OnyxPluginInfo;
 
-/* AOB Match / Validation Result Structure */
 typedef struct OnyxAobMatchResult {
-    uint64_t address;           /* Resolved absolute address of first match */
-    uint32_t match_count;       /* Total number of matches in target process */
-    uint32_t is_unique;         /* 1 if exactly 1 match found, 0 otherwise */
-    char module_name[128];      /* Name of module containing match, e.g. "game.exe" */
-    uint64_t module_base;       /* Base address of the containing module */
-    uint64_t module_offset;     /* Offset from module base */
-    char function_name[256];    /* Closest export / PDB symbol / function name */
-    uint64_t function_start;    /* Entry address of the enclosing function */
-    int64_t function_offset;    /* Displacement in bytes from function start */
-    char disasm_preview[512];   /* Disassembly lines preview around match */
+    uint64_t address;
+    uint32_t match_count;
+    uint32_t is_unique;
+    char module_name[128];
+    uint64_t module_base;
+    uint64_t module_offset;
+    char function_name[256];
+    uint64_t function_start;
+    int64_t function_offset;
+    char disasm_preview[512];
 } OnyxAobMatchResult;
 
-/* Host Engine API passed to plugin on initialization */
 typedef struct OnyxPluginHostAPI {
     uint32_t struct_size;
     uint32_t (ONYX_PLUGIN_CALL *get_target_pid)(void);
@@ -69,12 +58,10 @@ typedef struct OnyxPluginHostAPI {
 } OnyxPluginHostAPI;
 #pragma pack(pop)
 
-/* Standard Plugin Exports (must be exported by plugin DLL) */
 ONYX_PLUGIN_EXPORT int32_t ONYX_PLUGIN_CALL OnyxPlugin_GetInfo(OnyxPluginInfo* out_info);
 ONYX_PLUGIN_EXPORT int32_t ONYX_PLUGIN_CALL OnyxPlugin_Init(const OnyxPluginHostAPI* host_api);
 ONYX_PLUGIN_EXPORT void    ONYX_PLUGIN_CALL OnyxPlugin_Shutdown(void);
 
-/* Optional Specific Capability Exports for SigMaker / AOB Validator */
 ONYX_PLUGIN_EXPORT int32_t ONYX_PLUGIN_CALL OnyxPlugin_ValidateAOB(
     uint32_t pid,
     const char* pattern,
@@ -94,4 +81,4 @@ ONYX_PLUGIN_EXPORT int32_t ONYX_PLUGIN_CALL OnyxPlugin_GenerateAOB(
 }
 #endif
 
-#endif /* ONYX_PLUGIN_H */
+#endif

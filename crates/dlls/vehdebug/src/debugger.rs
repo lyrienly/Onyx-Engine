@@ -1,12 +1,3 @@
-//! Breakpoint manager (software INT3 + hardware DR0-DR7) por cima do
-//! dispatcher VEH. Design foca em estabilidade:
-//!
-//! * SW bp: escreve `0xCC`, VEH captura `EXCEPTION_BREAKPOINT`, decrementa RIP,
-//!   restaura o byte original e liga a Trap Flag para re-armar o `0xCC`
-//!   depois que a instrucao original executa (igual tecnica usada em #36).
-//! * HW bp: configura DR0-DR3 + DR7 na thread corrente; no hit, limpa DR6 e
-//!   seta a Resume Flag para evitar refire infinito.
-
 use crate::ffi::*;
 use crate::veh::{
     BreakpointId, VehDisposition, VehHandler, allocate_id, register_handler,
@@ -15,7 +6,6 @@ use crate::veh::{
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Mutex;
 
-/// Snapshot entregue ao callback de hit.
 #[derive(Debug, Copy, Clone, Default)]
 pub struct BpHit {
     pub id: u64,
@@ -34,7 +24,6 @@ pub struct BpHit {
 
 pub type HitSink = Box<dyn Fn(BpHit) + Send + Sync>;
 
-/// Tamanhos validos para HW bp (bits LEN em DR7).
 #[derive(Debug, Copy, Clone)]
 #[repr(u8)]
 pub enum HwBpSize {
@@ -44,7 +33,6 @@ pub enum HwBpSize {
     Eight = 0b10,
 }
 
-/// Tipos de acesso (bits R/W em DR7).
 #[derive(Debug, Copy, Clone)]
 #[repr(u8)]
 pub enum HwBpAccess {
@@ -52,8 +40,6 @@ pub enum HwBpAccess {
     Write = 0b01,
     ReadWrite = 0b11,
 }
-
-// -------------------- Software breakpoint --------------------
 
 struct SwBreakpoint {
     id: BreakpointId,
@@ -85,15 +71,14 @@ impl SwBreakpoint {
 
 impl Drop for SwBreakpoint {
     fn drop(&mut self) {
-        // Garante que o byte original volta ao lugar quando o breakpoint
-        // sai do registry — essencial para evitar INT3 orfao no alvo.
+
         let _ = self.disarm();
     }
 }
 
 impl Drop for HwBreakpoint {
     fn drop(&mut self) {
-        // Reprograma o DR correspondente para zero.
+
         let _ = program_debug_registers(
             0,
             self.dr_index,
@@ -111,14 +96,13 @@ impl VehHandler for SwBreakpoint {
 
     fn matches(&self, record: &EXCEPTION_RECORD, context: &CONTEXT) -> bool {
         if record.ExceptionCode == EXCEPTION_BREAKPOINT {
-            // RIP ja esta no byte do INT3 em x64 (o kernel aponta para a
-            // instrucao faulting, nao para a proxima).
+
             return context.Rip as usize == self.address;
         }
         if record.ExceptionCode == EXCEPTION_SINGLE_STEP
             && self.expecting_single_step.load(Ordering::SeqCst)
         {
-            // Um unico single-step pendente apos restauro para re-armar.
+
             return true;
         }
         false
@@ -127,7 +111,7 @@ impl VehHandler for SwBreakpoint {
     fn handle(&self, record: &EXCEPTION_RECORD, context: &mut CONTEXT) -> VehDisposition {
         match record.ExceptionCode {
             EXCEPTION_BREAKPOINT => {
-                // Reporta hit.
+
                 if let Some(sink) = &self.sink {
                     sink(BpHit {
                         id: self.id.0,
@@ -145,20 +129,18 @@ impl VehHandler for SwBreakpoint {
                     });
                 }
 
-                // Restaura byte original para a instrucao poder rodar.
                 unsafe {
                     let orig = self.original_byte.load(Ordering::SeqCst);
                     write_byte(self.address, orig);
                 }
                 self.armed.store(false, Ordering::SeqCst);
 
-                // Liga TF para pegar um single-step e re-armar o INT3.
                 self.expecting_single_step.store(true, Ordering::SeqCst);
                 context.EFlags |= EFLAGS_TF;
                 VehDisposition::Continue
             }
             EXCEPTION_SINGLE_STEP => {
-                // Instrucao original ja executou — re-arma.
+
                 self.expecting_single_step.store(false, Ordering::SeqCst);
                 let _ = self.arm();
                 context.EFlags &= !EFLAGS_TF;
@@ -169,12 +151,10 @@ impl VehHandler for SwBreakpoint {
     }
 }
 
-// -------------------- Hardware breakpoint --------------------
-
 struct HwBreakpoint {
     id: BreakpointId,
     address: u64,
-    dr_index: u8, // 0..=3
+    dr_index: u8,
     sink: Option<HitSink>,
 }
 
@@ -187,7 +167,7 @@ impl VehHandler for HwBreakpoint {
         if record.ExceptionCode != EXCEPTION_SINGLE_STEP {
             return false;
         }
-        // bit B0..B3 em DR6 sinaliza qual DR disparou.
+
         let mask = 1u64 << self.dr_index;
         (context.Dr6 & mask) != 0
     }
@@ -209,17 +189,13 @@ impl VehHandler for HwBreakpoint {
                 rbp: context.Rbp,
             });
         }
-        // Limpa o bit especifico de DR6 e seta RF em EFLAGS: assim a
-        // instrucao faulting nao refira o mesmo DR imediatamente.
+
         context.Dr6 &= !(1u64 << self.dr_index);
         context.EFlags |= EFLAGS_RF;
         VehDisposition::Continue
     }
 }
 
-// -------------------- VehDebugger --------------------
-
-/// Facade publica. Dona do `VehRegistration` enquanto estiver viva.
 pub struct VehDebugger {
     _registration: crate::veh::VehRegistration,
 }
@@ -275,27 +251,15 @@ impl VehDebugger {
 
     pub fn remove(&self, id: BreakpointId) -> bool {
         if let Some(h) = unregister_handler(id) {
-            // Downcast nao e trivial com dyn trait sem Any; usamos um
-            // marcador via drop custom. Para simplicidade: tentamos
-            // tratar como SwBreakpoint primeiro — se o drop desarmar o
-            // byte, otimo; HwBreakpoint precisa limpar DR*.
-            //
-            // Como alternativa limpa, chamamos uma trait method opcional
-            // via side-channel: um Box<dyn VehHandler> nao expoe `remove`,
-            // entao executamos a limpeza aqui por heuristica — a
-            // implementacao concreta fica a cargo de cada struct via Drop.
+
             drop(h);
-            // Reprograma DRs — se o id correspondia a um hw bp, o DR fica
-            // sem a entrada. Como nao sabemos qual DR era, iteramos: na
-            // pratica, chamadores sabem o id e podem invocar
-            // `clear_all_hw_bps` quando quiserem.
+
             true
         } else {
             false
         }
     }
 
-    /// Desliga TODOS os DRs da thread corrente — util como kill-switch.
     pub fn clear_all_hw_bps(&self) {
         clear_debug_registers();
     }
@@ -307,8 +271,6 @@ impl Drop for VehDebugger {
         crate::veh::disarm_dispatcher();
     }
 }
-
-// -------------------- Byte patching helpers --------------------
 
 unsafe fn write_byte(address: usize, value: u8) -> bool {
     let mut old_prot: DWORD = 0;
@@ -344,11 +306,8 @@ unsafe fn patch_byte(
     true
 }
 
-// -------------------- Debug register plumbing --------------------
-
 static DR_LOCK: Mutex<()> = Mutex::new(());
 
-/// Programa um DR especifico. Preserva outros DRs ja setados.
 fn program_debug_registers(
     address: u64,
     dr_index: u8,
@@ -372,17 +331,17 @@ fn program_debug_registers(
             _ => return false,
         }
         let mut dr7 = ctx.Dr7;
-        // Limpa 4 bits de LEN/RW para este DR (bits 16+idx*4 .. 19+idx*4).
+
         let rw_shift = 16 + (dr_index as u64) * 4;
         let len_shift = 18 + (dr_index as u64) * 4;
         dr7 &= !(0b1111u64 << rw_shift);
-        // Limpa bits L/G (local/global enable) do DR.
+
         let le_shift = (dr_index as u64) * 2;
         dr7 &= !(0b11u64 << le_shift);
         if enable {
             dr7 |= (access as u64) << rw_shift;
             dr7 |= (size as u64) << len_shift;
-            dr7 |= 1u64 << le_shift; // Local Enable
+            dr7 |= 1u64 << le_shift;
         }
         ctx.Dr7 = dr7;
         ctx.Dr6 = 0;
@@ -391,7 +350,6 @@ fn program_debug_registers(
     }
 }
 
-/// Zera todos os DRs da thread corrente.
 pub fn clear_debug_registers() {
     let _guard = DR_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     unsafe {

@@ -1,4 +1,3 @@
-
 use std::mem::size_of;
 use std::ptr::null_mut;
 use crate::win32::*;
@@ -236,7 +235,6 @@ impl DbkDriver {
         }
     }
 
-    /// Oculta o processo especificado (ou o proprio OnyxEngine) da lista ActiveProcessLinks via DKOM no kernel.
     pub fn hide_process(&self, pid: u32) -> Result<(), String> {
         let mut input_pid = pid;
         let mut returned: DWORD = 0;
@@ -693,8 +691,6 @@ impl DbkDriver {
         }
     }
 
-
-    /// Leitura direta de memoria do alvo via page-walking de CR3 (Zero thread attach, indetectavel por anti-cheats).
     pub fn read_memory_cr3(&self, pid: u32, address: u64, len: usize) -> Result<Vec<u8>, String> {
         self.bulk_dump_cr3(pid, address, len)
     }
@@ -716,7 +712,6 @@ impl DbkDriver {
         false
     }
 
-    /// Verifica se o Test Signing (Modo de Teste) esta ativo no Windows.
     pub fn is_test_signing_enabled() -> bool {
         #[cfg(target_os = "windows")]
         {
@@ -744,4 +739,3 @@ impl Drop for DbkDriver {
         }
     }
 }
-

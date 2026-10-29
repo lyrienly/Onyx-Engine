@@ -74,14 +74,11 @@ pub struct StructLayout {
 pub struct StructSpider;
 
 impl StructSpider {
-    /// Analyze bytes already read from the target (unit-testable without a Process).
+
     pub fn infer_bytes(base: usize, buf: &[u8]) -> StructLayout {
         Self::infer_from_slice(base, buf, &[], &[])
     }
 
-    /// Analyze with knowledge of readable and executable memory regions for
-    /// pointer classification. `readable` and `executable` are lists of
-    /// (base, size) pairs.
     pub fn infer_from_slice(
         base: usize,
         buf: &[u8],
@@ -99,16 +96,14 @@ impl StructSpider {
         while off < total_size {
             let remaining = total_size - off;
 
-            // Try 8-byte aligned, 8-byte wide field first
             if off % 8 == 0 && remaining >= 8 {
                 let bytes = &buf[off..off + 8];
                 let u = u64::from_le_bytes(bytes.try_into().unwrap());
                 let s = i64::from_le_bytes(bytes.try_into().unwrap());
                 let f = f64::from_le_bytes(bytes.try_into().unwrap());
 
-                // Padding: 8 zero bytes
                 if u == 0 {
-                    // Coalesce zero padding
+
                     let start = off;
                     let mut end = off + 8;
                     while end + 8 <= total_size && end % 8 == 0 {
@@ -129,7 +124,6 @@ impl StructSpider {
                     continue;
                 }
 
-                // Pointer candidates (user-space, high enough to not be small int)
                 let ptr = u as usize;
                 let looks_like_pointer = u >= 0x10000 && u <= 0x7FFF_FFFF_FFFF;
                 if looks_like_pointer {
@@ -144,8 +138,7 @@ impl StructSpider {
                         continue;
                     }
                     if in_region(ptr, readable) {
-                        // Attempt to detect a vtable: first qword points to code
-                        // We don't have Process here; caller may re-scan. Default to Pointer.
+
                         fields.push(InferredField {
                             offset: off,
                             size: 8,
@@ -157,9 +150,8 @@ impl StructSpider {
                     }
                 }
 
-                // Float64 in reasonable magnitude
                 if f.is_finite() && f.abs() >= 1e-3 && f.abs() <= 1e5 {
-                    // But only if it doesn't look like a nicely-sized int64
+
                     if !(s.abs() < 1_000_000 && (u & 0xFFFF_FFFF_0000_0000) == 0) {
                         fields.push(InferredField {
                             offset: off,
@@ -172,7 +164,6 @@ impl StructSpider {
                     }
                 }
 
-                // Split: upper 4 bytes zero -> try i32/f32 at lower, then 4-byte padding
                 let upper = &buf[off + 4..off + 8];
                 if upper == [0, 0, 0, 0] {
                     let lower = &buf[off..off + 4];
@@ -195,7 +186,7 @@ impl StructSpider {
                             value_hint: format!("{} (0x{:X})", i, i),
                         });
                     }
-                    // trailing 4 zero bytes = alignment padding
+
                     fields.push(InferredField {
                         offset: off + 4,
                         size: 4,
@@ -206,7 +197,6 @@ impl StructSpider {
                     continue;
                 }
 
-                // Fallback: i64
                 fields.push(InferredField {
                     offset: off,
                     size: 8,
@@ -217,7 +207,6 @@ impl StructSpider {
                 continue;
             }
 
-            // 4-byte aligned, 4-byte wide
             if off % 4 == 0 && remaining >= 4 {
                 let lower = &buf[off..off + 4];
                 let i = i32::from_le_bytes(lower.try_into().unwrap());
@@ -254,7 +243,6 @@ impl StructSpider {
                 continue;
             }
 
-            // byte-level
             let b = buf[off];
             let kind = match b {
                 0 => InferredKind::Padding,
@@ -270,7 +258,6 @@ impl StructSpider {
             off += 1;
         }
 
-        // Infer overall alignment: 8 if any field is 8-wide, else 4, else 1
         let alignment = if fields.iter().any(|f| f.size == 8) {
             8
         } else if fields.iter().any(|f| f.size == 4) {
@@ -282,9 +269,6 @@ impl StructSpider {
         StructLayout { base, total_size, alignment, fields }
     }
 
-    /// Full inference using a live Process: reads memory, enumerates regions,
-    /// and promotes heap pointers to VTablePointer / StringPointer when their
-    /// targets qualify.
     pub fn infer_struct(
         proc: &Process,
         base: usize,
@@ -306,10 +290,9 @@ impl StructSpider {
 
         let mut layout = Self::infer_from_slice(base, &buf, &readable, &executable);
 
-        // Second pass: upgrade Pointer -> VTablePointer / StringPointer
         for f in layout.fields.iter_mut() {
             if let InferredKind::Pointer(p) = f.kind {
-                // Try reading a string first
+
                 if let Ok(s) = proc.read_string(p, 64, false) {
                     if is_printable_ascii(&s) && s.len() >= 2 {
                         f.kind = InferredKind::StringPointer(p, s.clone());
@@ -317,7 +300,7 @@ impl StructSpider {
                         continue;
                     }
                 }
-                // Try reading first qword and checking if it's code (vtable)
+
                 if let Ok(first) = proc.read::<usize>(p) {
                     let is_code = executable.iter().any(|(b, s)| first >= *b && first < b.saturating_add(*s));
                     if is_code {
@@ -400,17 +383,7 @@ mod tests {
     use super::*;
 
     fn build_buf() -> ([u8; 48], usize, usize) {
-        // Layout:
-        //  +0x00 i64 = 0x1122334455667788
-        //  +0x08 i32 = 42
-        //  +0x0C pad (4 zero bytes)
-        //  +0x10 f32 = 2.5
-        //  +0x14 pad (4 zero bytes)
-        //  +0x18 i64 = -9999
-        //  +0x20 i32 = 1337
-        //  +0x24 pad (4 zero bytes)
-        //  +0x28 i32 = 7
-        //  +0x2C pad (4 zero bytes)
+
         let mut b = [0u8; 48];
         b[0..8].copy_from_slice(&0x1122334455667788i64.to_le_bytes());
         b[8..12].copy_from_slice(&42i32.to_le_bytes());
@@ -418,7 +391,7 @@ mod tests {
         b[24..32].copy_from_slice(&(-9999i64).to_le_bytes());
         b[32..36].copy_from_slice(&1337i32.to_le_bytes());
         b[40..44].copy_from_slice(&7i32.to_le_bytes());
-        // Pretend a readable region at 0x40000000..0x40010000 and executable at 0x50000000..0x50010000
+
         let fake_readable_base = 0x4000_0000usize;
         let fake_exec_base = 0x5000_0000usize;
         (b, fake_readable_base, fake_exec_base)
@@ -429,17 +402,6 @@ mod tests {
         let (buf, _, _) = build_buf();
         let layout = StructSpider::infer_bytes(0, &buf);
 
-        // We expect:
-        //  field @ 0x00 size 8 (i64 at high magnitude)
-        //  field @ 0x08 size 4 i32=42
-        //  pad   @ 0x0C size 4
-        //  field @ 0x10 size 4 f32=2.5
-        //  pad   @ 0x14 size 4
-        //  field @ 0x18 size 8 i64=-9999
-        //  field @ 0x20 size 4 i32=1337
-        //  pad   @ 0x24 size 4
-        //  field @ 0x28 size 4 i32=7
-        //  pad   @ 0x2C size 4
         let f0 = &layout.fields[0];
         assert_eq!(f0.offset, 0);
         assert_eq!(f0.size, 8);
@@ -489,8 +451,7 @@ mod tests {
 
     #[test]
     fn detects_pointer_as_code_vs_heap() {
-        // bytes[0..8] = pointer into fake executable region
-        // bytes[8..16] = pointer into fake readable region (heap)
+
         let (mut buf, readable_base, exec_base) = build_buf();
         buf[0..8].copy_from_slice(&(exec_base + 0x400).to_le_bytes());
         buf[8..16].copy_from_slice(&(readable_base + 0x200).to_le_bytes());
@@ -510,8 +471,6 @@ mod tests {
         assert!(matches!(f1.kind, InferredKind::Pointer(_)), "got {:?}", f1.kind);
     }
 
-    /// E2E: alloc memory in the current process, write a known struct, run the
-    /// spider against the live Process API, and verify inference.
     #[test]
     fn e2e_infer_struct_from_live_process() {
         let proc = Process::attach_current().expect("attach current");
@@ -519,14 +478,6 @@ mod tests {
             .alloc(64, crate::process::win32::PAGE_READWRITE)
             .expect("alloc");
 
-        // offset  value
-        //  0x00   i64 = 0x7F00000012345678
-        //  0x08   i32 = 42
-        //  0x0C   pad
-        //  0x10   f32 = 2.5
-        //  0x14   pad
-        //  0x18   i64 = -1000
-        //  0x20   pointer into own heap (another alloc)
         let other = proc
             .alloc(32, crate::process::win32::PAGE_READWRITE)
             .expect("alloc other");
@@ -564,7 +515,6 @@ mod tests {
             f20.kind
         );
 
-        // Export checks
         let cpp = StructSpider::to_cpp("E2E", &layout);
         assert!(cpp.contains("int32_t"));
         assert!(cpp.contains("float"));
@@ -572,7 +522,6 @@ mod tests {
         assert!(rs.contains(": i32"));
         assert!(rs.contains(": f32"));
 
-        // Print layout to help debugging in CI logs
         println!("--- Inferred layout ---\n{}\n{}", cpp, rs);
 
         let _ = proc.free(addr);

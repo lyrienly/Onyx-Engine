@@ -1,10 +1,3 @@
-/*
- * server.h
- *
- *  Created on: Aug 25, 2013
- *      Author: eric
- */
-
 #ifndef SERVER_H_
 #define SERVER_H_
 
@@ -16,5 +9,4 @@
 #define EXTCMD_CHANGEMEMORYPROTECTION  5
 #define EXTCMD_LOADMODULEEX            6
 
-
-#endif /* SERVER_H_ */
+#endif

@@ -1,26 +1,24 @@
 #ifdef TARGET_DEFS_ONLY
 
-// Number of registers available to allocator:
-#define NB_REGS 19 // x10-x17 aka a0-a7, f10-f17 aka fa0-fa7, xxx, ra, sp
+#define NB_REGS 19
 #define NB_ASM_REGS 32
 #define CONFIG_TCC_ASM
 
-#define TREG_R(x) (x) // x = 0..7
-#define TREG_F(x) (x + 8) // x = 0..7
+#define TREG_R(x) (x)
+#define TREG_F(x) (x + 8)
 
-// Register classes sorted from more general to more precise:
 #define RC_INT (1 << 0)
 #define RC_FLOAT (1 << 1)
-#define RC_R(x) (1 << (2 + (x))) // x = 0..7
-#define RC_F(x) (1 << (10 + (x))) // x = 0..7
+#define RC_R(x) (1 << (2 + (x)))
+#define RC_F(x) (1 << (10 + (x)))
 
-#define RC_IRET (RC_R(0)) // int return register class
-#define RC_IRE2 (RC_R(1)) // int 2nd return register class
-#define RC_FRET (RC_F(0)) // float return register class
+#define RC_IRET (RC_R(0))
+#define RC_IRE2 (RC_R(1))
+#define RC_FRET (RC_F(0))
 
-#define REG_IRET (TREG_R(0)) // int return register number
-#define REG_IRE2 (TREG_R(1)) // int 2nd return register number
-#define REG_FRET (TREG_F(0)) // float return register number
+#define REG_IRET (TREG_R(0))
+#define REG_IRE2 (TREG_R(1))
+#define REG_FRET (TREG_F(0))
 
 #define PTR_SIZE 8
 
@@ -83,11 +81,11 @@ ST_DATA int func_bound_add_epilog;
 static int ireg(int r)
 {
     if (r == TREG_RA)
-      return 1; // ra
+      return 1;
     if (r == TREG_SP)
-      return 2; // sp
+      return 2;
     assert(r >= 0 && r < 8);
-    return r + 10;  // tccrX --> aX == x(10+X)
+    return r + 10;
 }
 
 static int is_ireg(int r)
@@ -98,7 +96,7 @@ static int is_ireg(int r)
 static int freg(int r)
 {
     assert(r >= 8 && r < 16);
-    return r - 8 + 10;  // tccfX --> faX == f(10+X)
+    return r - 8 + 10;
 }
 
 static int is_freg(int r)
@@ -144,7 +142,6 @@ static void ES(uint32_t opcode, uint32_t func3,
       | (rs2 << 20) | ((imm >> 5) << 25));
 }
 
-// Patch all branches in list pointed to by t to branch to a:
 ST_FUNC void gsym_addr(int t_, int a_)
 {
     uint32_t t = t_;
@@ -159,7 +156,7 @@ ST_FUNC void gsym_addr(int t_, int a_)
             | (((r >> 11) &     1) << 20)
             | (((r >>  1) & 0x3ff) << 21)
             | (((r >> 20) &     1) << 31);
-        write32le(ptr, r == 4 ? 0x33 : 0x6f | imm); // nop || j imm
+        write32le(ptr, r == 4 ? 0x33 : 0x6f | imm);
         t = next;
     }
 }
@@ -171,7 +168,7 @@ static int load_symofs(int r, SValue *sv, int forstore)
     int fc = sv->c.i, v = sv->r & VT_VALMASK;
     if (sv->r & VT_SYM) {
         assert(v == VT_CONST);
-        if (sv->sym->type.t & VT_STATIC) { // XXX do this per linker relax
+        if (sv->sym->type.t & VT_STATIC) {
             greloca(cur_text_section, sv->sym, ind,
                     R_RISCV_PCREL_HI20, sv->c.i);
             sv->c.i = 0;
@@ -186,24 +183,24 @@ static int load_symofs(int r, SValue *sv, int forstore)
             label.v = tok_alloc(".L0 ", 4)->tok;
             label.type.t = VT_VOID | VT_STATIC;
         }
-        label.c = 0; /* force new local ELF symbol */
+        label.c = 0;
         put_extern_sym(&label, cur_text_section, ind, 0);
         rr = is_ireg(r) ? ireg(r) : 5;
-        o(0x17 | (rr << 7));   // auipc RR, 0 %pcrel_hi(sym)+addend
+        o(0x17 | (rr << 7));
         greloca(cur_text_section, &label, ind,
                 doload || !forstore
                   ? R_RISCV_PCREL_LO12_I : R_RISCV_PCREL_LO12_S, 0);
         if (doload) {
-            EI(0x03, 3, rr, rr, 0); // ld RR, 0(RR)
+            EI(0x03, 3, rr, rr, 0);
         }
     } else if (v == VT_LOCAL || v == VT_LLOCAL) {
-        rr = 8; // s0
+        rr = 8;
         if (fc != sv->c.i)
           tcc_error("unimp: store(giant local off) (0x%lx)", (long)sv->c.i);
         if (((unsigned)fc + (1 << 11)) >> 12) {
-            rr = is_ireg(r) ? ireg(r) : 5; // t0
-            o(0x37 | (rr << 7) | ((0x800 + fc) & 0xfffff000)); //lui RR, upper(fc)
-            ER(0x33, 0, rr, rr, 8, 0); // add RR, RR, s0
+            rr = is_ireg(r) ? ireg(r) : 5;
+            o(0x37 | (rr << 7) | ((0x800 + fc) & 0xfffff000));
+            ER(0x33, 0, rr, rr, 8, 0);
             sv->c.i = fc << 20 >> 20;
         }
     } else
@@ -215,14 +212,14 @@ static void load_large_constant(int rr, int fc, uint32_t pi)
 {
     if (fc < 0)
 	pi++;
-    o(0x37 | (rr << 7) | (((pi + 0x800) & 0xfffff000))); // lui RR, up(up(fc))
-    EI(0x13, 0, rr, rr, (int)pi << 20 >> 20);   // addi RR, RR, lo(up(fc))
-    EI(0x13, 1, rr, rr, 12); // slli RR, RR, 12
-    EI(0x13, 0, rr, rr, (fc + (1 << 19)) >> 20);  // addi RR, RR, up(lo(fc))
-    EI(0x13, 1, rr, rr, 12); // slli RR, RR, 12
+    o(0x37 | (rr << 7) | (((pi + 0x800) & 0xfffff000)));
+    EI(0x13, 0, rr, rr, (int)pi << 20 >> 20);
+    EI(0x13, 1, rr, rr, 12);
+    EI(0x13, 0, rr, rr, (fc + (1 << 19)) >> 20);
+    EI(0x13, 1, rr, rr, 12);
     fc = fc << 12 >> 12;
-    EI(0x13, 0, rr, rr, fc >> 8);  // addi RR, RR, lo1(lo(fc))
-    EI(0x13, 1, rr, rr, 8); // slli RR, RR, 8
+    EI(0x13, 0, rr, rr, fc >> 8);
+    EI(0x13, 1, rr, rr, 8);
 }
 
 ST_FUNC void load(int r, SValue *sv)
@@ -237,7 +234,7 @@ ST_FUNC void load(int r, SValue *sv)
         int func3, opcode = is_freg(r) ? 0x07 : 0x03, br;
         size = type_size(&sv->type, &align);
         assert (!is_freg(r) || bt == VT_FLOAT || bt == VT_DOUBLE);
-        if (bt == VT_FUNC) /* XXX should be done in generic code */
+        if (bt == VT_FUNC)
           size = PTR_SIZE;
         func3 = size == 1 ? 0 : size == 2 ? 1 : size == 4 ? 2 : 3;
         if (size < 4 && !is_float(sv->type.t) && (sv->type.t & VT_UNSIGNED))
@@ -247,13 +244,12 @@ ST_FUNC void load(int r, SValue *sv)
             fc = sv->c.i;
         } else if (v < VT_CONST) {
             br = ireg(v);
-            /*if (((unsigned)fc + (1 << 11)) >> 12)
-              tcc_error("unimp: load(large addend) (0x%x)", fc);*/
-            fc = 0; // XXX store ofs in LVAL(reg)
+
+            fc = 0;
         } else if (v == VT_LLOCAL) {
             br = load_symofs(r, sv, 0);
             fc = sv->c.i;
-            EI(0x03, 3, rr, br, fc); // ld RR, fc(BR)
+            EI(0x03, 3, rr, br, fc);
             br = rr;
             fc = 0;
         } else if (v == VT_CONST) {
@@ -263,14 +259,14 @@ ST_FUNC void load(int r, SValue *sv)
 		load_large_constant(rr, fc, si);
                 fc &= 0xff;
             } else {
-                o(0x37 | (rr << 7) | ((0x800 + fc) & 0xfffff000)); //lui RR, upper(fc)
+                o(0x37 | (rr << 7) | ((0x800 + fc) & 0xfffff000));
                 fc = fc << 20 >> 20;
 	    }
             br = rr;
 	} else {
             tcc_error("unimp: load(non-local lval)");
         }
-        EI(opcode, func3, rr, br, fc); // l[bhwd][u] / fl[wd] RR, fc(BR)
+        EI(opcode, func3, rr, br, fc);
     } else if (v == VT_CONST) {
         int rb = 0, do32bit = 8, zext = 0;
         assert((!is_float(sv->type.t) && is_ireg(r)) || bt == VT_LDOUBLE);
@@ -290,30 +286,29 @@ ST_FUNC void load(int r, SValue *sv)
                 rb = rr;
                 do32bit = 0;
             } else if (bt == VT_LLONG) {
-                /* A 32bit unsigned constant for a 64bit type.
-                   lui always sign extends, so we need to do an explicit zext.*/
+
                 zext = 1;
             }
         }
         if (((unsigned)fc + (1 << 11)) >> 12)
-            o(0x37 | (rr << 7) | ((0x800 + fc) & 0xfffff000)), rb = rr; //lui RR, upper(fc)
+            o(0x37 | (rr << 7) | ((0x800 + fc) & 0xfffff000)), rb = rr;
         if (fc || (rr != rb) || do32bit || (fr & VT_SYM))
-          EI(0x13 | do32bit, 0, rr, rb, fc << 20 >> 20); // addi[w] R, x0|R, FC
+          EI(0x13 | do32bit, 0, rr, rb, fc << 20 >> 20);
         if (zext) {
-            EI(0x13, 1, rr, rr, 32); // slli RR, RR, 32
-            EI(0x13, 5, rr, rr, 32); // srli RR, RR, 32
+            EI(0x13, 1, rr, rr, 32);
+            EI(0x13, 5, rr, rr, 32);
         }
     } else if (v == VT_LOCAL) {
         int br = load_symofs(r, sv, 0);
         assert(is_ireg(r));
         fc = sv->c.i;
-        EI(0x13, 0, rr, br, fc); // addi R, s0, FC
-    } else if (v < VT_CONST) { /* reg-reg */
-        //assert(!fc); XXX support offseted regs
+        EI(0x13, 0, rr, br, fc);
+    } else if (v < VT_CONST) {
+
         if (is_freg(r) && is_freg(v))
-          ER(0x53, 0, rr, freg(v), freg(v), bt == VT_DOUBLE ? 0x11 : 0x10); //fsgnj.[sd] RR, V, V == fmv.[sd] RR, V
+          ER(0x53, 0, rr, freg(v), freg(v), bt == VT_DOUBLE ? 0x11 : 0x10);
         else if (is_ireg(r) && is_ireg(v))
-          EI(0x13, 0, rr, ireg(v), 0); // addi RR, V, 0 == mv RR, V
+          EI(0x13, 0, rr, ireg(v), 0);
         else {
             int func7 = is_ireg(r) ? 0x70 : 0x78;
             size = type_size(&sv->type, &align);
@@ -321,7 +316,7 @@ ST_FUNC void load(int r, SValue *sv)
               func7 |= 1;
             assert(size == 4 || size == 8);
             o(0x53 | (rr << 7) | ((is_freg(v) ? freg(v) : ireg(v)) << 15)
-              | (func7 << 25)); // fmv.{w.x, x.w, d.x, x.d} RR, VR
+              | (func7 << 25));
         }
     } else if (v == VT_CMP) {
         int op = vtop->cmp_op;
@@ -337,35 +332,35 @@ ST_FUNC void load(int r, SValue *sv)
             case TOK_GE:
             case TOK_LE:
             case TOK_GT:
-                if (op & 1) { // remove [U]GE,GT
+                if (op & 1) {
                     inv = 1;
                     op--;
                 }
-                if ((op & 7) == 6) { // [U]LE
+                if ((op & 7) == 6) {
                     int t = a; a = b; b = t;
                     inv ^= 1;
                 }
-                ER(0x33, (op > TOK_UGT) ? 2 : 3, rr, a, b, 0); // slt[u] d, a, b
+                ER(0x33, (op > TOK_UGT) ? 2 : 3, rr, a, b, 0);
                 if (inv)
-                  EI(0x13, 4, rr, rr, 1); // xori d, d, 1
+                  EI(0x13, 4, rr, rr, 1);
                 break;
             case TOK_NE:
             case TOK_EQ:
                 if (rr != a || b)
-                  ER(0x33, 0, rr, a, b, 0x20); // sub d, a, b
+                  ER(0x33, 0, rr, a, b, 0x20);
                 if (op == TOK_NE)
-                  ER(0x33, 3, rr, 0, rr, 0); // sltu d, x0, d == snez d,d
+                  ER(0x33, 3, rr, 0, rr, 0);
                 else
-                  EI(0x13, 3, rr, rr, 1); // sltiu d, d, 1 == seqz d,d
+                  EI(0x13, 3, rr, rr, 1);
                 break;
         }
     } else if ((v & ~1) == VT_JMP) {
         int t = v & 1;
         assert(is_ireg(r));
-        EI(0x13, 0, rr, 0, t);      // addi RR, x0, t
+        EI(0x13, 0, rr, 0, t);
         gjmp_addr(ind + 8);
         gsym(fc);
-        EI(0x13, 0, rr, 0, t ^ 1);  // addi RR, x0, !t
+        EI(0x13, 0, rr, 0, t ^ 1);
     } else
       tcc_error("unimp: load(non-const)");
 }
@@ -378,8 +373,7 @@ ST_FUNC void store(int r, SValue *sv)
     int bt = sv->type.t & VT_BTYPE;
     int align, size = type_size(&sv->type, &align);
     assert(!is_float(bt) || is_freg(r) || bt == VT_LDOUBLE);
-    /* long doubles are in two integer registers, but the load/store
-       primitives only deal with one, so do as if it's one reg.  */
+
     if (bt == VT_LDOUBLE)
       size = align = 8;
     if (bt == VT_STRUCT)
@@ -392,45 +386,44 @@ ST_FUNC void store(int r, SValue *sv)
         fc = sv->c.i;
     } else if (fr < VT_CONST) {
         ptrreg = ireg(fr);
-        /*if (((unsigned)fc + (1 << 11)) >> 12)
-          tcc_error("unimp: store(large addend) (0x%x)", fc);*/
-        fc = 0; // XXX support offsets regs
+
+        fc = 0;
     } else if (fr == VT_CONST) {
         int64_t si = sv->c.i;
-        ptrreg = 8; // s0
+        ptrreg = 8;
         si >>= 32;
         if (si != 0) {
 	    load_large_constant(ptrreg, fc, si);
             fc &= 0xff;
         } else {
-            o(0x37 | (ptrreg << 7) | ((0x800 + fc) & 0xfffff000)); //lui RR, upper(fc)
+            o(0x37 | (ptrreg << 7) | ((0x800 + fc) & 0xfffff000));
             fc = fc << 20 >> 20;
 	}
     } else
       tcc_error("implement me: %s(!local)", __FUNCTION__);
-    ES(is_freg(r) ? 0x27 : 0x23,                          // fs... | s...
-       size == 1 ? 0 : size == 2 ? 1 : size == 4 ? 2 : 3, // ... [wd] | [bhwd]
-       ptrreg, rr, fc);                                   // RR, fc(base)
+    ES(is_freg(r) ? 0x27 : 0x23,
+       size == 1 ? 0 : size == 2 ? 1 : size == 4 ? 2 : 3,
+       ptrreg, rr, fc);
 }
 
 static void gcall_or_jmp(int docall)
 {
-    int tr = docall ? 1 : 5; // ra or t0
+    int tr = docall ? 1 : 5;
     if ((vtop->r & (VT_VALMASK | VT_LVAL)) == VT_CONST &&
         ((vtop->r & VT_SYM) && vtop->c.i == (int)vtop->c.i)) {
-        /* constant symbolic case -> simple relocation */
+
         greloca(cur_text_section, vtop->sym, ind,
                 R_RISCV_CALL_PLT, (int)vtop->c.i);
-        o(0x17 | (tr << 7));   // auipc TR, 0 %call(func)
-        EI(0x67, 0, tr, tr, 0);// jalr  TR, r(TR)
+        o(0x17 | (tr << 7));
+        EI(0x67, 0, tr, tr, 0);
     } else if (vtop->r < VT_CONST) {
         int r = ireg(vtop->r);
-        EI(0x67, 0, tr, r, 0);      // jalr TR, 0(R)
+        EI(0x67, 0, tr, r, 0);
     } else {
         int r = TREG_RA;
         load(r, vtop);
         r = ireg(r);
-        EI(0x67, 0, tr, r, 0);      // jalr TR, 0(R)
+        EI(0x67, 0, tr, r, 0);
     }
 }
 
@@ -441,19 +434,19 @@ static void gen_bounds_call(int v)
     Sym *sym = external_helper_sym(v);
 
     greloca(cur_text_section, sym, ind, R_RISCV_CALL_PLT, 0);
-    o(0x17 | (1 << 7));   // auipc TR, 0 %call(func)
-    EI(0x67, 0, 1, 1, 0); // jalr  TR, r(TR)
+    o(0x17 | (1 << 7));
+    EI(0x67, 0, 1, 1, 0);
 }
 
 static void gen_bounds_prolog(void)
 {
-    /* leave some room for bound checking code */
+
     func_bound_offset = lbounds_section->data_offset;
     func_bound_ind = ind;
     func_bound_add_epilog = 0;
-    o(0x00000013);  /* ld a0,#lbound section pointer */
     o(0x00000013);
-    o(0x00000013);  /* nop -> call __bound_local_new */
+    o(0x00000013);
+    o(0x00000013);
     o(0x00000013);
 }
 
@@ -468,7 +461,6 @@ static void gen_bounds_epilog(void)
     if (!offset_modified && !func_bound_add_epilog)
         return;
 
-    /* add end of table info */
     bounds_ptr = section_ptr_add(lbounds_section, sizeof(addr_t));
     *bounds_ptr = 0;
 
@@ -479,32 +471,31 @@ static void gen_bounds_epilog(void)
         label.v = tok_alloc(".LB0 ", 4)->tok;
         label.type.t = VT_VOID | VT_STATIC;
     }
-    /* generate bound local allocation */
+
     if (offset_modified) {
         saved_ind = ind;
         ind = func_bound_ind;
-        label.c = 0; /* force new local ELF symbol */
+        label.c = 0;
         put_extern_sym(&label, cur_text_section, ind, 0);
         greloca(cur_text_section, sym_data, ind, R_RISCV_GOT_HI20, 0);
-        o(0x17 | (10 << 7));    // auipc a0, 0 %pcrel_hi(sym)+addend
+        o(0x17 | (10 << 7));
         greloca(cur_text_section, &label, ind, R_RISCV_PCREL_LO12_I, 0);
-        EI(0x03, 3, 10, 10, 0); // ld a0, 0(a0)
+        EI(0x03, 3, 10, 10, 0);
         gen_bounds_call(TOK___bound_local_new);
         ind = saved_ind;
     }
 
-    /* generate bound check local freeing */
-    o(0xe02a1101); /* addi sp,sp,-32  sd   a0,0(sp)   */
-    o(0xa82ae42e); /* sd   a1,8(sp)   fsd  fa0,16(sp) */
-    label.c = 0; /* force new local ELF symbol */
+    o(0xe02a1101);
+    o(0xa82ae42e);
+    label.c = 0;
     put_extern_sym(&label, cur_text_section, ind, 0);
     greloca(cur_text_section, sym_data, ind, R_RISCV_GOT_HI20, 0);
-    o(0x17 | (10 << 7));    // auipc a0, 0 %pcrel_hi(sym)+addend
+    o(0x17 | (10 << 7));
     greloca(cur_text_section, &label, ind, R_RISCV_PCREL_LO12_I, 0);
-    EI(0x03, 3, 10, 10, 0); // ld a0, 0(a0)
+    EI(0x03, 3, 10, 10, 0);
     gen_bounds_call(TOK___bound_local_delete);
-    o(0x65a26502); /* ld   a0,0(sp)   ld   a1,8(sp)   */
-    o(0x61052542); /* fld  fa0,16(sp) addi sp,sp,32   */
+    o(0x65a26502);
+    o(0x61052542);
 }
 #endif
 
@@ -567,14 +558,14 @@ ST_FUNC void gfunc_call(int nb_args)
         gbound_args(nb_args);
 #endif
 
-    areg[0] = 0; /* int arg regs */
-    areg[1] = 8; /* float arg regs */
+    areg[0] = 0;
+    areg[1] = 8;
     sa = vtop[-nb_args].type.ref->next;
     for (i = 0; i < nb_args; i++) {
         int nregs, byref = 0, tempofs;
         int prc[3], fieldofs[3];
         sv = &vtop[1 + i - nb_args];
-        sv->type.t &= ~VT_ARRAY; // XXX this should be done in tccgen.c
+        sv->type.t &= ~VT_ARRAY;
         size = type_size(&sv->type, &align);
         if (size > 16) {
             if (align < XLEN)
@@ -601,7 +592,7 @@ ST_FUNC void gfunc_call(int nb_args)
             if (align < XLEN)
               align = XLEN;
             stack_adj += (size + align - 1) & -align;
-            if (!sa) /* one vararg on stack forces the rest on stack */
+            if (!sa)
               areg[0] = 8, areg[1] = 16;
         } else {
             info[i] = areg[prc[1] - 1]++;
@@ -617,7 +608,7 @@ ST_FUNC void gfunc_call(int nb_args)
                 }
                 if (!byref) {
                     assert((fieldofs[2] >> 4) < 2048);
-                    info[i] |= fieldofs[2] << (12 + 4); // includes offset
+                    info[i] |= fieldofs[2] << (12 + 4);
                 }
             }
         }
@@ -630,12 +621,12 @@ ST_FUNC void gfunc_call(int nb_args)
     stack_add = stack_adj + tempspace;
     if (stack_add) {
         if (stack_add >= 0x1000) {
-            o(0x37 | (5 << 7) | (-stack_add & 0xfffff000)); //lui t0, upper(v)
-            EI(0x13, 0, 5, 5, -stack_add << 20 >> 20); // addi t0, t0, lo(v)
-            ER(0x33, 0, 2, 2, 5, 0); // add sp, sp, t0
+            o(0x37 | (5 << 7) | (-stack_add & 0xfffff000));
+            EI(0x13, 0, 5, 5, -stack_add << 20 >> 20);
+            ER(0x33, 0, 2, 2, 5, 0);
         }
         else
-            EI(0x13, 0, 2, 2, -stack_add);   // addi sp, sp, -adj
+            EI(0x13, 0, 2, 2, -stack_add);
         for (i = ofs = 0; i < nb_args; i++) {
             if (info[i] & (64 | 32)) {
                 vrotb(nb_args - i);
@@ -644,7 +635,7 @@ ST_FUNC void gfunc_call(int nb_args)
                     vset(&char_pointer_type, TREG_SP, 0);
                     vpushi(stack_adj + (info[i] >> 7));
                     gen_op('+');
-                    vpushv(vtop); // this replaces the old argument
+                    vpushv(vtop);
                     vrott(3);
                     indir();
                     vtop->type = vtop[-1].type;
@@ -656,10 +647,7 @@ ST_FUNC void gfunc_call(int nb_args)
                 if (info[i] & 32) {
                     if (align < XLEN)
                       align = XLEN;
-                    /* Once we support offseted regs we can do this:
-                       vset(&vtop->type, TREG_SP | VT_LVAL, ofs);
-                       to construct the lvalue for the outgoing stack slot,
-                       until then we have to jump through hoops.  */
+
                     vset(&char_pointer_type, TREG_SP, 0);
                     ofs = (ofs + align - 1) & -align;
                     vpushi(ofs);
@@ -668,7 +656,7 @@ ST_FUNC void gfunc_call(int nb_args)
                     vtop->type = vtop[-1].type;
                     vswap();
                     vstore();
-                    vtop->r = vtop->r2 = VT_CONST; // this arg is done
+                    vtop->r = vtop->r2 = VT_CONST;
                     ofs += size;
                 }
                 vrott(nb_args - i);
@@ -740,13 +728,12 @@ ST_FUNC void gfunc_call(int nb_args)
                 vtop->r2 = r2;
             }
             if (info[nb_args - 1 - i] & 16) {
-                ES(0x23, 3, 2, ireg(vtop->r2), splitofs); // sd t0, ofs(sp)
+                ES(0x23, 3, 2, ireg(vtop->r2), splitofs);
                 vtop->r2 = VT_CONST;
             } else if (loadt == VT_LDOUBLE && vtop->r2 != r2) {
                 assert(vtop->r2 <= 7 && r2 <= 7);
-                /* XXX we'd like to have 'gv' move directly into
-                   the right class instead of us fixing it up.  */
-                EI(0x13, 0, ireg(r2), ireg(vtop->r2), 0); // mv Ra+1, RR2
+
+                EI(0x13, 0, ireg(r2), ireg(vtop->r2), 0);
                 vtop->r2 = r2;
             }
 done:
@@ -759,12 +746,12 @@ done:
     vtop -= nb_args + 1;
     if (stack_add) {
         if (stack_add >= 0x1000) {
-            o(0x37 | (5 << 7) | (stack_add & 0xfffff000)); //lui t0, upper(v)
-            EI(0x13, 0, 5, 5, stack_add << 20 >> 20); // addi t0, t0, lo(v)
-            ER(0x33, 0, 2, 2, 5, 0); // add sp, sp, t0
+            o(0x37 | (5 << 7) | (stack_add & 0xfffff000));
+            EI(0x13, 0, 5, 5, stack_add << 20 >> 20);
+            ER(0x33, 0, 2, 2, 5, 0);
         }
         else
-            EI(0x13, 0, 2, 2, stack_add);      // addi sp, sp, adj
+            EI(0x13, 0, 2, 2, stack_add);
    }
    tcc_free(info);
 }
@@ -781,21 +768,20 @@ ST_FUNC void gfunc_prolog(Sym *func_sym)
     CType *type;
 
     sym = func_type->ref;
-    loc = -16; // for ra and s0
+    loc = -16;
     func_sub_sp_offset = ind;
     ind += 5 * 4;
 
     areg[0] = 0, areg[1] = 0;
     addr = 0;
-    /* if the function returns by reference, then add an
-       implicit pointer parameter */
+
     size = type_size(&func_vt, &align);
     if (size > 2 * XLEN) {
         loc -= 8;
         func_vc = loc;
-        ES(0x23, 3, 8, 10 + areg[0]++, loc); // sd a0, loc(s0)
+        ES(0x23, 3, 8, 10 + areg[0]++, loc);
     }
-    /* define parameters */
+
     while ((sym = sym->next) != NULL) {
         int byref = 0;
         int regcount;
@@ -818,18 +804,18 @@ ST_FUNC void gfunc_prolog(Sym *func_sym)
             param_addr = addr;
             addr += size;
         } else {
-            loc -= regcount * 8; // XXX could reserve only 'size' bytes
+            loc -= regcount * 8;
             param_addr = loc;
             for (i = 0; i < regcount; i++) {
                 if (areg[prc[1+i] - 1] >= 8) {
                     assert(i == 1 && regcount == 2 && !(addr & 7));
-                    EI(0x03, 3, 5, 8, addr); // ld t0, addr(s0)
+                    EI(0x03, 3, 5, 8, addr);
                     addr += 8;
-                    ES(0x23, 3, 8, 5, loc + i*8); // sd t0, loc(s0)
+                    ES(0x23, 3, 8, 5, loc + i*8);
                 } else if (prc[1+i] == RC_FLOAT) {
-                    ES(0x27, (size / regcount) == 4 ? 2 : 3, 8, 10 + areg[1]++, loc + (fieldofs[i+1] >> 4)); // fs[wd] FAi, loc(s0)
+                    ES(0x27, (size / regcount) == 4 ? 2 : 3, 8, 10 + areg[1]++, loc + (fieldofs[i+1] >> 4));
                 } else {
-                    ES(0x23, 3, 8, 10 + areg[0]++, loc + i*8); // sd aX, loc(s0) // XXX
+                    ES(0x23, 3, 8, 10 + areg[0]++, loc + i*8);
                 }
             }
         }
@@ -842,7 +828,7 @@ ST_FUNC void gfunc_prolog(Sym *func_sym)
     if (func_var) {
         for (; areg[0] < 8; areg[0]++) {
             num_va_regs++;
-            ES(0x23, 3, 8, 10 + areg[0], -8 + num_va_regs * 8); // sd aX, loc(s0)
+            ES(0x23, 3, 8, 10 + areg[0], -8 + num_va_regs * 8);
         }
     }
 #ifdef CONFIG_TCC_BCHECK
@@ -863,7 +849,7 @@ ST_FUNC int gfunc_sret(CType *vt, int variadic, CType *ret,
     reg_pass(vt, prc, fieldofs, 1);
     nregs = prc[0];
     if (nregs == 2 && prc[1] != prc[2])
-      return -1;  /* generic code can't deal with this case */
+      return -1;
     if (prc[1] == RC_FLOAT) {
         *regsize = size / nregs;
     }
@@ -901,34 +887,34 @@ ST_FUNC void gfunc_epilog(void)
 
     if (v >= (1 << 11)) {
         d = 16;
-        o(0x37 | (5 << 7) | ((0x800 + (v-16)) & 0xfffff000)); //lui t0, upper(v)
-        EI(0x13, 0, 5, 5, (v-16) << 20 >> 20); // addi t0, t0, lo(v)
-        ER(0x33, 0, 2, 2, 5, 0); // add sp, sp, t0
+        o(0x37 | (5 << 7) | ((0x800 + (v-16)) & 0xfffff000));
+        EI(0x13, 0, 5, 5, (v-16) << 20 >> 20);
+        ER(0x33, 0, 2, 2, 5, 0);
     }
-    EI(0x03, 3, 1, 2, d - 8 - num_va_regs * 8);  // ld ra, v-8(sp)
-    EI(0x03, 3, 8, 2, d - 16 - num_va_regs * 8); // ld s0, v-16(sp)
-    EI(0x13, 0, 2, 2, d);      // addi sp, sp, v
-    EI(0x67, 0, 0, 1, 0);      // jalr x0, 0(x1), aka ret
+    EI(0x03, 3, 1, 2, d - 8 - num_va_regs * 8);
+    EI(0x03, 3, 8, 2, d - 16 - num_va_regs * 8);
+    EI(0x13, 0, 2, 2, d);
+    EI(0x67, 0, 0, 1, 0);
     large_ofs_ind = ind;
     if (v >= (1 << 11)) {
-        EI(0x13, 0, 8, 2, d - num_va_regs * 8);      // addi s0, sp, d
-        o(0x37 | (5 << 7) | ((0x800 + (v-16)) & 0xfffff000)); //lui t0, upper(v)
-        EI(0x13, 0, 5, 5, (v-16) << 20 >> 20); // addi t0, t0, lo(v)
-        ER(0x33, 0, 2, 2, 5, 0x20); // sub sp, sp, t0
+        EI(0x13, 0, 8, 2, d - num_va_regs * 8);
+        o(0x37 | (5 << 7) | ((0x800 + (v-16)) & 0xfffff000));
+        EI(0x13, 0, 5, 5, (v-16) << 20 >> 20);
+        ER(0x33, 0, 2, 2, 5, 0x20);
         gjmp_addr(func_sub_sp_offset + 5*4);
     }
     saved_ind = ind;
 
     ind = func_sub_sp_offset;
-    EI(0x13, 0, 2, 2, -d);     // addi sp, sp, -d
-    ES(0x23, 3, 2, 1, d - 8 - num_va_regs * 8);  // sd ra, d-8(sp)
-    ES(0x23, 3, 2, 8, d - 16 - num_va_regs * 8); // sd s0, d-16(sp)
+    EI(0x13, 0, 2, 2, -d);
+    ES(0x23, 3, 2, 1, d - 8 - num_va_regs * 8);
+    ES(0x23, 3, 2, 8, d - 16 - num_va_regs * 8);
     if (v < (1 << 11))
-      EI(0x13, 0, 8, 2, d - num_va_regs * 8);      // addi s0, sp, d
+      EI(0x13, 0, 8, 2, d - num_va_regs * 8);
     else
       gjmp_addr(large_ofs_ind);
     if ((ind - func_sub_sp_offset) != 5*4)
-      EI(0x13, 0, 0, 0, 0);      // addi x0, x0, 0 == nop
+      EI(0x13, 0, 0, 0, 0);
     ind = saved_ind;
 }
 
@@ -943,12 +929,11 @@ ST_FUNC void gen_fill_nops(int bytes)
     if ((bytes & 3))
       tcc_error("alignment of code section not multiple of 4");
     while (bytes > 0) {
-        EI(0x13, 0, 0, 0, 0);      // addi x0, x0, 0 == nop
+        EI(0x13, 0, 0, 0, 0);
         bytes -= 4;
     }
 }
 
-// Generate forward branch to label:
 ST_FUNC int gjmp(int t)
 {
     if (nocode_wanted)
@@ -957,20 +942,19 @@ ST_FUNC int gjmp(int t)
     return ind - 4;
 }
 
-// Generate branch to known address:
 ST_FUNC void gjmp_addr(int a)
 {
     uint32_t r = a - ind, imm;
     if ((r + (1 << 21)) & ~((1U << 22) - 2)) {
-        o(0x17 | (5 << 7) | (((r + 0x800) & 0xfffff000))); // lui RR, up(r)
+        o(0x17 | (5 << 7) | (((r + 0x800) & 0xfffff000)));
         r = (int)r << 20 >> 20;
-        EI(0x67, 0, 0, 5, r);      // jalr x0, r(t0)
+        EI(0x67, 0, 0, 5, r);
     } else {
         imm = (((r >> 12) &  0xff) << 12)
             | (((r >> 11) &     1) << 20)
             | (((r >>  1) & 0x3ff) << 21)
             | (((r >> 20) &     1) << 31);
-        o(0x6f | imm); // jal x0, imm ==  j imm
+        o(0x6f | imm);
     }
 }
 
@@ -991,14 +975,14 @@ ST_FUNC int gjmp_cond(int op, int t)
         case TOK_NE:  op = 1; break;
         case TOK_EQ:  op = 0; break;
     }
-    o(0x63 | (op ^ 1) << 12 | a << 15 | b << 20 | 8 << 7); // bOP a,b,+4
+    o(0x63 | (op ^ 1) << 12 | a << 15 | b << 20 | 8 << 7);
     return gjmp(t);
 }
 
 ST_FUNC int gjmp_append(int n, int t)
 {
     void *p;
-    /* insert jump list n into t */
+
     if (n) {
         uint32_t n1 = n, n2;
         while ((n2 = read32le(p = cur_text_section->data + n1)))
@@ -1032,7 +1016,7 @@ static void gen_opil(int op, int ll)
                       break;
                     fc = -fc;
                 case '+':
-                    func3 = 0; // addi d, a, fc
+                    func3 = 0;
                     cll = ll;
                 do_cop:
                     EI(0x13 | cll, func3, ireg(d), a, fc);
@@ -1047,23 +1031,23 @@ static void gen_opil(int op, int ll)
                     if (fc >= (1 << 11) - 1)
                       break;
                     ++fc;
-                case TOK_LT:  func3 = 2; goto do_cop; // slti d, a, fc
+                case TOK_LT:  func3 = 2; goto do_cop;
                 case TOK_ULE:
                     if (fc >= (1 << 11) - 1 || fc == -1)
                       break;
                     ++fc;
-                case TOK_ULT: func3 = 3; goto do_cop; // sltiu d, a, fc
-                case '^':     func3 = 4; goto do_cop; // xori d, a, fc
-                case '|':     func3 = 6; goto do_cop; // ori  d, a, fc
-                case '&':     func3 = 7; goto do_cop; // andi d, a, fc
-                case TOK_SHL: func3 = 1; cll = ll; fc &= m; goto do_cop; // slli d, a, fc
-                case TOK_SHR: func3 = 5; cll = ll; fc &= m; goto do_cop; // srli d, a, fc
+                case TOK_ULT: func3 = 3; goto do_cop;
+                case '^':     func3 = 4; goto do_cop;
+                case '|':     func3 = 6; goto do_cop;
+                case '&':     func3 = 7; goto do_cop;
+                case TOK_SHL: func3 = 1; cll = ll; fc &= m; goto do_cop;
+                case TOK_SHR: func3 = 5; cll = ll; fc &= m; goto do_cop;
                 case TOK_SAR: func3 = 5; cll = ll; fc = 1024 | (fc & m); goto do_cop;
 
-                case TOK_UGE: /* -> TOK_ULT */
-                case TOK_UGT: /* -> TOK_ULE */
-                case TOK_GE:  /* -> TOK_LT */
-                case TOK_GT:  /* -> TOK_LE */
+                case TOK_UGE:
+                case TOK_UGT:
+                case TOK_GE:
+                case TOK_GT:
                     gen_opil(op - 1, !ll);
                     vtop->cmp_op ^= 1;
                     return;
@@ -1098,44 +1082,44 @@ static void gen_opil(int op, int ll)
         break;
 
     case '+':
-        ER(0x33 | ll, 0, d, a, b, 0); // add d, a, b
+        ER(0x33 | ll, 0, d, a, b, 0);
         break;
     case '-':
-        ER(0x33 | ll, 0, d, a, b, 0x20); // sub d, a, b
+        ER(0x33 | ll, 0, d, a, b, 0x20);
         break;
     case TOK_SAR:
-        ER(0x33 | ll | ll, 5, d, a, b, 0x20); // sra d, a, b
+        ER(0x33 | ll | ll, 5, d, a, b, 0x20);
         break;
     case TOK_SHR:
-        ER(0x33 | ll | ll, 5, d, a, b, 0); // srl d, a, b
+        ER(0x33 | ll | ll, 5, d, a, b, 0);
         break;
     case TOK_SHL:
-        ER(0x33 | ll, 1, d, a, b, 0); // sll d, a, b
+        ER(0x33 | ll, 1, d, a, b, 0);
         break;
     case '*':
-        ER(0x33 | ll, 0, d, a, b, 1); // mul d, a, b
+        ER(0x33 | ll, 0, d, a, b, 1);
         break;
     case '/':
-        ER(0x33 | ll, 4, d, a, b, 1); // div d, a, b
+        ER(0x33 | ll, 4, d, a, b, 1);
         break;
     case '&':
-        ER(0x33, 7, d, a, b, 0); // and d, a, b
+        ER(0x33, 7, d, a, b, 0);
         break;
     case '^':
-        ER(0x33, 4, d, a, b, 0); // xor d, a, b
+        ER(0x33, 4, d, a, b, 0);
         break;
     case '|':
-        ER(0x33, 6, d, a, b, 0); // or d, a, b
+        ER(0x33, 6, d, a, b, 0);
         break;
     case '%':
-        ER(ll ? 0x3b:  0x33, 6, d, a, b, 1); // rem d, a, b
+        ER(ll ? 0x3b:  0x33, 6, d, a, b, 1);
         break;
     case TOK_UMOD:
-        ER(0x33 | ll, 7, d, a, b, 1); // remu d, a, b
+        ER(0x33 | ll, 7, d, a, b, 1);
         break;
     case TOK_PDIV:
     case TOK_UDIV:
-        ER(0x33 | ll, 5, d, a, b, 1); // divu d, a, b
+        ER(0x33 | ll, 5, d, a, b, 1);
         break;
     }
 }
@@ -1196,48 +1180,48 @@ ST_FUNC void gen_opf(int op)
     default:
         assert(0);
     case '+':
-        op = 0; // fadd
+        op = 0;
     arithop:
         rd = get_reg(RC_FLOAT);
         vtop->r = rd;
         rd = freg(rd);
-        ER(0x53, 7, rd, rs1, rs2, dbl | (op << 2)); // fop.[sd] RD, RS1, RS2 (dyn rm)
+        ER(0x53, 7, rd, rs1, rs2, dbl | (op << 2));
         break;
     case '-':
-        op = 1; // fsub
+        op = 1;
         goto arithop;
     case '*':
-        op = 2; // fmul
+        op = 2;
         goto arithop;
     case '/':
-        op = 3; // fdiv
+        op = 3;
         goto arithop;
     case TOK_EQ:
-        op = 2; // EQ
+        op = 2;
     cmpop:
         rd = get_reg(RC_INT);
         vtop->r = rd;
         rd = ireg(rd);
-        ER(0x53, op, rd, rs1, rs2, dbl | 0x50); // fcmp.[sd] RD, RS1, RS2 (op == eq/lt/le)
+        ER(0x53, op, rd, rs1, rs2, dbl | 0x50);
         if (invert)
-          EI(0x13, 4, rd, rd, 1); // xori RD, 1
+          EI(0x13, 4, rd, rd, 1);
         break;
     case TOK_NE:
         invert = 1;
-        op = 2; // EQ
+        op = 2;
         goto cmpop;
     case TOK_LT:
-        op = 1; // LT
+        op = 1;
         goto cmpop;
     case TOK_LE:
-        op = 0; // LE
+        op = 0;
         goto cmpop;
     case TOK_GT:
-        op = 1; // LT
+        op = 1;
         rd = rs1, rs1 = rs2, rs2 = rd;
         goto cmpop;
     case TOK_GE:
-        op = 0; // LE
+        op = 0;
         rd = rs1, rs1 = rs2, rs2 = rd;
         goto cmpop;
     }
@@ -1245,8 +1229,7 @@ ST_FUNC void gen_opf(int op)
 
 ST_FUNC void gen_cvt_sxtw(void)
 {
-    /* XXX on risc-v the registers are usually sign-extended already.
-       Let's try to not do anything here.  */
+
 }
 
 ST_FUNC void gen_cvt_itof(int t)
@@ -1271,7 +1254,7 @@ ST_FUNC void gen_cvt_itof(int t)
         vtop++;
         vtop->r = dr;
         dr = freg(dr);
-        EIu(0x53, 7, dr, rr, ((0x68 | (t == VT_DOUBLE ? 1 : 0)) << 5) | (u ? 1 : 0) | (l ? 2 : 0)); // fcvt.[sd].[wl][u]
+        EIu(0x53, 7, dr, rr, ((0x68 | (t == VT_DOUBLE ? 1 : 0)) << 5) | (u ? 1 : 0) | (l ? 2 : 0));
     }
 }
 
@@ -1297,7 +1280,7 @@ ST_FUNC void gen_cvt_ftoi(int t)
         vtop++;
         vtop->r = dr;
         dr = ireg(dr);
-        EIu(0x53, 1, dr, rr, ((0x60 | (ft == VT_DOUBLE ? 1 : 0)) << 5) | (u ? 1 : 0) | (l ? 2 : 0)); // fcvt.[wl][u].[sd] rtz
+        EIu(0x53, 1, dr, rr, ((0x60 | (ft == VT_DOUBLE ? 1 : 0)) << 5) | (u ? 1 : 0) | (l ? 2 : 0));
     }
 }
 
@@ -1311,10 +1294,7 @@ ST_FUNC void gen_cvt_ftof(int dt)
         int func = (dt == VT_LDOUBLE) ?
             (st == VT_FLOAT ? TOK___extendsftf2 : TOK___extenddftf2) :
             (dt == VT_FLOAT ? TOK___trunctfsf2 : TOK___trunctfdf2);
-        /* We can't use gfunc_call, as func_old_type works like vararg
-           functions, and on riscv unnamed float args are passed like
-           integers.  But we really need them in the float argument registers
-           for extendsftf2/extenddftf2.  So, do it explicitely.  */
+
         save_regs(1);
         if (dt == VT_LDOUBLE)
           gv(RC_F(0));
@@ -1322,7 +1302,7 @@ ST_FUNC void gen_cvt_ftof(int dt)
             gv(RC_R(0));
             assert(vtop->r2 < 7);
             if (vtop->r2 != 1 + vtop->r) {
-                EI(0x13, 0, ireg(vtop->r) + 1, ireg(vtop->r2), 0); // mv Ra+1, RR2
+                EI(0x13, 0, ireg(vtop->r) + 1, ireg(vtop->r2), 0);
                 vtop->r2 = 1 + vtop->r;
             }
         }
@@ -1341,9 +1321,9 @@ ST_FUNC void gen_cvt_ftof(int dt)
         rs = gv(RC_FLOAT);
         rd = get_reg(RC_FLOAT);
         if (dt == VT_DOUBLE)
-          EI(0x53, 0, freg(rd), freg(rs), 0x21 << 5); // fcvt.d.s RD, RS (no rm)
+          EI(0x53, 0, freg(rd), freg(rs), 0x21 << 5);
         else
-          EI(0x53, 7, freg(rd), freg(rs), (0x20 << 5) | 1); // fcvt.s.d RD, RS (dyn rm)
+          EI(0x53, 7, freg(rd), freg(rs), (0x20 << 5) | 1);
         vtop->r = rd;
     }
 }
@@ -1356,12 +1336,12 @@ ST_FUNC void ggoto(void)
 
 ST_FUNC void gen_vla_sp_save(int addr)
 {
-    ES(0x23, 3, 8, 2, addr); // sd sp, fc(s0)
+    ES(0x23, 3, 8, 2, addr);
 }
 
 ST_FUNC void gen_vla_sp_restore(int addr)
 {
-    EI(0x03, 3, 2, 8, addr); // ld sp, fc(s0)
+    EI(0x03, 3, 2, 8, addr);
 }
 
 ST_FUNC void gen_vla_alloc(CType *type, int align)
@@ -1374,18 +1354,18 @@ ST_FUNC void gen_vla_alloc(CType *type, int align)
     rr = ireg(gv(RC_INT));
 #if defined(CONFIG_TCC_BCHECK)
     if (tcc_state->do_bounds_check)
-        EI(0x13, 0, rr, rr, 15+1);   // addi RR, RR, 15+1
+        EI(0x13, 0, rr, rr, 15+1);
     else
 #endif
-    EI(0x13, 0, rr, rr, 15);   // addi RR, RR, 15
-    EI(0x13, 7, rr, rr, -16);  // andi, RR, RR, -16
-    ER(0x33, 0, 2, 2, rr, 0x20); // sub sp, sp, rr
+    EI(0x13, 0, rr, rr, 15);
+    EI(0x13, 7, rr, rr, -16);
+    ER(0x33, 0, 2, 2, rr, 0x20);
     vpop();
 #if defined(CONFIG_TCC_BCHECK)
     if (tcc_state->do_bounds_check) {
         vpushi(0);
         vtop->r = TREG_R(0);
-        o(0x00010513); /* mv a0,sp */
+        o(0x00010513);
         vswap();
         vpush_helper_func(TOK___bound_new_region);
         vrott(3);

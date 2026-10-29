@@ -1,4 +1,3 @@
-
 use std::ffi::CStr;
 use std::os::raw::c_char;
 use onyx_core::freeze::Freezer;
@@ -115,4 +114,3 @@ pub unsafe extern "C" fn onyx_freezer_clear(freezer: *mut Freezer) {
         f.clear();
     }
 }
-

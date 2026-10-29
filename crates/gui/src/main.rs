@@ -1,4 +1,3 @@
-
 #![windows_subsystem = "windows"]
 #![allow(dead_code, unused_variables, unsafe_op_in_unsafe_fn, static_mut_refs)]
 
@@ -66,4 +65,3 @@ fn main() -> eframe::Result<()> {
         }),
     )
 }
-

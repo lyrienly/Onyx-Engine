@@ -1,10 +1,3 @@
-/*
- * vmeventhandler_amd.c
- *
- *  Created on: May 22, 2013
- *      Author: eric
- */
-
 #include "vmeventhandler_amd.h"
 #include "vmeventhandler.h"
 #include "main.h"
@@ -20,16 +13,11 @@
 #include "epthandler.h"
 #include "vmxemu.h"
 
-//GIF_EMUMETHOD : 1=Intercept external interrupts and trigger them back when GIF is back to 1
-//                2=Use interrupt masking, and don't set the IF flag, so interrupts do not get sent to the VM (faster)
-
 #define GIF_EMUMETHOD 2
-
 
 int c=0;
 
 criticalSection debugoutput={.name="debugoutput", .debuglevel=2};
-
 
 int isPrefix(unsigned char b)
 {
@@ -54,39 +42,19 @@ int isPrefix(unsigned char b)
 
 int logeverything=0;
 
-
-
 int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE64 *fxsave)
 {
   int i;
   int wasStep;
-/*
-  c++;
-  if (c>50)
-    while (1);*/
-
-
-
-
 
   wasStep=currentcpuinfo->singleStepping.ReasonsPos>0;
 
-  nosendchar[getAPICID()]=1; //currentcpuinfo->vmcb->EXITCODE==0x400;//everything but npt //!logeverything;
+  nosendchar[getAPICID()]=1;
 
   if (currentcpuinfo->showall)
    nosendchar[getAPICID()]=0;
 
-
- // nosendchar[getAPICID()]=((PRFLAGS)(&currentcpuinfo->vmcb->RFLAGS))->IF==1; //don't bother if IF==1
-
- // if (currentcpuinfo->vmcb_GIF==0)
- //   nosendchar[getAPICID()]=0;
-
-
   currentcpuinfo->LastVMCall=currentcpuinfo->vmcb->EXITCODE;
-
-
-
 
   PEXITINTINFO eii=(PEXITINTINFO)&currentcpuinfo->vmcb->EXITINTINFO;
 
@@ -97,25 +65,21 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
     sendstringf("EXITINTINFO=%x\n", currentcpuinfo->vmcb->EXITINTINFO);
   }
 
-
   sendstringf("%d: %x:%6 - getAPICID()=%d VM_HSAVE_PA_MSR=%6 RFLAGS=%x\n", currentcpuinfo->cpunr, currentcpuinfo->vmcb->cs_selector, currentcpuinfo->vmcb->RIP, getAPICID(),readMSR(VM_HSAVE_PA_MSR), currentcpuinfo->vmcb->RFLAGS);
   sendstringf("IF==%d\n",((PRFLAGS)(&currentcpuinfo->vmcb->RFLAGS))->IF);
 
   sendstringf("GIF==%d\n", currentcpuinfo->vmcb_GIF);
   sendstringf("V_TPR=%d V_IRQ=%d\n", currentcpuinfo->vmcb->V_TPR, currentcpuinfo->vmcb->V_IRQ);
 
-
-
   sendstringf("currentcpuinfo->cpunr=%d (nr:%d)\n", currentcpuinfo->cpunr, currentcpuinfo->eventcounter[0]);
   currentcpuinfo->eventcounter[0]++;
-
 
   sendstringf("currentcpuinfo->vmcb->EXITCODE=%x\n", currentcpuinfo->vmcb->EXITCODE);
   sendstringf("EXITINTINFO=%x\nEXITINFO1=%x\nEXITINFO2=%x\n", currentcpuinfo->vmcb->EXITINTINFO, currentcpuinfo->vmcb->EXITINFO1, currentcpuinfo->vmcb->EXITINFO2);
 
   sendstringf("currentcpuinfo->vmcb->VMCB_CLEAN_BITS = %8\n", currentcpuinfo->vmcb->VMCB_CLEAN_BITS);
 
-  currentcpuinfo->vmcb->VMCB_CLEAN_BITS=0xffffffff; //nothing cached changed (yet)
+  currentcpuinfo->vmcb->VMCB_CLEAN_BITS=0xffffffff;
 
   if (currentcpuinfo->eptUpdated==1)
   {
@@ -125,19 +89,11 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
     ept_invalidate();
   }
 
-
-
-
-
-
-
-  if ((currentcpuinfo->singleStepping.ReasonsPos) && (currentcpuinfo->vmcb->EXITCODE!=VMEXIT_NPF)) //ANYTHING except NPF is counted as a single step (in case of interrupts)
+  if ((currentcpuinfo->singleStepping.ReasonsPos) && (currentcpuinfo->vmcb->EXITCODE!=VMEXIT_NPF))
   {
-    //logeverything=1; //start the log
 
-    //restore EFER
     currentcpuinfo->vmcb->EFER=currentcpuinfo->singleStepping.PreviousEFER;
-    currentcpuinfo->vmcb->VMCB_CLEAN_BITS&=~(1<< 5); //crx and EFER
+    currentcpuinfo->vmcb->VMCB_CLEAN_BITS&=~(1<< 5);
 
     if (currentcpuinfo->singleStepping.LastInstructionWasSyscall)
     {
@@ -154,16 +110,14 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       vmregisters->r11 &= ~(QWORD)(1<<8);
 
       currentcpuinfo->vmcb->SFMASK=currentcpuinfo->singleStepping.PreviousFMASK;
-     // currentcpuinfo->vmcb->VMCB_CLEAN_BITS=0;
 
       sendstringf("%d: r11=%x\n", currentcpuinfo->cpunr, vmregisters->r11);
 
-      //efer is restored, fmask is restored, going to handle the step like always
     }
 
     if (currentcpuinfo->vmcb->EXITCODE==VMEXIT_EXCP6)
     {
-     // nosendchar[getAPICID()]=0;
+
       sendstringf("%d: UD exception while single stepping at %6.  Could be a syscall\n", currentcpuinfo->cpunr, currentcpuinfo->vmcb->RIP);
 
       int error;
@@ -171,7 +125,6 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
 
       sendstringf("%d: csbase=%6\n rip=%6\n",currentcpuinfo->cpunr, currentcpuinfo->vmcb->cs_base, currentcpuinfo->vmcb->RIP);
 
-      //nosendchar[getAPICID()]=0;
       sendstringf("%d: mapping vm memory\n", currentcpuinfo->cpunr);
 
       int size=15;
@@ -188,7 +141,7 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       if (bytes)
       {
         int start=-1;
-        //check if it's a syscall (0f 05)
+
         for (i=0; i<15; i++)
           if (isPrefix(bytes[i])==FALSE)
           {
@@ -199,13 +152,13 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
         if ((start==-1) || (start>=14))
         {
           sendstringf("Just a bunch of prefixes. WTF?\n");
-          currentcpuinfo->vmcb->EVENTINJ=currentcpuinfo->vmcb->EXITINTINFO; //retrigger
+          currentcpuinfo->vmcb->EVENTINJ=currentcpuinfo->vmcb->EXITINTINFO;
           unmapVMmemory(bytes, size);
           return 0;
         }
         else
         {
-          //valid instruction
+
           if ((bytes[start]==0x0f) && (bytes[start+1]==0x05))
           {
             sendstringf("%d: it IS a syscall\n", currentcpuinfo->cpunr);
@@ -215,16 +168,10 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
             currentcpuinfo->vmcb->SFMASK=currentcpuinfo->singleStepping.PreviousFMASK & ~(QWORD)(1<<8);
             sendstringf("%d: old IA32_FMASK was %6\nnew IA32_FMASK is  %6\n", currentcpuinfo->cpunr, currentcpuinfo->singleStepping.PreviousFMASK, currentcpuinfo->vmcb->SFMASK);
 
-
             sendstringf("%d: current rflags before syscall is %x\n", currentcpuinfo->cpunr, currentcpuinfo->vmcb->RFLAGS);
 
             sendstringf("%d: Next step should be at %6\n", currentcpuinfo->cpunr, currentcpuinfo->vmcb->LSTAR);
 
-            //
-           // currentcpuinfo->vmcb->VMCB_CLEAN_BITS=0;
-
-
-            //efer was already restored, so repeat this instruction
             unmapVMmemory(bytes, size);
             return 0;
           }
@@ -236,29 +183,23 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       {
         nosendchar[getAPICID()]=0;
         sendstringf("Failed reading the memory that was just executed and caused an UD... Guess it's not a syscall... fuuuuu (error=%d pagefaultaddress=%6)\n", error, pagefaultaddress);
-        currentcpuinfo->vmcb->EVENTINJ=currentcpuinfo->vmcb->EXITINTINFO; //retrigger
+        currentcpuinfo->vmcb->EVENTINJ=currentcpuinfo->vmcb->EXITINTINFO;
         return 0;
       }
     }
 
-    //nosendchar[getAPICID()]=0;
-    //sendstringf("AMD Handler: currentcpuinfo->singleStepping.ReasonsPos=%d Calling handleSingleStep()\n",currentcpuinfo->singleStepping.ReasonsPos);
     if (currentcpuinfo->singleStepping.ReasonsPos>=2)
     {
       nosendchar[getAPICID()]=0;
       sendstringf("Handling multiple single step reasons\n");
     }
 
-
     handleSingleStep(currentcpuinfo, vmregisters, fxsave);
     sendstringf("%d: After handleSingleStep()\n", currentcpuinfo->cpunr);
 
     if (currentcpuinfo->vmcb->EXITCODE==VMEXIT_EXCP1)
     {
-      sendstringf("%d: It was an int1 so skip this (cs:rip=%x:%6  rflags=%x)\n", currentcpuinfo->cpunr, currentcpuinfo->vmcb->cs_selector, currentcpuinfo->vmcb->RIP, currentcpuinfo->vmcb->RFLAGS); //Todo: Check if it was a int1 or other BP before the step
-
-
-      //sendstringf("%6:\n", currentcpuinfo->vmcb->RIP);
+      sendstringf("%d: It was an int1 so skip this (cs:rip=%x:%6  rflags=%x)\n", currentcpuinfo->cpunr, currentcpuinfo->vmcb->cs_selector, currentcpuinfo->vmcb->RIP, currentcpuinfo->vmcb->RFLAGS);
 
       if (currentcpuinfo->singleStepping.PreviousTFState)
       {
@@ -267,25 +208,16 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
         ept_handleHardwareBreakpoint(currentcpuinfo, vmregisters, fxsave);
       }
 
-      //no further handling is needed
       return 0;
     }
 
-    sendstringf("%d: Need to do some further handling (rflags=%x)\n", currentcpuinfo->cpunr, currentcpuinfo->vmcb->RFLAGS);//eg external interrupts
+    sendstringf("%d: Need to do some further handling (rflags=%x)\n", currentcpuinfo->cpunr, currentcpuinfo->vmcb->RFLAGS);
   }
   else
   {
     if (currentcpuinfo->singleStepping.ReasonsPos)
       sendstringf("AMD Handler: currentcpuinfo->singleStepping.ReasonsPos=%d and EXITCODE IS AN NPF\n",currentcpuinfo->singleStepping.ReasonsPos);
   }
-
-//  if (currentcpuinfo->NP_Cloak.ActiveRegion)
-//  {
-
-//  }
-
-
-
 
   switch (currentcpuinfo->vmcb->EXITCODE)
   {
@@ -300,7 +232,7 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
 
       result=setVM_CR3(currentcpuinfo, vmregisters, value);
 
-      if (CR3ValueLog==NULL) //stop logging
+      if (CR3ValueLog==NULL)
         currentcpuinfo->vmcb->InterceptCR0_15Write&=~(1<<3);
 
       if (result==0)
@@ -312,13 +244,11 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
     case VMEXIT_INTR:
     {
 
-      if (currentcpuinfo->vmcb->InterceptINTR==0) return 0; //not handled anymore
+      if (currentcpuinfo->vmcb->InterceptINTR==0) return 0;
 
       nosendchar[getAPICID()]=1;
       sendstringf("%d: VMEXIT_INTR: EXITINFO1=%6 EXITINFO2=%6 EXITINTINFO=%6 RFLAGS=%x V_IRQ=%d V_TPR=%d\n", currentcpuinfo->cpunr, currentcpuinfo->vmcb->EXITINFO1, currentcpuinfo->vmcb->EXITINFO2, currentcpuinfo->vmcb->EXITINTINFO, currentcpuinfo->vmcb->RFLAGS, currentcpuinfo->vmcb->V_IRQ, currentcpuinfo->vmcb->V_TPR);
       sendstringf("my RSP=%6\n", getRSP());
-
-
 
       while(1)
       {
@@ -326,13 +256,12 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
 
         try
         {
-          //sendstringf("Checking for interrupt\n");
-          //setCR8(0);
+
           asm("stgi\nsti");
           asm("nop");
-          //no interrupt...
+
           asm("clgi\ncli");
-          //sendstringf("No interrupt\n");
+
         }
         except
         {
@@ -364,12 +293,10 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
 
           currentcpuinfo->vmcb_pending[interruptnr >> 4]=interruptnr;
 
-
-
         }
         else break;
 
-      } //test while
+      }
 
       sendstringf("done. Resuming\n");
 
@@ -407,41 +334,37 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
     case VMEXIT_EXCP30:
     case VMEXIT_EXCP31:
     {
-      //shouldn't happen (but used as debug to find exceptions)
+
       nosendchar[getAPICID()]=0;
       sendstringf("One of the other exceptions (%d) (not INTR) got intercepted (wasStep=%d EXITINTINFO=%8)\n", (int)(currentcpuinfo->vmcb->EXITCODE-VMEXIT_EXCP0), wasStep, currentcpuinfo->vmcb->EXITINTINFO);
 
       sendvmstate(currentcpuinfo, vmregisters);
       ShowCurrentInstructions(currentcpuinfo);
 
-
       currentcpuinfo->vmcb->EVENTINJ=0;
       currentcpuinfo->vmcb->inject_Vector=currentcpuinfo->vmcb->EXITCODE-VMEXIT_EXCP0;
       currentcpuinfo->vmcb->inject_Type=3;
 
       while (1);
-      //currentcpuinfo->vmcb->inject_EV
-     // currentcpuinfo->vmcb->EXITINTINFO; //retrigger
+
       return 0;
 
     }
 
     case VMEXIT_EXCP1:
     {
-      int isFault=0; //on amd it seems it ever ever set RF. isDebugFault(currentcpuinfo->vmcb->DR6, currentcpuinfo->vmcb->DR7);
+      int isFault=0;
 
-      //int1 breakpoint
-      nosendchar[getAPICID()]=0; //urrentcpuinfo->vmcb->CPL!=3;
+      nosendchar[getAPICID()]=0;
       sendstringf("%d: INT1 breakpoint at %6 (rflags=%x)\n", currentcpuinfo->cpunr, currentcpuinfo->vmcb->RIP, currentcpuinfo->vmcb->RFLAGS);
 
       if (ept_handleHardwareBreakpoint(currentcpuinfo, vmregisters, fxsave))
         return 0;
 
-
       if (wasStep)
       {
         sendstringf("wasStep=1 so retrigger\n");
-        currentcpuinfo->vmcb->EVENTINJ=currentcpuinfo->vmcb->EXITINTINFO; //retrigger
+        currentcpuinfo->vmcb->EVENTINJ=currentcpuinfo->vmcb->EXITINTINFO;
         return 0;
       }
       else
@@ -449,13 +372,10 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
         sendstringf("wasStep=0\n");
       }
 
-
-
       sendstringf("dr0=%x\n", getDR0());
       sendstringf("dr1=%x\n", getDR1());
       sendstringf("dr2=%x\n", getDR2());
       sendstringf("dr3=%x\n", getDR3());
-
 
       sendstringf("dr6=%x\n", currentcpuinfo->vmcb->DR6);
       sendstringf("dr7=%x\n", currentcpuinfo->vmcb->DR7);
@@ -463,32 +383,29 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
 
       sendstringf("isFault=%d\n", isFault);
 
-
       if (((PregDR7)(&currentcpuinfo->vmcb->DR7))->GD)
       {
-        //GD is set, unset it (should already be unset)
+
         ((PregDR7)(&currentcpuinfo->vmcb->DR7))->GD=0;
-        currentcpuinfo->vmcb->VMCB_CLEAN_BITS&=~(1 << 6); //tell the cpu it got changed
+        currentcpuinfo->vmcb->VMCB_CLEAN_BITS&=~(1 << 6);
       }
-
-
 
       if ((int1redirection_idtbypass==0) || (ISREALMODE(currentcpuinfo)))
       {
         sendstring("Realmode bp or No idtbypass\n");
-        currentcpuinfo->vmcb->inject_Type=3; //exception
+        currentcpuinfo->vmcb->inject_Type=3;
         currentcpuinfo->vmcb->inject_Vector=int1redirection;
         currentcpuinfo->vmcb->inject_Valid=1;
         currentcpuinfo->vmcb->inject_EV=0;
 
-        if (isFault) //set the RF flag in rflags
+        if (isFault)
           ((PRFLAGS)(&currentcpuinfo->vmcb->RFLAGS))->RF=1;
 
         return 0;
       }
       else
       {
-        //idt bypass method
+
         int result;
 
         sendstringf("before:\n");
@@ -503,7 +420,6 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       break;
     }
 
-
     case VMEXIT_EXCP3:
     {
       nosendchar[getAPICID()]=0;
@@ -514,7 +430,7 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
 
       if (handleSoftwareBreakpoint(currentcpuinfo, vmregisters, fxsave))
       {
-        //sendstring("VMEXIT_EXCP3: handleSoftwareBreakpoint handled it. Returning 0\n");
+
         return 0;
       }
 
@@ -527,21 +443,18 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       ShowCurrentInstructions(currentcpuinfo);
 #endif
 
-
-      //set RIP to after the instruction
       if (AMD_hasNRIPS)
       {
         currentcpuinfo->vmcb->RIP=currentcpuinfo->vmcb->nRIP;
       }
       else
       {
-        //scan where the 0xcc is...
+
         int error;
         UINT64 pagefaultaddress;
         unsigned char *bytes=(unsigned char *)mapVMmemory(currentcpuinfo, currentcpuinfo->vmcb->cs_base+currentcpuinfo->vmcb->RIP, 15, &error, &pagefaultaddress);
         if (!bytes)
             bytes=mapVMmemory(currentcpuinfo, currentcpuinfo->vmcb->cs_base+currentcpuinfo->vmcb->RIP, pagefaultaddress-currentcpuinfo->vmcb->cs_base+currentcpuinfo->vmcb->RIP, &error, &pagefaultaddress);
-
 
         int i;
         for (i=0; i<15; i++)
@@ -557,14 +470,11 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       }
       sendstringf("new RIP=%6\n", currentcpuinfo->vmcb->RIP);
 
-
-
-      //and raise the interrupt
       if ((int3redirection_idtbypass==0) || (ISREALMODE(currentcpuinfo)))
       {
         sendstring("Realmode bp or No idtbypass\n");
         currentcpuinfo->vmcb->EVENTINJ=0;
-        currentcpuinfo->vmcb->inject_Type=3; //exception
+        currentcpuinfo->vmcb->inject_Type=3;
         currentcpuinfo->vmcb->inject_Vector=int3redirection;
         currentcpuinfo->vmcb->inject_Valid=1;
         currentcpuinfo->vmcb->inject_EV=0;
@@ -572,19 +482,17 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
        }
        else
        {
-         //idt bypass method
+
          int result;
 
          sendstringf("before:\n");
          sendvmstate(currentcpuinfo, vmregisters);
-         result=emulateExceptionInterrupt(currentcpuinfo, vmregisters, int3redirection_idtbypass_cs, int3redirection_idtbypass_rip, 0, 0, 0); //it' a trap!
+         result=emulateExceptionInterrupt(currentcpuinfo, vmregisters, int3redirection_idtbypass_cs, int3redirection_idtbypass_rip, 0, 0, 0);
          sendstringf("after:\n");
          sendvmstate(currentcpuinfo, vmregisters);
 
          return result;
        }
-
-
 
       return 1;
     }
@@ -594,10 +502,7 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       DWORD errorcode=currentcpuinfo->vmcb->EXITINFO1;
       QWORD cr2=currentcpuinfo->vmcb->EXITINFO2;
 
-
-      nosendchar[getAPICID()]=(((PRFLAGS)(&currentcpuinfo->vmcb->RFLAGS))->IF) && (currentcpuinfo->vmcb->V_TPR<=1); //don't bother if IF==1
-
-
+      nosendchar[getAPICID()]=(((PRFLAGS)(&currentcpuinfo->vmcb->RFLAGS))->IF) && (currentcpuinfo->vmcb->V_TPR<=1);
 
       sendstringf("INT14 breakpoint\n");
       sendstringf("RFLAGS=%x", currentcpuinfo->vmcb->RFLAGS);
@@ -617,17 +522,11 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
         while (1);
       }
 
-
-
-
-      setCR2(cr2); //<---bochs bug? My real hardware does not use this CR2 value but the one in the vmcb. (no matter)
+      setCR2(cr2);
       currentcpuinfo->vmcb->CR2=cr2;
-      currentcpuinfo->vmcb->VMCB_CLEAN_BITS&=~(1 << 9); //cr2 got changed
-
+      currentcpuinfo->vmcb->VMCB_CLEAN_BITS&=~(1 << 9);
 
       ((PRFLAGS)(&currentcpuinfo->vmcb->RFLAGS))->RF=1;
-
-
 
       if ((int14redirection_idtbypass==0) || (ISREALMODE(currentcpuinfo)))
       {
@@ -635,13 +534,10 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
 
         if (ISREALMODE(currentcpuinfo))
         {
-          //todo: setup a realmode paging setup and set cr3 to that and intercept cr3 read/write and cr0 read/write
 
         }
 
-
-
-        currentcpuinfo->vmcb->inject_Type=3; //exception
+        currentcpuinfo->vmcb->inject_Type=3;
         currentcpuinfo->vmcb->inject_Vector=int14redirection;
         currentcpuinfo->vmcb->inject_Valid=1;
         currentcpuinfo->vmcb->inject_EV=1;
@@ -651,7 +547,7 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       }
       else
       {
-        //idt bypass method
+
         int result;
 
         sendstringf("before:\n");
@@ -666,15 +562,11 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       break;
     }
 
-
-    case VMEXIT_SWINT: //software interrupts (INTn)
+    case VMEXIT_SWINT:
     {
       int handled=0;
       int intnr;
       int instructionlength=0;
-
-      //nosendchar[getAPICID()]=0; //this seems to work well enough
-      //sendstringf("VMEXIT_SWINT: Software interrupt\n");
 
       if (AMD_hasDecodeAssists)
       {
@@ -684,13 +576,9 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       }
       else
       {
-        //get the interrupt nr from the instruction
-        //map CS:RIP and read out the instruction
+
         int error;
         UINT64 pagefaultaddress;
-
-        //sendstringf("DB:2:currentcpuinfo->AvailableVirtualAddress=%6\n", currentcpuinfo->AvailableVirtualAddress);
-
 
         unsigned char *bytes=mapVMmemory(currentcpuinfo, currentcpuinfo->vmcb->cs_base+currentcpuinfo->vmcb->RIP, 15, &error, &pagefaultaddress);
 
@@ -712,26 +600,14 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
         unmapVMmemory(bytes,15);
       }
 
-
-      if ((ISREALMODE(currentcpuinfo)/* || ((currentcpuinfo->vmcb->RFLAGS >> 17) & 1) */) && (intnr==0x15))
+      if ((ISREALMODE(currentcpuinfo)) && (intnr==0x15))
       {
-
-
-        //todo: Split this up into a function used by both intel and amd. Right now it's basically just a copy/paste with minor changes
-
-        //realmode of Virtual 8086 mode and the interrupt matches
-        //sendstringf("INT 0x15\n");
-        //sendstringf("RAX=%6\n", currentcpuinfo->vmcb->RAX);
 
         if ((currentcpuinfo->vmcb->RAX & 0xff00)==0x8800)
         {
           sendstringf("Handling int 15h, AH=88\n\r");
           currentcpuinfo->vmcb->RAX=(currentcpuinfo->vmcb->RAX & 0xffffffff00000000ULL)+0xfc00;
 
-         // RFLAGS
-         // currentcpuinfo->vmcb->RFLAGS
-
-          //clear the carry flag
           ((PRFLAGS)(&currentcpuinfo->vmcb->RFLAGS))->CF=0;
 
           handled=1;
@@ -740,16 +616,10 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
         if ((currentcpuinfo->vmcb->RAX & 0xffff)==0xe801)
         {
 
-
-          DWORD between1and16MB=0; //in KB, max 3c00  (between 0x100000 and 0x1000000)
+          DWORD between1and16MB=0;
           DWORD above16MB=0;
 
-
-
-
-
           sendstringf("Handling int 15h, AH=e801. ARDcount=%d \n\r",ARDcount);
-
 
           for (i=0; i<ARDcount; i++)
           {
@@ -760,11 +630,9 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
             if (fakeARD[i].BaseAddrHigh>0)
               continue;
 
-
-
             if ((fakeARD[i].Type==1) && ((fakeARD[i].BaseAddrLow+fakeARD[i].LengthLow)>0x100000))
             {
-              //upper mem, and available
+
               DWORD start=fakeARD[i].BaseAddrLow;
               DWORD stop=fakeARD[i].BaseAddrLow+fakeARD[i].LengthLow;
 
@@ -784,7 +652,6 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
               if (start>=0x1000000)
                 above16MB+=stop-start;
 
-
             }
           }
 
@@ -797,7 +664,7 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
           vmregisters->rcx=(vmregisters->rcx & 0xffffffffffff0000ULL) + (between1and16MB / 1024);
           vmregisters->rdx=(vmregisters->rdx & 0xffffffffffff0000ULL) + (above16MB / (64*1024));
 
-          ((PRFLAGS)(&currentcpuinfo->vmcb->RFLAGS))->CF=0; //clear carry
+          ((PRFLAGS)(&currentcpuinfo->vmcb->RFLAGS))->CF=0;
 
           handled=1;
         }
@@ -807,18 +674,13 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       {
         int startindex=(ULONG)vmregisters->rbx;
 
-        //return 1;
-
-
         sendstringf("Handling int 15h, ax=E820 (maxindex=%d)\n\r",ARDcount-1);
         sendstringf("startindex=%d vmregisters->rcx=%d\n\r",startindex,vmregisters->rcx);
 
-
         if (((ULONG)vmregisters->rcx >= 20) && ((ULONG)vmregisters->rdx==0x534D4150) && (startindex<ARDcount))
         {
-          //call=ok
 
-          PARD output=(PARD)(currentcpuinfo->vmcb->es_base+(vmregisters->rdi & 0xffff)); //es:di
+          PARD output=(PARD)(currentcpuinfo->vmcb->es_base+(vmregisters->rdi & 0xffff));
           int totalentries=(ULONG)vmregisters->rcx/20;
           int o,i;
           currentcpuinfo->vmcb->RAX=(currentcpuinfo->vmcb->RAX & 0xffffffff00000000ULL) + 0x534D4150;
@@ -837,7 +699,6 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
             i++;
           }
 
-          //set next index, i already contains the value of the next index
           if (i>=ARDcount)
           {
             vmregisters->rbx=(vmregisters->rbx & 0xffffffff00000000ULL) + 0;
@@ -848,7 +709,7 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
           }
 
           vmregisters->rcx=(vmregisters->rcx & 0xffffffff00000000ULL) + (o*20);
-          ((PRFLAGS)(&currentcpuinfo->vmcb->RFLAGS))->CF=0; //clear carry
+          ((PRFLAGS)(&currentcpuinfo->vmcb->RFLAGS))->CF=0;
 
           sendstringf("Handled int15h ax=e820. ECX=%8 \n\r",(ULONG)vmregisters->rcx);
 
@@ -857,20 +718,18 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
         }
         else
         {
-          //return error
+
           sendstringf("Returning error\n\r");
-          ((PRFLAGS)(&currentcpuinfo->vmcb->RFLAGS))->CF=1; //set carry
+          ((PRFLAGS)(&currentcpuinfo->vmcb->RFLAGS))->CF=1;
           handled=1;
         }
-
 
       }
       else
       {
-       // sendstringf("INT 0x%x .  Not INT 0x15 or not in realmode so handle it normally (inject this interrupt)\n", intnr);
+
       }
 
-      //adjust RIP
       if (AMD_hasNRIPS)
         currentcpuinfo->vmcb->RIP=currentcpuinfo->vmcb->nRIP;
       else
@@ -879,8 +738,8 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       if (!handled)
       {
         {
-         // sendstringf("Injecting interrupt\n");
-          currentcpuinfo->vmcb->inject_Type=4; //software int
+
+          currentcpuinfo->vmcb->inject_Type=4;
           currentcpuinfo->vmcb->inject_Vector=intnr;
           currentcpuinfo->vmcb->inject_Valid=1;
           currentcpuinfo->vmcb->inject_EV=0;
@@ -917,7 +776,6 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       sendstringf("EXITINFO1=%d\n", currentcpuinfo->vmcb->EXITINFO1);
       sendstringf("EXITINFO2=%d\n", currentcpuinfo->vmcb->EXITINFO2);
 
-
       if (currentcpuinfo->vmcb->EXITINFO1)
       {
 
@@ -949,20 +807,17 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
 
             break;
 
-          case 0xc0000080://efer
-            //store the efer the guest wants it to be
+          case 0xc0000080:
+
             currentcpuinfo->efer=((vmregisters->rdx & 0xffffffff) << 32) + (currentcpuinfo->vmcb->RAX & 0xffffffff);
 
-            //and set the actual efer  (make sure SVME is set)
             currentcpuinfo->vmcb->EFER=currentcpuinfo->efer | (1 << 12);
 
             sendstringf("Wants to set efer to %x\nActually set efer to %x\n",currentcpuinfo->efer, currentcpuinfo->vmcb->EFER);
 
-            currentcpuinfo->vmcb->VMCB_CLEAN_BITS&=~(1 << 5); //the efer got changed
+            currentcpuinfo->vmcb->VMCB_CLEAN_BITS&=~(1 << 5);
 
             sendstringf("currentcpuinfo->vmcb->VMCB_CLEAN_BITS = %8\n", currentcpuinfo->vmcb->VMCB_CLEAN_BITS);
-
-
 
             break;
 
@@ -973,17 +828,14 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
             break;
 
           case VM_HSAVE_PA_MSR:
-            //nosendchar[getAPICID()]=0;
+
             sendstringf("wrmsr(VM_HSAVE_PA,%6)\n", newvalue);
             currentcpuinfo->guest_VM_HSAVE_PA=newvalue;
 
             if (newvalue==0)
             {
-              //sendvmstate(currentcpuinfo, vmregisters);
-              //ShowCurrentInstructions(currentcpuinfo);
-              //currentcpuinfo->showall=1;
-            }
 
+            }
 
             nosendchar[getAPICID()]=1;
             break;
@@ -1012,11 +864,7 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
               return er;
             }
 
-
             break;
-
-
-
 
         }
       }
@@ -1030,17 +878,15 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
         switch (vmregisters->rcx & 0xffffffff)
         {
           case IA32_TIME_STAMP_COUNTER:
-            return handle_rdtsc(currentcpuinfo, vmregisters); //will be responsible for adjust rip as well
+            return handle_rdtsc(currentcpuinfo, vmregisters);
 
+          case 0xc0000080:
 
-          case 0xc0000080://efer
-            //update LMA
-
-            if ((currentcpuinfo->efer >> 12) & 1) //just give it the full EFER if it has enabled svmx as well
+            if ((currentcpuinfo->efer >> 12) & 1)
               currentcpuinfo->efer=currentcpuinfo->vmcb->EFER;
             else
             {
-              currentcpuinfo->efer=currentcpuinfo->vmcb->EFER & ~(1<<12); //everything except this bit
+              currentcpuinfo->efer=currentcpuinfo->vmcb->EFER & ~(1<<12);
             }
 
             value=currentcpuinfo->efer;
@@ -1085,11 +931,6 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
         sendstringf("vmregisters->rdx is %6\n", vmregisters->rdx);
         sendstringf("currentcpuinfo->vmcb->RAX is %6\n", currentcpuinfo->vmcb->RAX);
 
-        //tell the cpu that ONLY the EFER and RIP got changed and nothing else
-
-
-
-
       }
       sendstringf("RIP=%6\n",currentcpuinfo->vmcb->RIP);
       sendstringf("nRIP=%6\n", currentcpuinfo->vmcb->nRIP);
@@ -1100,13 +941,11 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       }
       else
       {
-        //FFS (I don't think i'm going to support cpu's without this)
+
         int error;
         UINT64 pagefaultaddress;
 
         sendstringf("AMD_hasNRIPS == 0 so...\n");
-
-       // sendstringf("DB:1:currentcpuinfo->AvailableVirtualAddress=%6\n", currentcpuinfo->AvailableVirtualAddress);
 
         unsigned char *bytes=(unsigned char *)mapVMmemory(currentcpuinfo, currentcpuinfo->vmcb->cs_base+currentcpuinfo->vmcb->RIP, 15, &error, &pagefaultaddress);
         if (!bytes)
@@ -1129,14 +968,10 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
 
       }
 
-
-
       return 0;
-
 
       break;
     }
-
 
     case VMEXIT_CLGI:
     {
@@ -1150,22 +985,19 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       else
         currentcpuinfo->vmcb->RIP+=3;
 
-
-
 #if GIF_EMUMETHOD == 1
-      currentcpuinfo->vmcb->InterceptINTR=1; //method 1
+      currentcpuinfo->vmcb->InterceptINTR=1;
       currentcpuinfo->vmcb->VMCB_CLEAN_BITS&=~(CLEAN_I);
 #elif GIF_EMUMETHOD == 2
-      currentcpuinfo->vmcb->V_INTR_MASKING=1; //method 2
+      currentcpuinfo->vmcb->V_INTR_MASKING=1;
       currentcpuinfo->vmcb->VMCB_CLEAN_BITS&=~(CLEAN_TPR);
-      asm("cli"); //method 2
+      asm("cli");
 #else
   #error GIF_EMUMETHOD not set
 #endif
       currentcpuinfo->vmcb->VMCB_CLEAN_BITS=0;
       currentcpuinfo->vmcb->TLB_CONTROL=1;
 
-    //  sendstringf("%d %x:%6 VMEXIT_CLGI DONE  (CR8=%d TPR=%d IF=%d)\n", currentcpuinfo->cpunr, currentcpuinfo->vmcb->cs_selector, currentcpuinfo->vmcb->RIP, getCR8(), currentcpuinfo->vmcb->V_TPR, ((PRFLAGS)(&currentcpuinfo->vmcb->RFLAGS))->IF);
       return 0;
     }
 
@@ -1174,14 +1006,11 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       nosendchar[getAPICID()]=1;
       sendstringf("%d %x:%6 - VMEXIT_STGI (CR8=%d TPR=%d IF=%d)\n", currentcpuinfo->cpunr, currentcpuinfo->vmcb->cs_selector, currentcpuinfo->vmcb->RIP,  getCR8(), currentcpuinfo->vmcb->V_TPR, ((PRFLAGS)(&currentcpuinfo->vmcb->RFLAGS))->IF);
 
-      //sendvmstate(currentcpuinfo, vmregisters);
-      //ShowCurrentInstructions(currentcpuinfo);
-
 #if GIF_EMUMETHOD == 1
-      currentcpuinfo->vmcb->InterceptINTR=0; //method 1
+      currentcpuinfo->vmcb->InterceptINTR=0;
 #elif GIF_EMUMETHOD == 2
-      currentcpuinfo->vmcb->V_INTR_MASKING=0; //method 2
-      asm("cli"); //method 2
+      currentcpuinfo->vmcb->V_INTR_MASKING=0;
+      asm("cli");
 #else
   #error GIF_EMUMETHOD not set
 #endif
@@ -1227,7 +1056,6 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       sendstringf("\nbefore vmload:\n");
       sendvmstate(currentcpuinfo, vmregisters);
 
-
       pvmcb guestvmcb=(pvmcb)mapPhysicalMemory(PA,4096);
       currentcpuinfo->vmcb->fs_selector=guestvmcb->fs_selector;
       currentcpuinfo->vmcb->fs_attrib=guestvmcb->fs_attrib;
@@ -1262,16 +1090,10 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       currentcpuinfo->vmcb->VMCB_CLEAN_BITS=0;
       currentcpuinfo->vmcb->TLB_CONTROL=1;
 
-
       unmapPhysicalMemory((void*)guestvmcb,4096);
-
 
       sendstringf("after vmload\n");
       sendvmstate(currentcpuinfo, vmregisters);
-      //ShowCurrentInstructions(currentcpuinfo);
-
-
-     // sendstringf("%d: %x:%6 - VMLOAD_DONE %6  IF=%d\n",currentcpuinfo->cpunr, currentcpuinfo->vmcb->cs_selector, currentcpuinfo->vmcb->RIP, PA, ((PRFLAGS)(&currentcpuinfo->vmcb->RFLAGS))->IF);
 
       return 0;
     }
@@ -1281,7 +1103,6 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       QWORD PA=currentcpuinfo->vmcb->RAX;
       nosendchar[getAPICID()]=1;
       sendstringf("%d: %x:%6 - VMSAVE %6  IF=%d\n",currentcpuinfo->cpunr, currentcpuinfo->vmcb->cs_selector, currentcpuinfo->vmcb->RIP, PA, ((PRFLAGS)(&currentcpuinfo->vmcb->RFLAGS))->IF);
-
 
       pvmcb guestvmcb=(pvmcb)mapPhysicalMemory(PA,4096);
       guestvmcb->fs_selector=currentcpuinfo->vmcb->fs_selector;
@@ -1309,7 +1130,6 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       guestvmcb->SYSENTER_ESP=currentcpuinfo->vmcb->SYSENTER_ESP;
       guestvmcb->SYSENTER_EIP=currentcpuinfo->vmcb->SYSENTER_EIP;
 
-      //guestvmcb->VMCB_CLEAN_BITS=0;
       unmapPhysicalMemory((void*)guestvmcb,4096);
 
       if (AMD_hasNRIPS)
@@ -1317,23 +1137,14 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       else
         currentcpuinfo->vmcb->RIP+=3;
 
-
-      //sendvmstate(currentcpuinfo, vmregisters);
-      //ShowCurrentInstructions(currentcpuinfo);
       currentcpuinfo->vmcb->VMCB_CLEAN_BITS=0;
       currentcpuinfo->vmcb->TLB_CONTROL=1;
-
-     // sendstringf("%d: %x:%6 - VMSAVE_DONE %6  IF=%d\n",currentcpuinfo->cpunr, currentcpuinfo->vmcb->cs_selector, currentcpuinfo->vmcb->RIP, PA, ((PRFLAGS)(&currentcpuinfo->vmcb->RFLAGS))->IF);
 
       return 0;
     }
 
-
-
     case VMEXIT_VMRUN:
     {
-      //nosendchar[getAPICID()]=0;
-      //sendstringf("%d: VMEXIT_VMRUN\n", currentcpuinfo->cpunr);
 
       return handleAMDVMRUNInstruction(currentcpuinfo, vmregisters, fxsave);
     }
@@ -1350,9 +1161,9 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
 
     case VMEXIT_VMMCALL:
     {
-      //dbvm callback for amd
+
       nosendchar[getAPICID()]=0;
-     // sendstringf("%d: handleVMCall()", currentcpuinfo->cpunr);
+
       return handleVMCall(currentcpuinfo, vmregisters);
       break;
     }
@@ -1382,22 +1193,14 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       sendstringf("V_INTR_PRIO=%d\n", currentcpuinfo->vmcb->V_INTR_PRIO);
       sendstringf("V_INTR_VECTOR=%d (%x)\n", currentcpuinfo->vmcb->V_INTR_VECTOR, currentcpuinfo->vmcb->V_INTR_VECTOR);
 
-      //sendvmstate(currentcpuinfo, vmregisters);
-      //ShowCurrentInstructions(currentcpuinfo);
-
-
-
-      //while (1);
       if (currentcpuinfo->vmcb_GIF==1)
       {
         sendstringf("GIF==1 so handling normally\n");
 
-
-        currentcpuinfo->vmcb->EVENTINJ=0; //init
+        currentcpuinfo->vmcb->EVENTINJ=0;
         currentcpuinfo->vmcb->inject_Vector=currentcpuinfo->vmcb->V_INTR_VECTOR;
-        currentcpuinfo->vmcb->inject_Type=0;//external
+        currentcpuinfo->vmcb->inject_Type=0;
         currentcpuinfo->vmcb->inject_Valid=1;
-
 
         currentcpuinfo->vmcb->V_IRQ=0;
 
@@ -1419,15 +1222,12 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
           }
         }
 
-
-        //currentcpuinfo->vmcb->InterceptExceptions=0xFFFFBFFF;
-
         currentcpuinfo->vmcb->VMCB_CLEAN_BITS=0;
       }
       else
       {
         nosendchar[getAPICID()]=0;
-        sendstringf("GIF==0\n"); //shouldn't happen
+        sendstringf("GIF==0\n");
         while (1);
       }
 
@@ -1438,8 +1238,7 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
     case VMEXIT_HLT:
     {
 
-
-      nosendchar[getAPICID()]=1; //with set to 0 eventually interrupts stop
+      nosendchar[getAPICID()]=1;
       PRFLAGS f=(PRFLAGS)&(currentcpuinfo->vmcb->RFLAGS);
       sendstringf("HLT IF=%d TPR=%d  (%d) ", f->IF, currentcpuinfo->vmcb->V_TPR, getCR8() );
       currentcpuinfo->vmcb->RIP=currentcpuinfo->vmcb->nRIP;
@@ -1480,7 +1279,7 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
           if (i!=-1)
           {
             sendstringf(" and got an interrupt using stgi/sti: %x\n", i);
-            currentcpuinfo->vmcb->inject_Type=0; //external
+            currentcpuinfo->vmcb->inject_Type=0;
             currentcpuinfo->vmcb->inject_Vector=i;
             currentcpuinfo->vmcb->inject_Valid=1;
             currentcpuinfo->vmcb->inject_EV=0;
@@ -1504,7 +1303,6 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
               sendstringf("%d-%d=%8\n",j*32,(j+1)*32-1, v);
             }
 
-
           }
         }
       }
@@ -1521,33 +1319,9 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
 
       nosendchar[getAPICID()]=0;
       while (1) sendstringf("PENIS");
-      /*
-      if (currentcpuinfo->cpunr==0)
-      {
-        apic_eoi();
-
-        nosendchar[getAPICID()]=0;
-        sendstringf("%6: %d(%d): VMEXIT_INIT Skipping (%6 -> %6)\n", currentcpuinfo, currentcpuinfo->cpunr,getAPICID(), currentcpuinfo->vmcb->RIP, currentcpuinfo->vmcb->nRIP);
-
-
-        if ((currentcpuinfo->vmcb->nRIP==0) || (currentcpuinfo->vmcb->nRIP==currentcpuinfo->vmcb->RIP))
-        {
-          currentcpuinfo->vmcb->RIP+=2;
-
-        }
-        else
-          currentcpuinfo->vmcb->RIP=currentcpuinfo->vmcb->nRIP;
-
-        currentcpuinfo->vmcb->VMCB_CLEAN_BITS=0;
-
-
-        return 0;
-      }*/
 
       UINT64 a,b,c,d;
       zeromemory(vmregisters,sizeof(VMRegisters));
-
-
 
       currentcpuinfo->vmcb->CR0=0x10;
       currentcpuinfo->vmcb->CR2=0;
@@ -1556,7 +1330,6 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       currentcpuinfo->vmcb->EFER=0;
       currentcpuinfo->vmcb->RIP=0xfff0;
 
-
       Segment_Attribs attrib;
       attrib.G=0;
       attrib.D_B=0;
@@ -1564,7 +1337,6 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       attrib.P=1;
       attrib.DPL=0;
 
-      //cs:
       attrib.S=1;
       attrib.Segment_type=0b1010;
       currentcpuinfo->vmcb->cs_attrib=attrib.SegmentAttrib;
@@ -1572,7 +1344,6 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       currentcpuinfo->vmcb->cs_base=0xffff0000;
       currentcpuinfo->vmcb->cs_limit=0xffff;
 
-      //data
       attrib.S=1;
       attrib.Segment_type=0b0010;
       currentcpuinfo->vmcb->ss_attrib=attrib.SegmentAttrib;
@@ -1600,7 +1371,6 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       currentcpuinfo->vmcb->gs_base=0;
       currentcpuinfo->vmcb->gs_limit=0xffff;
 
-      //ldtr:
       attrib.S=0;
       attrib.Segment_type=0b0010;
       currentcpuinfo->vmcb->ldtr_attrib=attrib.SegmentAttrib;
@@ -1608,7 +1378,6 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       currentcpuinfo->vmcb->ldtr_base=0;
       currentcpuinfo->vmcb->ldtr_limit=0xffff;
 
-      //tr:
       attrib.S=0;
       attrib.Segment_type=0b0011;
       currentcpuinfo->vmcb->tr_attrib=attrib.SegmentAttrib;
@@ -1616,13 +1385,11 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       currentcpuinfo->vmcb->tr_base=0;
       currentcpuinfo->vmcb->tr_limit=0xffff;
 
-
       currentcpuinfo->vmcb->gdtr_base=0;
       currentcpuinfo->vmcb->gdtr_limit=0xffff;
 
       currentcpuinfo->vmcb->idtr_base=0;
       currentcpuinfo->vmcb->idtr_limit=0xffff;
-
 
       a=1;
       _cpuid(&a,&b,&c,&d);
@@ -1656,13 +1423,10 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
 
       return 0;
 
-
-
       break;
     }
 
-
-    case VMEXIT_SHUTDOWN: //shutdown
+    case VMEXIT_SHUTDOWN:
     {
       nosendchar[getAPICID()]=0;
       sendvmstate(currentcpuinfo, vmregisters);
@@ -1687,8 +1451,6 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
     case VMEXIT_NPF:
     {
       nosendchar[getAPICID()]=0;
-      //sendstringf("%d VMEXIT_NPF\n", currentcpuinfo->cpunr);
-
 
       return handleNestedPagingFault(currentcpuinfo,vmregisters, fxsave);
     }
@@ -1699,8 +1461,6 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
 
   displayline("%d: Unhandled event 0x%x (%x:%6: %6)  nrip=%6\n", currentcpuinfo->cpunr, currentcpuinfo->vmcb->EXITCODE, currentcpuinfo->vmcb->cs_selector, currentcpuinfo->vmcb->RIP, (QWORD)(currentcpuinfo->vmcb->cs_base+currentcpuinfo->vmcb->RIP), currentcpuinfo->vmcb->nRIP);
   while (1) ;
-  //still here
+
   return 1;
 }
-
-

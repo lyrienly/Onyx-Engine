@@ -1,4 +1,3 @@
-
 use std::collections::HashMap;
 use std::mem::zeroed;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -24,8 +23,7 @@ pub enum BreakpointSize {
 }
 
 impl BreakpointSize {
-    /// Tamanho em bytes observado (1, 2, 4 ou 8), ao contrário do encoding de 2 bits
-    /// usado em DR7.
+
     pub fn byte_size(self) -> usize {
         match self {
             BreakpointSize::Byte1 => 1,
@@ -172,7 +170,6 @@ impl HardwareBreakpointMonitor {
     }
 }
 
-/// Estado dos registradores de depuração de uma thread (DR0..DR3, DR6, DR7).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ThreadDebugRegisters {
     pub dr0: u64,
@@ -199,8 +196,6 @@ impl ThreadDebugRegisters {
     }
 }
 
-/// Lê DR0..DR3/DR6/DR7 de uma thread do alvo sem alterar nada.
-/// Usado por diagnóstico (`examples/dr_dump.rs`) e pelos testes em VM.
 pub fn read_thread_debug_registers(tid: u32) -> Result<ThreadDebugRegisters, String> {
     let handle = open_thread_handle(tid)?;
 
@@ -346,8 +341,6 @@ fn write_debug_context(handle: HANDLE, tid: u32, ctx: &CONTEXT) -> Result<(), St
     Ok(())
 }
 
-/// Suspends `tid` for the duration of `op`, then always resumes it exactly once.
-/// A thread that was already suspended is left at its previous suspend count.
 fn with_suspended_thread<T, F>(tid: u32, op: F) -> Result<T, String>
 where
     F: FnOnce(HANDLE) -> Result<T, String>,
@@ -390,11 +383,6 @@ pub fn set_hw_breakpoint_on_thread(
     })
 }
 
-/// Applies one hardware breakpoint slot to every thread, skipping threads that
-/// already have the identical slot configured. Returns how many threads changed.
-///
-/// If a thread fails, the threads already updated by this call are rolled back,
-/// so the caller never observes a half-applied breakpoint.
 pub fn set_hw_breakpoint_for_threads(
     threads: &[u32],
     index: usize,
@@ -445,9 +433,6 @@ pub fn clear_hw_breakpoint_on_thread(tid: u32, index: usize) -> Result<(), Strin
     })
 }
 
-/// Clears one hardware breakpoint slot from every thread. Threads that cannot be
-/// updated are skipped, so an exited thread does not block cleanup.
-/// Returns how many threads were updated.
 pub fn clear_hw_breakpoint_from_threads(threads: &[u32], index: usize) -> Result<usize, String> {
     check_slot(index)?;
 
@@ -729,7 +714,7 @@ mod tests {
             dr2: 0x3000,
             dr3: 0x4000,
             dr6: 0,
-            // habilita DR0 (bit 0) e DR2 (bit 4)
+
             dr7: 0b010001,
         };
 
@@ -755,4 +740,3 @@ mod tests {
         }
     }
 }
-

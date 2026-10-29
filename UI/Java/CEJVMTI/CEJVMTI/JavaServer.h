@@ -36,8 +36,6 @@
 #define JAVACMD_STOPFINDWHATWRITES 31
 #define JAVACMD_GETMETHODDECLARINGCLASS 32
 
-
-
 using namespace std;
 
 class CJavaServer : public Pipe
@@ -53,14 +51,13 @@ private:
 	void GetAllFieldsFromClass(jclass c, vector<jfieldID> *allfields);
 	void GetAllClassesAndInterfacesFromClass(jclass c, vector<jclass> *classes, vector<jclass> *interfaces);
 	jfieldID getFieldIDFromFieldIndex(jobject o, jint index);
-	
+
 	void CreatePipeandWaitForconnect(void);
 public:
 	CJavaServer(jvmtiEnv* jvmti_env, JNIEnv* jni_env);
 	~CJavaServer(void);
 
 	void Start(void);
-
 
 	void StartCodeCallbacks(void);
 	void StopCodeCallbacks(void);
@@ -91,7 +88,6 @@ public:
 	void GetField(void);
 	void SetField(void);
 
-	
 	void StartScan(void);
 	void RefineScanResults(void);
 	void GetScanResults(void);

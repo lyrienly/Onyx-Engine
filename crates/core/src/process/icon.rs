@@ -1,4 +1,3 @@
-
 use std::path::Path;
 use std::ptr::null_mut;
 use crate::process::win32::*;
@@ -298,4 +297,3 @@ mod tests {
         assert!(ProcessIconExtractor::get_process_path(4, "System").is_none());
     }
 }
-

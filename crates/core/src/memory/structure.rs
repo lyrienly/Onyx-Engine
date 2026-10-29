@@ -1,4 +1,3 @@
-
 use std::mem::size_of;
 use crate::process::Process;
 
@@ -452,4 +451,3 @@ mod tests {
         let _ = proc.free(obj2);
     }
 }
-

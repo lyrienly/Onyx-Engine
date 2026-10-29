@@ -1,4 +1,3 @@
-
 use crate::process::Process;
 use crate::debugger::disasm::Disassembler;
 
@@ -154,4 +153,3 @@ mod tests {
         assert_eq!(res, Some("GameOver".to_string()));
     }
 }
-

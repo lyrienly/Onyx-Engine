@@ -1,8 +1,4 @@
-/* ------------------------------------------------------------------ */
-/* WARNING: relative order of tokens is important. */
-
-/* register */
- DEF_ASM(al)
+DEF_ASM(al)
  DEF_ASM(cl)
  DEF_ASM(dl)
  DEF_ASM(bl)
@@ -94,14 +90,13 @@
  DEF_ASM(rip)
 
 #ifdef TCC_TARGET_X86_64
- /* The four low parts of sp/bp/si/di that exist only on
-    x86-64 (encoding aliased to ah,ch,dh,dh when not using REX). */
+
  DEF_ASM(spl)
  DEF_ASM(bpl)
  DEF_ASM(sil)
  DEF_ASM(dil)
 #endif
- /* generic two operands */
+
  DEF_BWLX(mov)
 
  DEF_BWLX(add)
@@ -113,7 +108,6 @@
  DEF_BWLX(xor)
  DEF_BWLX(cmp)
 
- /* unary ops */
  DEF_BWLX(inc)
  DEF_BWLX(dec)
  DEF_BWLX(not)
@@ -126,7 +120,6 @@
  DEF_BWLX(xchg)
  DEF_BWLX(test)
 
- /* shifts */
  DEF_BWLX(rol)
  DEF_BWLX(ror)
  DEF_BWLX(rcl)
@@ -196,12 +189,11 @@
  DEF_WLX(lar)
  DEF_WLX(lsl)
 
- /* generic FP ops */
  DEF_FP(add)
  DEF_FP(mul)
 
  DEF_ASM(fcom)
- DEF_ASM(fcom_1) /* non existent op, just to have a regular table */
+ DEF_ASM(fcom_1)
  DEF_FP1(com)
 
  DEF_FP(comp)
@@ -213,7 +205,6 @@
  DEF_BWLX(xadd)
  DEF_BWLX(cmpxchg)
 
- /* string ops */
  DEF_BWLX(cmps)
  DEF_BWLX(scmp)
  DEF_BWL(ins)
@@ -227,7 +218,6 @@
  DEF_BWLX(stos)
  DEF_BWLX(ssto)
 
- /* generic asm ops */
 #define ALT(x)
 #define DEF_ASM_OP0(name, opcode) DEF_ASM(name)
 #define DEF_ASM_OP0L(name, opcode, group, instr_type)

@@ -1,4 +1,4 @@
-#ifdef WIN32   
+#ifdef WIN32
   #include <windows.h>
 #else
   #include <pthread.h>
@@ -7,12 +7,9 @@
   #include "lua_user.h"
   #include "lstate.h"
 
-//CRITICAL_SECTION b;
-//BOOL cscreated = FALSE;
-
-  void LuaLockInitial(lua_State * L) 
-  { 
-	  if (!L->l_G->lock_init)	  
+  void LuaLockInitial(lua_State * L)
+  {
+	  if (!L->l_G->lock_init)
 	  {
 #ifdef WIN32
 		  InitializeCriticalSection((CRITICAL_SECTION*)(&L->l_G->lock));
@@ -27,16 +24,16 @@
 	  }
   }
 
-  void LuaLockFinal(lua_State * L) /* Not called by Lua. */
+  void LuaLockFinal(lua_State * L)
   {
-#ifdef WIN32 
+#ifdef WIN32
 	  DeleteCriticalSection((CRITICAL_SECTION*)(&L->l_G->lock));
 #endif
 
   }
 
   void LuaLock(lua_State * L)
-  {	  
+  {
 	  if (!L->l_G->lock_init)
 		  LuaLockInitial(L);
 
@@ -48,9 +45,8 @@
   }
 
   void LuaUnlock(lua_State * L)
-  { 
-	//  MessageBox(0, "LuaUnlock","LuaUnlock", MB_OK);
-    /* Release control of mutex */
+  {
+
 	  if (!L->l_G->lock_init)
 	    LuaLockInitial(L);
 

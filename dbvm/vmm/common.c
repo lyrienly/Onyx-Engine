@@ -1,18 +1,8 @@
-/*
-common.c: vmm version. Contains several functions that might be usefull and can be shared by
-multiple sources. (e.g vmm and vmloader)
-
-*/
-
 #include "common.h"
 #include "keyboard.h"
 #include "main.h"
 #include "mm.h"
 #include "displaydebug.h"
-
-//#include <ieee754.h>
-
-//#include <string.h>
 
 #ifdef DEBUG
 void sendstringf_nolock(char *string UNUSED, ...);
@@ -29,12 +19,9 @@ criticalSection sendstringCS={.name="sendstringCS", .debuglevel=1};
 int useserial=0;
 #endif
 
-
 #if DISPLAYDEBUG==1
 int linessincelastkey=0;
 PStackList displaydebuglog_back, displaydebuglog_forward;
-
-
 
 #endif
 
@@ -61,14 +48,10 @@ int popcnt_nosupport(QWORD val)
 
 POPCNT_IMPLEMENTATION popcnt=popcnt_nosupport;
 
-
-
 void bochsbp(void)
 {
 	asm volatile ("xchg %bx,%bx");
 }
-
-
 
 unsigned char inportb(unsigned int port)
 {
@@ -101,7 +84,6 @@ void outportd(unsigned int port,unsigned long value)
    asm volatile ("outl %%eax,%%dx": :"d" (port), "a" (value));
 }
 
-
 QWORD minq(QWORD x,QWORD y)
 {
   return (x<y)?x:y;
@@ -121,8 +103,6 @@ int max(int x,int y)
 {
   return (x>y)?x:y;
 }
-
-
 
 size_t strspn(const char *str, const char *chars)
 {
@@ -154,7 +134,6 @@ void abort(void)
   ddDrawRectangle(0,DDVerticalResolution-100,100,100,0xff0000);
   while (1) outportb(0x80,0xc1);
 }
-
 
 int isalpha(int c)
 {
@@ -188,13 +167,13 @@ int iscntrl(int c)
 
 int toupper(int c)
 {
-  //unset bit 5
+
   return (c & (~(1<<5)));
 }
 
 int tolower(int c)
 {
-  //set bit 5
+
   return (c | (1<< 5));
 }
 
@@ -225,13 +204,10 @@ int ispunct(int c)
   return isprint(c) && (!isspace(c)) && (!isalpha(c));
 }
 
-
-
 int isxdigit(int c)
 {
   return ((c>=48) && (c<=57)) || ((c>=65) && (c<=70)) || ((c>=97) && (c<=102));
 }
-
 
 double floor(double x)
 {
@@ -254,7 +230,6 @@ double sqrt(double x)
 	return x;
 }
 
-
 double pow(double x, double y)
 {
 	sendstringf("DBVM doesn't do powers or roots atm");
@@ -266,7 +241,6 @@ double frexp(double x UNUSED, int *exp UNUSED)
   sendstringf("DBVM doesn't do frexp yet");
   return 0;
 }
-
 
 int isalnum(int c)
 {
@@ -309,11 +283,8 @@ int strcmp(const char *s1, const char *s2)
   return 0;
 }
 
-
 char *addCharToString(char c, char* string, int lastpos, int *stringsize)
-/*
- * Adds a char to a variablesize string
- * */
+
 {
   if ((*stringsize==0) || (string==NULL))
   {
@@ -423,7 +394,7 @@ double atof(char* num)
      int divisorForFraction = 1;
      int sign = 1;
      int inFraction = 0;
-     /*Take care of +/- sign*/
+
      if (*num == '-')
      {
          ++num;
@@ -439,7 +410,7 @@ double atof(char* num)
          {
              if (inFraction)
              {
-                 /*See how are we converting a character to integer*/
+
                  fractionPart = fractionPart*10 + (*num - '0');
                  divisorForFraction *= 10;
              }
@@ -479,7 +450,6 @@ double strtod(const char *str, char **ptr)
     if (*p == '+' || *p == '-')
       ++p;
 
-    /* INF or INFINITY.  */
     if ((p[0] == 'i' || p[0] == 'I')
         && (p[1] == 'n' || p[1] == 'N')
         && (p[2] == 'f' || p[2] == 'F'))
@@ -500,7 +470,6 @@ double strtod(const char *str, char **ptr)
     }
       }
 
-    /* NAN or NAN(foo).  */
     if ((p[0] == 'n' || p[0] == 'N')
         && (p[1] == 'a' || p[1] == 'A')
         && (p[2] == 'n' || p[2] == 'N'))
@@ -518,7 +487,6 @@ double strtod(const char *str, char **ptr)
         return atof ((char *)str);
       }
 
-    /* digits, with 0 or 1 periods in it.  */
     if (isdigit(*p) || *p == '.')
       {
         int got_dot = 0;
@@ -529,7 +497,6 @@ double strtod(const char *str, char **ptr)
       ++p;
     }
 
-        /* Exponent.  */
         if (*p == 'e' || *p == 'E')
     {
       int i;
@@ -547,7 +514,7 @@ double strtod(const char *str, char **ptr)
         *ptr = p;
         return atof ((char *)str);
       }
-    /* Didn't find any digits.  Doesn't look like a number.  */
+
     *ptr = (char *)str;
     return 0.0;
 }
@@ -575,13 +542,11 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
     int size;
     int digitcount;
   } varlist[64];
-  //unsigned char varlist[64];
+
   char temps[100];
   char workstring[strlen(string)];
   int i,_i,l,strpos,vlc;
-  //int count;
 
-  //int debug=0;
   l=strlen(string);
   vlc=0;
 
@@ -590,7 +555,6 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
 
   strpos=0;
 
-  // work on the copy of string, not the original
   for (i=0; (unsigned int)i<strlen(string); i++)
     workstring[i]=string[i];
 
@@ -602,13 +566,11 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
     varlist[i].digitcount=0;
   }
 
-
-  // parse the string for known operators
   for (i=0; i<l; i++)
   {
     if (workstring[i]=='%')
     {
-      int additional=0; //gets added to the size
+      int additional=0;
 
       workstring[i]=0;
 
@@ -616,7 +578,7 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
       {
         workstring[i+1]=0;
         additional++;
-        if ((i+2<l) && (isdigit(workstring[i+2])))  //%.#(xxxx)
+        if ((i+2<l) && (isdigit(workstring[i+2])))
         {
           varlist[vlc].digitcount=workstring[i+2]-'0';
           workstring[i+2]=0;
@@ -631,64 +593,64 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
 
         if ((i+2<l) && (workstring[i+2]=='l'))
         {
-          if ((i+3<l) && (workstring[i+3]=='d')) //%lld
+          if ((i+3<l) && (workstring[i+3]=='d'))
           {
-            varlist[vlc].type=7; //64-bit decimal
+            varlist[vlc].type=7;
             varlist[vlc].size=4;
           }
           else
-          if ((i+3<l) && (workstring[i+3]=='x')) //%llx
+          if ((i+3<l) && (workstring[i+3]=='x'))
           {
-            varlist[vlc].type=8; //64-bit(16 char) hexadecimal
+            varlist[vlc].type=8;
             varlist[vlc].size=4;
           }
         }
 
       }
 
-      if (workstring[i+1]=='d') //decimal
+      if (workstring[i+1]=='d')
       {
         varlist[vlc].type=0;
         varlist[vlc].size=2;
       }
       else
-      if (workstring[i+1]=='x') //hex
+      if (workstring[i+1]=='x')
       {
         varlist[vlc].type=1;
         varlist[vlc].size=2;
       }
       else
-      if (workstring[i+1]=='8') //8 char hex (%8)
+      if (workstring[i+1]=='8')
       {
         varlist[vlc].type=3;
         varlist[vlc].size=2;
       }
       else
-      if (workstring[i+1]=='p') //6 char hex (%p)
+      if (workstring[i+1]=='p')
       {
         varlist[vlc].type=4;
         varlist[vlc].size=2;
       }
       else
-      if (workstring[i+1]=='6') //16 char hex (%8)
+      if (workstring[i+1]=='6')
       {
         varlist[vlc].type=4;
         varlist[vlc].size=2;
       }
       else
-      if (workstring[i+1]=='2') //2 char hex (%2)
+      if (workstring[i+1]=='2')
       {
         varlist[vlc].type=6;
         varlist[vlc].size=2;
       }
       else
-      if (workstring[i+1]=='s') //string
+      if (workstring[i+1]=='s')
       {
         varlist[vlc].type=2;
         varlist[vlc].size=2;
       }
       else
-      if (workstring[i+1]=='c') //char
+      if (workstring[i+1]=='c')
       {
         varlist[vlc].type=5;
         varlist[vlc].size=2;
@@ -699,14 +661,13 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
       workstring[i+1]=0;
       vlc++;
 
-      if (vlc>=64) //todo: malloc/realloc
+      if (vlc>=64)
         break;
     }
   }
 
   i=0;
   vlc=0;
-
 
   while ((i<l) && (strpos<size))
   {
@@ -723,7 +684,7 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
 
       switch (varlist[vlc].type)
       {
-        case 0: //decimal
+        case 0:
         {
           unsigned int x;
           x=__builtin_va_arg(arglist,unsigned int);
@@ -738,7 +699,7 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
           break;
         }
 
-        case 1: //hex
+        case 1:
         {
           unsigned int x;
           x=__builtin_va_arg(arglist,unsigned int);
@@ -754,7 +715,7 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
           break;
         }
 
-        case 3: //%8, DWORD
+        case 3:
         {
           unsigned int x;
           x=__builtin_va_arg(arglist,unsigned int);
@@ -771,12 +732,11 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
           break;
         }
 
-        case 6: //%2, char
+        case 6:
         {
 
           unsigned char x;
           x=__builtin_va_arg(arglist,int);
-
 
           itoa(x,16,temps,100);
           appendzero(temps,2,100);
@@ -791,7 +751,7 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
           break;
         }
 
-        case 7: //%lld
+        case 7:
         {
           long long x;
           x=__builtin_va_arg(arglist,long long);
@@ -806,14 +766,10 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
           break;
         }
 
-
-
         case 255:
           printstring("UNDEFINED VARLIST",40,21,2,4);
           sendstring("UNDEFINED VARLIST");
-          /*printstring(string,40,22,2,4);
-          printstring(temps,40,23,2,4);
-          printstring(str,40,24,2,4);*/\
+          \
 
           if (strpos>=size)
             strpos=size-1;
@@ -825,8 +781,7 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
 
       }
 
-      //todo: move to switch/case above
-      if (varlist[vlc].type==2) //string
+      if (varlist[vlc].type==2)
       {
         char *s=__builtin_va_arg(arglist,char *);
 
@@ -838,7 +793,7 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
         strpos+=_i;
       }
 
-      if ((varlist[vlc].type==4) || (varlist[vlc].type==8)) //16 char hex or llx
+      if ((varlist[vlc].type==4) || (varlist[vlc].type==8))
       {
         unsigned long long i=__builtin_va_arg(arglist,unsigned long long);
 
@@ -849,7 +804,6 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
         if (varlist[vlc].digitcount>0)
           appendzero(temps,varlist[vlc].digitcount,100);
 
-
         _i=strlen(temps);
         if (strpos+_i>=size)
           _i=size-(strpos+_i-size);
@@ -858,7 +812,7 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
         strpos+=_i;
       }
 
-      if (varlist[vlc].type==5) //char
+      if (varlist[vlc].type==5)
       {
         int c=__builtin_va_arg(arglist,int);
 
@@ -866,34 +820,29 @@ int vbuildstring(char *str, int size, char *string, __builtin_va_list arglist)
         strpos++;
       }
 
-      //todo: ^^^^^^^^
-
       i+=varlist[vlc].size;
 
-      vlc++; //next paramtype
+      vlc++;
       continue;
     }
     else
     {
-      //else a normal char
+
       str[strpos]=workstring[i];
       strpos++;
 
       if (strpos>=size)
       {
         str[size-1]=0;
-        return size; //enough
+        return size;
       }
       i++;
     }
 
   }
 
-
-
   if (strpos>=size)
     strpos=size-1;
-
 
   str[strpos]=0;
   return strpos;
@@ -913,7 +862,6 @@ void sendstring(char *s UNUSED)
 
     if (nosendchar[getAPICID()])
         return;
-
 
     csEnter(&sendstringCS);
 
@@ -942,7 +890,7 @@ void sendstringf_nolock(char *string UNUSED, ...)
   __builtin_va_end(arglist);
 
   #if DISPLAYDEBUG==1
-    displayline(temps); //instead of sending the output to the serial port, output to the display
+    displayline(temps);
   #else
     if (sl>0)
     {
@@ -959,7 +907,6 @@ void sendstringf(char *string UNUSED, ...)
   if (!useserial) return;
 #endif
 
-
 #ifdef DEBUG
   __builtin_va_list arglist;
   char temps[200];
@@ -968,14 +915,12 @@ void sendstringf(char *string UNUSED, ...)
   if (nosendchar[getAPICID()])
       return;
 
-
-
   __builtin_va_start(arglist,string);
   sl=vbuildstring(temps,200,string,arglist);
   __builtin_va_end(arglist);
 
   #if DISPLAYDEBUG==1
-    displayline(temps); //instead of sending the output to the serial port, output to the display
+    displayline(temps);
   #else
     csEnter(&sendstringfCS);
     csEnter(&sendstringCS);
@@ -1015,9 +960,6 @@ int snprintf(char *str, size_t size, const char *format, ...)
 
   return sl;
 }
-
-
-
 
 unsigned int getAPICID(void)
 {
@@ -1082,7 +1024,6 @@ void mrewEndWrite(Pmultireadexclusivewritesychronizer MREW)
   MREW->writers=0;
 }
 
-
 void csEnter(PcriticalSection CS)
 {
 #ifdef DEBUG
@@ -1091,36 +1032,30 @@ void csEnter(PcriticalSection CS)
 
 #endif
 
-
-  int apicid=getAPICID()+1; //+1 so it never returns 0
+  int apicid=getAPICID()+1;
 
   if ((CS->locked) && (CS->apicid==apicid))
   {
-    //already locked but the locker is this cpu, so allow, just increase lockcount
+
     CS->lockcount++;
     return;
   }
 
-
-
-
-
-
 #ifdef DEBUG
-  //sendstringf_nolock("%d",getcpuinfo()->cpunr);
+
   if (spinlock(&(CS->locked)))
   {
     while (1)
     {
       nosendchar[getAPICID()]=0;
-      if ((emergencyOutputOnly==FALSE) || (CS->debuglevel>emergencyOutputLevel)) //similar to a BSOD
+      if ((emergencyOutputOnly==FALSE) || (CS->debuglevel>emergencyOutputLevel))
       {
         emergencyOutputOnly=TRUE;
         emergencyOutputAPICID=getAPICID();
         emergencyOutputLevel=CS->debuglevel;
       }
 
-      sendstringf_nolock("%d: spinlock timeout. CS Name=",getcpuinfo()->cpunr); //todo: more info
+      sendstringf_nolock("%d: spinlock timeout. CS Name=",getcpuinfo()->cpunr);
       if (CS->name)
         sendstringf_nolock(CS->name);
 
@@ -1142,20 +1077,15 @@ void csEnter(PcriticalSection CS)
         c=c->next;
       }
 
-
-
-
-
     }
 
   }
 #else
-  spinlock(&(CS->locked)); //sets CS->locked to 1
+  spinlock(&(CS->locked));
 #endif
 
   asm volatile ("": : :"memory");
 
-  //here so the lock is aquired and locked is 1
   CS->lockcount=1;
   CS->apicid=apicid;
 }
@@ -1167,10 +1097,9 @@ void csLeave(PcriticalSection CS)
     return;
 #endif
 
-  int apicid=getAPICID()+1; //+1 so it never returns 0
+  int apicid=getAPICID()+1;
   int locked=CS->locked;
   int ownerAPICID=CS->apicid;
-
 
   if ((CS->locked) && (CS->apicid==apicid))
   {
@@ -1179,8 +1108,8 @@ void csLeave(PcriticalSection CS)
     asm volatile ("": : :"memory");
     if (CS->lockcount==0)
     {
-      //unlock
-      CS->apicid=-1; //set to an invalid apicid
+
+      CS->apicid=-1;
       asm volatile ("": : :"memory");
       CS->locked=0;
       asm volatile ("": : :"memory");
@@ -1199,7 +1128,7 @@ void csLeave(PcriticalSection CS)
 #ifdef DEBUG
       if (CS->ignorelock)
       {
-        outportb(0x80,0xc5); //todo: return
+        outportb(0x80,0xc5);
       }
 #endif
 
@@ -1213,11 +1142,9 @@ void csLeave(PcriticalSection CS)
         outportb(0x80,0xc4);
       }
 
-
     }
   }
 }
-
 
 void zeromemory(volatile void *address, unsigned int size)
 {
@@ -1226,7 +1153,6 @@ void zeromemory(volatile void *address, unsigned int size)
   for (i=0; i < size; i++)
     a[i]=0;
 }
-
 
 volatile void* copymem(volatile void *dest, volatile const void *src, size_t size)
 {
@@ -1312,22 +1238,18 @@ char *strncpy(char *dest, const char *src, size_t n)
 
 }
 
-
-
 void appendzero(char *string, int wantedsize,int maxstringsize)
 {
-/* basicly to be used after itoa */
+
   int i=0;
   int zerostoadd=wantedsize-strlen(string);
 	char newstring[wantedsize+1];
 
   if ((zerostoadd+(int)strlen(string))>=maxstringsize)
-    return; //not enough memory
-
+    return;
 
 	for (i=0; i<zerostoadd; i++)
     newstring[i]='0';
-
 
   newstring[zerostoadd]=0;
   newstring[wantedsize]=0;
@@ -1365,7 +1287,6 @@ unsigned long long int strtoull(const char *nptr, char **endptr, int base)
 	int err;
 	unsigned long long result=atoi2((char *)nptr, base, &err);
 
-
     if (endptr)
     {
         if (err==0)
@@ -1384,7 +1305,6 @@ unsigned long long atoi2(char* input, int base, int *err)
 	unsigned long long result=0;
 	int negative=0;
 
-	//parse the string according to the used base
 	if (base<2)
 	{
 		if (err)
@@ -1399,8 +1319,6 @@ unsigned long long atoi2(char* input, int base, int *err)
 		return 0;
 	}
 
-  //some override checks
-	//if it starts with 0x or $ make it base16 and set start to 2 or 1 respectivly
 	while (input[start])
 	{
 		if (input[start]=='-')
@@ -1421,35 +1339,33 @@ unsigned long long atoi2(char* input, int base, int *err)
 			start+=2;
 		}
 		else
-			break; //nothing to parse
+			break;
 	}
-
 
 	for (i=strlen(input)-1; i>=start ; i--,j++)
   {
-    if ((input[i] >='0') && (input[i] <= '9')) //check if it's in the range of 0 to 9
+    if ((input[i] >='0') && (input[i] <= '9'))
       c=input[i]-'0';
 		else
-    if ((input[i] >='a') && (input[i] <= 'z')) //check if it's in the range of 0 to 9
+    if ((input[i] >='a') && (input[i] <= 'z'))
       c=10+input[i]-'a';
 		else
-    if ((input[i] >='A') && (input[i] <= 'Z')) //check if it's in the range of 0 to 9
+    if ((input[i] >='A') && (input[i] <= 'Z'))
       c=10+input[i]-'A';
 		else
 		{
 			if (err)
-				*err=i; //not a valid character
+				*err=i;
 			return result;
 		}
 
 		if (c>=base)
 		{
 			if (err)
-				*err=i; //not a valid character
+				*err=i;
 			return result;
 		}
 
-		/* c now contains the value in numerical state, now adjust it for i and the given base) */
 		result=result+c*(power(base,j));
 
 		if (negative)
@@ -1459,14 +1375,13 @@ unsigned long long atoi2(char* input, int base, int *err)
 	if (err)
 		*err=0;
 
-  //sendstringf("atoi result is %6\n\r",result);
 	return result;
 }
 
 int lltoa(unsigned long long value,int base, char *output,int maxsize)
-/* base: 10=decimal, 16=hexadecimal, 8 = octal, 2=binary */
+
 {
-  char tempbuf[maxsize]; /* will get the string but in reverse */
+  char tempbuf[maxsize];
   int i,j,t;
 
   if (base<2)
@@ -1482,7 +1397,6 @@ int lltoa(unsigned long long value,int base, char *output,int maxsize)
     return 2;
   }
 
-
   for (i=0; (value>0) && (i<maxsize); i++)
   {
     t=value % base;
@@ -1494,7 +1408,6 @@ int lltoa(unsigned long long value,int base, char *output,int maxsize)
     value=value / base;
   }
 
-  /* we now have the string in reverse order, so put it in output reverse... */
   t=i-1;
   for (j=0;t>=0;t--,j++)
     output[j]=tempbuf[t];
@@ -1504,13 +1417,13 @@ int lltoa(unsigned long long value,int base, char *output,int maxsize)
   else
     output[maxsize-1]=0;
 
-  return i; //return how many bytes are used
+  return i;
 }
 
 int itoa(unsigned int value,int base, char *output,int maxsize)
-/* base: 10=decimal, 16=hexadecimal, 8 = octal, 2=binary , 1=youraloser, 0=diebitch */
+
 {
-  char tempbuf[maxsize]; /* will get the string but in reverse */
+  char tempbuf[maxsize];
   int i,j,t;
 
 	if (base<2)
@@ -1526,7 +1439,6 @@ int itoa(unsigned int value,int base, char *output,int maxsize)
 	  return 2;
 	}
 
-
 	for (i=0; (value>0) && (i<maxsize); i++)
 	{
 		t=value % base;
@@ -1538,7 +1450,6 @@ int itoa(unsigned int value,int base, char *output,int maxsize)
 	  value=value / base;
 	}
 
-  /* we now have the string in reverse order, so put it in output reverse... */
   t=i-1;
   for (j=0;t>=0;t--,j++)
     output[j]=tempbuf[t];
@@ -1548,7 +1459,7 @@ int itoa(unsigned int value,int base, char *output,int maxsize)
 	else
     output[maxsize-1]=0;
 
-	return i; //return how many bytes are used
+	return i;
 }
 
 criticalSection serialCS={.name="serialCS", .debuglevel=2};
@@ -1568,13 +1479,11 @@ void sendchar(char c UNUSED)
   if (!useserial) return;
 #endif
 
-
 #if (defined SERIALPORT) && (SERIALPORT != 0)
 	unsigned char x;
 
 	if (!c)
-	  return; //don't sent 0 bytes...
-
+	  return;
 
   x=c;
   if (x>0x80)
@@ -1589,15 +1498,13 @@ void sendchar(char c UNUSED)
       return;
   }
 
-
-  if (c=='\r') //to deal with an obsolete linefeed not needed anymore
+  if (c=='\r')
     return;
 
   csEnter(&serialCS);
 
   x=inportb(SERIALPORT+5);
 
-  //while ((x & 0x20) != 0x20)
   while ((x & 0x40) != 0x40)
   {
     _pause();
@@ -1606,7 +1513,7 @@ void sendchar(char c UNUSED)
 
 	outportb(SERIALPORT,c);
 
-	if (1) //terminal emu under bochs, it NEEDS an linefeed, and this'll make it compatible with the non linefeed strings passed
+	if (1)
 	{
 	  if (c=='\n')
 	  {
@@ -1630,13 +1537,10 @@ int getchar(void)
   if (!useserial) return 0;
 #endif
 
-
 #if DISPLAYDEBUG==1
   return kbd_getchar();
 #endif
 #if (defined SERIALPORT) && (SERIALPORT != 0)
-/* returns 0 when no char is pressed
-	 use readstring to wait for keypresses */
 
   csEnter(&serialCS);
 
@@ -1644,7 +1548,6 @@ int getchar(void)
   {
     _pause();
   }
-
 
 	if (inportb(SERIALPORT+5) & 0x1)
   {
@@ -1662,7 +1565,6 @@ int getchar(void)
 #else
 	return 0;
 #endif
-
 
 }
 
@@ -1682,18 +1584,12 @@ char waitforchar(void)
 #endif
   return c;
 
-
-
-/*  while (inputa==0) ;//memedit at this address
-  inputa=0;
-  return inputb;*/
-
 }
 
 int readstringc(char *s, int minlength, int maxlength)
 {
   int i=0;
-  //keeps reading till it hits minlength, but can go over till maxlength
+
   while (i<minlength)
   {
     s[i]=kbd_getchar();
@@ -1716,7 +1612,7 @@ int readstringc(char *s, int minlength, int maxlength)
 int readstring(char *s, int minlength, int maxlength)
 {
 	int i=0;
-	//keeps reading till it hits minlength or enter, but can go over till maxlength (depending on the size of the uart buffer)
+
 	while (i<minlength)
 	{
     s[i]=waitforchar();
@@ -1734,9 +1630,6 @@ int readstring(char *s, int minlength, int maxlength)
     s[i]=0;
   else
     s[maxlength-1]=0;
-
-
-
 
 	return i;
 }
@@ -1799,14 +1692,12 @@ void getdisplayline(int y, TEXTVIDEOLINE lineinfo)
   }
 }
 
-
 void printstring(char *s, int x, int y, char foreground, char background)
 {
   int i;
   for (i=0; s[i]; i++,x++)
     printchar(s[i],x%80,y+(x/80),foreground,background);
 }
-
 
 void push(PStackList stackobject, void *data, int size)
 {
@@ -1832,25 +1723,20 @@ int pop(PStackList stackobject, void *data, int size)
     return 1;
   }
   else
-    return 0; //empty list
+    return 0;
 }
 
 volatile int zl=0;
 void movelinesdown(void)
-/*
- * Moves the lines down (if there is a log to get the previous line from)
- */
+
 {
   PTEXTVIDEO tv=(PTEXTVIDEO)textmemory;
   TEXTVIDEO thischar;
   int x,y;
 
-
- // while (zl==0);
-
 #if DISPLAYDEBUG==1
-  //save the bottom line to the displaydebuglog_forward buffer
-  if (displaydebuglog_forward) //possible it's NULL
+
+  if (displaydebuglog_forward)
     push(displaydebuglog_forward, &tv[24*80], sizeof(TEXTVIDEOLINE));
 #endif
 
@@ -1858,31 +1744,28 @@ void movelinesdown(void)
   {
     for (x=0; x<80; x++)
     {
-      //move this char to the one at top
+
       getdisplaychar(x,y,&thischar);
       tv[(y+1)*80+x]=thischar;
     }
   }
 
 #if DISPLAYDEBUG==1
-  //get the top line from the displaydebuglog_back
-  if (displaydebuglog_back) //possible it's NULL
+
+  if (displaydebuglog_back)
     pop(displaydebuglog_back, tv, sizeof(TEXTVIDEOLINE));
 #endif
 }
 
 void movelinesup(void)
-/*
- * Moves the lines up
- */
+
 {
   PTEXTVIDEO tv=(PTEXTVIDEO)textmemory;
   TEXTVIDEO thischar;
 
-
 #if DISPLAYDEBUG==1
-  //save the top line to the displaydebug buffer
-  if (displaydebuglog_back) //possible it's NULL
+
+  if (displaydebuglog_back)
     push(displaydebuglog_back, tv, sizeof(TEXTVIDEOLINE));
 #endif
 
@@ -1895,7 +1778,7 @@ void movelinesup(void)
     {
       for (x=0; x<80; x++)
       {
-        //move this char to the one at top
+
         getdisplaychar(x,y,&thischar);
         tv[(y-1)*80+x]=thischar;
       }
@@ -1910,7 +1793,7 @@ void movelinesup(void)
   }
 
 #if DISPLAYDEBUG==1
-  //load the bottom line with the displaydebuglog_forward
+
   if (displaydebuglog_forward)
     pop(displaydebuglog_forward,&tv[24*80], sizeof(TEXTVIDEOLINE));
 #endif
@@ -1918,23 +1801,20 @@ void movelinesup(void)
 }
 
 void nextline(void)
-/*
- * move the 'cursor' down one line
- */
+
 {
 
-
-  currentdisplayrow=0; //all the way to the left
+  currentdisplayrow=0;
 
   if (currentdisplayline>=24)
   {
-    movelinesup(); //all other lines go up one line and currentdisplayline stays the same
-    currentdisplayline=24; //just set it in case 'something' sets it different
+    movelinesup();
+    currentdisplayline=24;
   }
   else
     currentdisplayline++;
-//#if DISPLAYDEBUG==1
-  #if 0 //disabling this while testing uefi graphics boot (nokb)
+
+  #if 0
   {
     linessincelastkey++;
     if (linessincelastkey>=screenheight-1)
@@ -1946,31 +1826,29 @@ void nextline(void)
       {
         c=kbd_getchar();
 
-        //displayline("(c=%x)", c);
-
         switch (c)
         {
-          case 3: //page up
+          case 3:
             if (displaydebuglog_back->last)
               movelinesdown();
-            //not yet implemented
+
             break;
 
-          case 4: //page down
+          case 4:
             if (displaydebuglog_forward->last)
               movelinesup();
             break;
 
-          case 1: //home
+          case 1:
             while (displaydebuglog_back->last)
               movelinesdown();
 
             break;
 
-          case 2: //end (or default)
+          case 2:
           case ' ':
           {
-            while (displaydebuglog_forward->last) //scroll to the end before continue
+            while (displaydebuglog_forward->last)
               movelinesup();
 
             done=1;
@@ -1989,8 +1867,7 @@ void nextline(void)
 }
 
 void displayline(char *s, ...)
-/* Displays a line on the screen and sets the 'currentline' down one pos
- */
+
 {
   __builtin_va_list arglist;
   char temps[200];
@@ -1999,7 +1876,6 @@ void displayline(char *s, ...)
   __builtin_va_start(arglist,s);
   sl=vbuildstring(temps,200,s,arglist);
   __builtin_va_end(arglist);
-
 
   if (sl>0)
   {
@@ -2013,7 +1889,6 @@ void displayline(char *s, ...)
     csEnter(&sendstringfCS);
     csEnter(&sendstringCS);
 
-
     for (i=0; i<sl; i++)
     {
       if (temps[i])
@@ -2024,10 +1899,9 @@ void displayline(char *s, ...)
           continue;
         }
 
-        if (temps[i]=='\r') //not handled
+        if (temps[i]=='\r')
           continue;
       }
-
 
       printchar(temps[i],currentdisplayrow,currentdisplayline,15,0);
       currentdisplayrow++;
@@ -2035,7 +1909,6 @@ void displayline(char *s, ...)
       if ((currentdisplayrow % 80)==0)
         nextline();
     }
-
 
     updateCursor();
 
@@ -2074,7 +1947,6 @@ void sendDissectedFlags(PRFLAGS rflags)
 
   if (rflags->CF)
     sendstring("CF ");
-
 
   if (rflags->PF)
     sendstring("PF ");
@@ -2129,7 +2001,7 @@ void sendDissectedFlags(PRFLAGS rflags)
 }
 
 void showstatec(ULONG *stack)
-/* send the state of the registers to the serial port */
+
 {
   if (stack==NULL)
 	  return;
@@ -2161,7 +2033,7 @@ DWORD getGDTENTRYBase(PGDT_ENTRY entry)
 
 void setGDTENTRYLimit(PGDT_ENTRY entry, DWORD limit)
 {
-  if (limit>=0x100000) //give as pagecount
+  if (limit>=0x100000)
   {
     entry->G=1;
 
@@ -2180,13 +2052,13 @@ GDT_ENTRY Build16BitDataSegmentDescriptor(DWORD baseaddress, DWORD size)
   setGDTENTRYBase(&result, baseaddress);
   setGDTENTRYLimit(&result, size-1);
 
-  result.Type=2; //data segment, no expand down, writable
+  result.Type=2;
   result.NotSystem=1;
   result.DPL=0;
   result.P=1;
   result.AVL=0;
   result.L=0;
-  result.B_D=0; //16-bit
+  result.B_D=0;
 
   return result;
 }
@@ -2194,7 +2066,7 @@ GDT_ENTRY Build16BitDataSegmentDescriptor(DWORD baseaddress, DWORD size)
 GDT_ENTRY Build16BitCodeSegmentDescriptor(DWORD baseaddress, DWORD size)
 {
   GDT_ENTRY result=Build16BitDataSegmentDescriptor(baseaddress, size);
-  result.Type=0xa; //code segment, readable
+  result.Type=0xa;
   return result;
 }
 
@@ -2204,13 +2076,13 @@ GDT_ENTRY Build32BitDataSegmentDescriptor(DWORD baseaddress, DWORD size)
   setGDTENTRYBase(&result, baseaddress);
   setGDTENTRYLimit(&result, size-1);
 
-  result.Type=2; //data segment, no expand down, writable
+  result.Type=2;
   result.NotSystem=1;
   result.DPL=0;
   result.P=1;
   result.AVL=0;
   result.L=0;
-  result.B_D=1; //32-bit
+  result.B_D=1;
 
   return result;
 }
@@ -2218,7 +2090,7 @@ GDT_ENTRY Build32BitDataSegmentDescriptor(DWORD baseaddress, DWORD size)
 GDT_ENTRY Build32BitCodeSegmentDescriptor(DWORD baseaddress, DWORD size)
 {
   GDT_ENTRY result=Build32BitDataSegmentDescriptor(baseaddress, size);
-  result.Type=0xa; //code segment, readable
+  result.Type=0xa;
   return result;
 }
 
@@ -2232,7 +2104,6 @@ void *stackbase32;
 int call32bit(DWORD address)
 {
   int r;
-  //setup a stack and gdt
 
   QWORD oldgdtbase=getGDTbase();
   QWORD oldgdtsize=getGDTsize();
@@ -2246,8 +2117,6 @@ int call32bit(DWORD address)
     stackbase32=(void *)((QWORD)stackbase32+(32*1024)-8);
   }
 
-
-
   setGDT((QWORD)gdtbase32,oldgdtsize);
 
   r=call32bita(address,(DWORD)((QWORD)stackbase32));
@@ -2259,7 +2128,7 @@ int call32bit(DWORD address)
 
 int Initialized=0;
 void InitCommon()
-//call once
+
 {
   if (Initialized) return;
 

@@ -94,17 +94,13 @@ impl Drop for CobaiaGuard {
     }
 }
 
-/// Shellcode x64 que escreve 0xDEADBEEF em DWORD* passado em RCX.
-/// `mov DWORD PTR [rcx], 0xDEADBEEF ; xor eax, eax ; ret`
 const SHELLCODE_WRITE_DWORD: [u8; 10] = [
     0xC7, 0x01, 0xEF, 0xBE, 0xAD, 0xDE,
     0x31, 0xC0,
     0xC3,
-    0x90, // nop padding
+    0x90,
 ];
 
-/// Shellcode x64 que le o DWORD em RCX, zera eax (descartando) e retorna.
-/// `mov eax, DWORD PTR [rcx] ; ret`
 const SHELLCODE_READ_DWORD: [u8; 4] = [
     0x8B, 0x01, 0xC3, 0x90,
 ];
@@ -130,7 +126,6 @@ fn spawn_cobaia() -> CobaiaGuard {
     };
     assert!(ok != 0, "CreateProcessW falhou (cobaia)");
 
-    // Da tempo pro loader do processo filho estabilizar.
     std::thread::sleep(Duration::from_millis(600));
 
     let data = unsafe {
@@ -206,16 +201,11 @@ fn e2e_page_guard_captura_write_remoto_e_filtra_falso_positivo() {
     let data_base = cobaia.data_page;
     let code_base = cobaia.code_page;
 
-    // Dois enderecos na mesma pagina de 4KB:
-    //  - alvo_bp: endereco monitorado
-    //  - alvo_fora: endereco NAO monitorado (serve pra conferir filtragem)
     let alvo_bp = data_base + 0x40;
     let alvo_fora = data_base + 0x800;
 
-    // Escreve o shellcode no code_page.
     write_remote(cobaia.h_process, code_base, &SHELLCODE_WRITE_DWORD);
 
-    // Attacha o manager (DebugActiveProcess rodando dentro do worker thread).
     let mgr = PageGuardManager::attach(cobaia.pid).expect("attach");
 
     let hits = Arc::new(Mutex::new(Vec::new()));
@@ -228,11 +218,8 @@ fn e2e_page_guard_captura_write_remoto_e_filtra_falso_positivo() {
         .set(alvo_bp as u64, 4, AccessType::Write)
         .expect("set bp");
 
-    // --- 1) Dispara acesso remoto FORA do range monitorado (mesma pagina).
-    // O PAGE_GUARD vai disparar, mas o filtro deve rejeitar.
     run_remote_shellcode(cobaia.h_process, code_base, alvo_fora);
 
-    // Aguarda o loop processar.
     std::thread::sleep(Duration::from_millis(300));
 
     let hits_after_falso = hits.lock().unwrap().clone();
@@ -243,7 +230,6 @@ fn e2e_page_guard_captura_write_remoto_e_filtra_falso_positivo() {
         hits_after_falso
     );
 
-    // --- 2) Dispara acesso remoto DENTRO do range monitorado.
     run_remote_shellcode(cobaia.h_process, code_base, alvo_bp);
 
     let deadline = Instant::now() + Duration::from_secs(3);
@@ -264,7 +250,6 @@ fn e2e_page_guard_captura_write_remoto_e_filtra_falso_positivo() {
     assert_eq!(h.fault_address, alvo_bp as u64);
     assert_eq!(h.access_type, AccessType::Write);
 
-    // --- 3) Remove o bp; proximo acesso nao deve gerar hit novo.
     mgr.remove(bp_id).expect("remove");
     run_remote_shellcode(cobaia.h_process, code_base, alvo_bp);
     std::thread::sleep(Duration::from_millis(300));

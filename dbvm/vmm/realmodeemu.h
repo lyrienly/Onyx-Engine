@@ -19,12 +19,10 @@ typedef struct
   unsigned Scale      :2;
 } __attribute__((__packed__)) SIB,*PSIB;
 
-
-
 typedef struct
 {
   int error;
-  int opperandsize; //0=16 bit, 1=32-bit, 2=64-bit
+  int opperandsize;
   int addresssize;
   int rep, repne;
   UINT64 segmentbase;
@@ -39,4 +37,4 @@ typedef struct
 int emulateRMinterrupt(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, int intnr);
 BOOL emulateRealMode(pcpuinfo currentcpuinfo, VMRegisters *vmregisters);
 
-#endif /*REALMODEEMU_H_*/
+#endif

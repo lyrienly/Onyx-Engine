@@ -35,7 +35,7 @@ DWORD AOBScan(HANDLE hProcess, const char* pattern, const char* mask, uint64_t s
 				}
 
 				for (int i = 0; i < 4096; i += inc)
-				{ 
+				{
 					for (int k = 0; k < patternLength; k++)
 					{
 
@@ -48,7 +48,7 @@ DWORD AOBScan(HANDLE hProcess, const char* pattern, const char* mask, uint64_t s
 					match_addr[result_count] = tmp2;
 					result_count++;
 					if (result_count >= MAX_HIT_COUNT)return result_count;
-					
+
 				label:
 					tmp2 += inc; MemoryBuff += inc;
 				}

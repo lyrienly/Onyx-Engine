@@ -1,10 +1,8 @@
 #pragma warning( disable: 4100 4101 4103 4189)
 
-
 #include "IOPLDispatcher.h"
 #include "DBKFunc.h"
 #include "DBKDrvr.h"
-
 
 #include "memscan.h"
 
@@ -12,7 +10,7 @@
 
 #include "vmxhelper.h"
 #include "vmxoffload.h"
-UINT64 PhysicalMemoryRanges=0; //initialized once, and used thereafter. If the user adds/removes ram at runtime, screw him and make him the reload the driver
+UINT64 PhysicalMemoryRanges=0;
 UINT64 PhysicalMemoryRangesListSize=0;
 
 #if (NTDDI_VERSION >= NTDDI_VISTA)
@@ -21,31 +19,10 @@ PEPROCESS DRMProcess = NULL;
 PEPROCESS DRMProcess2 = NULL;
 #endif
 
-typedef PCHAR (*GET_PROCESS_IMAGE_NAME) (PEPROCESS Process); 
-GET_PROCESS_IMAGE_NAME PsGetProcessImageFileName; 
-
-
-/*
-typedef struct
-{
-	int listcount;
-	char cpunrs[255];
-} CPULISTFILLSTRUCT, *PCPULISTFILLSTRUCT;
-
-VOID GetCPUIDS_all(PCPULISTFILLSTRUCT p)
-{
-	DbgPrint("GetCPUIDS_all(for cpu %d)\n", cpunr());
-	if (p->listcount<255)
-	{
-		p->cpunrs[p->listcount]=cpunr();
-		p->listcount++;
-	}
-}
-*/
+typedef PCHAR (*GET_PROCESS_IMAGE_NAME) (PEPROCESS Process);
+GET_PROCESS_IMAGE_NAME PsGetProcessImageFileName;
 
 NTSYSAPI NTSTATUS NTAPI ZwQueryInformationProcess(IN HANDLE ProcessHandle, IN PROCESSINFOCLASS ProcessInformationClass, OUT PVOID ProcessInformation, IN ULONG ProcessInformationLength, OUT PULONG ReturnLength OPTIONAL);
-
-
 
 void mykapc2(PKAPC Apc, PKNORMAL_ROUTINE NormalRoutine, PVOID NormalContext, PVOID SystemArgument1, PVOID SystemArgument2)
 {
@@ -57,7 +34,7 @@ void mykapc2(PKAPC Apc, PKNORMAL_ROUTINE NormalRoutine, PVOID NormalContext, PVO
 
 	if (ZwQueryInformationProcess(ZwCurrentProcess(), ProcessWow64Information, &iswow64, sizeof(iswow64), NULL) == STATUS_SUCCESS)
 	{
-#if (NTDDI_VERSION >= NTDDI_VISTA)	
+#if (NTDDI_VERSION >= NTDDI_VISTA)
 		if (iswow64)
 		{
 			DbgPrint("WOW64 apc");
@@ -70,13 +47,13 @@ void mykapc2(PKAPC Apc, PKNORMAL_ROUTINE NormalRoutine, PVOID NormalContext, PVO
 
 void nothing2(PVOID arg1, PVOID arg2, PVOID arg3)
 {
-	
+
 	return;
 }
 
 void mykapc(PKAPC Apc, PKNORMAL_ROUTINE NormalRoutine, PVOID NormalContext, PVOID SystemArgument1, PVOID SystemArgument2)
 {
-	//kernelmode apc, always gets executed
+
 	PKAPC      kApc;
 	LARGE_INTEGER Timeout;
 
@@ -85,14 +62,12 @@ void mykapc(PKAPC Apc, PKNORMAL_ROUTINE NormalRoutine, PVOID NormalContext, PVOI
 	ExFreePool(Apc);
 
 	DbgPrint("My kernelmode apc!!!!(irql=%d)\n", KeGetCurrentIrql());
-	
+
 	DbgPrint("NormalRoutine=%p\n",*(PUINT_PTR)NormalRoutine);
 	DbgPrint("NormalContext=%p\n",*(PUINT_PTR)NormalContext);
 	DbgPrint("SystemArgument1=%p\n",*(PUINT_PTR)SystemArgument1);
 	DbgPrint("SystemArgument2=%p\n",*(PUINT_PTR)SystemArgument2);
-	
-	
-	
+
 	KeInitializeApc(kApc,
 		            (PKTHREAD)PsGetCurrentThread(),
                     0,
@@ -105,8 +80,6 @@ void mykapc(PKAPC Apc, PKNORMAL_ROUTINE NormalRoutine, PVOID NormalContext, PVOI
 
 	KeInsertQueueApc (kApc, (PVOID)*(PUINT_PTR)SystemArgument1, (PVOID)*(PUINT_PTR)SystemArgument2, 0);
 
-
-	//wait in usermode (so interruptable by a usermode apc)
 	Timeout.QuadPart = 0;
 	KeDelayExecutionThread(UserMode, TRUE, &Timeout);
 
@@ -118,10 +91,9 @@ void nothing(PVOID arg1, PVOID arg2, PVOID arg3)
 	return;
 }
 
-
 void CreateRemoteAPC(ULONG threadid,PVOID addresstoexecute)
 {
-	
+
 	PKTHREAD   kThread;
 	PKAPC      kApc;
 
@@ -130,8 +102,7 @@ void CreateRemoteAPC(ULONG threadid,PVOID addresstoexecute)
 	kThread=(PKTHREAD)getPEThread(threadid);
 	DbgPrint("(PVOID)KThread=%p\n",kThread);
 	DbgPrint("addresstoexecute=%p\n", addresstoexecute);
-	
-   
+
 	KeInitializeApc(kApc,
 		            kThread,
                     0,
@@ -145,24 +116,23 @@ void CreateRemoteAPC(ULONG threadid,PVOID addresstoexecute)
 	KeInsertQueueApc (kApc, addresstoexecute, addresstoexecute, 0);
 }
 
-#define PROCESS_TERMINATE                  (0x0001)  
-#define PROCESS_CREATE_THREAD              (0x0002)  
-#define PROCESS_SET_SESSIONID              (0x0004)  
-#define PROCESS_VM_OPERATION               (0x0008)  
-#define PROCESS_VM_READ                    (0x0010)  
-#define PROCESS_VM_WRITE                   (0x0020)  
-#define PROCESS_DUP_HANDLE                 (0x0040)  
-#define PROCESS_CREATE_PROCESS             (0x0080)  
-#define PROCESS_SET_QUOTA                  (0x0100)  
-#define PROCESS_SET_INFORMATION            (0x0200)  
-#define PROCESS_QUERY_INFORMATION          (0x0400)  
-#define PROCESS_SUSPEND_RESUME             (0x0800)  
-#define PROCESS_QUERY_LIMITED_INFORMATION  (0x1000)  
-
+#define PROCESS_TERMINATE                  (0x0001)
+#define PROCESS_CREATE_THREAD              (0x0002)
+#define PROCESS_SET_SESSIONID              (0x0004)
+#define PROCESS_VM_OPERATION               (0x0008)
+#define PROCESS_VM_READ                    (0x0010)
+#define PROCESS_VM_WRITE                   (0x0020)
+#define PROCESS_DUP_HANDLE                 (0x0040)
+#define PROCESS_CREATE_PROCESS             (0x0080)
+#define PROCESS_SET_QUOTA                  (0x0100)
+#define PROCESS_SET_INFORMATION            (0x0200)
+#define PROCESS_QUERY_INFORMATION          (0x0400)
+#define PROCESS_SUSPEND_RESUME             (0x0800)
+#define PROCESS_QUERY_LIMITED_INFORMATION  (0x1000)
 
 #if (NTDDI_VERSION >= NTDDI_VISTA)
 OB_PREOP_CALLBACK_STATUS ThreadPreCallback(PVOID RegistrationContext, POB_PRE_OPERATION_INFORMATION OperationInformation)
-{		
+{
 	if (DRMProcess == NULL)
 		return OB_PREOP_SUCCESS;
 
@@ -170,14 +140,12 @@ OB_PREOP_CALLBACK_STATUS ThreadPreCallback(PVOID RegistrationContext, POB_PRE_OP
 		return OB_PREOP_SUCCESS;
 
 	if (OperationInformation->ObjectType == *PsThreadType)
-	{		
+	{
 		if ((PsGetProcessId(DRMProcess) == PsGetThreadProcessId(OperationInformation->Object)) || ((DRMProcess2) && (PsGetProcessId(DRMProcess2) == PsGetThreadProcessId(OperationInformation->Object))))
 		{
-			//probably block it
 
 			if (OperationInformation->Operation == OB_OPERATION_HANDLE_CREATE)
 			{
-				//create handle			
 
 				ACCESS_MASK da = OperationInformation->Parameters->CreateHandleInformation.DesiredAccess;
 
@@ -185,106 +153,87 @@ OB_PREOP_CALLBACK_STATUS ThreadPreCallback(PVOID RegistrationContext, POB_PRE_OP
 
 				da = da & (THREAD_SET_LIMITED_INFORMATION | THREAD_QUERY_LIMITED_INFORMATION);
 
-				OperationInformation->Parameters->CreateHandleInformation.DesiredAccess = 0;// da;
+				OperationInformation->Parameters->CreateHandleInformation.DesiredAccess = 0;
 			}
 			else if (OperationInformation->Operation == OB_OPERATION_HANDLE_DUPLICATE)
 			{
-				//duplicate handle
+
 				ACCESS_MASK da = OperationInformation->Parameters->DuplicateHandleInformation.DesiredAccess;
 
 				DbgPrint("PID %d duplicated a handle to a CE thread with access mask %x", PsGetCurrentProcessId(), da);
 
 				da = da & (THREAD_SET_LIMITED_INFORMATION | THREAD_QUERY_LIMITED_INFORMATION);
-				OperationInformation->Parameters->DuplicateHandleInformation.DesiredAccess = 0;// da;
+				OperationInformation->Parameters->DuplicateHandleInformation.DesiredAccess = 0;
 			}
 		}
 	}
 	return OB_PREOP_SUCCESS;
 }
 
-
 VOID ThreadPostCallback(PVOID RegistrationContext, POB_POST_OPERATION_INFORMATION OperationInformation)
 {
-	//DbgPrint("ProcessPostCallback");
-}
 
+}
 
 OB_PREOP_CALLBACK_STATUS ProcessPreCallback(PVOID RegistrationContext, POB_PRE_OPERATION_INFORMATION OperationInformation)
 {
 	if (DRMProcess == NULL)
 		return OB_PREOP_SUCCESS;
 
-	//if (PsGetCurrentProcess() == DRMProcess)
-	//	return OB_PREOP_SUCCESS;
-
 	if (OperationInformation->ObjectType == *PsProcessType)
 	{
 		if ((OperationInformation->Object == DRMProcess) || (OperationInformation->Object == DRMProcess2))
 		{
-			//probably block it
 
 			if (OperationInformation->Operation == OB_OPERATION_HANDLE_CREATE)
 			{
-				//create handle			
-				
+
 				ACCESS_MASK da = OperationInformation->Parameters->CreateHandleInformation.DesiredAccess;
 
 				DbgPrint("PID %d(%p) opened a handle to the CE process(%p) with access mask %x", PsGetCurrentProcessId(), PsGetCurrentProcess(), DRMProcess, da);
 
 				da = da & (PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SUSPEND_RESUME);
 
-				//da = da & PROCESS_SUSPEND_RESUME;
-
-				OperationInformation->Parameters->CreateHandleInformation.DesiredAccess = 0;// da;
+				OperationInformation->Parameters->CreateHandleInformation.DesiredAccess = 0;
 			}
 			else if (OperationInformation->Operation == OB_OPERATION_HANDLE_DUPLICATE)
 			{
-				//duplicate handle
+
 				ACCESS_MASK da = OperationInformation->Parameters->DuplicateHandleInformation.DesiredAccess;
 
 				DbgPrint("PID %d(%p) opened a handle to the CE process(%p) with access mask %x", PsGetCurrentProcessId(), PsGetCurrentProcess(), DRMProcess, da);
 
-
 				da = da & (PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SUSPEND_RESUME);
 
-				//da = da & PROCESS_SUSPEND_RESUME;
-
-				OperationInformation->Parameters->DuplicateHandleInformation.DesiredAccess = 0;// da;
+				OperationInformation->Parameters->DuplicateHandleInformation.DesiredAccess = 0;
 			}
 		}
 	}
 	return OB_PREOP_SUCCESS;
 }
 
-
 VOID ProcessPostCallback(PVOID RegistrationContext, POB_POST_OPERATION_INFORMATION OperationInformation)
 {
-	//DbgPrint("ProcessPostCallback");
+
 }
 #endif
 
-
 BOOL DispatchIoctlDBVM(IN PDEVICE_OBJECT DeviceObject, ULONG IoControlCode, PVOID lpInBuffer, DWORD nInBufferSize, PVOID lpOutBuffer, DWORD nOutBufferSize, PDWORD lpBytesReturned)
-/*
-Called if dbvm has loaded the driver. Use this to setup a fake irp
-*/
+
 {
-	//allocate a in and out buffer
-	//setup a fake IRP
+
 	IRP FakeIRP;
 	BOOL r;
 	PVOID buffer;
 	buffer=ExAllocatePool(PagedPool, max(nInBufferSize, nOutBufferSize));
-	RtlCopyMemory(buffer, lpInBuffer, nInBufferSize);	
-
+	RtlCopyMemory(buffer, lpInBuffer, nInBufferSize);
 
 	DbgPrint("DispatchIoctlDBVM\n");
 
 	FakeIRP.AssociatedIrp.SystemBuffer=buffer;
-	FakeIRP.Flags=IoControlCode; //(ab)using an unused element
+	FakeIRP.Flags=IoControlCode;
 
 	r=DispatchIoctl(DeviceObject, &FakeIRP)==STATUS_SUCCESS;
-
 
 	RtlCopyMemory(lpOutBuffer, buffer, nOutBufferSize);
 
@@ -308,27 +257,24 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 	}
 	else
 		IoControlCode=Irp->Flags;
-		
-	//DbgPrint("DispatchIoctl. IoControlCode=%x\n", IoControlCode);
+
 #ifdef TOBESIGNED
     sedebugprivUID.LowPart=SE_DEBUG_PRIVILEGE;
 	sedebugprivUID.HighPart=0;
-	
+
 	if (SeSinglePrivilegeCheck(sedebugprivUID, UserMode)==FALSE)
 	{
 		DbgPrint("DispatchIoctl called by a process without SeDebugPrivilege");
 		return STATUS_UNSUCCESSFUL;
 	}
 #endif
-	
 
-	
     __try
     {
         switch(IoControlCode)
         {
-		
-        case IOCTL_CE_READMEMORY:			
+
+        case IOCTL_CE_READMEMORY:
 			__try
 			{
 				struct input
@@ -354,9 +300,8 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 			{
 				ntStatus = STATUS_UNSUCCESSFUL;
 			};
-				
+
             break;
-			
 
         case IOCTL_CE_WRITEMEMORY:
 			__try
@@ -391,9 +336,8 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 
             break;
 
-
 		case IOCTL_CE_OPENPROCESS:
-			{					
+			{
 				PEPROCESS selectedprocess = NULL;
 				struct out
 				{
@@ -422,7 +366,7 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 
 						if (PsLookupProcessByProcessId((PVOID)(UINT_PTR)(processid), &selectedprocess) == STATUS_SUCCESS)
 						{
-							// Gestao Furtiva: Neutraliza temporariamente ObRegisterCallbacks (EAC/BattlEye)
+
 							ULONG strippedCount = StripProcessCallbacks(FALSE);
 
 							ntStatus = ObOpenObjectByPointer(
@@ -431,7 +375,7 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 								NULL,
 								PROCESS_ALL_ACCESS,
 								*PsProcessType,
-								KernelMode, //UserMode,
+								KernelMode,
 								&ProcessHandle);
 
 							if (strippedCount > 0)
@@ -447,25 +391,24 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				}
 				else
 				{
-					POutput->Special = 1;					
+					POutput->Special = 1;
 				}
 
 				if (selectedprocess)
 				{
 					ObDereferenceObject(selectedprocess);
 				}
-				
+
 				POutput->h=(UINT64)ProcessHandle;
 				break;
 			}
-			
 
 		case IOCTL_CE_OPENTHREAD:
 			{
 				HANDLE ThreadHandle;
 				CLIENT_ID ClientID;
 				OBJECT_ATTRIBUTES ObjectAttributes;
-	
+
 				RtlZeroMemory(&ObjectAttributes,sizeof(OBJECT_ATTRIBUTES));
 
 				ntStatus=STATUS_SUCCESS;
@@ -477,24 +420,22 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				__try
 				{
 					ThreadHandle=0;
-					ntStatus=ZwOpenThread(&ThreadHandle,PROCESS_ALL_ACCESS,&ObjectAttributes,&ClientID);									
+					ntStatus=ZwOpenThread(&ThreadHandle,PROCESS_ALL_ACCESS,&ObjectAttributes,&ClientID);
 				}
 				__except(1)
 				{
 					ntStatus=STATUS_UNSUCCESSFUL;
 				}
-			
+
 				*(PUINT64)Irp->AssociatedIrp.SystemBuffer=(UINT64)ThreadHandle;
-				
 
 				break;
 			}
 
-			
 		case IOCTL_CE_MAKEWRITABLE:
 			{
 #ifdef AMD64
-				//untill I know how win64 handles paging, not implemented
+
 #else
 				struct InputBuf
 				{
@@ -504,13 +445,11 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				} *PInputBuf;
 
 				PInputBuf=Irp->AssociatedIrp.SystemBuffer;
-				
-				ntStatus=MakeWritable((PVOID)(UINT_PTR)PInputBuf->StartAddress,PInputBuf->Size,(PInputBuf->CopyOnWrite==1)) ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL; 
+
+				ntStatus=MakeWritable((PVOID)(UINT_PTR)PInputBuf->StartAddress,PInputBuf->Size,(PInputBuf->CopyOnWrite==1)) ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
 #endif
 				break;
 			}
-			
-
 
 		case IOCTL_CE_QUERY_VIRTUAL_MEMORY:
 			{
@@ -555,8 +494,8 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				}
 				break;
 			}
-		
-		case IOCTL_CE_TEST: //just a test to see it's working
+
+		case IOCTL_CE_TEST:
 			{
 				UNICODE_STRING test;
 				PVOID x;
@@ -568,25 +507,22 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 
 				_enable();
 
-				
-				DbgPrint("%d\n", (int)(b - a));				
+				DbgPrint("%d\n", (int)(b - a));
 				break;
 			}
 
 		case IOCTL_CE_GETPETHREAD:
 			{
-				
+
 				*(PUINT64)Irp->AssociatedIrp.SystemBuffer=(UINT64)getPEThread((UINT_PTR)*(PULONG)Irp->AssociatedIrp.SystemBuffer);
 				ntStatus= STATUS_SUCCESS;
 				break;
 			}
-			
 
 		case IOCTL_CE_GETPEPROCESS:
 			{
 				DWORD processid=*(PDWORD)Irp->AssociatedIrp.SystemBuffer;
 				PEPROCESS selectedprocess;
-			
 
 				if (processid==0)
 				{
@@ -601,7 +537,7 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 #else
 						*(PUINT64)Irp->AssociatedIrp.SystemBuffer=(DWORD)selectedprocess;
 #endif
-						//DbgPrint("PEProcess=%llx\n", *(PUINT64)Irp->AssociatedIrp.SystemBuffer);
+
 						ObDereferenceObject(selectedprocess);
 
 					}
@@ -609,13 +545,10 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 						*(PUINT64)Irp->AssociatedIrp.SystemBuffer=0;
 				}
 
-				
-
-				ntStatus= STATUS_SUCCESS;				
+				ntStatus= STATUS_SUCCESS;
 				break;
 			}
 
-			
 		case IOCTL_CE_READPHYSICALMEMORY:
 			{
 				struct input
@@ -625,13 +558,10 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				} *pinp;
 				pinp=Irp->AssociatedIrp.SystemBuffer;
 
-				DbgPrint("IOCTL_CE_READPHYSICALMEMORY:pinp->startaddress=%x, pinp->bytestoread=%d", pinp->startaddress, pinp->bytestoread); 
-
+				DbgPrint("IOCTL_CE_READPHYSICALMEMORY:pinp->startaddress=%x, pinp->bytestoread=%d", pinp->startaddress, pinp->bytestoread);
 
 				ntStatus = ReadPhysicalMemory((PVOID)(UINT_PTR)pinp->startaddress, (UINT_PTR)pinp->bytestoread, pinp);
 				break;
-
-
 
 			}
 
@@ -643,13 +573,13 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				WCHAR			physmemName[] = L"\\device\\physicalmemory";
 				UCHAR*			memoryview;
 
-				RtlInitUnicodeString( &physmemString, physmemName );	
+				RtlInitUnicodeString( &physmemString, physmemName );
 
-            	InitializeObjectAttributes( &attributes, &physmemString, OBJ_CASE_INSENSITIVE, NULL, NULL );	
+            	InitializeObjectAttributes( &attributes, &physmemString, OBJ_CASE_INSENSITIVE, NULL, NULL );
 			    ntStatus=ZwOpenSection( &physmem, SECTION_ALL_ACCESS, &attributes );
 				if (ntStatus==STATUS_SUCCESS)
 				{
-					//hey look, it didn't kill it
+
 					struct input
 					{
 						UINT64 startaddress;
@@ -663,23 +593,22 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 					UINT_PTR offset;
 					UINT_PTR toread;
 
-					
 					pinp=Irp->AssociatedIrp.SystemBuffer;
 					pinp2=(UCHAR *)pinp;
-					viewBase.QuadPart = (ULONGLONG)(pinp->startaddress);					
-					
-					length=0x2000;//pinp->bytestoread;
+					viewBase.QuadPart = (ULONGLONG)(pinp->startaddress);
+
+					length=0x2000;
 					toread=(UINT_PTR)pinp->bytestoread;
 
 					memoryview=NULL;
 					ntStatus=ZwMapViewOfSection(
-						physmem,  //sectionhandle
-						NtCurrentProcess(), //processhandle
-						&memoryview, //BaseAddress
-						0L, //ZeroBits
-						length, //CommitSize
-						&viewBase, //SectionOffset
-						&length, //ViewSize
+						physmem,
+						NtCurrentProcess(),
+						&memoryview,
+						0L,
+						length,
+						&viewBase,
+						&length,
 						ViewShare,
 						0,
 						PAGE_READWRITE);
@@ -690,7 +619,7 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 						RtlCopyMemory(&memoryview[offset],&pinp2[16],toread);
 
 						ZwUnmapViewOfSection(
-							NtCurrentProcess(), //processhandle
+							NtCurrentProcess(),
 							memoryview);
 					}
 
@@ -700,14 +629,12 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				break;
 			}
 
-			
-
 		case IOCTL_CE_GETPHYSICALADDRESS:
 			{
 				struct input
 				{
 					UINT64  ProcessID;
-					UINT64 BaseAddress; 
+					UINT64 BaseAddress;
 				} *pinp;
 
 				PEPROCESS selectedprocess;
@@ -717,17 +644,15 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				ntStatus=STATUS_SUCCESS;
 				pinp=Irp->AssociatedIrp.SystemBuffer;
 
-				//DbgPrint("IOCTL_CE_GETPHYSICALADDRESS. ProcessID(%p)=%x BaseAddress(%p)=%x\n",&pinp->ProcessID, pinp->ProcessID, &pinp->BaseAddress, pinp->BaseAddress);
-
 				__try
 				{
-					//switch to the selected process
+
 					if (PsLookupProcessByProcessId((PVOID)(UINT_PTR)(pinp->ProcessID),&selectedprocess)==STATUS_SUCCESS)
 					{
 						KAPC_STATE apc_state;
-						RtlZeroMemory(&apc_state,sizeof(apc_state));					
+						RtlZeroMemory(&apc_state,sizeof(apc_state));
     					KeStackAttachProcess((PVOID)selectedprocess,&apc_state);
-                 
+
 						__try
 						{
 							physical=MmGetPhysicalAddress((PVOID)(UINT_PTR)pinp->BaseAddress);
@@ -736,7 +661,6 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 						{
 							KeUnstackDetachProcess(&apc_state);
 						}
-	
 
 						ObDereferenceObject(selectedprocess);
 
@@ -749,18 +673,17 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 
 				if (ntStatus==STATUS_SUCCESS)
 				{
-					//DbgPrint("physical.LowPart=%x",physical.LowPart);
+
                     RtlCopyMemory(Irp->AssociatedIrp.SystemBuffer,&physical.QuadPart,8);
 
 				}
-				
-				
+
 				break;
 			}
 
 		case IOCTL_CE_GETMEMORYRANGES:
 			{
-				
+
 				struct output
 				{
 					UINT64 address;
@@ -769,32 +692,29 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 
 				DbgPrint("IOCTL_CE_GETMEMORYRANGES\n");
 
-
 				if (PhysicalMemoryRanges==0)
 				{
 					__try
 					{
 						PPHYSICAL_MEMORY_RANGE mr=MmGetPhysicalMemoryRanges();
-						
+
 						if (mr)
 						{
-							//find the end
+
 							int i;
 							PhysicalMemoryRanges=(UINT64)mr;
 							for (i=0; mr[i].NumberOfBytes.QuadPart || mr[i].BaseAddress.QuadPart; i++);
 
 							PhysicalMemoryRangesListSize=(UINT64)(&mr[i])-(UINT64)(&mr[0]);
 						}
-						
-
 
 					}
 					__except(1)
 					{
-						//just in case this function decides to bug out in the future
+
 					}
 				}
-				
+
 				poutp->address=PhysicalMemoryRanges;
 				poutp->size=PhysicalMemoryRangesListSize;
 
@@ -802,14 +722,13 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 
 				break;
 			}
-			
+
 		case IOCTL_CE_GETSDTADDRESS:
 			{
 				DbgPrint("Obsolete\n");
 				ntStatus=STATUS_UNSUCCESSFUL;
 				break;
 			}
-			
 
 		case IOCTL_CE_GETCR0:
 			{
@@ -818,27 +737,24 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 
 				break;
 			}
-			
 
 		case IOCTL_CE_GETCR4:
 			{
-				//seems CR4 isn't seen as a register...
+
 				*(UINT64*)Irp->AssociatedIrp.SystemBuffer=(UINT64)getCR4();
 				ntStatus=STATUS_SUCCESS;
 
 				break;
 			}
-			
 
 		case IOCTL_CE_SETCR4:
 			{
-				//seems CR4 isn't seen as a register...
+
 				ULONG cr4reg=*(ULONG*)Irp->AssociatedIrp.SystemBuffer;
 				setCR4((UINT64)cr4reg);
 				ntStatus=STATUS_SUCCESS;
 				break;
 			}
-			
 
 				case IOCTL_CE_GETCR3:
 			{
@@ -1236,7 +1152,7 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				struct in_freeze
 				{
 					ULONG64 ProcessId;
-					ULONG Freeze; // 1 = freeze/suspend, 0 = thaw/resume
+					ULONG Freeze;
 				} *pinp = (struct in_freeze*)Irp->AssociatedIrp.SystemBuffer;
 #pragma pack(pop)
 
@@ -1270,7 +1186,7 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				struct in_protect
 				{
 					ULONG64 ProcessId;
-					ULONG Enable; // 1 = protect (PPL WinTcb), 0 = unprotect
+					ULONG Enable;
 				} *pinp = (struct in_protect*)Irp->AssociatedIrp.SystemBuffer;
 #pragma pack(pop)
 
@@ -1298,13 +1214,11 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				break;
 			}
 
-
 		case IOCTL_CE_CLEAN_KERNEL_TRACES:
 			{
 				ntStatus = CleanKernelTraces();
 				break;
 			}
-
 
 		case IOCTL_CE_CLOAK_DEVICE_SYMLINK:
 			{
@@ -1317,7 +1231,6 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 					break;
 				}
 
-				// Garante terminação nula segura no buffer de entrada
 				PWCHAR safeBuf = (PWCHAR)ExAllocatePoolWithTag(NonPagedPool, inLen + sizeof(WCHAR), 'kOLS');
 				if (!safeBuf)
 				{
@@ -1332,7 +1245,6 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				ExFreePoolWithTag(safeBuf, 'kOLS');
 				break;
 			}
-
 
 		case IOCTL_CE_PHYSICAL_RAM_SCAVENGE:
 			{
@@ -1391,7 +1303,6 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				break;
 			}
 
-
 		case IOCTL_CE_GET_DBVM_STATUS:
 			{
 #pragma pack(push, 1)
@@ -1415,7 +1326,6 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				break;
 			}
 
-
 		case IOCTL_CE_CLOAK_REGION:
 			{
 #pragma pack(push, 1)
@@ -1424,7 +1334,7 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 					ULONG64 ProcessId;
 					ULONG64 VirtualAddress;
 					ULONG Size;
-					UCHAR Data[1]; // Variável
+					UCHAR Data[1];
 				} *pinp = (struct in_cloak_region*)Irp->AssociatedIrp.SystemBuffer;
 #pragma pack(pop)
 
@@ -1456,7 +1366,6 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				break;
 			}
 
-
 		case IOCTL_CE_START_DBVM_WATCH:
 			{
 #pragma pack(push, 1)
@@ -1465,7 +1374,7 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 					ULONG64 ProcessId;
 					ULONG64 VirtualAddress;
 					ULONG Size;
-					ULONG WatchType; // 0 = Write, 1 = Read/Access
+					ULONG WatchType;
 				} *pinp = (struct in_start_watch*)Irp->AssociatedIrp.SystemBuffer;
 
 				struct out_start_watch
@@ -1584,7 +1493,6 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				break;
 			}
 
-
 static PVOID g_TraceStoreBuffer = NULL;
 
 		case IOCTL_CE_START_HARDWARE_TRACE:
@@ -1624,7 +1532,7 @@ static PVOID g_TraceStoreBuffer = NULL;
 
 					if (!g_TraceStoreBuffer)
 					{
-						// Aloca 64 KB de memória não-paginada contígua para armazenar os pacotes de trace
+
 						g_TraceStoreBuffer = ExAllocatePoolWithTag(NonPagedPool, 64 * 1024, 'rtSU');
 					}
 
@@ -1636,7 +1544,6 @@ static PVOID g_TraceStoreBuffer = NULL;
 
 					RtlZeroMemory(g_TraceStoreBuffer, 64 * 1024);
 
-					// debugctl = 0x1 (BTF) | 0x40 (BTS) | 0x80 (BTINT)
 					UINT64 debugctl = 0x1 | 0x40;
 					unsigned int r = vmx_ultimap(cr3, debugctl, g_TraceStoreBuffer);
 
@@ -1671,44 +1578,42 @@ static PVOID g_TraceStoreBuffer = NULL;
 
 		case IOCTL_CE_GETSDT:
 			{
-				//returns the address of KeServiceDescriptorTable
+
 				ntStatus = STATUS_UNSUCCESSFUL;
 				break;
-			}	
-			
-
+			}
 
 		case IOCTL_CE_GETIDT:
 			{
-				//returns the address of the IDT of the current CPU
+
 				IDT idt;
-				RtlZeroMemory(&idt,sizeof(IDT));				
+				RtlZeroMemory(&idt,sizeof(IDT));
 				GetIDT(&idt);
-				RtlZeroMemory(Irp->AssociatedIrp.SystemBuffer,2+8); //so that the 32-bit version doesn't have to deal with garbage at the end
-				RtlCopyMemory(Irp->AssociatedIrp.SystemBuffer,&idt,sizeof(IDT)); //copy idt
+				RtlZeroMemory(Irp->AssociatedIrp.SystemBuffer,2+8);
+				RtlCopyMemory(Irp->AssociatedIrp.SystemBuffer,&idt,sizeof(IDT));
 				ntStatus=STATUS_SUCCESS;
-			
+
 				break;
-			}	
+			}
 
 		case IOCTL_CE_GETGDT:
 			{
-				//returns the address of the IDT of the current CPU
+
 				GDT gdt;
 				RtlZeroMemory(&gdt,sizeof(GDT));
 				GetGDT(&gdt);
-				RtlZeroMemory(Irp->AssociatedIrp.SystemBuffer,2+8); 
-				RtlCopyMemory(Irp->AssociatedIrp.SystemBuffer,&gdt,sizeof(GDT)); //copy gdt
+				RtlZeroMemory(Irp->AssociatedIrp.SystemBuffer,2+8);
+				RtlCopyMemory(Irp->AssociatedIrp.SystemBuffer,&gdt,sizeof(GDT));
 				ntStatus=STATUS_SUCCESS;
-			
+
 				break;
 			}
-			
+
 		case IOCTL_CE_LAUNCHDBVM:
 			{
 				struct intput
 				{
-					UINT64 dbvmimgpath;	
+					UINT64 dbvmimgpath;
 					DWORD32 cpuid;
 				} *pinp;
 				pinp=Irp->AssociatedIrp.SystemBuffer;
@@ -1726,7 +1631,6 @@ static PVOID g_TraceStoreBuffer = NULL;
 				DbgPrint("Returned from vmxoffload()\n");
 				break;
 			}
-			
 
 		case IOCTL_CE_HOOKINTS:
 		case IOCTL_CE_USERDEFINEDINTERRUPTHOOK:
@@ -1742,7 +1646,7 @@ static PVOID g_TraceStoreBuffer = NULL;
 				struct input
 				{
 					int state;
-					
+
 				} *inp=Irp->AssociatedIrp.SystemBuffer;
 				KernelCodeStepping=inp->state;
 				ntStatus=STATUS_SUCCESS;
@@ -1756,7 +1660,6 @@ static PVOID g_TraceStoreBuffer = NULL;
 			break;
 		}
 
-		
 		case IOCTL_CE_GD_SETBREAKPOINT:
 		case IOCTL_CE_TOUCHDEBUGREGISTER:
 		case IOCTL_CE_SETSTORELBR:
@@ -1764,13 +1667,13 @@ static PVOID g_TraceStoreBuffer = NULL;
 			break;
 
 		case IOCTL_CE_EXECUTE_CODE:
-			{		
+			{
 				typedef NTSTATUS (*PARAMETERLESSFUNCTION)(UINT64 parameters);
 				PARAMETERLESSFUNCTION functiontocall;
 
 				struct input
 				{
-					UINT64	functionaddress; //function address to call
+					UINT64	functionaddress;
 					UINT64	parameters;
 				} *inp=Irp->AssociatedIrp.SystemBuffer;
 				DbgPrint("IOCTL_CE_EXECUTE_CODE\n");
@@ -1792,11 +1695,10 @@ static PVOID g_TraceStoreBuffer = NULL;
 				break;
 			}
 
-
 		case IOCTL_CE_GETVERSION:
 			{
 				DbgPrint("IOCTL_CE_GETVERSION. Version=%d\n",dbkversion);
-				*(PULONG)Irp->AssociatedIrp.SystemBuffer=dbkversion;	
+				*(PULONG)Irp->AssociatedIrp.SystemBuffer=dbkversion;
 				ntStatus=STATUS_SUCCESS;
 				break;
 			}
@@ -1805,12 +1707,9 @@ static PVOID g_TraceStoreBuffer = NULL;
 			{
 				DWORD msr=*(PDWORD)Irp->AssociatedIrp.SystemBuffer;
 
-				//DbgPrint("IOCTL_CE_READMSR: msr=%x\n", msr);
-
 				__try
 				{
 					*(PUINT64)Irp->AssociatedIrp.SystemBuffer=__readmsr(msr);
-					//DbgPrint("Output: %llx\n",*(PUINT64)Irp->AssociatedIrp.SystemBuffer); 
 
 					ntStatus=STATUS_SUCCESS;
 				}
@@ -1820,13 +1719,13 @@ static PVOID g_TraceStoreBuffer = NULL;
 				}
 
 				break;
-			}	
+			}
 
 		case IOCTL_CE_WRITEMSR:
 			{
 				struct input
 				{
-					UINT64 msr;			
+					UINT64 msr;
 					UINT64 value;
 				} *inp=Irp->AssociatedIrp.SystemBuffer;
 
@@ -1836,7 +1735,7 @@ static PVOID g_TraceStoreBuffer = NULL;
 
 				__try
 				{
-					__writemsr(inp->msr, inp->value );					
+					__writemsr(inp->msr, inp->value );
 					ntStatus=STATUS_SUCCESS;
 				}
 				__except(1)
@@ -1868,17 +1767,9 @@ static PVOID g_TraceStoreBuffer = NULL;
 			ntStatus = STATUS_NOT_SUPPORTED;
 			break;
 
-			/*
-		case IOCTL_CE_GETCPUIDS:
-			{
-				CPULISTFILLSTRUCT x;	
-
-				forEachCpuPassive(GetCPUIDS_all,&x);
-			}*/
-
 		case IOCTL_CE_STARTACCESMONITOR:
 			{
-				//this is used instead of writeProcessMemory for speed reasons (the reading out is still done with readProcessMemory because of easier memory management)
+
 				struct input
 				{
 					UINT64 ProcessID;
@@ -1890,7 +1781,6 @@ static PVOID g_TraceStoreBuffer = NULL;
 
 				inp=Irp->AssociatedIrp.SystemBuffer;
 				DbgPrint("IOCTL_CE_STARTACCESMONITOR(%d)\n", inp->ProcessID);
-
 
 				ntStatus = STATUS_UNSUCCESSFUL;
 
@@ -1917,7 +1807,6 @@ static PVOID g_TraceStoreBuffer = NULL;
 				inp = Irp->AssociatedIrp.SystemBuffer;
 				DbgPrint("IOCTL_CE_ENUMACCESSEDMEMORY(%d)\n", inp->ProcessID);
 
-
 				ntStatus = STATUS_UNSUCCESSFUL;
 
 				if (PsLookupProcessByProcessId((PVOID)(UINT_PTR)(inp->ProcessID), &selectedprocess) == STATUS_SUCCESS)
@@ -1935,7 +1824,7 @@ static PVOID g_TraceStoreBuffer = NULL;
 				int ListSizeInBytes = *(int *)Irp->AssociatedIrp.SystemBuffer;
 				PPRANGE List = (PPRANGE)Irp->AssociatedIrp.SystemBuffer;
 
-				DbgPrint("IOCTL_CE_GETACCESSEDMEMORYLIST\n"); 
+				DbgPrint("IOCTL_CE_GETACCESSEDMEMORYLIST\n");
 
 				getAccessedPageList(List, ListSizeInBytes);
 
@@ -1946,7 +1835,7 @@ static PVOID g_TraceStoreBuffer = NULL;
 
 		case IOCTL_CE_INITIALIZE:
 			{
-				//find the KeServiceDescriptorTableShadow 
+
 				struct input
 				{
 					UINT64 AddressOfWin32K;
@@ -1957,7 +1846,7 @@ static PVOID g_TraceStoreBuffer = NULL;
 					UINT64 NtUserGetForegroundWindow_callnumber;
 					UINT64 ActiveLinkOffset;
 					UINT64 ProcessNameOffset;
-					UINT64 DebugportOffset;	
+					UINT64 DebugportOffset;
 					UINT64 ProcessEvent;
 					UINT64 ThreadEvent;
   				} *pinp;
@@ -1966,13 +1855,9 @@ static PVOID g_TraceStoreBuffer = NULL;
 				pinp=Irp->AssociatedIrp.SystemBuffer;
 				ntStatus=STATUS_SUCCESS;
 
-				//referencing event handles to objects
-
-				
 				*(UINT_PTR*)Irp->AssociatedIrp.SystemBuffer=(UINT_PTR)0;
 				break;
 			}
-			
 
 		case IOCTL_CE_VMXCONFIG:
 			{
@@ -1985,9 +1870,8 @@ static PVOID g_TraceStoreBuffer = NULL;
 					QWORD Password3;
   				} *pinp;
 #pragma pack()
-				
 
-				DbgPrint("IOCTL_CE_VMXCONFIG called\n");	
+				DbgPrint("IOCTL_CE_VMXCONFIG called\n");
 				ntStatus=STATUS_SUCCESS;
 
 				pinp=Irp->AssociatedIrp.SystemBuffer;
@@ -2003,7 +1887,7 @@ static PVOID g_TraceStoreBuffer = NULL;
 					__try
 					{
 						vmx_version=vmx_getversion();
-						DbgPrint("Still here, so vmx is loaded. vmx_version=%x\n",vmx_version);	
+						DbgPrint("Still here, so vmx is loaded. vmx_version=%x\n",vmx_version);
 						vmxusable = 1;
 					}
 					__except(1)
@@ -2019,46 +1903,42 @@ static PVOID g_TraceStoreBuffer = NULL;
 					DbgPrint("Virtualization_Enabled=0\n");
 					vmxusable=0;
 				}
-				
+
 				break;
 			}
 
-
 		case IOCTL_CE_ENABLE_DRM:
 			{
-#if (NTDDI_VERSION >= NTDDI_VISTA)				
+#if (NTDDI_VERSION >= NTDDI_VISTA)
 				struct
 				{
 					QWORD PreferedAltitude;
-					QWORD ProtectedProcess;									
+					QWORD ProtectedProcess;
 				} *inp = Irp->AssociatedIrp.SystemBuffer;
 
-	
-				
 				DbgPrint("inp->PreferedAltitude=%p", inp->PreferedAltitude);
 				DbgPrint("inp->PreferedAltitude=%p", inp->ProtectedProcess);
 
-				
 				if (DRMProcess)
 				{
-					//check if this process has been terminated
+
 					LARGE_INTEGER timeout;
 
 					timeout.QuadPart = -500000;
 					ntStatus=KeWaitForSingleObject(DRMProcess, UserRequest, UserMode, FALSE, &timeout);
 
 					if (ntStatus != STATUS_SUCCESS)
-						break;					
+						break;
 				}
 
 				DRMProcess = PsGetCurrentProcess();
 
 				if (inp->ProtectedProcess)
 				{
-					if (DRMProcess != (PEPROCESS)((UINT_PTR)inp->ProtectedProcess))						
+					if (DRMProcess != (PEPROCESS)((UINT_PTR)inp->ProtectedProcess))
 						DRMProcess2 = (PEPROCESS)((UINT_PTR)inp->ProtectedProcess);
 				}
-					
+
 				DbgPrint("DRMProcess=%p", DRMProcess);
 				DbgPrint("DRMProcess2=%p", DRMProcess2);
 
@@ -2079,7 +1959,7 @@ static PVOID g_TraceStoreBuffer = NULL;
 						RandomVal = 1000 + (tc.QuadPart % 50000);
 					}
 
-					DbgPrint("Activating CE's super advanced DRM"); //yeah right....
+					DbgPrint("Activating CE's super advanced DRM");
 
 					DbgPrint("RandomVal=%d", RandomVal);
 					RtlStringCbPrintfW(wcAltitude, sizeof(wcAltitude) - 2, L"%d", RandomVal);
@@ -2090,7 +1970,6 @@ static PVOID g_TraceStoreBuffer = NULL;
 					r.Version = OB_FLT_REGISTRATION_VERSION;
 					r.Altitude = usAltitude;
 					r.RegistrationContext = NULL;
-
 
 					obr[0].ObjectType = PsProcessType;
 					obr[0].Operations = OB_OPERATION_HANDLE_CREATE | OB_OPERATION_HANDLE_DUPLICATE;
@@ -2125,7 +2004,7 @@ static PVOID g_TraceStoreBuffer = NULL;
 					ntStatus = STATUS_SUCCESS;
 #else
 				ntStatus = STATUS_NOT_IMPLEMENTED;
-#endif				
+#endif
 				break;
 			}
 
@@ -2134,19 +2013,16 @@ static PVOID g_TraceStoreBuffer = NULL;
 			KAPC_STATE oldstate;
 			PEPROCESS ep = *(PEPROCESS *)Irp->AssociatedIrp.SystemBuffer;
 
-
-			//DbgPrint("IOCTL_CE_GET_PEB");
 			KeStackAttachProcess((PKPROCESS)ep, &oldstate);
 			__try
 			{
 				ULONG r;
 				PROCESS_BASIC_INFORMATION pbi;
-				//DbgPrint("Calling ZwQueryInformationProcess");
+
 				ntStatus = ZwQueryInformationProcess(ZwCurrentProcess(), ProcessBasicInformation, &pbi, sizeof(pbi), &r);
 				if (ntStatus==STATUS_SUCCESS)
 				{
-					//DbgPrint("pbi.UniqueProcessId=%x\n", (int)pbi.UniqueProcessId);
-					//DbgPrint("pbi.PebBaseAddress=%p\n", (PVOID)pbi.PebBaseAddress);					
+
 					*(QWORD *)Irp->AssociatedIrp.SystemBuffer = (QWORD)(pbi.PebBaseAddress);
 				}
 				else
@@ -2155,20 +2031,19 @@ static PVOID g_TraceStoreBuffer = NULL;
 			__finally
 			{
 				KeUnstackDetachProcess(&oldstate);
-			}	
+			}
 
-			
 			break;
 		}
 
 		case IOCTL_CE_QUERYINFORMATIONPROCESS:
 		{
 			struct
-			{	
+			{
 				QWORD processid;
 				QWORD ProcessInformationAddress;
 				QWORD ProcessInformationClass;
-				QWORD ProcessInformationLength;				
+				QWORD ProcessInformationLength;
 			}  *inp = Irp->AssociatedIrp.SystemBuffer;
 
 			struct
@@ -2189,7 +2064,7 @@ static PVOID g_TraceStoreBuffer = NULL;
 			}
 			__try
 			{
-				
+
 				if (PsLookupProcessByProcessId((HANDLE)(UINT_PTR)inp->processid, &selectedprocess) == STATUS_SUCCESS)
 				{
 					KAPC_STATE oldstate;
@@ -2237,7 +2112,6 @@ static PVOID g_TraceStoreBuffer = NULL;
 		case IOCTL_CE_NTPROTECTVIRTUALMEMORY:
 		{
 
-			
 			break;
 		}
 
@@ -2259,7 +2133,7 @@ static PVOID g_TraceStoreBuffer = NULL;
 			LowAddress.QuadPart = 0;
 			HighAddress.QuadPart = 0xffffffffffffffffI64;
 			SkipBytes.QuadPart = 0;
-			mdl = MmAllocatePagesForMdlEx(LowAddress, HighAddress, SkipBytes, (SIZE_T)pagecount * 4096, MmCached, MM_ALLOCATE_REQUIRE_CONTIGUOUS_CHUNKS | MM_ALLOCATE_FULLY_REQUIRED); //do not free this, EVER
+			mdl = MmAllocatePagesForMdlEx(LowAddress, HighAddress, SkipBytes, (SIZE_T)pagecount * 4096, MmCached, MM_ALLOCATE_REQUIRE_CONTIGUOUS_CHUNKS | MM_ALLOCATE_FULLY_REQUIRED);
 			if (mdl)
 			{
 				int i;
@@ -2272,7 +2146,7 @@ static PVOID g_TraceStoreBuffer = NULL;
 
 				if (pfnlist)
 				{
-					//convert the pfnlist to a list dbvm understands, and go in blocks of 32
+
 					mi = ExAllocatePool(PagedPool, sizeof(DBVMOffloadMemInfo));
 					if (mi)
 					{
@@ -2290,14 +2164,12 @@ static PVOID g_TraceStoreBuffer = NULL;
 									int j;
 									int r = vmx_add_memory(mi->List, mi->Count);
 
-								
 									DbgPrint("vmx_add_memory for %d pages returned %d\n", mi->Count, r);
 
 									for (j = 0; j < mi->Count; j++)
 									{
 										DbgPrint("%d : %p\n", j, (void*)((UINT_PTR)mi->List[j]));
 									}
-
 
 									mi->Count = 0;
 								}
@@ -2320,7 +2192,7 @@ static PVOID g_TraceStoreBuffer = NULL;
 				}
 				else
 					DbgPrint("Failure getting pfn list");
-				ExFreePool(mdl); //only free the mdl, the rest belongs to dbvm now
+				ExFreePool(mdl);
 
 				ntStatus = STATUS_SUCCESS;
 			}
@@ -2330,12 +2202,11 @@ static PVOID g_TraceStoreBuffer = NULL;
 				ntStatus = STATUS_MEMORY_NOT_ALLOCATED;
 			}
 
-
 			break;
 		}
 
         default:
-			DbgPrint("Unhandled IO request: %x\n", IoControlCode);			
+			DbgPrint("Unhandled IO request: %x\n", IoControlCode);
             break;
         }
     }
@@ -2345,11 +2216,9 @@ static PVOID g_TraceStoreBuffer = NULL;
         ntStatus = STATUS_UNSUCCESSFUL;
     }
 
-	
     Irp->IoStatus.Status = ntStatus;
-    
-    // Set # of bytes to copy back to user-mode...
-	if (irpStack) //only NULL when loaded by dbvm
+
+	if (irpStack)
 	{
 		if (ntStatus == STATUS_SUCCESS)
 			Irp->IoStatus.Information = irpStack->Parameters.DeviceIoControl.OutputBufferLength;
@@ -2359,6 +2228,5 @@ static PVOID g_TraceStoreBuffer = NULL;
 		IoCompleteRequest(Irp, IO_NO_INCREMENT);
 	}
 
-    
     return ntStatus;
 }

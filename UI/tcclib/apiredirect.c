@@ -13,17 +13,15 @@ typedef int(__stdcall *OPENFILE_OVERRIDE)(const char *filename, int OpenFlag);
 typedef int(__stdcall *READFILE_OVERRIDE)(int FileHandle, void *DstBuf, int MaxCharCount);
 typedef int(__stdcall *CLOSEFILE_OVERRIDE)(int FileHandle);
 
-
 OPENFILE_OVERRIDE openfile_override;
 READFILE_OVERRIDE readfile_override;
 CLOSEFILE_OVERRIDE closefile_override;
-
 
 LIBTCCAPI void tcc_install_filehook(OPENFILE_OVERRIDE newopenfile_override, READFILE_OVERRIDE newreadfile_override, CLOSEFILE_OVERRIDE newclosefile_override)
 {
 	openfile_override = newopenfile_override;
 	readfile_override = newreadfile_override;
-	closefile_override = newclosefile_override;	
+	closefile_override = newclosefile_override;
 }
 
 int __cdecl redirectedopen(char const* _FileName, int _OpenFlag, ...)
@@ -34,7 +32,6 @@ int __cdecl redirectedopen(char const* _FileName, int _OpenFlag, ...)
 
 	if (r == -1)
 		r = open(_FileName, _OpenFlag);
-
 
 	return r;
 }
@@ -51,9 +48,8 @@ int __cdecl redirectedclose(int _FileHandle)
 	return r;
 }
 
-
 int __cdecl redirectedread(int _FileHandle, void* _DstBuf, unsigned int _MaxCharCount)
-{	
+{
 	int r = -1;
 	if (readfile_override)
 		r = readfile_override(_FileHandle, _DstBuf, _MaxCharCount);

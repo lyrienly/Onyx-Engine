@@ -1,4 +1,3 @@
-
 use std::ffi::{c_char, CStr};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
@@ -747,4 +746,3 @@ pub unsafe extern "C" fn onyx_pointer_scanner_intersect_file(
         0
     }
 }
-

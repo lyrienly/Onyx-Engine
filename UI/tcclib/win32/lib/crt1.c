@@ -1,7 +1,3 @@
-// =============================================
-// crt1.c
-
-// _UNICODE for tchar.h, UNICODE for API
 #include <tchar.h>
 
 #include <windows.h>
@@ -12,10 +8,10 @@
 #define _CONSOLE_APP    1
 #define _GUI_APP        2
 
-#define _MCW_PC         0x00030000 // Precision Control
-#define _PC_24          0x00020000 // 24 bits
-#define _PC_53          0x00010000 // 53 bits
-#define _PC_64          0x00000000 // 64 bits
+#define _MCW_PC         0x00030000
+#define _PC_24          0x00020000
+#define _PC_53          0x00010000
+#define _PC_64          0x00000000
 
 #ifdef _UNICODE
 #define __tgetmainargs __wgetmainargs
@@ -46,7 +42,6 @@ static int do_main (int argc, _TCHAR * argv[], _TCHAR * env[])
     return retval;
 }
 
-/* Allow command-line globbing with "int _dowildcard = 1;" in the user source */
 int _dowildcard;
 
 static LONG WINAPI catch_sig(EXCEPTION_POINTERS *ex)
@@ -58,11 +53,9 @@ void _tstart(void)
 {
     _startupinfo start_info = {0};
     SetUnhandledExceptionFilter(catch_sig);
-    // Sets the current application type
+
     __set_app_type(_CONSOLE_APP);
 
-    // Set default FP precision to 53 bits (8-byte double)
-    // _MCW_PC (Precision control) is not supported on ARM
 #if defined __i386__ || defined __x86_64__
     _controlfp(_PC_53, _MCW_PC);
 #endif
@@ -71,13 +64,13 @@ void _tstart(void)
     exit(do_main(__argc, __targv, _tenviron));
 }
 
-int _runtmain(int argc, /* as tcc passed in */ char **argv)
+int _runtmain(int argc,  char **argv)
 {
 #ifdef UNICODE
     _startupinfo start_info = {0};
 
     __tgetmainargs(&__argc, &__targv, &_tenviron, _dowildcard, &start_info);
-    /* may be wrong when tcc has received wildcards (*.c) */
+
     if (argc < __argc) {
         __targv += __argc - argc;
         __argc = argc;
@@ -91,5 +84,3 @@ int _runtmain(int argc, /* as tcc passed in */ char **argv)
 #endif
     return _tmain(__argc, __targv, _tenviron);
 }
-
-// =============================================

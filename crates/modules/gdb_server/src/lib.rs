@@ -1,5 +1,3 @@
-//! servidor gdb remote serial protocol (rsp) para integracao com ida/ghidra/radare2
-
 pub mod protocol;
 pub mod target;
 pub mod server;

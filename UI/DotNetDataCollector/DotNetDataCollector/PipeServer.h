@@ -1,6 +1,5 @@
 #pragma once
 
-//#include "CorDebugManagedCallback2.h"
 #include "MyIcorDebugDataTarget.h"
 #include "MyICLRDebuggingLibraryProvider.h"
 #include "pipe.h"
@@ -21,19 +20,17 @@
 #define CMD_GETTYPEDEFPARENT 11
 #define CMD_GETALLOBJECTSOFTYPE 12
 
-
 typedef struct COR_FIELDEX
 {
 	COR_FIELD field;
 	COR_TYPEID owner;
 };
 
-
 class CPipeServer : Pipe
 {
 private:
 	TCHAR pipename[255];
-	//HANDLE pipe;
+
 	ULONG processid;
 	HANDLE processhandle;
 	ICLRDebugging *CLRDebugging = NULL;
@@ -44,17 +41,12 @@ private:
 	CMyICLRDebuggingLibraryProvider *libprovider;
 	CMyIcorDebugDataTarget *datacallback;
 
-
 	std::map<ICorDebugModule* , IMetaDataImport*> moduleMetaData;
-
-	
-
 
 	IMetaDataImport *getMetaData(ICorDebugModule *module);
 	IMetaDataImport *getMetaDataFromTypeID(COR_TYPEID type_id);
 	ICorDebugModule *getModuleFromTypeID(COR_TYPEID type_id);
 	mdTypeDef getClassTokenFromTypeID(COR_TYPEID type_id);
-
 
 	BOOL OpenOrAttachToProcess(void);
 	COR_TYPEID getCOR_TYPEID(UINT64 hModule, mdTypeDef TypeDef);

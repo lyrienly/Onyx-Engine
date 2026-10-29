@@ -1,9 +1,3 @@
-/*
-** $Id: lobject.c,v 2.22.1.1 2007/12/27 13:02:25 roberto Exp $
-** Some generic functions over Lua objects
-** See Copyright Notice in lua.h
-*/
-
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -24,17 +18,10 @@
 #include "llex.h"
 #include "lnum.h"
 
-
 const TValue luaO_nilobject_ = {{NULL}, LUA_TNIL};
 
-
-/*
-** converts an integer to a "floating point byte", represented as
-** (eeeeexxx), where the real value is (1xxx) * 2^(eeeee - 1) if
-** eeeee != 0 and (xxx) otherwise.
-*/
 int luaO_int2fb (unsigned int x) {
-  int e = 0;  /* expoent */
+  int e = 0;
   while (x >= 16) {
     x = (x+1) >> 1;
     e++;
@@ -43,14 +30,11 @@ int luaO_int2fb (unsigned int x) {
   else return ((e+1) << 3) | (cast_int(x) - 8);
 }
 
-
-/* converts back */
 int luaO_fb2int (int x) {
   int e = (x >> 3) & 31;
   if (e == 0) return x;
   else return ((x & 7)+8) << (e - 1);
 }
-
 
 int luaO_log2 (unsigned int x) {
   static const lu_byte log_2[256] = {
@@ -69,7 +53,6 @@ int luaO_log2 (unsigned int x) {
 
 }
 
-
 int luaO_rawequalObj (const TValue *l, const TValue *r) {
   int tl= ttype(l), tr= ttype(r);
   if (tl == tr) {
@@ -86,7 +69,7 @@ int luaO_rawequalObj (const TValue *l, const TValue *r) {
 #endif
         return luai_numeq(nvalue_fast(l), nvalue_fast(r));
       case LUA_TBOOLEAN:
-        return bvalue(l) == bvalue(r);  /* boolean true must be 1 !! */
+        return bvalue(l) == bvalue(r);
       case LUA_TLIGHTUSERDATA:
         return pvalue(l) == pvalue(r);
       default:
@@ -99,7 +82,7 @@ int luaO_rawequalObj (const TValue *l, const TValue *r) {
 # ifdef LNUM_COMPLEX
     if (nvalue_img_fast(r) != 0) return 0;
 # endif
-    /* Avoid doing accuracy losing cast, if possible. */
+
     lua_Integer tmp;
     return tt_integer_valued(r,&tmp) ? (ivalue(l) == tmp)
                 : luai_numeq( cast_num(ivalue(l)), nvalue_fast(r) );
@@ -116,8 +99,6 @@ static void pushstr (lua_State *L, const char *str) {
   incr_top(L);
 }
 
-
-/* this function handles only `%d', `%c', %f, %p, and `%s' formats */
 const char *luaO_pushvfstring (lua_State *L, const char *fmt, va_list argp) {
   int n = 1;
   pushstr(L, "");
@@ -141,10 +122,7 @@ const char *luaO_pushvfstring (lua_State *L, const char *fmt, va_list argp) {
         break;
       }
       case 'd': {
-        /* This is tricky for 64-bit integers; maybe they even cannot be
-         * supported on all compilers; depends on the conversions applied to
-         * variable argument lists. TBD: test!
-         */
+
         setivalue(L->top, (lua_Integer) va_arg(argp, l_uacInteger));
         incr_top(L);
         break;
@@ -155,7 +133,7 @@ const char *luaO_pushvfstring (lua_State *L, const char *fmt, va_list argp) {
         break;
       }
       case 'p': {
-        char buff[4*sizeof(void *) + 8]; /* should be enough space for a `%p' */
+        char buff[4*sizeof(void *) + 8];
         sprintf(buff, "%p", va_arg(argp, void *));
         pushstr(L, buff);
         break;
@@ -182,7 +160,6 @@ const char *luaO_pushvfstring (lua_State *L, const char *fmt, va_list argp) {
   return svalue(L->top - 1);
 }
 
-
 const char *luaO_pushfstring (lua_State *L, const char *fmt, ...) {
   const char *msg;
   va_list argp;
@@ -192,31 +169,30 @@ const char *luaO_pushfstring (lua_State *L, const char *fmt, ...) {
   return msg;
 }
 
-
 void luaO_chunkid (char *out, const char *source, size_t bufflen) {
   if (*source == '=') {
-    strncpy(out, source+1, bufflen);  /* remove first char */
-    out[bufflen-1] = '\0';  /* ensures null termination */
+    strncpy(out, source+1, bufflen);
+    out[bufflen-1] = '\0';
   }
-  else {  /* out = "source", or "...source" */
+  else {
     if (*source == '@') {
       size_t l;
-      source++;  /* skip the `@' */
+      source++;
       bufflen -= sizeof(" '...' ");
       l = strlen(source);
       strcpy(out, "");
       if (l > bufflen) {
-        source += (l-bufflen);  /* get last part of file name */
+        source += (l-bufflen);
         strcat(out, "...");
       }
       strcat(out, source);
     }
-    else {  /* out = [string "string"] */
-      size_t len = strcspn(source, "\n\r");  /* stop at first newline */
+    else {
+      size_t len = strcspn(source, "\n\r");
       bufflen -= sizeof(" [string \"...\"] ");
       if (len > bufflen) len = bufflen;
       strcpy(out, "[string \"");
-      if (source[len] != '\0') {  /* must truncate? */
+      if (source[len] != '\0') {
         strncat(out, source, len);
         strcat(out, "...");
       }
@@ -226,4 +202,3 @@ void luaO_chunkid (char *out, const char *source, size_t bufflen) {
     }
   }
 }
-

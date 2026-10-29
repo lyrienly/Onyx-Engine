@@ -1,8 +1,3 @@
-//! framing e parsing do gdb remote serial protocol
-//!
-//! formato: `$<data>#<xx>` onde xx eh checksum (mod 256) em hex ascii.
-//! ack: `+` (ok) ou `-` (reenviar).
-
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,8 +56,6 @@ pub fn encode_packet(data: &[u8]) -> Vec<u8> {
     out
 }
 
-/// faz parse de um pacote em `bytes`. retorna o pacote e quantos bytes consumidos.
-/// pula bytes de ack/nack iniciais (`+`/`-`).
 pub fn parse_packet(bytes: &[u8]) -> Result<(Packet, usize), ParseError> {
     let mut i = 0;
     while i < bytes.len() && (bytes[i] == b'+' || bytes[i] == b'-') {
@@ -102,7 +95,6 @@ fn hex_val(b: u8) -> Result<u8, ParseError> {
     }
 }
 
-/// bytes -> string hex little-endian irrelevante aqui (apenas hex ascii dos bytes).
 pub fn bytes_to_hex(data: &[u8]) -> String {
     let mut s = String::with_capacity(data.len() * 2);
     for b in data {
@@ -125,7 +117,6 @@ pub fn hex_to_bytes(s: &str) -> Result<Vec<u8>, ParseError> {
     Ok(out)
 }
 
-/// parse de inteiro hex em string (ex: "deadbeef")
 pub fn parse_hex_u64(s: &str) -> Result<u64, ParseError> {
     if s.is_empty() {
         return Err(ParseError::BadHex);
@@ -144,7 +135,7 @@ mod tests {
 
     #[test]
     fn checksum_sanity() {
-        // "OK" -> O=0x4f K=0x4b soma=0x9a
+
         assert_eq!(checksum(b"OK"), 0x9a);
     }
 

@@ -1,11 +1,3 @@
-/*
- * context.c
- *
- *  Created on: May 18, 2015
- *      Author: eric
- */
-
-
 #include "context.h"
 #include "api.h"
 
@@ -71,8 +63,6 @@ int getContext(int tid, CONTEXT *context)
   context->type=3;
 #endif
 
-
-
   return r;
 #else
   int r,r2;
@@ -110,7 +100,6 @@ int getContext(int tid, CONTEXT *context)
       context->type=2;
       iov.iov_base=&context->fp32;
 
-
       context->structsize=((uintptr_t)(&context->fp32)-(uintptr_t)context)+sizeof(CONTEXT_FP32);
 
       iov.iov_len=sizeof(CONTEXT_FP32);
@@ -134,8 +123,6 @@ int getContext(int tid, CONTEXT *context)
     }
 #endif
 
-
-
   }
   return r;
 #endif
@@ -145,7 +132,7 @@ int getContext(int tid, CONTEXT *context)
 int setContext(int tid, CONTEXT *context)
 {
   int r;
-  //todo FPU
+
   debug_log("setContext\n");
 #ifndef NT_PRSTATUS
   return safe_ptrace(PTRACE_SETREGS, tid, 0, &context->regs);
@@ -169,7 +156,6 @@ int setContext(int tid, CONTEXT *context)
         break;
 
       case 3:
-        //set the fpu fields
 
         break;
 
@@ -182,5 +168,3 @@ int setContext(int tid, CONTEXT *context)
   return r;
 #endif
 }
-
-

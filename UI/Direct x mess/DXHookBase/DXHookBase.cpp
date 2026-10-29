@@ -1,6 +1,3 @@
-// DXHookBase.cpp : Defines the exported functions for the DLL application.
-//
-
 #include "stdafx.h"
 #include "Dxhookbase.h"
 
@@ -12,21 +9,13 @@
 #include "DX9Hook.h"
 #endif
 
-//Explenation about the DEBUG define.
-//If DEBUG is used the hook assumes that this hook is compiled in with a dx program that calls the functions manually
-//If DEBUG is not used it will assume it was loaded from dll injection
-
 PD3DHookShared shared;
-
-
 
 HANDLE hasClickEvent;
 HANDLE handledClickEvent;
 
 HANDLE hasKeyboardEvent;
 HANDLE handledKeyboardEvent;
-
-
 
 typedef HRESULT     (__stdcall *D3D9_RESET_ORIGINAL)(IDirect3DDevice9 *Device, D3DPRESENT_PARAMETERS *pPresentationParameters);
 typedef HRESULT     (__stdcall *D3D9_PRESENT_ORIGINAL)(IDirect3DDevice9 *Device, RECT* pSourceRect,CONST RECT* pDestRect,HWND hDestWindowOverride,CONST RGNDATA* pDirtyRegion);
@@ -49,8 +38,6 @@ typedef HRESULT		(__stdcall *D3D11_DRAWINDEXEDINSTANCED_ORIGINAL)(ID3D11DeviceCo
 typedef HRESULT		(__stdcall *D3D11_DRAWINSTANCED_ORIGINAL)(ID3D11DeviceContext *dc, UINT VertexCountPerInstance, UINT InstanceCount, UINT StartVertexLocation, UINT StartInstanceLocation);
 typedef HRESULT		(__stdcall *D3D11_DRAWAUTO_ORIGINAL)(ID3D11DeviceContext *dc);
 
-
-
 typedef HRESULT     (__stdcall *DXGI_PRESENT_ORIGINAL)(IDXGISwapChain *x, UINT SyncInterval, UINT Flags);
 typedef HRESULT     (__stdcall *DXGI_RESIZEBUFFERS_ORIGINAL)(IDXGISwapChain *x, UINT BufferCount, UINT Width, UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags);
 
@@ -58,14 +45,12 @@ typedef void        (__stdcall *D3D10PlusHookPresentAPICall)(IDXGISwapChain *swa
 typedef void        (__stdcall *D3D9HookPresentAPICall)(IDirect3DDevice9 *device, PD3DHookShared shared);
 typedef HRESULT     (__stdcall *D3D9HookResetAPICall)(D3D9_RESET_ORIGINAL originalfunction, IDirect3DDevice9 *device, D3DPRESENT_PARAMETERS *pPresentationParameters);
 
-
 typedef HRESULT		(__stdcall *D3D9HookDrawPrimitiveAPICall)(D3D9_DRAWPRIMITIVE_ORIGINAL originalfunction, IDirect3DDevice9 *device, D3DPRIMITIVETYPE PrimitiveType,UINT StartVertex,UINT PrimitiveCount);
 typedef HRESULT 	(__stdcall *D3D9HookDrawIndexedPrimitiveAPICall)(D3D9_DRAWINDEXEDPRIMITIVE_ORIGINAL originalfunction, IDirect3DDevice9 *device, D3DPRIMITIVETYPE PrimitiveType,INT BaseVertexIndex,UINT MinVertexIndex,UINT NumVertices,UINT startIndex,UINT primCount);
 typedef HRESULT 	(__stdcall *D3D9HookDrawPrimitiveUPAPICall)(D3D9_DRAWPRIMITIVEUP_ORIGINAL originalfunction, IDirect3DDevice9 *device, D3DPRIMITIVETYPE PrimitiveType,UINT PrimitiveCount,CONST void* pVertexStreamZeroData,UINT VertexStreamZeroStride);
 typedef HRESULT 	(__stdcall *D3D9HookDrawIndexedPrimitiveUPAPICall)(D3D9_DRAWINDEXEDPRIMITIVEUP_ORIGINAL originalfunction, IDirect3DDevice9 *device, D3DPRIMITIVETYPE PrimitiveType,UINT MinVertexIndex,UINT NumVertices,UINT PrimitiveCount,CONST void* pIndexData,D3DFORMAT IndexDataFormat,CONST void* pVertexStreamZeroData,UINT VertexStreamZeroStride);
 typedef HRESULT 	(__stdcall *D3D9HookDrawRectPatchAPICall)(D3D9_DRAWRECTPATCH_ORIGINAL originalfunction, IDirect3DDevice9 *device, UINT Handle,CONST float* pNumSegs,CONST D3DRECTPATCH_INFO* pRectPatchInfo);
 typedef HRESULT 	(__stdcall *D3D9HookDrawTriPatchAPICall)(D3D9_DRAWTRIPATCH_ORIGINAL originalfunction, IDirect3DDevice9 *device, UINT Handle,CONST float* pNumSegs,CONST D3DTRIPATCH_INFO* pTriPatchInfo);
-
 
 typedef HRESULT		(__stdcall *D3D10HookDrawIndexedAPICall)(D3D10_DRAWINDEXED_ORIGINAL originalfunction, ID3D10Device *device, UINT IndexCount, UINT StartIndexLocation, INT BaseVertexLocation);
 typedef HRESULT		(__stdcall *D3D10HookDrawAPICall)(D3D10_DRAW_ORIGINAL originalfunction, ID3D10Device *device, UINT VertexCount, UINT StartVertexLocation);
@@ -79,18 +64,9 @@ typedef HRESULT		(__stdcall *D3D11HookDrawIndexedInstancedAPICall)(D3D11_DRAWIND
 typedef HRESULT		(__stdcall *D3D11HookDrawInstancedAPICall)(D3D11_DRAWINSTANCED_ORIGINAL originalfunction, ID3D11DeviceContext *dc, UINT VertexCountPerInstance, UINT InstanceCount, UINT StartVertexLocation, UINT StartInstanceLocation);
 typedef HRESULT		(__stdcall *D3D11HookDrawAutoAPICall)(D3D11_DRAWAUTO_ORIGINAL originalfunction, ID3D11DeviceContext *dc);
 
-
-
-
-typedef IDirect3D9* (__stdcall *DIRECT3DCREATE9)(UINT SDKVersion); 
+typedef IDirect3D9* (__stdcall *DIRECT3DCREATE9)(UINT SDKVersion);
 typedef HRESULT     (__stdcall *D3D10CREATEDEVICEANDSWAPCHAIN)(IDXGIAdapter *pAdapter, D3D10_DRIVER_TYPE DriverType, HMODULE Software, UINT Flags, UINT SDKVersion, DXGI_SWAP_CHAIN_DESC *pSwapChainDesc, IDXGISwapChain **ppSwapChain, ID3D10Device **ppDevice);
 typedef HRESULT     (__stdcall *D3D11CREATEDEVICEANDSWAPCHAIN)(IDXGIAdapter *pAdapter, D3D_DRIVER_TYPE DriverType, HMODULE Software, UINT Flags, CONST D3D_FEATURE_LEVEL* pFeatureLevels, UINT FeatureLevels, UINT SDKVersion, CONST DXGI_SWAP_CHAIN_DESC* pSwapChainDesc, IDXGISwapChain** ppSwapChain, ID3D11Device** ppDevice, D3D_FEATURE_LEVEL* pFeatureLevel, ID3D11DeviceContext** ppImmediateContext );
-
-  
-    
-
-
-
 
 D3D10CREATEDEVICEANDSWAPCHAIN d3d10create=NULL;
 D3D11CREATEDEVICEANDSWAPCHAIN d3d11create=NULL;
@@ -135,7 +111,6 @@ D3D9_DRAWINDEXEDPRIMITIVEUP_ORIGINAL D3D9_DrawIndexedPrimitiveUP_Original=NULL;
 D3D9_DRAWRECTPATCH_ORIGINAL D3D9_DrawRectPatch_Original=NULL;
 D3D9_DRAWTRIPATCH_ORIGINAL D3D9_DrawTriPatch_Original=NULL;
 
-
 D3D10_DRAWINDEXED_ORIGINAL D3D10_DrawIndexed_Original=NULL;
 D3D10_DRAW_ORIGINAL D3D10_Draw_Original=NULL;
 D3D10_DRAWINDEXEDINSTANCED_ORIGINAL D3D10_DrawIndexedInstanced_Original=NULL;
@@ -148,14 +123,9 @@ D3D11_DRAWINDEXEDINSTANCED_ORIGINAL D3D11_DrawIndexedInstanced_Original=NULL;
 D3D11_DRAWINSTANCED_ORIGINAL D3D11_DrawInstanced_Original=NULL;
 D3D11_DRAWAUTO_ORIGINAL D3D11_DrawAuto_Original=NULL;
 
-
-
-
-
-//this function is exported and only called by CE when inside CE
 void GetAddresses(void)
 {
-	//create window and create a d3ddevice for dx9, dx10 and dx11H
+
 	OutputDebugStringA("GetAddresses()");
 
 	HRESULT hr=S_OK;
@@ -166,10 +136,10 @@ void GetAddresses(void)
 
 	wcex.cbSize = sizeof( WNDCLASSEX );
 	wcex.style = CS_HREDRAW | CS_VREDRAW;
-	wcex.lpfnWndProc = DefWindowProc;//WndProc;
+	wcex.lpfnWndProc = DefWindowProc;
 	wcex.cbClsExtra = 0;
 	wcex.cbWndExtra = 0;
-	
+
 	wcex.hInstance = GetModuleHandle(0);
 	wcex.hCursor = LoadCursor( NULL, IDC_ARROW );
 	wcex.hbrBackground = ( HBRUSH )( COLOR_WINDOW + 1 );
@@ -178,8 +148,6 @@ void GetAddresses(void)
 	if( !RegisterClassExW( &wcex ) )
 		OutputDebugStringA("Failure\n");
 
-
-	// Create window   
 	RECT rc = { 0, 0, 640, 480 };
 	AdjustWindowRect( &rc, WS_OVERLAPPEDWINDOW, FALSE );
 	x = CreateWindowW( L"BLA", L"BLA",
@@ -191,7 +159,7 @@ void GetAddresses(void)
 	{
 
 		DXGI_SWAP_CHAIN_DESC sd;
-		
+
 		ZeroMemory( &sd, sizeof( sd ) );
 		sd.BufferCount = 1;
 		sd.BufferDesc.Width = 640;
@@ -211,7 +179,6 @@ void GetAddresses(void)
 		ID3D11DeviceContext *pd3dDevice11Context;
 		D3D_FEATURE_LEVEL fl;
 
-
 		HMODULE d3d11dll=LoadLibraryA("D3D11.dll");
 
 		if (d3d11dll)
@@ -220,28 +187,24 @@ void GetAddresses(void)
 			hr=d3d11create( NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, 0, NULL, 0, D3D11_SDK_VERSION, &sd, &pSwapChain, &pd3dDevice11, &fl, &pd3dDevice11Context);
 
 			if (SUCCEEDED(hr))
-			{	
-				//get the present function of the swapchain
+			{
+
 				uintptr_t *a=(uintptr_t *)*(uintptr_t *)pSwapChain;
 
-	
 				a=(uintptr_t *)*(uintptr_t *)pd3dDevice11Context;
-				shared->d3d11_drawindexed=a[12]; //DrawIndexed();  //v
-				shared->d3d11_draw=a[13]; //Draw();  //v
+				shared->d3d11_drawindexed=a[12];
+				shared->d3d11_draw=a[13];
 				shared->d3d11_drawindexedinstanced=a[20];
 				shared->d3d11_drawinstanced=a[21];
-				shared->d3d11_drawauto=a[38];   //v
-				
+				shared->d3d11_drawauto=a[38];
 
-				//now cleanup
 				pSwapChain->Release();
 				pd3dDevice11Context->Release();
 				pd3dDevice11->Release();
-			}		
+			}
 		}
 		else
 			OutputDebugStringA("D3D11.dll not loaded");
-
 
 		HMODULE d3d10dll=LoadLibraryA("D3D10.dll");
 
@@ -251,47 +214,40 @@ void GetAddresses(void)
 			hr=d3d10create( NULL, D3D10_DRIVER_TYPE_HARDWARE, NULL, 0, D3D10_SDK_VERSION, &sd, &pSwapChain, &pd3dDevice );
 
 			if (SUCCEEDED(hr))
-			{	
-				//get the present function of the swapchain
+			{
+
 				uintptr_t *a=(uintptr_t *)*(uintptr_t *)pSwapChain;
 
-				shared->dxgi_present=a[8]; //8th element is Present()		
-				shared->dxgi_resizebuffers=a[13]; 
-			
-							
+				shared->dxgi_present=a[8];
+				shared->dxgi_resizebuffers=a[13];
 
 				a=(uintptr_t *)*(uintptr_t *)pd3dDevice;
-				shared->d3d10_drawindexed=a[8]; //DrawIndexed();  //v
-				shared->d3d10_draw=a[9]; //Draw();  //v
+				shared->d3d10_drawindexed=a[8];
+				shared->d3d10_draw=a[9];
 				shared->d3d10_drawindexedinstanced=a[14];
 				shared->d3d10_drawinstanced=a[15];
-				shared->d3d10_drawauto=a[28];   //v
-	
+				shared->d3d10_drawauto=a[28];
 
-
-				//now cleanup
-				pSwapChain->Release();	
+				pSwapChain->Release();
 				pd3dDevice->Release();
-			}		
+			}
 		}
 		else
 			OutputDebugStringA("D3D10 dll not loaded");
 
-		//now the same for d3d9 to get the present function of d3d9device
 		HMODULE d3d9dll=LoadLibraryA("D3D9.dll");
-		
 
 		if (d3d9dll)
 		{
-			D3DCreate9=(DIRECT3DCREATE9)GetProcAddress(d3d9dll, "Direct3DCreate9");		
+			D3DCreate9=(DIRECT3DCREATE9)GetProcAddress(d3d9dll, "Direct3DCreate9");
 			if (D3DCreate9)
 			{
 				IDirect3D9 *d3d9=D3DCreate9(D3D_SDK_VERSION);
-				IDirect3DDevice9 *d3d9device;		
+				IDirect3DDevice9 *d3d9device;
 
 				if (d3d9)
 				{
-					D3DPRESENT_PARAMETERS d3dpp; 
+					D3DPRESENT_PARAMETERS d3dpp;
 					ZeroMemory( &d3dpp, sizeof(d3dpp) );
 					d3dpp.Windowed   = TRUE;
 					d3dpp.SwapEffect = D3DSWAPEFFECT_COPY;
@@ -301,20 +257,19 @@ void GetAddresses(void)
 					{
 						if (d3d9device)
 						{
-							//get present address
+
 							uintptr_t *a=(uintptr_t *)*(uintptr_t *)d3d9device;
 
-							shared->d3d9_present=a[17]; //17th element is Present()	
-							shared->d3d9_reset=a[16]; //16th element is reset
+							shared->d3d9_present=a[17];
+							shared->d3d9_reset=a[16];
 
 							shared->d3d9_drawprimitive=a[81];
 							shared->d3d9_drawindexedprimitive=a[82];
 							shared->d3d9_drawprimitiveup=a[83];
 							shared->d3d9_drawindexedprimitiveup=a[84];
 							shared->d3d9_drawrectpatch=a[115];
-							shared->d3d9_drawtripatch=a[116];												
+							shared->d3d9_drawtripatch=a[116];
 
-							//d3d9device->Present(NULL,NULL,0,NULL);
 							d3d9device->Release();
 
 							OutputDebugStringA("Success: Fetched the Direct3D9 method addresses");
@@ -334,12 +289,11 @@ void GetAddresses(void)
 			else
 				OutputDebugStringA("Direct3DCreate9 not found");
 
-
 		}
 		else
 		  OutputDebugStringA("D3D9 dll not loaded");
 
-		DestroyWindow(x);	
+		DestroyWindow(x);
 	}
 
 }
@@ -351,10 +305,6 @@ typedef LRESULT (CALLBACK *WNDPROCHOOK)(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
 
 map<HWND, LONG_PTR> originalwndprocs;
 
-
-
-
-//windowhook
 int overlaydown=-1;
 RECT oldoverlayrect;
 
@@ -365,15 +315,13 @@ int appdoestranslate=0;
 int called=0;
 #endif
 
-
 LRESULT CALLBACK windowhook(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	int i;
 
-	
 	POINTS p;
 	RECT r;
-	RECT cr;	
+	RECT cr;
 	LONG_PTR o=originalwndprocs[hwnd];
 	BOOL hasTextureLock=FALSE;
 	BOOL hasLock=FALSE;
@@ -386,10 +334,7 @@ LRESULT CALLBACK windowhook(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	}
 #endif
 
-
-
-
-	switch(uMsg)	
+	switch(uMsg)
 	{
 
 		case WM_CHAR:
@@ -398,80 +343,65 @@ LRESULT CALLBACK windowhook(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				break;
 			}
 
-	
 		case WM_KEYDOWN:
 			if ((shared->console.hasconsole) || (shared->hasOnKey))
 			{
 				if ((shared->console.hasconsole) && ((!shared->console.consolevisible) && (wParam==shared->console.consolekey)))
 				{
-				
-					//tell ce to create a console background sprite, a cursor, a fontmap and a textcontainer
 
-					//make the console entries visible
-
-					shared->console.lastmessage.uMsg=0xffffffff; //special identifier to show the console stuff
+					shared->console.lastmessage.uMsg=0xffffffff;
 					SetEvent(hasKeyboardEvent);
-					WaitForSingleObject(handledKeyboardEvent, 2000); //wait for ce finish this (so the next frame rendered has the console)
+					WaitForSingleObject(handledKeyboardEvent, 2000);
 
 					shared->console.consolevisible=1;
-				
+
 				}
 				else
 				{
 					if (wParam==shared->console.consolekey)
 					{
-						/*
-						shared->resources[shared->console.overlayid].valid=0;
-						shared->resources[shared->console.cursorid].valid=0;
-						shared->OverLayHasUpdate=1;						
-						*/
-						shared->console.lastmessage.uMsg=0xfffffffe; //special identifier to hide the console stuff
+
+						shared->console.lastmessage.uMsg=0xfffffffe;
 
 						SetEvent(hasKeyboardEvent);
-						WaitForSingleObject(handledKeyboardEvent, 2000); 
+						WaitForSingleObject(handledKeyboardEvent, 2000);
 						shared->console.consolevisible=0;
-						
+
 					}
 					else
 					if (hasKeyboardEvent)
 					{
 						BYTE keyboardstate[256];
-						
+
 						shared->console.lastmessage.uMsg=uMsg;
 						shared->console.lastmessage.wParam=wParam;
 						shared->console.lastmessage.lParam=lParam;
 
 						GetKeyboardState(keyboardstate);
-						shared->console.lastmessage.character=0;						
+						shared->console.lastmessage.character=0;
 						ToAscii(wParam, (lParam >> 16) & 0xff, keyboardstate, (LPWORD)&shared->console.lastmessage.character,0);
 
-						
 						SetEvent(hasKeyboardEvent);
 						WaitForSingleObject(handledKeyboardEvent, 10000);
-						
+
 						if (shared->console.lastmessage.uMsg==0)
-							return DefWindowProcA(hwnd, uMsg, wParam, lParam); //no handling, else handle it by the original handler 
+							return DefWindowProcA(hwnd, uMsg, wParam, lParam);
 					}
 					else OutputDebugStringA("Keyboard event handler events are not present");
-				}				
+				}
 			}
-		
-			
-			break;
-		
-			
 
-		case WM_LBUTTONDOWN:			
-			
+			break;
+
+		case WM_LBUTTONDOWN:
+
 			if (shared->clipmouseinwindow)
-			{				
-				//lock the mouse inside the current client region
+			{
+
 				POINT pt;
 
+				GetClientRect(hwnd, &r);
 
-				GetClientRect(hwnd, &r);			
-
-				//convert the client coordinates to screen coordinates
 				pt.x=r.left;
 				pt.y=r.top;
 				ClientToScreen(hwnd, &pt);
@@ -484,14 +414,13 @@ LRESULT CALLBACK windowhook(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				r.right=pt.x;
 				r.bottom=pt.y;
 
-
 				ClipCursor(&r);
 				waslockedin=1;
 			}
 			else
 			{
 				if (waslockedin)
-				{//release the lock
+				{
 					ClipCursor(NULL);
 					waslockedin=0;
 				}
@@ -499,14 +428,11 @@ LRESULT CALLBACK windowhook(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 			p=MAKEPOINTS(lParam);
 
-
-			//check if an sprite is pressed down
 			overlaydown=-1;
 
 			if (shared->UseCommandlistLock)
 				hasLock=WaitForSingleObject((HANDLE)shared->CommandlistLock, INFINITE)==WAIT_OBJECT_0;
 
-			//find the end of the list
 			i=0;
 			while (shared->RenderCommands[i].Command)
 				i++;
@@ -518,12 +444,11 @@ LRESULT CALLBACK windowhook(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				y=(int)shared->RenderCommands[i].y;
 
 				if ((x==-2) || (y==-2))
-					continue; //mouse objects are not clickable
+					continue;
 
-				if ((x==-1) || (y==-1)) //the client rect is required
+				if ((x==-1) || (y==-1))
 					GetClientRect(hwnd, &cr);
 
-				//find the width and height (and adjust x and y accordingly)
 				switch (shared->RenderCommands[i].Command)
 				{
 					case rcDrawSprite:
@@ -537,37 +462,32 @@ LRESULT CALLBACK windowhook(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 						if (y==-1)
 							y=((cr.bottom-cr.top) / 2)-(height / 2);
 
-						
 						break;
 					}
 
 					case rcDrawFont:
 					{
 						PTextureEntry tea=(PTextureEntry)((uintptr_t)shared+shared->texturelist);
-						if (hasTextureLock==FALSE)					
-							hasTextureLock=(WaitForSingleObject((HANDLE)(shared->TextureLock), INFINITE)==WAIT_OBJECT_0);						
+						if (hasTextureLock==FALSE)
+							hasTextureLock=(WaitForSingleObject((HANDLE)(shared->TextureLock), INFINITE)==WAIT_OBJECT_0);
 
 						WORD *cefontmap=(WORD *)(tea[shared->RenderCommands[i].font.fontid].AddressOfFontmap);
 
 						if (cefontmap)
 						{
 
-						
-								
-							height=cefontmap[0];				
+							height=cefontmap[0];
 
-							//if the clicked y position falls between y and y+height then count the full size of this string to determine the width, else skip it
-
-							if (y==-1)					
-								y=((cr.bottom-cr.top) / 2)-(height / 2);						
+							if (y==-1)
+								y=((cr.bottom-cr.top) / 2)-(height / 2);
 
 							if ((p.y>=y) && (p.y<y+height))
 							{
-								//clicked inside the range, find out the width
+
 								unsigned int j;
 								char *text=(char *)(shared->RenderCommands[i].font.addressoftext);
 								width=0;
-								for (j=0; j<strlen(text); j++)							
+								for (j=0; j<strlen(text); j++)
 								{
 									if ((text[j]>=32) && (text[j]<=127))
 										width+=cefontmap[(text[j]-32)+1];
@@ -575,18 +495,16 @@ LRESULT CALLBACK windowhook(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 								if (x==-1)
 									x=((cr.right-cr.left) / 2)-(width / 2);
-								
+
 							}
-							else						
-								continue; //not inside the range
+							else
+								continue;
 						}
-						
 
 						break;
 					}
 				}
 
-				//x,y width and height are now filled in, check if it was clicked
 				r.left=x;
 				r.right=x+width;
 				r.top=y;
@@ -596,10 +514,10 @@ LRESULT CALLBACK windowhook(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 				p2.x=p.x;
 				p2.y=p.y;
-			
+
 				if (PtInRect(&r, p2))
 				{
-					overlaydown=i; //this object was clicked
+					overlaydown=i;
 					oldoverlayrect=r;
 					break;
 				}
@@ -611,14 +529,9 @@ LRESULT CALLBACK windowhook(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			if (hasLock)
 				SetEvent((HANDLE)(HANDLE)shared->CommandlistLock);
 
-
-			
 			break;
-		
+
 		case WM_LBUTTONUP:
-			
-			//check if the same overlay is released
-			//known bug: It doesn't handle zorder rearangement while the mouse is down
 
 			p=MAKEPOINTS(lParam);
 			POINT p2;
@@ -628,39 +541,30 @@ LRESULT CALLBACK windowhook(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 			if (overlaydown != -1)
 			{
-				//check if it is still in the same rect
+
 				if (PtInRect(&oldoverlayrect, p2))
 				{
-					//still focused				
-					if (WaitForSingleObject(handledClickEvent, 5000)==WAIT_OBJECT_0) //wait for a previous click to get handled
+
+					if (WaitForSingleObject(handledClickEvent, 5000)==WAIT_OBJECT_0)
 					{
 						shared->clickedoverlay=overlaydown;
 
 						shared->clickedx=p.x-oldoverlayrect.left;
 						shared->clickedy=p.y-oldoverlayrect.top;
-						
+
 						SetEvent(hasClickEvent);
 					}
-					
 
 					break;
 				}
 			}
-			
+
 			break;
 
-		//case WM_MOUSEMOVE:
-			//break;
-		
 	}
 
-	
-
-	
-	return CallWindowProcW((WNDPROC)o, hwnd, uMsg, wParam, lParam); //call the original window message handler
+	return CallWindowProcW((WNDPROC)o, hwnd, uMsg, wParam, lParam);
 }
-
-
 
 void hookIfNeeded(void)
 {
@@ -670,21 +574,17 @@ void hookIfNeeded(void)
 		LONG_PTR o;
 		o=GetWindowLongPtrW(h, GWLP_WNDPROC);
 
-
 		originalwndprocs[h]=o;
 
-		//now change it to point to the hook handler
-		SetWindowLongPtrW(h, GWLP_WNDPROC, (LONG_PTR)windowhook);  
+		SetWindowLongPtrW(h, GWLP_WNDPROC, (LONG_PTR)windowhook);
 
 	}
 
-
 }
-
 
 void InitializeD3D9Api()
 {
-	char dllpath[MAX_PATH];				
+	char dllpath[MAX_PATH];
 	strcpy_s(dllpath, MAX_PATH, (char *)shared->CheatEngineDir);
 #ifdef _AMD64_
 	strcat_s(dllpath, MAX_PATH, "CED3D9Hook64.dll");
@@ -695,7 +595,6 @@ void InitializeD3D9Api()
 	OutputDebugStringA("InitializeD3D9Api()");
 	OutputDebugStringA("dllpath = :");
 	OutputDebugStringA(dllpath);
-
 
 	HMODULE hdll=LoadLibraryA((char *)dllpath);
 	if (hdll)
@@ -711,14 +610,14 @@ void InitializeD3D9Api()
 		D3D9Hook_DrawTriPatch=(D3D9HookDrawTriPatchAPICall)GetProcAddress(hdll, "D3D9Hook_DrawTriPatch_imp");
 
 		if (D3D9Hook_Reset && D3D9Hook_Present && D3D9Hook_DrawPrimitive && D3D9Hook_DrawIndexedPrimitive && D3D9Hook_DrawPrimitiveUP && D3D9Hook_DrawIndexedPrimitiveUP && D3D9Hook_DrawRectPatch && D3D9Hook_DrawTriPatch)
-			OutputDebugStringA("D3D9Hook: SUCCESSFULLY LOADED");		
+			OutputDebugStringA("D3D9Hook: SUCCESSFULLY LOADED");
 		else
 			OutputDebugStringA("D3D9Hook: Not all exports found");
 
 	}
 	else
 	{
-		int err=GetLastError();		
+		int err=GetLastError();
 		char msg[255];
 		sprintf_s(msg, 255, "LoadLibraryA for the D3D9 hook failed: %d", err);
 		OutputDebugStringA(msg);
@@ -729,7 +628,7 @@ HRESULT	__stdcall D3D9_DrawPrimitive_new(IDirect3DDevice9 *Device, D3DPRIMITIVET
 {
 	if (shared)
 	{
-			if (D3D9Hook_DrawPrimitive==NULL)		
+			if (D3D9Hook_DrawPrimitive==NULL)
 				InitializeD3D9Api();
 
 			if (D3D9Hook_DrawPrimitive)
@@ -742,7 +641,7 @@ HRESULT	__stdcall D3D9_DrawIndexedPrimitive_new(IDirect3DDevice9 *Device, D3DPRI
 {
 	if (shared)
 	{
-			if (D3D9Hook_DrawIndexedPrimitive==NULL)		
+			if (D3D9Hook_DrawIndexedPrimitive==NULL)
 				InitializeD3D9Api();
 
 			if (D3D9Hook_DrawIndexedPrimitive)
@@ -755,7 +654,7 @@ HRESULT	__stdcall D3D9_DrawPrimitiveUP_new(IDirect3DDevice9 *Device, D3DPRIMITIV
 {
 	if (shared)
 	{
-			if (D3D9Hook_DrawPrimitiveUP==NULL)		
+			if (D3D9Hook_DrawPrimitiveUP==NULL)
 				InitializeD3D9Api();
 
 			if (D3D9Hook_DrawPrimitiveUP)
@@ -768,7 +667,7 @@ HRESULT	__stdcall D3D9_DrawIndexedPrimitiveUP_new(IDirect3DDevice9 *Device, D3DP
 {
 	if (shared)
 	{
-			if (D3D9Hook_DrawIndexedPrimitiveUP==NULL)		
+			if (D3D9Hook_DrawIndexedPrimitiveUP==NULL)
 				InitializeD3D9Api();
 
 			if (D3D9Hook_DrawIndexedPrimitiveUP)
@@ -777,12 +676,11 @@ HRESULT	__stdcall D3D9_DrawIndexedPrimitiveUP_new(IDirect3DDevice9 *Device, D3DP
 	return D3D9_DrawIndexedPrimitiveUP_Original(Device, PrimitiveType, MinVertexIndex, NumVertices, PrimitiveCount, pIndexData, IndexDataFormat, pVertexStreamZeroData, VertexStreamZeroStride);
 }
 
-
 HRESULT	__stdcall D3D9_DrawRectPatch_new(IDirect3DDevice9 *device, UINT Handle,CONST float* pNumSegs,CONST D3DRECTPATCH_INFO* pRectPatchInfo)
 {
 	if (shared)
 	{
-			if (D3D9Hook_DrawRectPatch==NULL)		
+			if (D3D9Hook_DrawRectPatch==NULL)
 				InitializeD3D9Api();
 
 			if (D3D9Hook_DrawRectPatch)
@@ -795,7 +693,7 @@ HRESULT	__stdcall D3D9_DrawTriPatch_new(IDirect3DDevice9 *device, UINT Handle,CO
 {
 	if (shared)
 	{
-			if (D3D9Hook_DrawTriPatch==NULL)		
+			if (D3D9Hook_DrawTriPatch==NULL)
 				InitializeD3D9Api();
 
 			if (D3D9Hook_DrawTriPatch)
@@ -804,12 +702,11 @@ HRESULT	__stdcall D3D9_DrawTriPatch_new(IDirect3DDevice9 *device, UINT Handle,CO
 	return D3D9_DrawTriPatch_Original(device, Handle, pNumSegs, pTriPatchInfo);
 }
 
-
 HRESULT __stdcall D3D9_Reset_new(IDirect3DDevice9 *Device, D3DPRESENT_PARAMETERS *pPresentationParameters)
 {
 	if (shared)
 	{
-			if (D3D9Hook_Reset==NULL)		
+			if (D3D9Hook_Reset==NULL)
 				InitializeD3D9Api();
 
 			if (D3D9Hook_Reset)
@@ -834,11 +731,9 @@ HRESULT __stdcall D3D9_Present_new(IDirect3DDevice9 *Device, RECT* pSourceRect,C
 	return D3D9_Present_Original(Device, pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion);
 }
 
-
-
 void InitializeD3D10Api()
 {
-	char dllpath[MAX_PATH];				
+	char dllpath[MAX_PATH];
 	strcpy_s(dllpath, MAX_PATH, (char *)shared->CheatEngineDir);
 #ifdef _AMD64_
 	strcat_s(dllpath, MAX_PATH, "CED3D10Hook64.dll");
@@ -847,7 +742,6 @@ void InitializeD3D10Api()
 #endif
 
 	HMODULE hdll=LoadLibraryA((char *)dllpath);
-
 
 	D3D10Hook_DrawIndexed=(D3D10HookDrawIndexedAPICall)GetProcAddress(hdll, "D3D10Hook_DrawIndexed_imp");
 	D3D10Hook_Draw=(D3D10HookDrawAPICall)GetProcAddress(hdll, "D3D10Hook_Draw_imp");
@@ -861,7 +755,7 @@ HRESULT	__stdcall D3D10_DrawIndexed_new(ID3D10Device *device, UINT IndexCount, U
 {
 	if (shared)
 	{
-			if (D3D10Hook_DrawIndexed==NULL)		
+			if (D3D10Hook_DrawIndexed==NULL)
 				InitializeD3D10Api();
 
 			if (D3D10Hook_DrawIndexed)
@@ -874,11 +768,11 @@ HRESULT	__stdcall D3D10_Draw_new(ID3D10Device *device, UINT VertexCount, UINT St
 {
 	if (shared)
 	{
-			if (D3D10Hook_Draw==NULL)		
+			if (D3D10Hook_Draw==NULL)
 				InitializeD3D10Api();
 
 			if (D3D10Hook_Draw)
-				return D3D10Hook_Draw(D3D10_Draw_Original, device, VertexCount, StartVertexLocation);			
+				return D3D10Hook_Draw(D3D10_Draw_Original, device, VertexCount, StartVertexLocation);
 	}
 	return D3D10_Draw_Original(device, VertexCount, StartVertexLocation);
 }
@@ -887,20 +781,20 @@ HRESULT	__stdcall D3D10_DrawIndexedInstanced_new(ID3D10Device *device, UINT Inde
 {
 	if (shared)
 	{
-			if (D3D10Hook_DrawIndexedInstanced==NULL)		
+			if (D3D10Hook_DrawIndexedInstanced==NULL)
 				InitializeD3D10Api();
 
 			if (D3D10Hook_DrawIndexedInstanced)
-				return D3D10Hook_DrawIndexedInstanced(D3D10_DrawIndexedInstanced_Original, device, IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);			
+				return D3D10Hook_DrawIndexedInstanced(D3D10_DrawIndexedInstanced_Original, device, IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
 	}
-	return D3D10_DrawIndexedInstanced_Original(device, IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);			
+	return D3D10_DrawIndexedInstanced_Original(device, IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
 }
 
 HRESULT	__stdcall D3D10_DrawInstanced_new(ID3D10Device *device, UINT VertexCountPerInstance, UINT InstanceCount, UINT StartVertexLocation, UINT StartInstanceLocation)
 {
 	if (shared)
 	{
-			if (D3D10Hook_DrawInstanced==NULL)		
+			if (D3D10Hook_DrawInstanced==NULL)
 				InitializeD3D10Api();
 
 			if (D3D10Hook_DrawInstanced)
@@ -913,7 +807,7 @@ HRESULT	__stdcall D3D10_DrawAuto_new(ID3D10Device *device)
 {
 	if (shared)
 	{
-			if (D3D10Hook_DrawAuto==NULL)		
+			if (D3D10Hook_DrawAuto==NULL)
 				InitializeD3D10Api();
 
 			if (D3D10Hook_DrawAuto)
@@ -924,7 +818,7 @@ HRESULT	__stdcall D3D10_DrawAuto_new(ID3D10Device *device)
 
 void InitializeD3D11Api()
 {
-	char dllpath[MAX_PATH];				
+	char dllpath[MAX_PATH];
 	strcpy_s(dllpath, MAX_PATH, (char *)shared->CheatEngineDir);
 #ifdef _AMD64_
 	strcat_s(dllpath, MAX_PATH, "CED3D11Hook64.dll");
@@ -933,7 +827,6 @@ void InitializeD3D11Api()
 #endif
 
 	HMODULE hdll=LoadLibraryA((char *)dllpath);
-
 
 	D3D11Hook_DrawIndexed=(D3D11HookDrawIndexedAPICall)GetProcAddress(hdll, "D3D11Hook_DrawIndexed_imp");
 	D3D11Hook_Draw=(D3D11HookDrawAPICall)GetProcAddress(hdll, "D3D11Hook_Draw_imp");
@@ -947,7 +840,7 @@ HRESULT	__stdcall D3D11_DrawIndexed_new(ID3D11DeviceContext *dc, UINT IndexCount
 {
 	if (shared)
 	{
-			if (D3D11Hook_DrawIndexed==NULL)		
+			if (D3D11Hook_DrawIndexed==NULL)
 				InitializeD3D11Api();
 
 			if (D3D11Hook_DrawIndexed)
@@ -960,11 +853,11 @@ HRESULT	__stdcall D3D11_Draw_new(ID3D11DeviceContext *dc, UINT VertexCount, UINT
 {
 	if (shared)
 	{
-			if (D3D11Hook_Draw==NULL)		
+			if (D3D11Hook_Draw==NULL)
 				InitializeD3D11Api();
 
 			if (D3D11Hook_Draw)
-				return D3D11Hook_Draw(D3D11_Draw_Original, dc, VertexCount, StartVertexLocation);			
+				return D3D11Hook_Draw(D3D11_Draw_Original, dc, VertexCount, StartVertexLocation);
 	}
 	return D3D11_Draw_Original(dc, VertexCount, StartVertexLocation);
 }
@@ -973,20 +866,20 @@ HRESULT	__stdcall D3D11_DrawIndexedInstanced_new(ID3D11DeviceContext *dc, UINT I
 {
 	if (shared)
 	{
-			if (D3D11Hook_DrawIndexedInstanced==NULL)		
+			if (D3D11Hook_DrawIndexedInstanced==NULL)
 				InitializeD3D11Api();
 
 			if (D3D11Hook_DrawIndexedInstanced)
-				return D3D11Hook_DrawIndexedInstanced(D3D11_DrawIndexedInstanced_Original, dc, IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);			
+				return D3D11Hook_DrawIndexedInstanced(D3D11_DrawIndexedInstanced_Original, dc, IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
 	}
-	return D3D11_DrawIndexedInstanced_Original(dc, IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);			
+	return D3D11_DrawIndexedInstanced_Original(dc, IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
 }
 
 HRESULT	__stdcall D3D11_DrawInstanced_new(ID3D11DeviceContext *dc, UINT VertexCountPerInstance, UINT InstanceCount, UINT StartVertexLocation, UINT StartInstanceLocation)
 {
 	if (shared)
 	{
-			if (D3D11Hook_DrawInstanced==NULL)		
+			if (D3D11Hook_DrawInstanced==NULL)
 				InitializeD3D11Api();
 
 			if (D3D11Hook_DrawInstanced)
@@ -999,7 +892,7 @@ HRESULT	__stdcall D3D11_DrawAuto_new(ID3D11DeviceContext *dc)
 {
 	if (shared)
 	{
-			if (D3D11Hook_DrawAuto==NULL)		
+			if (D3D11Hook_DrawAuto==NULL)
 				InitializeD3D11Api();
 
 			if (D3D11Hook_DrawAuto)
@@ -1017,17 +910,14 @@ int GetDXVersionAndInitDLL(IDXGISwapChain *x, void *device)
 
 	DWORD fl;
 
-
 	int version=0;
 
-
-	//find what kind of device this is	
 	if (SUCCEEDED(x->GetDevice(__uuidof(ID3D11Device), (void**)&d11)))
 	{
-		//D3D11
-		fl=(DWORD)d11->GetFeatureLevel();	
+
+		fl=(DWORD)d11->GetFeatureLevel();
 		version=11;
-		
+
 		d11->Release();
 	}
 	else
@@ -1035,12 +925,12 @@ int GetDXVersionAndInitDLL(IDXGISwapChain *x, void *device)
 	{
 		fl=(DWORD)d101->GetFeatureLevel();
 		version=101;
-		d101->Release();		
+		d101->Release();
 	}
 	else
 	if (SUCCEEDED(x->GetDevice(__uuidof(ID3D10Device), (void**)&d10)))
-	{		
-		version=10;		
+	{
+		version=10;
 		fl=D3D_FEATURE_LEVEL_10_0;
 		d10->Release();
 	}
@@ -1060,18 +950,17 @@ int GetDXVersionAndInitDLL(IDXGISwapChain *x, void *device)
 		case D3D_FEATURE_LEVEL_11_0:
 		case D3D_FEATURE_LEVEL_11_1:
 			x->GetDevice(__uuidof(ID3D11Device), (void **)device);
-			version=11;			
-			break;		
+			version=11;
+			break;
 	}
-
 
 	switch (version)
 	{
 		case 11:
-			//make sure the D3DHook11.dll is loaded and pass on this device ,swapchain and shared buffer
+
 			if ((D3D11Hook_SwapChain_Present==NULL) || (D3D11Hook_SwapChain_ResizeBuffers==NULL))
 			{
-				//load the dll and use getprocaddress
+
 				char dllpath[MAX_PATH];
 				strcpy_s(dllpath, MAX_PATH, (char *)shared->CheatEngineDir);
 				strcat_s(dllpath, MAX_PATH, "CED3D11Hook.dll");
@@ -1079,12 +968,12 @@ int GetDXVersionAndInitDLL(IDXGISwapChain *x, void *device)
 				HMODULE hdll=LoadLibraryA(dllpath);
 				D3D11Hook_SwapChain_Present=(D3D10PlusHookPresentAPICall)GetProcAddress(hdll, "D3D11Hook_SwapChain_Present_imp");
 				D3D11Hook_SwapChain_ResizeBuffers=(D3D10PlusHookPresentAPICall)GetProcAddress(hdll, "D3D11Hook_SwapChain_ResizeBuffers_imp");
-			}		
+			}
 
 			break;
 
 		case 101:
-			//make sure the D3DHook10.1.dll is loaded and pass on this device ,swapchain and shared buffer
+
 			if ((D3D10_1Hook_SwapChain_Present==NULL) || (D3D10_1Hook_SwapChain_ResizeBuffers==NULL))
 			{
 				char dllpath[MAX_PATH];
@@ -1109,16 +998,13 @@ int GetDXVersionAndInitDLL(IDXGISwapChain *x, void *device)
 				D3D10Hook_SwapChain_Present=(D3D10PlusHookPresentAPICall)GetProcAddress(hdll, "D3D10Hook_SwapChain_Present_imp");
 				D3D10Hook_SwapChain_ResizeBuffers=(D3D10PlusHookPresentAPICall)GetProcAddress(hdll, "D3D10Hook_SwapChain_ResizeBuffers_imp");
 
-			
 			}
 			break;
 
-		
 	}
 
 	return version;
 }
-
 
 HRESULT __stdcall IDXGISwapChain_ResizeBuffers_new(IDXGISwapChain *x, UINT BufferCount, UINT Width, UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags)
 {
@@ -1129,7 +1015,7 @@ HRESULT __stdcall IDXGISwapChain_ResizeBuffers_new(IDXGISwapChain *x, UINT Buffe
 		int version=GetDXVersionAndInitDLL(x, &dev);
 
 		switch (version)
-		{			
+		{
 			case 10:
 				if (D3D10Hook_SwapChain_ResizeBuffers)
 					D3D10Hook_SwapChain_ResizeBuffers(x, dev, shared);
@@ -1150,15 +1036,13 @@ HRESULT __stdcall IDXGISwapChain_ResizeBuffers_new(IDXGISwapChain *x, UINT Buffe
 			dev->Release();
 	}
 
-
-
 	return DXGI_ResizeBuffers_Original(x, BufferCount, Width, Height, NewFormat, SwapChainFlags);
 }
 
 HRESULT __stdcall IDXGISwapChain_Present_new(IDXGISwapChain *x, UINT SyncInterval, UINT Flags)
 {
 
-	if (shared)	
+	if (shared)
 	{
 		IUnknown *dev;
 
@@ -1187,20 +1071,14 @@ HRESULT __stdcall IDXGISwapChain_Present_new(IDXGISwapChain *x, UINT SyncInterva
 		if ((shared->hookwnd) && (shared->lastHwnd))
 			hookIfNeeded();
 
-
 	}
-	
 
-	//call original present
 	return DXGI_Present_Original(x, SyncInterval, Flags);
 }
 
-
-
 DWORD WINAPI InitializeD3DHookDll(PVOID params)
 {
-	//called when the dll is injected
-	//open the map
+
 	uintptr_t present=0,d3d9present=0, d3d9reset=0;
 	HANDLE fmhandle;
 
@@ -1209,70 +1087,51 @@ DWORD WINAPI InitializeD3DHookDll(PVOID params)
 	char hasclickeventname[50];
 	char handledclickeventname[50];
 
-	char haskeyboardeventname[50]; 
+	char haskeyboardeventname[50];
 	char handledkeyboardeventname[50];
 
-	
-
-//#ifdef DEBUG	
-//	sprintf_s(sharename, 100,"CED3D_DEBUG2");	
-	//sprintf_s(eventname, 100,"CED3D_DEBUG2_READY");	
-//#else
 	sprintf_s(sharename, 50,"CED3D_%d", GetCurrentProcessId());
-	sprintf_s(eventname, 50,"%s_READY", sharename);	
+	sprintf_s(eventname, 50,"%s_READY", sharename);
 
 	sprintf_s(hasclickeventname, 50,"%s_HASCLICK", sharename);
 	sprintf_s(handledclickeventname, 50,"%s_HANDLEDCLICK", sharename);
 
 	sprintf_s(haskeyboardeventname, 50,"%s_HASKEYBOARD", sharename);
 	sprintf_s(handledkeyboardeventname, 50,"%s_HANDLEDKEYBOARD", sharename);
-//#endif
- 
-	fmhandle=OpenFileMappingA(FILE_MAP_EXECUTE | FILE_MAP_READ | FILE_MAP_WRITE, FALSE, sharename);
-  
-    shared=(PD3DHookShared)MapViewOfFile(fmhandle,FILE_MAP_EXECUTE | FILE_MAP_READ | FILE_MAP_WRITE, 0,0,0 );   
 
+	fmhandle=OpenFileMappingA(FILE_MAP_EXECUTE | FILE_MAP_READ | FILE_MAP_WRITE, FALSE, sharename);
+
+    shared=(PD3DHookShared)MapViewOfFile(fmhandle,FILE_MAP_EXECUTE | FILE_MAP_READ | FILE_MAP_WRITE, 0,0,0 );
 
 	if (shared)
 	{
 
-		
-		//tell ce the address to hook
 		GetAddresses();
 
-		
-	
-
-		//tell ce the address where the hook should point to
 		shared->dxgi_newpresent=(uintptr_t)IDXGISwapChain_Present_new;
 		shared->dxgi_newresizebuffers=(uintptr_t)IDXGISwapChain_ResizeBuffers_new;
 		shared->d3d9_newpresent=(uintptr_t)D3D9_Present_new;
 		shared->d3d9_newreset=(uintptr_t)D3D9_Reset_new;
 
-		
 		shared->d3d9_newdrawprimitive=(uintptr_t)D3D9_DrawPrimitive_new;
 		shared->d3d9_newdrawindexedprimitive=(uintptr_t)D3D9_DrawIndexedPrimitive_new;
 		shared->d3d9_newdrawprimitiveup=(uintptr_t)D3D9_DrawPrimitiveUP_new;
 		shared->d3d9_newdrawindexedprimitiveup=(uintptr_t)D3D9_DrawIndexedPrimitiveUP_new;
 		shared->d3d9_newdrawrectpatch=(uintptr_t)D3D9_DrawRectPatch_new;
-		shared->d3d9_newdrawtripatch=(uintptr_t)D3D9_DrawTriPatch_new;	
+		shared->d3d9_newdrawtripatch=(uintptr_t)D3D9_DrawTriPatch_new;
 
-		
 		shared->d3d10_newdrawindexed=(uintptr_t)D3D10_DrawIndexed_new;
 		shared->d3d10_newdraw=(uintptr_t)D3D10_Draw_new;
 		shared->d3d10_newdrawindexedinstanced=(uintptr_t)D3D10_DrawIndexedInstanced_new;
 		shared->d3d10_newdrawinstanced=(uintptr_t)D3D10_DrawInstanced_new;
 		shared->d3d10_newdrawauto=(uintptr_t)D3D10_DrawAuto_new;
-		
+
 		shared->d3d11_newdrawindexed=(uintptr_t)D3D11_DrawIndexed_new;
 		shared->d3d11_newdraw=(uintptr_t)D3D11_Draw_new;
 		shared->d3d11_newdrawindexedinstanced=(uintptr_t)D3D11_DrawIndexedInstanced_new;
 		shared->d3d11_newdrawinstanced=(uintptr_t)D3D11_DrawInstanced_new;
 		shared->d3d11_newdrawauto=(uintptr_t)D3D11_DrawAuto_new;
-		
 
-
-		//tell ce where it should write a pointer to the unhooked version of the hooked functions
 		shared->dxgi_originalpresent=(uintptr_t)&DXGI_Present_Original;
 		shared->dxgi_originalresizebuffers=(uintptr_t)&DXGI_ResizeBuffers_Original;
 		shared->d3d9_originalpresent=(uintptr_t)&D3D9_Present_Original;
@@ -1297,7 +1156,6 @@ DWORD WINAPI InitializeD3DHookDll(PVOID params)
 		shared->d3d11_originaldrawinstanced=(uintptr_t)&D3D11_DrawInstanced_Original;
 		shared->d3d11_originaldrawauto=(uintptr_t)&D3D11_DrawAuto_Original;
 
-
 	}
 
 	HANDLE eventhandle=OpenEventA(EVENT_MODIFY_STATE, FALSE, eventname);
@@ -1316,15 +1174,9 @@ DWORD WINAPI InitializeD3DHookDll(PVOID params)
 		handledKeyboardEvent=OpenEventA(EVENT_MODIFY_STATE| SYNCHRONIZE, FALSE, handledkeyboardeventname);
 	}
 
-
-
-
-
 #ifdef DEBUG
 	D3D9_Present_Original=(D3D9_PRESENT_ORIGINAL)d3d9present;
-	DXGI_Present_Original=(DXGI_PRESENT_ORIGINAL)present;	
+	DXGI_Present_Original=(DXGI_PRESENT_ORIGINAL)present;
 #endif
 	return 0;
 }
-
-

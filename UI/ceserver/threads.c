@@ -1,10 +1,3 @@
-/*
- * threads.c
- *
- *  Created on: Jul 13, 2013
- *      Author: eric
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include "threads.h"
@@ -12,9 +5,9 @@
 
 void InitializeProcessThreadlist(PProcessData p)
 {
-  if (p->threadlist==NULL) //new list
+  if (p->threadlist==NULL)
   {
-    p->threadlist=malloc(sizeof(ThreadData)*64); //preallocate room for 64
+    p->threadlist=malloc(sizeof(ThreadData)*64);
     p->threadlistmax=64;
   }
 
@@ -28,7 +21,7 @@ void AddThreadToProcess(PProcessData p, PThreadData threaddata)
 
   if (p->threadlistpos==p->threadlistmax)
   {
-    //realloc
+
     p->threadlist=realloc(p->threadlist, sizeof(ThreadData)*p->threadlistmax*2);
     if (p->threadlist==NULL)
     {
@@ -50,7 +43,7 @@ int RemoveThreadFromProcess(PProcessData p, int tid)
   for (i=0; i<p->threadlistpos; i++)
     if (p->threadlist[i].tid==tid)
     {
-      //found it
+
       int j;
       for (j=i; j<p->threadlistpos-1; j++)
         p->threadlist[j]=p->threadlist[j+1];

@@ -1,10 +1,3 @@
-/*
- * test.h
- *
- *  Created on: May 22, 2011
- *      Author: erich
- */
-
 #ifndef TEST_H_
 #define TEST_H_
 
@@ -17,7 +10,6 @@ extern void testBranch(void);
 extern void *DebugStore;
 
 extern int handlePerformanceCounterInterrupt(void);
-
 
 typedef struct
 {
@@ -67,9 +59,6 @@ typedef struct
   QWORD Extra;
 } __attribute__((__packed__)) BTS64,*PBTS64;
 
-
-//DBVM vmcall stuff
-
 int getDBVMVersion(void);
 void dbvm_watch_writes_test(void);
 void dbvm_watch_reads_test(void);
@@ -77,7 +66,4 @@ void dbvm_watch_execute_test(void);
 void dbvm_cloak_test(void);
 void dbvm_changeregonbp_test(void);
 
-
-
-
-#endif /* TEST_H_ */
+#endif

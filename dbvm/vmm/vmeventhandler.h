@@ -4,36 +4,34 @@
 #include "main.h"
 #include "vmmhelper.h"
 
-//single step reasons
-#define SSR_HANDLEWATCH 1 //restore the protection after step
+#define SSR_HANDLEWATCH 1
 #define SSR_HANDLECLOAK 2
 #define SSR_HANDLESOFTWAREBREAKPOINT 3
-#define SSR_STEPANDBREAK 4 //do a single step and then change RIP to the loop routine
-#define SSR_STEPTILLINTERUPTABLE 5 //nyi
+#define SSR_STEPANDBREAK 4
+#define SSR_STEPTILLINTERUPTABLE 5
 
 typedef struct
-/* this struct is to keep track of what the guest sets in the comport */
+
 {
-  unsigned char Transmitter_Holding_Buffer; //baseport+0 write
-  unsigned char Receiver_Buffer; //baseport+0 read
-  unsigned char Devisor_Latch_Low; //baseport+0 read/write DLAB=1
+  unsigned char Transmitter_Holding_Buffer;
+  unsigned char Receiver_Buffer;
+  unsigned char Devisor_Latch_Low;
 
-  unsigned char Interrupt_Enable_Register; //baseport+1 read/write
-  unsigned char Devisor_Latch_High; //baseport+1 read/write DLAB=1
+  unsigned char Interrupt_Enable_Register;
+  unsigned char Devisor_Latch_High;
 
-  unsigned char Interrupt_Identification_Register; //baseport+2 read
-  unsigned char FIFO_Control_Register; //baseport+2 write
+  unsigned char Interrupt_Identification_Register;
+  unsigned char FIFO_Control_Register;
 
-  unsigned char Line_Control_Register; //baseport+3 read/write
-  unsigned char Modem_Control_Register; //baseport+4 read/write
+  unsigned char Line_Control_Register;
+  unsigned char Modem_Control_Register;
 
-  unsigned char Line_Status_Register; //baseport+5 read
-  unsigned char Modem_Status_Register; //baseport+6 read
+  unsigned char Line_Status_Register;
+  unsigned char Modem_Status_Register;
 
-  unsigned char Scratch_Register; //baseport+7 read/write
+  unsigned char Scratch_Register;
 } FakeCOMport, *PFakeCOMport;
 FakeCOMport fakecom1;
-
 
 int DidHLT;
 
@@ -42,17 +40,16 @@ typedef struct
   union {
     ULONG Exit_Qualification;
     struct {
-      ULONG size      : 3;  //0=1byte 1=2 byte, 3=4 byte.  (size+1 is bytesize)
-      ULONG direction : 1;  //0=OUT 1=IN
-      ULONG isstring  : 1;  //0=no string, 1=string
-      ULONG hasrep    : 1;  //0=not rep, 1=rep
-      ULONG opperand  : 1;  //0=DX, 1=immeadiate
+      ULONG size      : 3;
+      ULONG direction : 1;
+      ULONG isstring  : 1;
+      ULONG hasrep    : 1;
+      ULONG opperand  : 1;
       ULONG reserved  : 9;
-      ULONG portnr    : 16; //port number
+      ULONG portnr    : 16;
     };
   };
 } __attribute__((__packed__)) IOExit_Qualification;
-
 
 int handleVMEvent(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE64 *fxsave);
 
@@ -87,7 +84,7 @@ extern volatile QWORD globalTSC;
 extern volatile QWORD lowestTSC;
 
 extern criticalSection CR3ValueLogCS;
-extern QWORD *CR3ValueLog; //if not NULL, record
+extern QWORD *CR3ValueLog;
 extern int CR3ValuePos;
 
 extern int adjustTimestampCounters;
@@ -95,11 +92,8 @@ extern int adjustTimestampCounterTimeout;
 
 extern int useSpeedhack;
 
-
-
 void speedhack_setspeed(double speed);
 
 void incrementRIP(int count);
-
 
 #endif

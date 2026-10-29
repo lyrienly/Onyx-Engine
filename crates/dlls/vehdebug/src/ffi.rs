@@ -1,5 +1,3 @@
-//! Tipos Win32 minimos usados pelo subsistema VEH.
-
 #![allow(non_snake_case, non_camel_case_types, dead_code)]
 
 use std::ffi::c_void;
@@ -22,11 +20,9 @@ pub const EXCEPTION_BREAKPOINT: DWORD = 0x8000_0003;
 pub const EXCEPTION_ACCESS_VIOLATION: DWORD = 0xC000_0005;
 pub const STATUS_GUARD_PAGE_VIOLATION: DWORD = 0x8000_0001;
 
-// Flags em EFLAGS
-pub const EFLAGS_TF: u32 = 0x0000_0100; // Trap Flag -> single-step
-pub const EFLAGS_RF: u32 = 0x0001_0000; // Resume Flag -> suprime bp refire
+pub const EFLAGS_TF: u32 = 0x0000_0100;
+pub const EFLAGS_RF: u32 = 0x0001_0000;
 
-// ContextFlags (x64) - vide winnt.h
 pub const CONTEXT_AMD64: u32 = 0x0010_0000;
 pub const CONTEXT_CONTROL: u32 = CONTEXT_AMD64 | 0x1;
 pub const CONTEXT_INTEGER: u32 = CONTEXT_AMD64 | 0x2;
@@ -40,10 +36,8 @@ pub const CONTEXT_ALL: u32 = CONTEXT_CONTROL
     | CONTEXT_FLOATING_POINT
     | CONTEXT_DEBUG_REGISTERS;
 
-// VirtualProtect
 pub const PAGE_EXECUTE_READWRITE: DWORD = 0x40;
 
-// Thread suspension
 pub const THREAD_ALL_ACCESS: DWORD = 0x001F_FFFF;
 
 #[repr(C)]
@@ -56,7 +50,6 @@ pub struct EXCEPTION_RECORD {
     pub ExceptionInformation: [usize; 15],
 }
 
-/// Layout fiel do CONTEXT amd64 do Windows. XMM registers inclusos via FLOATING_POINT.
 #[repr(C, align(16))]
 #[derive(Copy, Clone)]
 pub struct M128A {
@@ -88,7 +81,7 @@ pub struct XMM_SAVE_AREA32 {
 #[repr(C, align(16))]
 #[derive(Copy, Clone)]
 pub struct CONTEXT {
-    // Home params
+
     pub P1Home: u64,
     pub P2Home: u64,
     pub P3Home: u64,
@@ -132,7 +125,6 @@ pub struct CONTEXT {
     pub R15: u64,
     pub Rip: u64,
 
-    // DUMMYUNIONNAME: FltSave + Legacy + XMMs
     pub FltSave: XMM_SAVE_AREA32,
 
     pub VectorRegister: [M128A; 26],

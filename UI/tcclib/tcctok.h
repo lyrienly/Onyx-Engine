@@ -1,5 +1,4 @@
-/* keywords */
-     DEF(TOK_INT, "int")
+DEF(TOK_INT, "int")
      DEF(TOK_VOID, "void")
      DEF(TOK_CHAR, "char")
      DEF(TOK_IF, "if")
@@ -18,24 +17,24 @@
      DEF(TOK_CASE, "case")
 
      DEF(TOK_CONST1, "const")
-     DEF(TOK_CONST2, "__const") /* gcc keyword */
-     DEF(TOK_CONST3, "__const__") /* gcc keyword */
+     DEF(TOK_CONST2, "__const")
+     DEF(TOK_CONST3, "__const__")
      DEF(TOK_VOLATILE1, "volatile")
-     DEF(TOK_VOLATILE2, "__volatile") /* gcc keyword */
-     DEF(TOK_VOLATILE3, "__volatile__") /* gcc keyword */
+     DEF(TOK_VOLATILE2, "__volatile")
+     DEF(TOK_VOLATILE3, "__volatile__")
      DEF(TOK_LONG, "long")
      DEF(TOK_REGISTER, "register")
      DEF(TOK_SIGNED1, "signed")
-     DEF(TOK_SIGNED2, "__signed") /* gcc keyword */
-     DEF(TOK_SIGNED3, "__signed__") /* gcc keyword */
+     DEF(TOK_SIGNED2, "__signed")
+     DEF(TOK_SIGNED3, "__signed__")
      DEF(TOK_AUTO, "auto")
      DEF(TOK_INLINE1, "inline")
-     DEF(TOK_INLINE2, "__inline") /* gcc keyword */
-     DEF(TOK_INLINE3, "__inline__") /* gcc keyword */
+     DEF(TOK_INLINE2, "__inline")
+     DEF(TOK_INLINE3, "__inline__")
      DEF(TOK_RESTRICT1, "restrict")
      DEF(TOK_RESTRICT2, "__restrict")
      DEF(TOK_RESTRICT3, "__restrict__")
-     DEF(TOK_EXTENSION, "__extension__") /* gcc keyword */
+     DEF(TOK_EXTENSION, "__extension__")
 
      DEF(TOK_GENERIC, "_Generic")
      DEF(TOK_STATIC_ASSERT, "_Static_assert")
@@ -68,9 +67,6 @@
      DEF(TOK_UINT128, "__uint128_t")
 #endif
 
-/*********************************************************************/
-/* the following are not keywords. They are included to ease parsing */
-/* preprocessor only */
      DEF(TOK_DEFINE, "define")
      DEF(TOK_INCLUDE, "include")
      DEF(TOK_INCLUDE_NEXT, "include_next")
@@ -93,18 +89,14 @@
      DEF(TOK___COUNTER__, "__COUNTER__")
      DEF(TOK___HAS_INCLUDE, "__has_include")
 
-/* special identifiers */
      DEF(TOK___FUNC__, "__func__")
 
-/* special floating point values */
      DEF(TOK___NAN__, "__nan__")
      DEF(TOK___SNAN__, "__snan__")
      DEF(TOK___INF__, "__inf__")
      DEF(TOK___mzerosf, "__mzerosf")
      DEF(TOK___mzerodf, "__mzerodf")
 
-/* attribute identifiers */
-/* XXX: handle all tokens generically since speed is not critical */
      DEF(TOK_SECTION1, "section")
      DEF(TOK_SECTION2, "__section__")
      DEF(TOK_ALIGNED1, "aligned")
@@ -159,7 +151,7 @@
      DEF(TOK_builtin_frame_address, "__builtin_frame_address")
      DEF(TOK_builtin_return_address, "__builtin_return_address")
      DEF(TOK_builtin_expect, "__builtin_expect")
-     /*DEF(TOK_builtin_va_list, "__builtin_va_list")*/
+
 #if defined TCC_TARGET_PE && defined TCC_TARGET_X86_64
      DEF(TOK_builtin_va_start, "__builtin_va_start")
 #elif defined TCC_TARGET_X86_64
@@ -171,11 +163,10 @@
      DEF(TOK_builtin_va_start, "__builtin_va_start")
 #endif
 
-/* pragma */
      DEF(TOK_pack, "pack")
 #if !defined(TCC_TARGET_I386) && !defined(TCC_TARGET_X86_64) && \
     !defined(TCC_TARGET_ARM) && !defined(TCC_TARGET_ARM64)
-     /* already defined for assembler */
+
      DEF(TOK_ASM_push, "push")
      DEF(TOK_ASM_pop, "pop")
 #endif
@@ -186,7 +177,6 @@
      DEF(TOK_once, "once")
      DEF(TOK_option, "option")
 
-/* builtin functions or variables */
 #ifndef TCC_ARM_EABI
      DEF(TOK_memcpy, "memcpy")
      DEF(TOK_memmove, "memmove")
@@ -299,7 +289,6 @@
      DEF(TOK___getf2, "__getf2")
 #endif
 
-/* bound checking symbols */
 #ifdef CONFIG_TCC_BCHECK
      DEF(TOK___bound_ptr_add, "__bound_ptr_add")
      DEF(TOK___bound_ptr_indir1, "__bound_ptr_indir1")
@@ -328,8 +317,7 @@
      DEF(TOK_longjmp, "longjmp")
 #endif
 
-/* Tiny Assembler */
- DEF_ASMDIR(byte)              /* must be first directive */
+ DEF_ASMDIR(byte)
  DEF_ASMDIR(word)
  DEF_ASMDIR(align)
  DEF_ASMDIR(balign)
@@ -368,7 +356,7 @@
  DEF_ASMDIR(short)
  DEF_ASMDIR(long)
  DEF_ASMDIR(int)
- DEF_ASMDIR(section)            /* must be last directive */
+ DEF_ASMDIR(section)
 
 #if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64
 #include "i386-tok.h"

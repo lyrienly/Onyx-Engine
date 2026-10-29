@@ -1,49 +1,3 @@
-/*
- * extentionloader.c  (todo: rename to ptracecodeexecutor.c)
- *
- *  Created on: Aug 19, 2013
- *      Author: eric
- *
- *  Used for loading an module that will extend the ceserver
- *  client<-->ceserver<-->extention
- *
- *  It doesn't HAVE to be used if the forced module load method works (Do not assume so)
- *
- *  How it works:
- *  Ptrace the target  (this means it must be loaded BEFORE the debugger is attached)
- *  Cause a stop and make sure it's runnable (Not sure if it executes if it's suspended for some reason. e.g: wait for event/critical section that may never happen)
- *  Change the current instruction pointer to the beginning of dlopen and the register/stack state setup to execute
- *  Set the return addres to an invalid return address (e.g 0x0ce0)
- *  Execute it and wait till a sigtrap/sigseg happens on that specific invalid address
- *  Then restore the state back
- *
- *  On arm32: Bit J and T in CPSR define the current execution state
- *  J T
- *  0 0 = ARM
- *  0 1 = Thumb
- *  1 0 = Jazelle (java...)
- *  1 1 = ThumbEE*
- *
- *  If ARM so set to 0 0 and restore that as well
- *  Note that The least significant bit in an address specifier also determines if it's THUMB or ARM (edit: nope.  But lets go with this in CE)
- *  It doesn't seem to matter if you set the least significant bit in the PC register. It will ignore that bit on execute. (probably a good idea to clear that bit anyhow)
- *
- *
- *  Problem: It doesn't return properly when the registers are changed when it's waiting in a syscall, so only change it when outside of a syscall
- *  Better solution: It seems it failed because the stop was at a syscall, so the program counter was decremented tithe the size of the syscall
- *  To prevent this RESTART change EAX to 0 so it won't do the restart.  Also works on ARM
- *
- *  Problem2: In android dlopen is in /system/bin/linker but not using a symbol (so ce's symbollist can't be used to find the address)
- *
- *  dlopen("libdl.so", RTLD_NOW) actually works in android and dlsym as well. (point to the linker version)
- *  This is useful since this makes it cross compatible with normal linux.
- *  for some reason getting the address of dlopen in x86 returns a local stub and I don't know yet how to prevent those stubs
- *
- *  so, to find dlopen find address range dlopen is in in this process (/proc/selfpid/maps), get the base address of that specific module
- *  and then add that offset to the same named module in the target process
- *
- */
-
 #include <stdlib.h>
 
 #include <stdio.h>
@@ -82,9 +36,8 @@
 #include "api.h"
 #include "ceserver.h"
 
-#ifndef SUN_LEN //missing in android (copy from linux sys/un.h)
+#ifndef SUN_LEN
 
-/* Evaluate to actual length of the `sockaddr_un' structure.  */
 # define SUN_LEN(ptr) ((size_t) (((struct sockaddr_un *) 0)->sun_path)        \
           + strlen ((ptr)->sun_path))
 #endif
@@ -155,7 +108,7 @@ int WaitForPid(int *status)
     if ((pid==-1) && (errno!=EINTR))
     {
       debug_log("WaitForPid wait fail. :%d (%s)\n", errno, strerror(errno) );
-      return -1; //something bad happened
+      return -1;
     }
   }
   return pid;
@@ -209,7 +162,7 @@ int showRegisters(int pid)
     return 0;
 }
 
-uintptr_t finddlopen(int pid, uintptr_t *_dlerror)  //todo: use the elf parsing routines (they work better now)
+uintptr_t finddlopen(int pid, uintptr_t *_dlerror)
 {
     void *libdl;
     void *realdlopen;
@@ -230,9 +183,6 @@ uintptr_t finddlopen(int pid, uintptr_t *_dlerror)  //todo: use the elf parsing 
       debug_log("Please tell db what you did to get this to function (excluding manually editing this if statement)\n");
 #endif
 
-
-    //open /proc/self/maps and look up the region that holds realdlopen
-
     FILE *maps=fopen("/proc/self/maps", "r");
 
     char x[200];
@@ -242,7 +192,6 @@ uintptr_t finddlopen(int pid, uintptr_t *_dlerror)  //todo: use the elf parsing 
     unsigned long long currentmodulestart;
 
     currentmodule[0]=0;
-
 
     while (fgets(x, 200, maps))
     {
@@ -268,7 +217,6 @@ uintptr_t finddlopen(int pid, uintptr_t *_dlerror)  //todo: use the elf parsing 
         char mapsfilename[255];
         debug_log("found it. Module: %s Offset=%x\n", currentmodule, offset);
 
-        //find this module in the target process and apply this offset to get the address of dlopen
         sprintf(mapsfilename, "/proc/%d/maps", pid);
         FILE *maps2=fopen(mapsfilename, "r");
         if (maps2)
@@ -278,7 +226,6 @@ uintptr_t finddlopen(int pid, uintptr_t *_dlerror)  //todo: use the elf parsing 
           {
              if (y[strlen(y)-1]!='\n')
              {
-               //need to go to the end of line first
 
                char discard[100];
 
@@ -288,7 +235,6 @@ uintptr_t finddlopen(int pid, uintptr_t *_dlerror)  //todo: use the elf parsing 
                  fgets(discard, 99, maps);
                } while (discard[99]!=0);
              }
-
 
              debug_log("%s", y);
 
@@ -313,7 +259,6 @@ uintptr_t finddlopen(int pid, uintptr_t *_dlerror)  //todo: use the elf parsing 
            debug_log("Failure to open %s\n", mapsfilename);
         }
 
-
         fclose(maps);
         return 0;
       }
@@ -336,7 +281,6 @@ void writeString(int pid, uintptr_t address, char *string)
   i=0;
 
   debug_log("l=%d\n", l);
-
 
   while (i<l)
   {
@@ -370,7 +314,7 @@ int openExtension(int pid, int *openedSocket)
       free(pd->pipename);
 
     free(pd);
-    RemoveHandle(h); //not needed anymore, but do keep the socket open
+    RemoveHandle(h);
 
     return 1;
   }
@@ -396,12 +340,9 @@ int loadExtension(PProcessData p, char *path)
     uintptr_t dlerror;
     uintptr_t str;
     int status;
-    int pathlen=strlen(path)+1; //0-terminater
+    int pathlen=strlen(path)+1;
 
     debug_log("loadExtension()\n");
-
-
-
 
     debug_log("Phase 0: Check if it's already open\n");
     if (isExtensionLoaded(p->pid))
@@ -420,11 +361,7 @@ int loadExtension(PProcessData p, char *path)
     else
       debug_log("Execute check passed\n");
 
-
-
-
-
-    if (p->dlopen==0) //fallback to the old method
+    if (p->dlopen==0)
     {
       debug_log("Phase 1: Find dlopen in target (old wonky method)\n");
       p->dlopen=finddlopen(p->pid, &dlerror);
@@ -437,8 +374,6 @@ int loadExtension(PProcessData p, char *path)
     }
 
     debug_log("dlopen=%p\n", (void *)p->dlopen);
-    //debug_log("dlerror=%p\n", (void *)dlerror);
-
 
     pid=pauseProcess(p);
     if (pid==-1)
@@ -446,7 +381,6 @@ int loadExtension(PProcessData p, char *path)
 
     debug_log("After pauseProcess: PID=%d\n", pid);
 
-    //save the current state and set the state to what I need it to be
   process_state origregs;
   process_state newregs;
 
@@ -454,8 +388,6 @@ int loadExtension(PProcessData p, char *path)
   process_state32 origregs32;
   process_state32 newregs32;
 #endif
-
-
 
 #ifdef __aarch64__
   struct iovec iov;
@@ -486,13 +418,10 @@ int loadExtension(PProcessData p, char *path)
 
       uintptr_t returnaddress=0x0ce0;
 
-
 #ifdef __arm__
-      //allocate space in the stack
 
       newregs.ARM_sp-=8+4*((pathlen+3)/ 4);
 
-      //not sur eif [sp] is written to with a push or if it's [sp-4] and then sp decreased, so start at sp+4 instead
       str=newregs.ARM_sp+4;
       writeString(pid, str, path);
 
@@ -500,25 +429,22 @@ int loadExtension(PProcessData p, char *path)
       newregs.ARM_pc=p->dlopen;
       newregs.ARM_r0=str;
       newregs.ARM_r1=RTLD_NOW;
-      newregs.ARM_r2=p->dlopencaller; //needed by android: loader_dlopen
-
+      newregs.ARM_r2=p->dlopencaller;
 
       if (newregs.ARM_pc & 1)
       {
-         //THUMB Address link
+
          debug_log("THUMB destination\n");
          newregs.ARM_cpsr=newregs.ARM_cpsr | (1 << 5);
 
-         //not sure how to set the J bit (thumbee uses it...)
-         //for now disable it until a bug happens
-         newregs.ARM_cpsr=newregs.ARM_cpsr & (~(1<<25)); //unset J
+         newregs.ARM_cpsr=newregs.ARM_cpsr & (~(1<<25));
       }
       else
       {
         debug_log("ARM destination\n");
         debug_log("newregs.ARM_cpsr was %x\n", newregs.ARM_cpsr);
-        newregs.ARM_cpsr=newregs.ARM_cpsr & (~(1<<5)); //unset T
-        newregs.ARM_cpsr=newregs.ARM_cpsr & (~(1<<25)); //unset J
+        newregs.ARM_cpsr=newregs.ARM_cpsr & (~(1<<5));
+        newregs.ARM_cpsr=newregs.ARM_cpsr & (~(1<<25));
         debug_log("newregs.ARM_cpsr is %x\n", newregs.ARM_cpsr);
       }
 #endif
@@ -532,7 +458,6 @@ int loadExtension(PProcessData p, char *path)
 
         newregs32.ARM_sp-=8+4*((pathlen+3)/ 4);
 
-        //not sure if [sp] is written to with a push or if it's [sp-4] and then sp decreased, so start at sp+4 instead
         str=newregs32.ARM_sp+4;
         writeString(pid, str, path);
 
@@ -540,35 +465,29 @@ int loadExtension(PProcessData p, char *path)
         newregs32.ARM_pc=p->dlopen;
         newregs32.ARM_r0=str;
         newregs32.ARM_r1=RTLD_NOW;
-        newregs32.ARM_r2=p->dlopencaller; //needed by android: loader_dlopen
-
-
+        newregs32.ARM_r2=p->dlopencaller;
 
         if (newregs32.ARM_pc & 1)
         {
-           //THUMB Address link
+
            debug_log("THUMB destination\n");
            newregs32.ARM_cpsr=newregs32.ARM_cpsr | (1 << 5);
 
-           //not sure how to set the J bit (thumbee uses it...)
-           //for now disable it until a bug happens
-           newregs32.ARM_cpsr=newregs32.ARM_cpsr & (~(1<<25)); //unset J
-
+           newregs32.ARM_cpsr=newregs32.ARM_cpsr & (~(1<<25));
 
         }
         else
         {
           debug_log("ARM destination\n");
           debug_log("newregs32.ARM_cpsr was %x\n", newregs32.ARM_cpsr);
-          newregs32.ARM_cpsr=newregs32.ARM_cpsr & (~(1<<5)); //unset T
-          newregs32.ARM_cpsr=newregs32.ARM_cpsr & (~(1<<25)); //unset J
+          newregs32.ARM_cpsr=newregs32.ARM_cpsr & (~(1<<5));
+          newregs32.ARM_cpsr=newregs32.ARM_cpsr & (~(1<<25));
           debug_log("newregs32.ARM_cpsr is %x\n", newregs32.ARM_cpsr);
         }
 
         debug_log("new pc=%lx\n", newregs32.ARM_pc);
         debug_log("new sp=%lx\n", newregs32.ARM_sp);
         debug_log("new cpsr=%lx\n", newregs32.ARM_cpsr);
-
 
       }
       else
@@ -581,44 +500,35 @@ int loadExtension(PProcessData p, char *path)
         debug_log("orig x0=%llx\n", origregs.regs[0]);
         debug_log("orig x1=%llx\n", origregs.regs[1]);
 
-
-
-        //allocate space in the stack
-
         newregs.sp-=16+16*((pathlen+3)/16);
         str=newregs.sp;
         writeString(pid, str, path);
 
         debug_log("injecting in aarch64\n");
 
-        newregs.regs[30]=returnaddress;  //30=LR
+        newregs.regs[30]=returnaddress;
         newregs.pc=p->dlopen;
         newregs.regs[0]=str;
         newregs.regs[1]=RTLD_NOW;
-        newregs.regs[2]=p->dlopencaller; //needed by android: loader_dlopen
+        newregs.regs[2]=p->dlopencaller;
 
       }
 #endif
 
 #ifdef __x86_64__
 
-
-      //allocate stackspace
       newregs.rsp=newregs.rsp-0x28-(8*((pathlen+7) / 8));
 
-      //check that the first 4 bits of rsp are 1000 (8) (aligned with the function return push)
       if ((newregs.rsp & 0xf)!=8)
       {
         debug_log("Aligning stack.  Was %llx", newregs.rsp);
         newregs.rsp-=8;
-        newregs.rsp&=~(0xf); //clear the first 4 bits
+        newregs.rsp&=~(0xf);
 
-        newregs.rsp=newregs.rsp | 8; //set to 8
+        newregs.rsp=newregs.rsp | 8;
 
         debug_log(" is now %llx\n", newregs.rsp);
       }
-
-      //write the path at rsp+18
 
       str=newregs.rsp+0x18;
       writeString(pid, str, path);
@@ -664,11 +574,7 @@ int loadExtension(PProcessData p, char *path)
       else
       {
 
-
-        //set the return address
-
         debug_log("Writing 0x0ce0 to %lx\n", newregs.rsp);
-
 
         if (ptrace(PTRACE_POKEDATA, pid, newregs.rsp, returnaddress)!=0)
         {
@@ -692,14 +598,8 @@ int loadExtension(PProcessData p, char *path)
         }
       }
 
-
-
-
-
-
       returnaddress=ptrace(PTRACE_PEEKDATA, pid, newregs.rsp, 0);
       debug_log("[%lx]=%lx", newregs.rsp, returnaddress);
-
 
       newregs.rip=p->dlopen;
       newregs.rax=0;
@@ -723,27 +623,17 @@ int loadExtension(PProcessData p, char *path)
     debug_log("orig_eax=%lx\n", origregs.orig_eax);
     debug_log("eip=%lx\n", origregs.eip);
 
-    //allocate stackspace
     newregs.esp=newregs.esp-0x28-(8*((pathlen+7) / 8));
     if ((newregs.esp & 0xf)!=8)
     {
       debug_log("Aligning stack.  Was %llx", newregs.esp);
       newregs.esp-=8;
-      newregs.esp&=~(0xf); //clear the first 4 bits
+      newregs.esp&=~(0xf);
 
-      newregs.esp=newregs.esp | 8; //set to 8
+      newregs.esp=newregs.esp | 8;
 
       debug_log(" is now %llx\n", newregs.esp);
     }
-
-    //in 32-bit the stack will have to look like:
-    //0-3: Return address  (0x0ce0)
-    //4-7: Address to path
-    //8-11:RTLD_NOW
-    //12-...: Path
-
-    //
-
 
     if (ptrace(PTRACE_POKEDATA, pid, newregs.esp+0, returnaddress)!=0)
     {
@@ -804,7 +694,6 @@ int loadExtension(PProcessData p, char *path)
 
     debug_log("\n\nContinuing thread\n");
 
-
     int ptr;
     ptr=ptrace(PTRACE_CONT,pid,(void *)0,(void *)SIGCONT);
 
@@ -815,7 +704,6 @@ int loadExtension(PProcessData p, char *path)
       return 1;
     }
 
-    //wait for this thread to crash
     int pid2;
 
     pid2=-1;
@@ -823,11 +711,9 @@ int loadExtension(PProcessData p, char *path)
     {
       pid2=waitpid(-1, &status,  WUNTRACED| __WALL);
 
-
       if (WIFSTOPPED(status))
       {
         debug_log("thread %d Stopped with signal %d\n", pid2, WSTOPSIG(status));
-
 
         if (pid2!=pid)
         {
@@ -843,7 +729,7 @@ int loadExtension(PProcessData p, char *path)
           }
           else
           {
-            //add it to the debug events
+
             DebugEvent de;
             de.threadid=pid2;
             de.debugevent=WSTOPSIG(status);
@@ -870,7 +756,6 @@ int loadExtension(PProcessData p, char *path)
       else
         debug_log("Unexpected status: %x\n", status);
 
-
       if ((pid2==-1) && (errno!=EINTR))
       {
         debug_log("LoadExtension wait fail. :%d\n", errno);
@@ -880,8 +765,6 @@ int loadExtension(PProcessData p, char *path)
 
       if (pid2==0)
         pid2=-1;
-
-
 
       debug_log(".");
     }
@@ -919,8 +802,6 @@ int loadExtension(PProcessData p, char *path)
       return 1;
     }
 
-    //wait for this thread to crash
-
     pid2=-1;
     while (pid2==-1)
     {
@@ -944,7 +825,7 @@ int loadExtension(PProcessData p, char *path)
           }
           else
           {
-            //add it to the debug events
+
             DebugEvent de;
             de.threadid=pid2;
             de.debugevent=WSTOPSIG(status);
@@ -960,7 +841,6 @@ int loadExtension(PProcessData p, char *path)
       else
         debug_log("Unexpected status: %x\n", status);
 
-
       if ((pid2==-1) && (errno!=EINTR))
       {
         debug_log("LoadExtension wait fail. :%d\n", errno);
@@ -971,8 +851,6 @@ int loadExtension(PProcessData p, char *path)
       if (pid2==0)
         pid2=-1;
 
-
-
       debug_log(".");
     }
 
@@ -982,10 +860,6 @@ int loadExtension(PProcessData p, char *path)
     debug_log("returned2: RIP=%lx RAX=%lx (orig=%lx)\n", rregs.rip, rregs.rax, rregs.orig_rax);
 
 #endif
-
-//    if (si.si_signo==SIGSEGV)
-      //debug_log("si._sifields._sigfault._addr=%x\n", si._sifields._sigfault._addr);
-
 
 #ifdef __aarch64__
      if (p->is64bit)
@@ -1013,7 +887,6 @@ int loadExtension(PProcessData p, char *path)
          debug_log("PTRACE_CONT failed\n");
      }
 
-
      debug_log("End...\n");
 
      return 1;
@@ -1038,7 +911,6 @@ void findmmapcallback(uintptr_t address, char *symbolname, PProcessData context)
   context->mmap=address;
 }
 
-
 uint64_t allocWithoutExtension(HANDLE hProcess, void *addr, size_t length, int prot)
 {
   int returnaddress=0xce0;
@@ -1047,15 +919,14 @@ uint64_t allocWithoutExtension(HANDLE hProcess, void *addr, size_t length, int p
   {
     PProcessData p=(PProcessData)GetPointerFromHandle(hProcess);
 
-
     if (p->isDebugged)
     {
       debug_log("this process is being debugged\n");
-      //make sure this is executed by the debugger thread
+
       if (p->debuggerThreadID!=pthread_self())
       {
         debug_log("Not the debugger thread. Switching...\n");
-        //tell the debugger thread to do this
+
         uint64_t result=0;
         #pragma pack(1)
         struct
@@ -1089,7 +960,6 @@ uint64_t allocWithoutExtension(HANDLE hProcess, void *addr, size_t length, int p
       else
         debug_log("This is the debugger thread\n");
     }
-    //the rest
 
     if (p->mmap==0)
       FindSymbol(hProcess, "mmap", (symcallback)findmmapcallback,p);
@@ -1100,7 +970,6 @@ uint64_t allocWithoutExtension(HANDLE hProcess, void *addr, size_t length, int p
       return 0;
     }
 
-    //stop for editing state
     int pid=pauseProcess(p);
     if (pid==-1)
     {
@@ -1108,8 +977,6 @@ uint64_t allocWithoutExtension(HANDLE hProcess, void *addr, size_t length, int p
       return 0;
     }
 
-
-    //get state
     process_state originalstate, newstate;
 #ifdef __aarch64__
     process_state32 originalstate32, newstate32;
@@ -1129,7 +996,6 @@ uint64_t allocWithoutExtension(HANDLE hProcess, void *addr, size_t length, int p
       newstate=originalstate;
     }
 
-    //edit state
 #ifdef __arm__
     newstate.ARM_sp-=8;
     newstate.ARM_lr=returnaddress;
@@ -1145,7 +1011,7 @@ uint64_t allocWithoutExtension(HANDLE hProcess, void *addr, size_t length, int p
 #ifdef __aarch64__
     if (p->is64bit)
     {
-      newstate.regs[30]=returnaddress; //LR
+      newstate.regs[30]=returnaddress;
       newstate.pc=p->mmap;
       newstate.regs[0]=(uint64_t)addr;
       newstate.regs[1]=length;
@@ -1189,7 +1055,7 @@ uint64_t allocWithoutExtension(HANDLE hProcess, void *addr, size_t length, int p
 #ifdef __x86_64__
     newstate.rsp-=0x40;
     newstate.rsp&=~(0xf);
-    newstate.rsp=newstate.rsp | 8; //emulate the push of the return on the stack
+    newstate.rsp=newstate.rsp | 8;
 
     if (ptrace(PTRACE_POKEDATA, pid, newstate.rsp, returnaddress)!=0)
     {
@@ -1208,7 +1074,6 @@ uint64_t allocWithoutExtension(HANDLE hProcess, void *addr, size_t length, int p
     newstate.r9=0;
 #endif
 
-    //apply state
 #ifdef __aarch64__
     if (p->is64bit==0)
     {
@@ -1230,7 +1095,6 @@ uint64_t allocWithoutExtension(HANDLE hProcess, void *addr, size_t length, int p
       }
     }
 
-    //run edited state
     debug_log("\n\nContinuing thread with edited state\n");
 
     int ptr;
@@ -1243,8 +1107,6 @@ uint64_t allocWithoutExtension(HANDLE hProcess, void *addr, size_t length, int p
       return 0;
     }
 
-
-    //wait for this thread to crash
     int pid2;
     int status;
 
@@ -1271,7 +1133,7 @@ uint64_t allocWithoutExtension(HANDLE hProcess, void *addr, size_t length, int p
           }
           else
           {
-            //add it to the debug events
+
             DebugEvent de;
             de.threadid=pid2;
             de.debugevent=WSTOPSIG(status);
@@ -1287,7 +1149,6 @@ uint64_t allocWithoutExtension(HANDLE hProcess, void *addr, size_t length, int p
       else
         debug_log("Unexpected status: %x\n", status);
 
-
       if ((pid2==-1) && (errno!=EINTR))
       {
         debug_log("LoadExtension wait fail. :%d\n", errno);
@@ -1302,7 +1163,6 @@ uint64_t allocWithoutExtension(HANDLE hProcess, void *addr, size_t length, int p
     }
 
     debug_log("\nafter wait: pid=%d (status=%x)\n", pid, status);
-
 
     siginfo_t si;
     if (ptrace(PTRACE_GETSIGINFO, pid, NULL, &si)!=0)
@@ -1333,7 +1193,6 @@ uint64_t allocWithoutExtension(HANDLE hProcess, void *addr, size_t length, int p
       }
     }
 
-    //read out result
     uint64_t result=0;
 
 #ifdef __arm__
@@ -1347,7 +1206,6 @@ uint64_t allocWithoutExtension(HANDLE hProcess, void *addr, size_t length, int p
       result=newstate.regs[0];
 #endif
 
-
 #ifdef __i386__
     result=newstate.eax;
 #endif
@@ -1358,8 +1216,6 @@ uint64_t allocWithoutExtension(HANDLE hProcess, void *addr, size_t length, int p
     result=newstate.rax;
 #endif
 
-
-    //restore state
 #ifdef __aarch64__
     if (p->is64bit==0)
     {
@@ -1375,7 +1231,6 @@ uint64_t allocWithoutExtension(HANDLE hProcess, void *addr, size_t length, int p
 
     resumeProcess(p, pid);
 
-
     return result;
 
   }
@@ -1390,16 +1245,14 @@ int loadCEServerExtension(HANDLE hProcess)
   {
     PProcessData p=(PProcessData)GetPointerFromHandle(hProcess);
 
-
     if (p->isDebugged)
     {
       debug_log("this process is being debugged\n");
 
-      //make sure this is executed by the debugger thread
       if (p->debuggerThreadID!=pthread_self())
       {
         debug_log("Not the debugger thread. Switching...\n");
-        //tell the debugger thread to do this
+
         int result=0;
 #pragma pack(1)
         struct
@@ -1434,8 +1287,6 @@ int loadCEServerExtension(HANDLE hProcess)
       }
     }
 
-
-
     if (p->hasLoadedExtension==0)
     {
       char modulepath[256], modulepath2[256];
@@ -1446,14 +1297,13 @@ int loadCEServerExtension(HANDLE hProcess)
 
       char *mp;
 
-
       l=readlink("/proc/self/exe", modulepath2, 256);
 
       if (l!=-1)
       {
         modulepath2[l]=0;
         debug_log("modulepath2=%s\n", modulepath2);
-        sscanf(modulepath2,"%s", modulepath); //sometimes it has a (deleted) text after it
+        sscanf(modulepath2,"%s", modulepath);
 
         debug_log("modulepath=%s\n", modulepath);
         mp=dirname(modulepath);
@@ -1484,8 +1334,6 @@ int loadCEServerExtension(HANDLE hProcess)
         strcat(modulepath, "_arm");
 #endif
         strcat(modulepath,".so");
-
-
 
       }
       else
@@ -1518,9 +1366,6 @@ int loadCEServerExtension(HANDLE hProcess)
 
       debug_log("modulepath = %s\n", modulepath);
 
-
-
-
       if (p->isDebugged)
       {
         debug_log("This process is being debugged. Checking if it's already loaded\n");
@@ -1529,7 +1374,6 @@ int loadCEServerExtension(HANDLE hProcess)
         p->hasLoadedExtension=openExtension(p->pid, &p->extensionFD);
         pthread_mutex_unlock(&p->extensionMutex);
       }
-     // else
 
       if (p->hasLoadedExtension)
         debug_log("The extension is already loaded\n");
@@ -1554,7 +1398,7 @@ int loadCEServerExtension(HANDLE hProcess)
 
       if (p->dlopencaller==0)
       {
-        //find the first system module base address
+
         debug_log("trying to find a suitable caller origin\n");
         HANDLE ths;
         ModuleListEntry me;
@@ -1631,7 +1475,7 @@ int loadCEServerExtension(HANDLE hProcess)
 
       {
         pthread_mutex_lock(&p->extensionMutex);
-        if (p->hasLoadedExtension==0) //still 0
+        if (p->hasLoadedExtension==0)
         {
 
           if (p->neverForceLoadExtension==0)
@@ -1644,13 +1488,11 @@ int loadCEServerExtension(HANDLE hProcess)
           if (p->hasLoadedExtension)
             p->hasLoadedExtension=openExtension(p->pid, &p->extensionFD);
 
-
           debug_log("p->hasLoadedExtension=%d\n", p->hasLoadedExtension);
         }
 
         pthread_mutex_unlock(&p->extensionMutex);
       }
-
 
     }
     else

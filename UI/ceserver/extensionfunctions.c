@@ -1,11 +1,3 @@
-/*
- * extensionfunctions.c
- *
- *  Created on: Aug 25, 2013
- *      Author: eric
- */
-
-
 #include <stdio.h>
 #include <pthread.h>
 #include <string.h>
@@ -16,8 +8,6 @@
 #include "extensionloader.h"
 #include "extensionfunctions.h"
 #include "api.h"
-
-//todo: Make all of these fail if the debugger is waiting to continue from a debug event (or perhaps the pipe server thread can keep running)
 
 int ext_speedhack_setSpeed(HANDLE hProcess, float speed)
 {
@@ -45,7 +35,6 @@ int ext_speedhack_setSpeed(HANDLE hProcess, float speed)
         return 0;
       }
     }
-
 
     speedhackSetSpeedCommand.command=EXTCMD_SPEEDHACK_SETSPEED;
     speedhackSetSpeedCommand.speed=speed;
@@ -98,7 +87,6 @@ uint64_t ext_loadModuleEx(HANDLE hProcess, uint64_t dlopenaddress, char *modulep
     debug_log("ext_loadModule: Locking extensionMutext\n");
     pthread_mutex_lock(&p->extensionMutex);
 
-
     debug_log("ext_loadModule: Locked extensionMutext\n");
 
     if (sendall(p->extensionFD, &loadModuleCommand, sizeof(loadModuleCommand), MSG_MORE)>0)
@@ -115,10 +103,8 @@ uint64_t ext_loadModuleEx(HANDLE hProcess, uint64_t dlopenaddress, char *modulep
 
   }
 
-
   return result;
 }
-
 
 uint64_t ext_loadModule(HANDLE hProcess, char *modulepath)
 {
@@ -154,7 +140,6 @@ uint64_t ext_loadModule(HANDLE hProcess, char *modulepath)
     debug_log("ext_loadModule: Locking extensionMutext\n");
     pthread_mutex_lock(&p->extensionMutex);
 
-
     debug_log("ext_loadModule: Locked extensionMutext\n");
 
     if (sendall(p->extensionFD, &loadModuleCommand, sizeof(loadModuleCommand), MSG_MORE)>0)
@@ -171,10 +156,8 @@ uint64_t ext_loadModule(HANDLE hProcess, char *modulepath)
 
   }
 
-
   return result;
 }
-
 
 uint64_t ext_createThread(HANDLE hProcess, uint64_t startaddress, uint64_t parameter)
 {
@@ -216,7 +199,6 @@ uint64_t ext_createThread(HANDLE hProcess, uint64_t startaddress, uint64_t param
 
   }
 
-
   return result;
 }
 
@@ -247,7 +229,6 @@ int ext_free(HANDLE hProcess, uint64_t address, int size)
         return 0;
       }
     }
-
 
     freeCommand.command=EXTCMD_FREE;
     freeCommand.address=address;
@@ -340,7 +321,6 @@ int ext_changememoryprotection(HANDLE hProcess, uint64_t address, uint32_t size,
     } changeProtectionCommand;
 #pragma pack()
 
-
     changeProtectionCommand.command=EXTCMD_CHANGEMEMORYPROTECTION;
     changeProtectionCommand.address=address;
     changeProtectionCommand.size=size;
@@ -354,8 +334,6 @@ int ext_changememoryprotection(HANDLE hProcess, uint64_t address, uint32_t size,
     pthread_mutex_unlock(&p->extensionMutex);
 
     debug_log("Returned from extension with result %llx\n", result);
-
-
 
   }
 

@@ -1,4 +1,3 @@
-
 #![allow(non_snake_case, non_camel_case_types, dead_code, unsafe_op_in_unsafe_fn, static_mut_refs)]
 
 use std::collections::HashMap;
@@ -1102,4 +1101,3 @@ mod tests {
         }
     }
 }
-

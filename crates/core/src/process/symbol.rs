@@ -1,4 +1,3 @@
-
 use std::collections::HashMap;
 use std::mem::size_of;
 use crate::process::Process;
@@ -270,4 +269,3 @@ mod tests {
         assert_eq!(resolver.module_preference[2], "another.dll");
     }
 }
-

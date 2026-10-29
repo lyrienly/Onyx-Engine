@@ -6,4 +6,4 @@
 extern volatile unsigned int cpucount;
 unsigned int initAPcpus(DWORD entrypage);
 
-#endif /*MULTICORE_H_*/
+#endif

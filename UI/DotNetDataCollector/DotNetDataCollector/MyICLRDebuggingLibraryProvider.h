@@ -3,10 +3,9 @@
 
 #include <CorDebug.h>
 
-
-class CMyICLRDebuggingLibraryProvider : 
+class CMyICLRDebuggingLibraryProvider :
 	public ICLRDebuggingLibraryProvider
-    
+
 {
 private:
 	long m_ref;
@@ -18,25 +17,23 @@ public:
 	{
 		m_ref = 1;
 		RuntimeInfo = rti;
-		dotnetcorepath = path;		
+		dotnetcorepath = path;
 	}
 
 	~CMyICLRDebuggingLibraryProvider()
 	{
 	}
 
-	// IUnknown
 	STDMETHOD(QueryInterface)(__in REFIID InterfaceId, __out PVOID* Interface);
 	STDMETHOD_(ULONG, AddRef)();
 	STDMETHOD_(ULONG, Release)();
 
-        virtual HRESULT STDMETHODCALLTYPE ProvideLibrary( 
-            /* [in] */ const WCHAR *pwszFileName,
-            /* [in] */ DWORD dwTimestamp,
-            /* [in] */ DWORD dwSizeOfImage,
-            /* [out] */ HMODULE *phModule);
-        
+        virtual HRESULT STDMETHODCALLTYPE ProvideLibrary(
+             const WCHAR *pwszFileName,
+             DWORD dwTimestamp,
+             DWORD dwSizeOfImage,
+             HMODULE *phModule);
 
 };
 
-#endif // __CMyICLRDebuggingLibraryProvider_H__
+#endif

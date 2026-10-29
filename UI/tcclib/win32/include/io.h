@@ -1,9 +1,3 @@
-
-/**
- * This file has no copyright assigned and is placed in the Public Domain.
- * This file is part of the w64 mingw-runtime package.
- * No warranty is given; refer to the file DISCLAIMER within this package.
- */
 #ifndef _IO_H_
 #define _IO_H_
 
@@ -35,8 +29,6 @@ _CRTIMP char* __cdecl _getcwd (char*, int);
     char name[260];
   };
 
-/*#if _INTEGRAL_MAX_BITS >= 64*/
-
   struct _finddata32i64_t {
     unsigned attrib;
     __time32_t time_create;
@@ -63,7 +55,6 @@ _CRTIMP char* __cdecl _getcwd (char*, int);
     __int64 size;
     char name[260];
   };
-/* #endif */
 
 #ifdef _USE_32BIT_TIME_T
 #define _finddata_t _finddata32_t
@@ -102,8 +93,6 @@ _CRTIMP char* __cdecl _getcwd (char*, int);
     wchar_t name[260];
   };
 
-/* #if _INTEGRAL_MAX_BITS >= 64 */
-
   struct _wfinddata32i64_t {
     unsigned attrib;
     __time32_t time_create;
@@ -130,7 +119,6 @@ _CRTIMP char* __cdecl _getcwd (char*, int);
     __int64 size;
     wchar_t name[260];
   };
-/* #endif */
 
 #ifdef _USE_32BIT_TIME_T
 #define _wfinddata_t _wfinddata32_t
@@ -214,12 +202,10 @@ _CRTIMP char* __cdecl _getcwd (char*, int);
 #endif
 #endif
 
-  /* Some defines for _access nAccessMode (MS doesn't define them, but
-  * it doesn't seem to hurt to add them). */
-#define	F_OK	0	/* Check for file existence */
-#define	X_OK	1	/* Check for execute permission. */
-#define	W_OK	2	/* Check for write permission */
-#define	R_OK	4	/* Check for read permission */
+#define	F_OK	0
+#define	X_OK	1
+#define	W_OK	2
+#define	R_OK	4
 
   _CRTIMP int __cdecl _access(const char *_Filename,int _AccessMode);
   _CRTIMP int __cdecl _chmod(const char *_Filename,int _Mode);
@@ -304,9 +290,9 @@ _CRTIMP char* __cdecl _getcwd (char*, int);
   char *__cdecl mktemp(char *);
   int __cdecl rmdir (const char*);
   int __cdecl chmod (const char *, int);
-#endif /* _UWIN */
+#endif
 
-#endif /* Not NO_OLDNAMES */
+#endif
 
   _CRTIMP errno_t __cdecl _sopen_s(int *_FileHandle,const char *_Filename,int _OpenFlag,int _ShareFlag,int _PermissionMode);
 
@@ -387,16 +373,13 @@ _CRTIMP char* __cdecl _getcwd (char*, int);
 extern "C" {
 #endif
 
-/* Misc stuff */
 char *getlogin(void);
 #ifdef __USE_MINGW_ALARM
 unsigned int alarm(unsigned int seconds);
 #endif
 
 #ifdef __USE_MINGW_ACCESS
-/*  Old versions of MSVCRT access() just ignored X_OK, while the version
-    shipped with Vista, returns an error code.  This will restore the
-    old behaviour  */
+
 static inline int __mingw_access (const char *__fname, int __mode) {
   return  _access (__fname, __mode & ~X_OK);
 }
@@ -404,15 +387,12 @@ static inline int __mingw_access (const char *__fname, int __mode) {
 #define access(__f,__m)  __mingw_access (__f, __m)
 #endif
 
-
 #ifdef __cplusplus
 }
 #endif
-
 
 #pragma pack(pop)
 
 #include <sec_api/io_s.h>
 
-#endif /* End _IO_H_ */
-
+#endif

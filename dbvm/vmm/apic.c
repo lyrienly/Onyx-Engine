@@ -1,11 +1,3 @@
-/*
- * apic.c
- *
- *  Created on: Jun 21, 2009
- *      Author: erich
- */
-
-
 #include "main.h"
 #include "common.h"
 #include "apic.h"
@@ -37,7 +29,6 @@ int getHighestPendingInterrupt()
 
   }
 
-
   unmapPhysicalMemory(apic,4096);
 
   return result;
@@ -67,7 +58,6 @@ void apic_eoi(void)
   *(volatile DWORD *)(IA32_APIC_BASE+0xb0)=0;
 }
 
-
 void apic_sendWaitInterrupt(BYTE apicid)
 {
   APIC_ICR Command;
@@ -80,23 +70,21 @@ void apic_sendWaitInterrupt(BYTE apicid)
 
   sendstringf("apic_nmi(%d)\n",apicid);
 
-
-
   Command.command=0;
-  Command.vector=0xce; //wait interrupt
-  Command.deliverymode=4; //nmi
-  Command.destinationmode=0; //physical
-  Command.deliverystatus=1; //not being sent, but just setting it anyhow
+  Command.vector=0xce;
+  Command.deliverymode=4;
+  Command.destinationmode=0;
+  Command.deliverystatus=1;
   Command.level=1;
   Command.triggermode=0;
 
-  Command.destination_shorthand=0; //APICID specific
+  Command.destination_shorthand=0;
 
   sendstringf("sending APIC command to wait to cpu with APICID %d", apicid);
 
   if (readMSR(IA32_APICBASE_MSR) & (1<<10))
   {
-    //x2apic mode
+
     Command.x2destination=apicid;
     sendstringf(" using x2apic\n");
 
@@ -106,7 +94,7 @@ void apic_sendWaitInterrupt(BYTE apicid)
   }
   else
   {
-    //oldmode
+
     Command.destination=apicid;
 
     sendstringf(" using legacy apic\n");
@@ -126,11 +114,11 @@ void apic_sendWaitInterrupt(BYTE apicid)
     } while (temp.deliverystatus==1);
 
     sendstringf("Sending NMI\n");
-    //send the NMI
+
     asm volatile ("": : :"memory");
     apic->Interrupt_Command_High32Bit.a=Command.higher;
     asm volatile ("": : :"memory");
-    apic->Interrupt_Command_Low32Bit.a=Command.lower; //this write sends it
+    apic->Interrupt_Command_Low32Bit.a=Command.lower;
     asm volatile ("": : :"memory");
 
     sendstringf("Waiting till ready again\n");

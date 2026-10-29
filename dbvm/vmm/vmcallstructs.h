@@ -1,13 +1,5 @@
-/*
- * vmcallstructs.h
- *
- *  Created on: Mar 12, 2018
- *      Author: erich
- */
-
 #ifndef VMM_VMCALLSTRUCTS_H_
 #define VMM_VMCALLSTRUCTS_H_
-
 
 typedef struct
 {
@@ -19,40 +11,32 @@ typedef struct
 typedef struct
 {
   VMCALL_BASIC vmcall;
-  QWORD sourcePA; //physical address to read
-  DWORD bytesToRead; //number of bytes to read
-  QWORD destinationVA; //virtual address to write to
-  DWORD nopagefault; //if not 0 stop at the first pagefault
+  QWORD sourcePA;
+  DWORD bytesToRead;
+  QWORD destinationVA;
+  DWORD nopagefault;
 } __attribute__((__packed__)) VMCALL_READPHYSICALMEMORY, *PVMCALL_READPHYSICALMEMORY;
 
 typedef struct
 {
   VMCALL_BASIC vmcall;
-  QWORD destinationPA; //physical address to read
-  DWORD bytesToWrite; //number of bytes to read
-  QWORD sourceVA; //virtual address to write to
-  DWORD nopagefault; //if not 0 stop at the first pagefault
+  QWORD destinationPA;
+  DWORD bytesToWrite;
+  QWORD sourceVA;
+  DWORD nopagefault;
 } __attribute__((__packed__)) VMCALL_WRITEPHYSICALMEMORY, *PVMCALL_WRITEPHYSICALMEMORY;
-
-
 
 typedef struct
 {
   VMCALL_BASIC vmcall;
   QWORD PhysicalAddress;
-  QWORD OptionalField1; //usermode loop address for DBVMBP
-  QWORD OptionalField2; //kernelmode loop address for DBVMBP
+  QWORD OptionalField1;
+  QWORD OptionalField2;
   int Size;
-  int Options; //binary.
-               //  Bit 0: 0=Log RIP once. 1=Log RIP multiple times (when different registers)
-               //  Bit 1: 0=Only log given Physical Address. 1=Log everything in the page(s) that is/are affected
-               //  Bit 2: 0=Do not save FPU/XMM data, 1=Also save FPU/XMM data
-               //  Bit 3: 0=Do not save a stack snapshot, 1=Save stack snapshot
-               //  Bit 4: 0=This CPU only.  1=All CPU's
-               //  Bit 5: 1=Interrupt mode. Don't log, just interrupt
+  int Options;
 
-  int MaxEntryCount; //DBVM will allocate this buffer
-  int ID; //ID describing this watcher for this CPU (keep track of this on a per cpu basis if you do more than 1 and don't specify all cpu's)
+  int MaxEntryCount;
+  int ID;
 } __attribute__((__packed__)) VMCALL_WATCH_PARAM, *PVMCALL_WATCH_PARAM;
 
 typedef struct
@@ -61,27 +45,22 @@ typedef struct
   DWORD ID;
 } __attribute__((__packed__)) VMCALL_WATCH_DISABLE_PARAM, *PVMCALL_WATCH_DISABLE_PARAM;
 
-
 typedef struct
 {
   VMCALL_BASIC vmcall;
   DWORD ID;
-  QWORD results; //virtual address receiving log
+  QWORD results;
   DWORD resultsize;
-  DWORD copied; //the number of bytes copied so far (This is a repeating instruction)
+  DWORD copied;
 } __attribute__((__packed__)) VMCALL_WATCH_RETRIEVELOG_PARAM, *PVMCALL_WATCH_RETRIEVELOG_PARAM;
-
 
 typedef struct
 {
   VMCALL_BASIC vmcall;
-  QWORD results; //virtual address receiving log
+  QWORD results;
   DWORD resultsize;
-  DWORD copied; //the number of bytes copied so far (This is a repeating instruction)
+  DWORD copied;
 } __attribute__((__packed__)) VMCALL_TRACEONBP_RETRIEVELOG_PARAM, *PVMCALL_TRACEONBP_RETRIEVELOG_PARAM;
-
-
-
 
 typedef struct
 {
@@ -96,7 +75,7 @@ typedef struct
   VMCALL_BASIC vmcall;
   QWORD physicalAddress;
   DWORD size;
-  DWORD whitelist_flags; //0=no whitelist...why?, 1=ip range whitelist, 2=cr3 whilelist, 3=both ip+cr3 whitelist
+  DWORD whitelist_flags;
   QWORD whitelist_ipfromrange;
   QWORD whitelist_iptorange;
   QWORD whitelist_cr3;
@@ -137,7 +116,7 @@ typedef struct
     unsigned changeR13 : 1;
     unsigned changeR14 : 1;
     unsigned changeR15 : 1;
-    //flags reg:
+
     unsigned changeCF : 1;
     unsigned changePF : 1;
     unsigned changeAF : 1;
@@ -153,7 +132,7 @@ typedef struct
     unsigned reserved : 3;
   } Flags;
 
-  QWORD changeXMM; //16 nibbles, each bit is one dword
+  QWORD changeXMM;
   QWORD changeFP;
   QWORD newRAX;
   QWORD newRBX;
@@ -231,21 +210,14 @@ typedef struct
   CHANGEREGONBPINFO changereginfo;
 } __attribute__((__packed__)) VMCALL_CLOAK_CHANGEREG_PARAM, *PVMCALL_CLOAK_CHANGEREG_PARAM;
 
-
-
 typedef struct
 {
   VMCALL_BASIC vmcall;
   QWORD physicalAddress;
   DWORD flags;
-  //bit 0: log fpu
-  //bit 1: log stack (say goodbye to your memory)
-  //bit todo: 1=hide stepping from pushf
-  //bit todo: 1=follow interrupts, 0=do not follow interrupts
+
   DWORD tracecount;
 } __attribute__((__packed__)) VMCALL_CLOAK_TRACEONBP_PARAM, *PVMCALL_CLOAK_TRACEONBP_PARAM;
-
-
 
 typedef struct
 {
@@ -253,7 +225,6 @@ typedef struct
   DWORD count;
   DWORD maxcount;
 } __attribute__((__packed__)) VMCALL_CLOAK_TRACEONBP_GETSTATUS_PARAM, *PVMCALL_CLOAK_TRACEONBP_GETSTATUS_PARAM;
-
 
 typedef struct
 {
@@ -269,16 +240,11 @@ typedef struct
   QWORD copied;
 } __attribute__((__packed__)) VMCALL_CLOAK_TRACEONBP_READLOG_PARAM, *PVMCALL_CLOAK_TRACEONBP_READLOG_PARAM;
 
-
-
-
-
 typedef struct
 {
   VMCALL_BASIC vmcall;
   QWORD physicalAddress;
 } __attribute__((__packed__)) VMCALL_CLOAK_REMOVECHANGEREG_PARAM, *PVMCALL_CLOAK_REMOVECHANGEREG_PARAM;
-
 
 typedef struct
 {
@@ -294,16 +260,14 @@ typedef struct
   QWORD destination;
 } __attribute__((__packed__)) VMCALL_LOGCR3_STOP_PARAM, *PVMCALL_LOGCR3_STOP_PARAM;
 
-
 typedef struct
 {
   VMCALL_BASIC vmcall;
-  int type; //0=pre, 1=post
-
+  int type;
 
   QWORD virtualAddress;
   unsigned int bytesize;
-  QWORD internalAddress; //caller must set this to 0
+  QWORD internalAddress;
   unsigned int bytescopied;
 
 } __attribute__((__packed__)) VMCALL_REGISTER_PLUGIN_PARAM, *PVMCALL_REGISTER_PLUGIN_PARAM;
@@ -323,8 +287,6 @@ typedef struct
 } __attribute__((__packed__)) VMCALL_GET_STATISTICS_PARAM, *PVMCALL_GET_STATISTICS_PARAM;
 #endif
 
-
-
 typedef struct
 {
   VMCALL_BASIC vmcall;
@@ -338,5 +300,4 @@ typedef struct
   double speedhackspeed;
 } __attribute__((__packed__)) VMCALL_SETSPEEDHACK_PARAM, *PVMCALL_SETSPEEDHACK_PARAM;
 
-
-#endif /* VMM_VMCALLSTRUCTS_H_ */
+#endif

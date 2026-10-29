@@ -1,9 +1,3 @@
-/*
-** $Id: lcode.h,v 1.64.1.1 2017/04/19 17:20:42 roberto Exp $
-** Code generator for Lua
-** See Copyright Notice in lua.h
-*/
-
 #ifndef lcode_h
 #define lcode_h
 
@@ -12,17 +6,8 @@
 #include "lopcodes.h"
 #include "lparser.h"
 
-
-/*
-** Marks the end of a patch list. It is an invalid value both as an absolute
-** address, and as a list link (would link an element to itself).
-*/
 #define NO_JUMP (-1)
 
-
-/*
-** grep "ORDER OPR" if you change these enums  (ORDER OP)
-*/
 typedef enum BinOpr {
   OPR_ADD, OPR_SUB, OPR_MUL, OPR_MOD, OPR_POW,
   OPR_DIV,
@@ -36,11 +21,8 @@ typedef enum BinOpr {
   OPR_NOBINOPR
 } BinOpr;
 
-
 typedef enum UnOpr { OPR_MINUS, OPR_BNOT, OPR_NOT, OPR_LEN, OPR_NOUNOPR } UnOpr;
 
-
-/* get (pointer to) instruction of given 'expdesc' */
 #define getinstruction(fs,e)	((fs)->f->code[(e)->u.info])
 
 #define luaK_codeAsBx(fs,o,A,sBx)	luaK_codeABx(fs,o,A,(sBx)+MAXARG_sBx)
@@ -83,6 +65,5 @@ LUAI_FUNC void luaK_infix (FuncState *fs, BinOpr op, expdesc *v);
 LUAI_FUNC void luaK_posfix (FuncState *fs, BinOpr op, expdesc *v1,
                             expdesc *v2, int line);
 LUAI_FUNC void luaK_setlist (FuncState *fs, int base, int nelems, int tostore);
-
 
 #endif

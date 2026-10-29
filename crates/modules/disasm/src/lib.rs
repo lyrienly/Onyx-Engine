@@ -1,4 +1,3 @@
-
 use onyx_core::disasm::Disassembler;
 
 pub mod zydis_backend;
@@ -7,10 +6,6 @@ pub mod cfg;
 pub use zydis_backend::{disassemble, format_instruction, FlowType, Instruction};
 pub use cfg::{build_cfg, cfg_to_dot, BasicBlock, ControlFlowGraph};
 
-/// Disassembles `length` bytes starting at `base_addr` using Zydis and
-/// returns a Graphviz DOT representation of the Control Flow Graph via
-/// `out_buf`. Returns the number of bytes written (not including the NUL
-/// terminator) or 0 on error / insufficient buffer.
 #[no_mangle]
 pub unsafe extern "C" fn onyx_disasm_cfg_dot(
     base_addr: u64,
@@ -142,4 +137,3 @@ pub unsafe extern "C" fn onyx_disasm_block(
 
     count as i32
 }
-

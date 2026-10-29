@@ -3,8 +3,7 @@
 
 #include <ntifs.h>
 
-//MSR's
-#define IA32_PERF_GLOBAL_STATUS		0x38e  
+#define IA32_PERF_GLOBAL_STATUS		0x38e
 #define IA32_PERF_GLOBAL_OVF_CTRL	0x390
 
 #define IA32_RTIT_CTL				0x570
@@ -34,25 +33,25 @@ typedef struct
 #pragma pack(1)
 typedef union {
 		struct{
-			ULONG TraceEn : 1;   //0
-			ULONG Reserved_0 : 1; //1
-			ULONG OS : 1; //2
-			ULONG USER : 1; //3
-			ULONG Reserved_1 : 2; //4,5
-			ULONG FabricEn : 1; //6
-			ULONG CR3Filter : 1; //7
-			ULONG ToPA : 1; //8
-			ULONG MTCEn : 1; //9
-			ULONG TSCEn : 1; //10
-			ULONG DisRETC : 1; //11
-			ULONG Reserved_2 : 1; //12
-			ULONG BranchEn : 1; //13
-			ULONG MTCFreq : 4; //14,15,16,17
-			ULONG Reserved_3 : 1; //18
-			ULONG CycThresh : 4; //19,20,21,22
-			ULONG Reserved_4 : 1; //32
-			ULONG PSBFreq : 4; //24,25,26,27
-			ULONG Reserved_5 : 4; //28,29,30,31
+			ULONG TraceEn : 1;
+			ULONG Reserved_0 : 1;
+			ULONG OS : 1;
+			ULONG USER : 1;
+			ULONG Reserved_1 : 2;
+			ULONG FabricEn : 1;
+			ULONG CR3Filter : 1;
+			ULONG ToPA : 1;
+			ULONG MTCEn : 1;
+			ULONG TSCEn : 1;
+			ULONG DisRETC : 1;
+			ULONG Reserved_2 : 1;
+			ULONG BranchEn : 1;
+			ULONG MTCFreq : 4;
+			ULONG Reserved_3 : 1;
+			ULONG CycThresh : 4;
+			ULONG Reserved_4 : 1;
+			ULONG PSBFreq : 4;
+			ULONG Reserved_5 : 4;
 
 			ULONG ADDR0_CFG : 4;
 			ULONG ADDR1_CFG : 4;
@@ -63,7 +62,6 @@ typedef union {
 		UINT64 Value;
 	}  RTIT_CTL, *PRTIT_CTL;
 
- 
 typedef union {
 	struct{
 		UINT64 FilterEn : 1;
@@ -101,7 +99,7 @@ typedef struct
 {
 	UINT64 Address;
 	UINT64 Size;
-	UINT64 CpuID;	
+	UINT64 CpuID;
 } ULTIMAP2DATAEVENT, *PULTIMAP2DATAEVENT;
 
 #pragma pack(pop)

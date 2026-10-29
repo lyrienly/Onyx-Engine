@@ -25,15 +25,12 @@
 #define VMCALL_REDIRECTINT3 24
 #define VMCALL_INT3REDIRECTED 25
 
-//dbvm v6+
 #define VMCALL_READMSR 26
 #define VMCALL_WRITEMSR 27
 
 #define VMCALL_ULTIMAP 28
 #define VMCALL_ULTIMAP_DISABLE 29
 
-
-//dbvm v7
 #define VMCALL_SWITCH_TO_KERNELMODE 30
 #define VMCALL_DISABLE_DATAPAGEFAULTS 31
 #define VMCALL_ENABLE_DATAPAGEFAULTS 32
@@ -46,7 +43,6 @@
 
 #define VMCALL_PSODTEST 37
 
-//dbvm11
 #define VMCALL_GETMEM 38
 #define VMCALL_JTAGBREAK 39
 #define VMCALL_GETNMICOUNT 40
@@ -74,8 +70,6 @@
 #define VMCALL_ULTIMAP2_HIDERANGEUSAGE 56
 
 #define VMCALL_ADD_MEMORY 57
-//#define VMCALL_DISABLE_EPT 58 dus nut wurk
-
 
 #ifdef STATISTICS
 #define VMCALL_GET_STATISTICS 59
@@ -107,7 +101,6 @@
 #define VMCALL_SETBROKENTHREADENTRYFULL 77
 #define VMCALL_RESUMEBROKENTHREAD 78
 
-
 #define VMCALL_HIDEDBVMPHYSICALADDRESSES 79
 #define VMCALL_HIDEDBVMPHYSICALADDRESSESALL 80
 
@@ -116,11 +109,8 @@
 
 #define VMCALL_DEBUG_SETSPINLOCKTIMEOUT 254
 
-
 extern int hasEPTsupport;
 extern int hasNPsupport;
-
-
 
 int handleVMCall(pcpuinfo currentcpuinfo, VMRegisters *vmregisters);
 
@@ -128,9 +118,9 @@ void returnFromCR3Callback(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, un
 QWORD readMSRSafe(DWORD msr);
 void writeMSRSafe(DWORD msr, QWORD value);
 
-int raiseInvalidOpcodeException(pcpuinfo currentcpuinfo); //
+int raiseInvalidOpcodeException(pcpuinfo currentcpuinfo);
 int raisePagefault(pcpuinfo currentcpuinfo, UINT64 address);
 
-void psod(void); //freezes DBVM
+void psod(void);
 
-#endif /*VMCALL_H_*/
+#endif

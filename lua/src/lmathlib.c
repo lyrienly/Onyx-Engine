@@ -1,9 +1,3 @@
-/*
-** $Id: lmathlib.c,v 1.67.1.1 2007/12/27 13:02:25 roberto Exp $
-** Standard mathematical library
-** See Copyright Notice in lua.h
-*/
-
 #include <stdlib.h>
 #include <math.h>
 
@@ -15,11 +9,8 @@
 #include "lauxlib.h"
 #include "lualib.h"
 
-/* 'luai_vectpow()' as a replacement for 'cpow()'. Defined in the header; we
- * don't intrude the code libs internal functions.
- */
 #ifdef LNUM_COMPLEX
-# include "lnum.h"    
+# include "lnum.h"
 #endif
 
 #undef PI
@@ -132,7 +123,7 @@ static int math_atan (lua_State *L) {
 }
 
 static int math_atan2 (lua_State *L) {
-  /* scalars only */
+
   lua_pushnumber(L, _LF(atan2) (luaL_checknumber(L, 1), luaL_checknumber(L, 2)));
   return 1;
 }
@@ -157,14 +148,14 @@ static int math_floor (lua_State *L) {
   return 1;
 }
 
-static int math_fmod (lua_State *L) {  
-  /* scalars only */
+static int math_fmod (lua_State *L) {
+
   lua_pushnumber(L, _LF(fmod) (luaL_checknumber(L, 1), luaL_checknumber(L, 2)));
   return 1;
 }
 
 static int math_modf (lua_State *L) {
-  /* scalars only */
+
   lua_Number ip;
   lua_Number fp = _LF(modf) (luaL_checknumber(L, 1), &ip);
   lua_pushnumber(L, ip);
@@ -183,9 +174,7 @@ static int math_sqrt (lua_State *L) {
 
 static int math_pow (lua_State *L) {
 #ifdef LNUM_COMPLEX
-  /* C99 'cpow' gives somewhat inaccurate results (i.e. (-1)^2 = -1+1.2246467991474e-16i). 
-  * 'luai_vectpow' smoothens such, reusing it is the reason we need to #include "lnum.h".
-  */
+
   lua_pushcomplex(L, luai_vectpow(luaL_checkcomplex(L,1), luaL_checkcomplex(L,2)));
 #else
   lua_pushnumber(L, _LF(pow) (luaL_checknumber(L, 1), luaL_checknumber(L, 2)));
@@ -204,8 +193,7 @@ static int math_log (lua_State *L) {
 
 static int math_log10 (lua_State *L) {
 #ifdef LNUM_COMPLEX
-  /* Not in standard <complex.h> , but easy to calculate: log_a(x) = log_b(x) / log_b(a) 
-  */
+
   lua_pushcomplex(L, _LF(clog) (luaL_checkcomplex(L,1)) / _LF(log) (10));
 #else
   lua_pushnumber(L, _LF(log10) (luaL_checknumber(L, 1)));
@@ -244,11 +232,9 @@ static int math_ldexp (lua_State *L) {
   return 1;
 }
 
-
-
 static int math_min (lua_State *L) {
-  /* scalars only */
-  int n = lua_gettop(L);  /* number of arguments */
+
+  int n = lua_gettop(L);
   lua_Number dmin = luaL_checknumber(L, 1);
   int i;
   for (i=2; i<=n; i++) {
@@ -260,10 +246,9 @@ static int math_min (lua_State *L) {
   return 1;
 }
 
-
 static int math_max (lua_State *L) {
-  /* scalars only */
-  int n = lua_gettop(L);  /* number of arguments */
+
+  int n = lua_gettop(L);
   lua_Number dmax = luaL_checknumber(L, 1);
   int i;
   for (i=2; i<=n; i++) {
@@ -275,15 +260,13 @@ static int math_max (lua_State *L) {
   return 1;
 }
 
-
 static int math_random (lua_State *L) {
-  /* the `%' avoids the (rare) case of r==1, and is needed also because on
-     some systems (SunOS!) `rand()' may return a value larger than RAND_MAX */
+
   lua_Number r = (lua_Number)(rand()%RAND_MAX) / (lua_Number)RAND_MAX;
-  int n= lua_gettop(L);  /* number of arguments */
-  if (n==0) {	/* no arguments: range [0,1) */
+  int n= lua_gettop(L);
+  if (n==0) {
     lua_pushnumber(L, r);
-  } else if (n<=2) {	/* int range [1,u] or [l,u] */
+  } else if (n<=2) {
     int l= n==1 ? 1 : luaL_checkint(L, 1);
     int u = luaL_checkint(L, n);
     int tmp;
@@ -298,15 +281,11 @@ static int math_random (lua_State *L) {
   return 1;
 }
 
-
 static int math_randomseed (lua_State *L) {
   srand(luaL_checkint(L, 1));
   return 0;
 }
 
-/* 
-* Lua 5.1 does not have acosh, asinh, atanh for scalars (not ANSI C)
-*/
 #if __STDC_VERSION__ >= 199901L
 static int math_acosh (lua_State *L) {
 # ifdef LNUM_COMPLEX
@@ -334,9 +313,6 @@ static int math_atanh (lua_State *L) {
 }
 #endif
 
-/* 
- * C99 complex functions, not covered above.
-*/
 #ifdef LNUM_COMPLEX
 static int math_arg (lua_State *L) {
   lua_pushnumber(L, _LF(carg) (luaL_checkcomplex(L,1)));
@@ -363,7 +339,6 @@ static int math_proj (lua_State *L) {
   return 1;
 }
 #endif
-
 
 static const luaL_Reg mathlib[] = {
   {"abs",   math_abs},
@@ -409,10 +384,6 @@ static const luaL_Reg mathlib[] = {
   {NULL, NULL}
 };
 
-
-/*
-** Open math library
-*/
 LUALIB_API int luaopen_math (lua_State *L) {
   luaL_register(L, LUA_MATHLIBNAME, mathlib);
   lua_pushnumber(L, PI);
@@ -427,4 +398,3 @@ LUALIB_API int luaopen_math (lua_State *L) {
 #endif
   return 1;
 }
-

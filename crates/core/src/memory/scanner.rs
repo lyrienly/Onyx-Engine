@@ -1,4 +1,3 @@
-
 use std::sync::{Arc, Mutex};
 use std::thread;
 use crate::process::{MemoryRegion, Process};
@@ -1722,4 +1721,3 @@ mod tests {
         assert_diff!(U64, 10u64);
     }
 }
-

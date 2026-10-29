@@ -1,4 +1,3 @@
-
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -163,4 +162,3 @@ mod tests {
         assert!(!watcher.is_running());
     }
 }
-

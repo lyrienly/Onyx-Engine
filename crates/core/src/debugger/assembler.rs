@@ -1,4 +1,3 @@
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegSize {
     Byte,
@@ -1067,4 +1066,3 @@ mod tests {
         assert_eq!(db, vec![0x90, 0x90, b'O', b'K', 0]);
     }
 }
-

@@ -6,25 +6,23 @@
 
 #include "vmxhelper.h"
 
-
 BOOLEAN MakeWritableKM(PVOID StartAddress,UINT_PTR size)
 {
 #ifndef AMD64
 	UINT_PTR PTE,PDE;
 	struct PTEStruct *x;
-	UINT_PTR CurrentAddress=(UINT_PTR)StartAddress;	
+	UINT_PTR CurrentAddress=(UINT_PTR)StartAddress;
 
 	while (CurrentAddress<((UINT_PTR)StartAddress+size))
 	{
-		//find the PTE or PDE of the selected address
+
 		PTE=(UINT_PTR)CurrentAddress;
 		PTE=PTE/0x1000*PTESize+0xc0000000;
 
 		PTE=(UINT_PTR)StartAddress;
 		PTE=PTE/0x1000*PTESize+0xc0000000;
 
-    	//now check if the address in PTE is valid by checking the page table directory at 0xc0300000 (same location as CR3 btw)
-	    PDE=PTE/0x1000*PTESize+0xc0000000; //same formula
+	    PDE=PTE/0x1000*PTESize+0xc0000000;
 
 		x=(PVOID)PDE;
 		if ((x->P==0) && (x->A2==0))
@@ -35,7 +33,7 @@ BOOLEAN MakeWritableKM(PVOID StartAddress,UINT_PTR size)
 
 		if (x->PS==1)
 		{
-			//big page, no pte
+
 			x->RW=1;
 			CurrentAddress+=PAGE_SIZE_LARGE;
 			continue;
@@ -44,7 +42,7 @@ BOOLEAN MakeWritableKM(PVOID StartAddress,UINT_PTR size)
 		CurrentAddress+=0x1000;
 		x=(PVOID)PTE;
 		if ((x->P==0) && (x->A2==0))
-			continue; //see for explenation the part of the PDE
+			continue;
 
 		x->RW=1;
 	}
@@ -60,36 +58,32 @@ BOOLEAN MakeWritable(PVOID StartAddress,UINT_PTR size,BOOLEAN usecopyonwrite)
 #ifndef AMD64
 	struct PTEStruct *x;
 	unsigned char y;
-	UINT_PTR CurrentAddress=(UINT_PTR)StartAddress;	
+	UINT_PTR CurrentAddress=(UINT_PTR)StartAddress;
 
-	//Makes usermode <0x80000000 writable
-	if (((UINT_PTR)StartAddress>=0x80000000) || ((UINT_PTR)StartAddress+size>=0x80000000)) 
-		return MakeWritableKM(StartAddress,size); //safety check: don't do kernelmemory with this routine
-
-	//4kb pages (assumption, I know, but thats the system i'm working with)
-	//PTE/0x1000*4+0xc0000000;
+	if (((UINT_PTR)StartAddress>=0x80000000) || ((UINT_PTR)StartAddress+size>=0x80000000))
+		return MakeWritableKM(StartAddress,size);
 
 	while (CurrentAddress<((UINT_PTR)StartAddress+size))
 	{
 		__try
 		{
-			y=*(PCHAR)CurrentAddress; //page it in if it wasn't loaded already (BSOD if kernelmode address)
+			y=*(PCHAR)CurrentAddress;
 			x=(PVOID)(CurrentAddress/0x1000*PTESize+0xc0000000);
-			if (x->RW==0) //if it's read only then
+			if (x->RW==0)
 			{
 				if (usecopyonwrite)
-                    x->A1=1;  //set the copy-on-write bit to 1
+                    x->A1=1;
 				else
-					x->RW=1; //just writable
+					x->RW=1;
 			}
 		}
 		__except(1)
 		{
-			//ignore and continue
-		}	
+
+		}
 
         CurrentAddress+=0x1000;
-	}	
+	}
 
 	return TRUE;
 #else
@@ -97,16 +91,10 @@ BOOLEAN MakeWritable(PVOID StartAddress,UINT_PTR size,BOOLEAN usecopyonwrite)
 #endif
 }
 
-
-//this unit will contain the functions and other crap used by the hider function
 BOOLEAN CheckImageName(IN PUNICODE_STRING FullImageName, IN char* List,int listsize)
 {
 #ifndef AMD64
-	/*
-	pre:List has been initialized and all entries are UPPERCASE. Each entry is seperated
-	    by a 0-marker so just setting the pointer ro the start and doing a compare will work
 
-	*/
 	ANSI_STRING tempstring;
 	int i;
 
@@ -121,34 +109,33 @@ BOOLEAN CheckImageName(IN PUNICODE_STRING FullImageName, IN char* List,int lists
 			RtlUpperString(&tempstring,&tempstring);
 
 			p=List;
-	
+
 			for (i=0;i<listsize;i++)
 			{
 				if (List[i]=='\0')
 				{
 					modulesize=i-(INT_PTR)(p-List);
 					if (modulesize>=0)
-					{	
+					{
 						DbgPrint("Checking %s with %s\n",&tempstring.Buffer[tempstring.Length-modulesize],p);
 
 						if ((tempstring.Length>=modulesize) && (strcmp(p,&tempstring.Buffer[tempstring.Length-modulesize])==0))
 						{
-							//we have a match!!!
+
 							DbgPrint("It's a match with %s\n",p);
-							return TRUE;	
-						}						
-	
+							return TRUE;
+						}
+
 					}
 					p=&List[i+1];
 				}
-	
+
 			}
-		
-			
+
 		}
 		__finally
 		{
-			RtlFreeAnsiString(&tempstring);	
+			RtlFreeAnsiString(&tempstring);
 		}
 	}
 
@@ -160,5 +147,5 @@ BOOLEAN CheckImageName(IN PUNICODE_STRING FullImageName, IN char* List,int lists
 
 VOID LoadImageNotifyRoutine(IN PUNICODE_STRING  FullImageName, IN HANDLE  ProcessId, IN PIMAGE_INFO  ImageInfo)
 {
-		
+
 }

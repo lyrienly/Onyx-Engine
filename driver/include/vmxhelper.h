@@ -24,15 +24,12 @@
 #define VMCALL_REDIRECTINT3 24
 #define VMCALL_INT3REDIRECTED 25
 
-//dbvm v6+
 #define VMCALL_READMSR 26
 #define VMCALL_WRITEMSR 27
 
 #define VMCALL_ULTIMAP 28
 #define VMCALL_ULTIMAP_DISABLE 29
 
-
-//dbvm v7+
 #define VMCALL_SWITCH_TO_KERNELMODE 30
 
 #define VMCALL_DISABLE_DATAPAGEFAULTS 31
@@ -44,8 +41,6 @@
 
 #define VMCALL_ULTIMAP_DEBUGINFO 36
 
-
-//dbvm v10+
 #define VMCALL_WATCH_WRITES 41
 #define VMCALL_WATCH_READS 41
 #define VMCALL_WATCH_RETRIEVELOG 43
@@ -61,7 +56,6 @@
 #define VMCALL_ADD_MEMORY 57
 
 #define VMCALL_CAUSEDDEBUGBREAK 63
-
 
 typedef UINT64 QWORD;
 
@@ -86,7 +80,7 @@ typedef struct _CHANGEREGONBPINFO
 		unsigned changeR13 : 1;
 		unsigned changeR14 : 1;
 		unsigned changeR15 : 1;
-		//flags reg:
+
 		unsigned changeCF : 1;
 		unsigned changePF : 1;
 		unsigned changeAF : 1;
@@ -125,7 +119,7 @@ typedef struct _pageevent_basic
 {
 	QWORD VirtualAddress;
 	QWORD PhysicalAddress;
-	QWORD CR3; //in case of kernel or other process
+	QWORD CR3;
 	QWORD FSBASE;
 	QWORD GSBASE;
 	QWORD FLAGS;
@@ -143,8 +137,8 @@ typedef struct _pageevent_basic
 	QWORD R13;
 	QWORD R14;
 	QWORD R15;
-	QWORD RBP; 
-	QWORD RSP; 
+	QWORD RBP;
+	QWORD RSP;
 	QWORD RIP;
 	WORD CS;
 	WORD DS;
@@ -253,7 +247,7 @@ typedef struct _pageeventlistdescriptor
 	DWORD maxSize;
 	DWORD numberOfEntries;
 	DWORD missedEntries;
-	DWORD entryType; //0=PageEventBasic, 1=PageEventExtended, 2=PageEventBasicWithStack, 3=PageEventExtendedWithStack
+	DWORD entryType;
 	union
 	{
 		PageEventBasic basic[0];
@@ -264,23 +258,21 @@ typedef struct _pageeventlistdescriptor
 
 } PageEventListDescriptor, *PPageEventListDescriptor;
 
-
 typedef enum {virt_differentInterrupt=0, virt_emulateInterrupt=1} VMXInterruptRedirectType;
 
 typedef struct
 {
-	UINT64 Active; //set to 1 when active
-	UINT64 CR3; //Holds the CR3 value to watch taskswitch to and from
-	UINT64 DEBUGCTL; //Holds the DebugCTL value to set when inside the target process
-	UINT64 DS_AREA; //Holds the DS_AREA to set when
-	UINT64 OriginalDebugCTL; //When inside the target process this holds the debugctl that was set before entering. Return this on readMSR (and set with writeMSR when inside the process)
-	UINT64 OriginalDS_AREA; //When inside the target process this holds the DS_AREA that was set before entering. Return this with readMSR ('''')
+	UINT64 Active;
+	UINT64 CR3;
+	UINT64 DEBUGCTL;
+	UINT64 DS_AREA;
+	UINT64 OriginalDebugCTL;
+	UINT64 OriginalDS_AREA;
 	UINT64 CR3_switchcount;
 	UINT64 CR3_switchcount2;
 	UINT64 LastOldCR3;
 	UINT64 LastNewCR3;
 } ULTIMAPDEBUGINFO, *PULTIMAPDEBUGINFO;
-
 
 unsigned int vmcall(void *vmcallinfo, unsigned int level1pass);
 
@@ -301,7 +293,6 @@ unsigned int vmx_ultimap_disable();
 
 unsigned int vmx_ultimap_pause();
 unsigned int vmx_ultimap_resume();
-
 
 unsigned int vmx_ultimap_getDebugInfo(PULTIMAPDEBUGINFO debuginfo);
 

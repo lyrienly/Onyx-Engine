@@ -1,8 +1,6 @@
 #ifndef KEYBOARD_H_
 #define KEYBOARD_H_
 
-//keyboard
-//void waitforkeypress(void);
 unsigned char kbd_getstatus(void);
 unsigned char kdb_getoutputport(void);
 unsigned char kdb_getinputport(void);
@@ -17,5 +15,4 @@ unsigned char kbd_getkey(void);
 char kbd_convertscancodetochar(unsigned char scancode, int scancodeset );
 char kbd_getchar(void);
 
-
-#endif /*KEYBOARD_H_*/
+#endif

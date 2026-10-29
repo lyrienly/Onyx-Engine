@@ -1,10 +1,3 @@
-/*
- * test.c
- *
- *  Created on: May 22, 2011
- *      Author: erich
- */
-
 #include "common.h"
 #include "main.h"
 #include "mm.h"
@@ -16,7 +9,6 @@
 int MSR_LASTBRANCH_TOS=0x1C9;
 int MSR_LASTBRANCH_0=0x1DB;
 
-
 int canstoreds=0;
 
 void *DebugStore;
@@ -26,8 +18,6 @@ extern void* cloakTestFunctionEnd;
 extern void* cloakTestFunctionInstruction;
 
 typedef int(*CLOAKTESTFUNCTION)(void);
-
-
 
 int testBranchPrediction(void)
 {
@@ -45,11 +35,8 @@ int testBranchPrediction(void)
 
   displayline("IA32_APIC_BASE=%6\n", IA32_APIC_BASE);
 
-
   LVT_Perfmon_Counter_Register=*(volatile DWORD *)(IA32_APIC_BASE+0x340);
   LVT_Perfmon_Vector=LVT_Perfmon_Counter_Register & 0xff;
-
-
 
   displayline("[IA32_APIC_BASE+0x340]=%x  (perfmon)\n", LVT_Perfmon_Counter_Register);
   displayline("[IA32_APIC_BASE+0x350]=%x  (Lint0)\n", *(DWORD *)(IA32_APIC_BASE+0x350));
@@ -60,7 +47,6 @@ int testBranchPrediction(void)
     displayline("and it was masked\n");
   else
     displayline("and it was unmasked\n");
-
 
   LVT_Perfmon_Counter_Register=0xfe;
   LVT_Perfmon_Vector=LVT_Perfmon_Counter_Register & 0xff;
@@ -73,9 +59,6 @@ int testBranchPrediction(void)
     displayline("and it is masked\n");
   else
     displayline("and it is unmasked\n");
-
-
-
 
   displayline("IA32_DEBUGCTL_MSR=%6\n", readMSR(IA32_DEBUGCTL_MSR));
   {
@@ -90,8 +73,6 @@ int testBranchPrediction(void)
     else
       displayline("This cpu DOES NOT support storing of branch messages\n");
 
-
-
     canstoreds=rcx & (1<<4);
     if (canstoreds)
     {
@@ -102,19 +83,8 @@ int testBranchPrediction(void)
       displayline("This cpu DOES NOT support a cpl qualified ds store\n");
     }
 
-
     displayline("Making sure LBR is enabled");
     writeMSR(IA32_DEBUGCTL_MSR, readMSR(IA32_DEBUGCTL_MSR) | (1 << 0));
-
-    //displayline("Setting bts_off_os");
-    //writeMSR(IA32_DEBUGCTL_MSR, readMSR(IA32_DEBUGCTL_MSR) | (1 << 9));
-
-
-    //displayline("setting bts");
-   // writeMSR(IA32_DEBUGCTL_MSR, readMSR(IA32_DEBUGCTL_MSR) | (1 << 7));
-
-    //displayline("setting BTF");
- //   writeMSR(IA32_DEBUGCTL_MSR, readMSR(IA32_DEBUGCTL_MSR) | (1 << 1));
 
     if (cpu_familyID==0x06)
     {
@@ -149,7 +119,6 @@ int testBranchPrediction(void)
       displayline("testing. turning lbr off\n");
       writeMSR(IA32_DEBUGCTL_MSR, 0);
 
-
       displayline("TOS=%d\n", readMSR(MSR_LASTBRANCH_TOS));
       displayline("Max index=%d\n", maxindex);
       displayline("\n");
@@ -172,11 +141,7 @@ int testBranchPrediction(void)
         i=i % maxindex;
       }
 
-
-
-
     }
-
 
     displayline("Setting up branch recording to memory\n");
     {
@@ -192,8 +157,6 @@ int testBranchPrediction(void)
 
       displayline("The original IA32_DS_AREA=%x\n", readMSR(IA32_DS_AREA));
 
-
-
       DebugStore=malloc(4096);
 
       if (DebugStore)
@@ -203,7 +166,6 @@ int testBranchPrediction(void)
 
         displayline("sizeof(BTS64)=%d\n", sizeof(BTS64));
 
-        //now configure it
         DebugStore64=(PDS_AREA_MANAGEMENT64)DebugStore;
 
         DebugStore64->BTS_BufferBaseAddress=(QWORD)DebugStore64+sizeof(DS_AREA_MANAGEMENT64);
@@ -224,7 +186,6 @@ int testBranchPrediction(void)
         displayline("DebugStore64->BTS_AbsoluteMaxAddress=%x\n", DebugStore64->BTS_AbsoluteMaxAddress);
         displayline("DebugStore64->BTS_InterruptThresholdAddress=%x\n", DebugStore64->BTS_InterruptThresholdAddress);
 
-
         writeMSR(IA32_DS_AREA, (QWORD)DebugStore);
         displayline("The new IA32_DS_AREA=%x\n", readMSR(IA32_DS_AREA));
       }
@@ -233,23 +194,16 @@ int testBranchPrediction(void)
 
     }
 
-
-
-
     writeMSR(IA32_DEBUGCTL_MSR, readMSR(IA32_DEBUGCTL_MSR) | 1 );
 
-
-
-
     writeMSR(IA32_DEBUGCTL_MSR, readMSR(IA32_DEBUGCTL_MSR) | (1<<7) );
-    writeMSR(IA32_DEBUGCTL_MSR, readMSR(IA32_DEBUGCTL_MSR) | (1<<6) ); //start trace
+    writeMSR(IA32_DEBUGCTL_MSR, readMSR(IA32_DEBUGCTL_MSR) | (1<<6) );
 
-    writeMSR(IA32_DEBUGCTL_MSR, readMSR(IA32_DEBUGCTL_MSR) | (1<<8) ); //interrupt when full
+    writeMSR(IA32_DEBUGCTL_MSR, readMSR(IA32_DEBUGCTL_MSR) | (1<<8) );
 
     displayline("IA32_DEBUGCTL_MSR is now %x", readMSR(IA32_DEBUGCTL_MSR));
 
     testBranch();
-
 
   }
 
@@ -276,8 +230,6 @@ int handlePerformanceCounterInterrupt(void)
 
     apic_eoi();
     DebugStore64->BTS_IndexBaseAddress=DebugStore64->BTS_BufferBaseAddress;
-  //  writeMSR(IA32_DEBUGCTL_MSR, (1<<7) | (1<<0) | (1<<6) | (1<<8));
-   // sendstringf("IA32_DEBUGCTL_MSR is now %x\n", readMSR(IA32_DEBUGCTL_MSR));
 
     return 1;
 }
@@ -286,7 +238,6 @@ int getDBVMVersion(void)
 {
   int result;
   VMCALL_BASIC param;
-//  sendstringf("getDBVMVersion\n");
 
   param.command=VMCALL_GETVERSION;
   param.password2=Password2;
@@ -404,7 +355,6 @@ int dbvm_watch_retrievelog(int watchid, void* result, int *size)
   param.resultsize=*size;
   param.copied=0;
 
-
   try
   {
     r=_vmcall(&param);
@@ -442,7 +392,6 @@ int dbvm_watch_delete(int id)
   return r;
 }
 
-
 int dbvm_cloak_activate(QWORD physicalAddress, int mode)
 {
   VMCALL_CLOAK_ACTIVATE_PARAM param;
@@ -451,7 +400,7 @@ int dbvm_cloak_activate(QWORD physicalAddress, int mode)
   param.vmcall.size=sizeof(param);
 
   param.physicalAddress=physicalAddress;
-  param.mode=mode; //single step
+  param.mode=mode;
 
   int r;
   try
@@ -501,7 +450,6 @@ int dbvm_cloak_readExecutable(QWORD PhysicalAddress, void *destination)
   param.physicalAddress=PhysicalAddress;
   param.destination=(QWORD)destination;
 
-
   int r;
   try
   {
@@ -526,7 +474,6 @@ int dbvm_cloak_writeExecutable(QWORD PhysicalAddress, void *source)
   param.physicalAddress=PhysicalAddress;
   param.source=(QWORD)source;
 
-
   int r;
   try
   {
@@ -540,7 +487,6 @@ int dbvm_cloak_writeExecutable(QWORD PhysicalAddress, void *source)
 
   return r;
 }
-
 
 void testfunction()
 {
@@ -556,7 +502,6 @@ void dbvm_cloak_test(void)
 {
   int DBVMVersion=getDBVMVersion();
   int watchid=-1;
-
 
   if (DBVMVersion)
   {
@@ -578,14 +523,10 @@ void dbvm_cloak_test(void)
     r=cloakTestFunction();
     sendstringf("Returned %d\n", r);
 
-
     sendstringf("Calling copy\n");
     r=newtestfunction();
     sendstringf("Returned %d\n", r);
     displayline("Unpatched result is %d\n", r);
-
-
-
 
     sendstring("Patching copy\n");
     unsigned char *funcindex=(unsigned char *)newtestfunction;
@@ -627,16 +568,12 @@ void dbvm_cloak_test(void)
     buf=(unsigned char *)newtestfunction;
     sendstringf("%6:", newtestfunction);
     for (i=0; i<size; i++)
-      sendstringf("%2 ",buf[i]); //when testing, should be all 0xce's
+      sendstringf("%2 ",buf[i]);
 
     sendstringf("\n");
 
-
-
     int aftercloak=generateCRC((unsigned char*)newtestfunction, size);
     displayline("After cloak crc is %x\n", aftercloak);
-
-
 
     sendstringf("Calling newtestfunction: (cloaked, unpatched)\n");
     r=newtestfunction();
@@ -684,30 +621,21 @@ void dbvm_cloak_test(void)
 
     }
 
-
-
-
     r=dbvm_cloak_deactivate(PA);
     displayline("8: crc=%x\n", generateCRC((unsigned char*)newtestfunction, size));
     sendstringf("dbvm_cloak_deactivate(%6) returned %d\n", PA, r);
     sendstringf("\n");
 
-
-
-
   }
   else
     sendstring("Error, no DBVM loaded\n");
 
-
 }
-
 
 void dbvm_watch_execute_test(void)
 {
   int DBVMVersion=getDBVMVersion();
   int watchid=-1;
-
 
   if (DBVMVersion)
   {
@@ -715,18 +643,13 @@ void dbvm_watch_execute_test(void)
     void *results=malloc(8192);
     zeromemory(results,8192);
 
-    writeMSR(EFER_MSR, readMSR(EFER_MSR) & ~(1<<11)); //this is the guest, disable no execute (test)
-
+    writeMSR(EFER_MSR, readMSR(EFER_MSR) & ~(1<<11));
 
     sendstringf("DBVM version is %x\n", DBVMVersion);
 
-
-
     PA=VirtualToPhysical((void *)testfunction);
 
-
     int r;
-
 
     r=dbvm_watch_executes(PA,&watchid);
     sendstringf("dbvm_watch_read returned %d. ID=%d\n", r,watchid);
@@ -742,7 +665,6 @@ void dbvm_watch_execute_test(void)
 
     sendstringf("dbvm_watch_retrievelog returned %d. size=%d\n", ec, size);
 
-
     dbvm_watch_delete(watchid);
 
     free(results);
@@ -751,14 +673,12 @@ void dbvm_watch_execute_test(void)
     sendstring("Error, no DBVM loaded\n");
 }
 
-
 void dbvm_watch_reads_test(void)
 {
   int DBVMVersion=getDBVMVersion();
   volatile int *testvar;
   volatile int *testvar2;
   int watchid=-1;
-
 
   if (DBVMVersion)
   {
@@ -776,17 +696,12 @@ void dbvm_watch_reads_test(void)
 
     PA=VirtualToPhysical((void *)testvar);
 
-
     int r;
-
-
-
 
     sendstringf("testvar has been allocated at %6 which is PA %6\n", testvar, PA);
 
     r=dbvm_watch_reads(PA,&watchid);
     sendstringf("dbvm_watch_read returned %d. ID=%d\n", r,watchid);
-
 
     sendstringf("Reading from same page as testvar but different location (%6)\n", testvar2);
     asm volatile ("": : :"memory");
@@ -817,7 +732,6 @@ void dbvm_watch_reads_test(void)
     int size=8192;
     int ec=dbvm_watch_retrievelog(watchid, results, &size);
     sendstringf("dbvm_watch_retrievelog returned %d. size=%d\n", ec, size);
-
 
     dbvm_watch_delete(watchid);
 
@@ -828,15 +742,12 @@ void dbvm_watch_reads_test(void)
     sendstring("Error, no DBVM loaded\n");
 }
 
-
-
 void dbvm_watch_writes_test(void)
 {
   int DBVMVersion=getDBVMVersion();
   volatile int *testvar;
   volatile int *testvar2;
   int watchid=-1;
-
 
   if (DBVMVersion)
   {
@@ -854,17 +765,12 @@ void dbvm_watch_writes_test(void)
 
     PA=VirtualToPhysical((void *)testvar);
 
-
     int r;
-
-
-
 
     sendstringf("testvar has been allocated at %6 which is PA %6\n", testvar, PA);
 
     r=dbvm_watch_writes(PA,&watchid);
     sendstringf("dbvm_watch_writes returned %d. ID=%d\n", r,watchid);
-
 
     sendstringf("Reading from same page as testvar but different location (%6)\n", testvar2);
     asm volatile ("": : :"memory");
@@ -895,7 +801,6 @@ void dbvm_watch_writes_test(void)
     int size=8192;
     int ec=dbvm_watch_retrievelog(watchid, results, &size);
     sendstringf("dbvm_watch_retrievelog returned %d. size=%d\n", ec, size);
-
 
     dbvm_watch_delete(watchid);
 

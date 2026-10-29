@@ -1,4 +1,3 @@
-
 use std::ffi::c_void;
 use std::mem::{size_of, zeroed};
 use std::ptr::{null, null_mut};
@@ -1071,4 +1070,3 @@ mod tests {
         assert_eq!(val.unwrap(), 0xDEADBEEFCAFE1337);
     }
 }
-

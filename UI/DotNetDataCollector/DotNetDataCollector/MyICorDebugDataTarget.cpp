@@ -1,21 +1,11 @@
-//MyIcorDebugDataTarget
-
 #include "stdafx.h"
-
 
 #include "MyIcorDebugDataTarget.h"
 
-
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// IUnknown
-//
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 STDMETHODIMP CMyIcorDebugDataTarget::QueryInterface(__in REFIID InterfaceId, __out PVOID* Interface)
 {
 	*Interface = NULL;
-	
+
 	if (IsEqualIID(InterfaceId, __uuidof(ICLRDataTarget)))
 	{
 		return E_NOINTERFACE;
@@ -47,17 +37,16 @@ STDMETHODIMP_(ULONG) CMyIcorDebugDataTarget::Release()
 	return nCount;
 }
 
-HRESULT STDMETHODCALLTYPE CMyIcorDebugDataTarget::GetPlatform(/* [out] */ CorDebugPlatform *pTargetPlatform)
+HRESULT STDMETHODCALLTYPE CMyIcorDebugDataTarget::GetPlatform( CorDebugPlatform *pTargetPlatform)
 {
 	if (pTargetPlatform)
 	{
 		BOOL Wow64=TRUE;
-		
 
-		if (_IsWow64Process)		
+		if (_IsWow64Process)
 		{
 			_IsWow64Process(processHandle, &Wow64);
-			if (Wow64)			
+			if (Wow64)
 				*pTargetPlatform=CORDB_PLATFORM_WINDOWS_X86;
 			else
 				*pTargetPlatform=CORDB_PLATFORM_WINDOWS_AMD64;
@@ -65,23 +54,18 @@ HRESULT STDMETHODCALLTYPE CMyIcorDebugDataTarget::GetPlatform(/* [out] */ CorDeb
 		else
 			*pTargetPlatform=CORDB_PLATFORM_WINDOWS_X86;
 
-
-
-		
-
 		return S_OK;
 
-		
 	}
 	else
 	  return E_FAIL;
 }
-        
+
 HRESULT STDMETHODCALLTYPE CMyIcorDebugDataTarget::ReadVirtual(
-		  /* [in] */ CORDB_ADDRESS address,
-            /* [length_is][size_is][out] */ BYTE *pBuffer,
-            /* [in] */ ULONG32 bytesRequested,
-            /* [out] */ ULONG32 *pBytesRead)
+		   CORDB_ADDRESS address,
+             BYTE *pBuffer,
+             ULONG32 bytesRequested,
+             ULONG32 *pBytesRead)
 {
 	SIZE_T bytesread=0;
 	ReadProcessMemory(processHandle, (void *)address, pBuffer, bytesRequested, &bytesread);
@@ -94,12 +78,12 @@ HRESULT STDMETHODCALLTYPE CMyIcorDebugDataTarget::ReadVirtual(
 	else
 		return E_FAIL;
 }
-        
-HRESULT STDMETHODCALLTYPE CMyIcorDebugDataTarget::GetThreadContext( 
-            /* [in] */ DWORD dwThreadID,
-            /* [in] */ ULONG32 contextFlags,
-            /* [in] */ ULONG32 contextSize,
-            /* [size_is][out] */ BYTE *pContext)
+
+HRESULT STDMETHODCALLTYPE CMyIcorDebugDataTarget::GetThreadContext(
+             DWORD dwThreadID,
+             ULONG32 contextFlags,
+             ULONG32 contextSize,
+             BYTE *pContext)
 {
 	CorDebugPlatform platform;
 	GetPlatform(&platform);
@@ -113,26 +97,24 @@ HRESULT STDMETHODCALLTYPE CMyIcorDebugDataTarget::GetThreadContext(
 		{
 			WOW64_CONTEXT context;
 			context.ContextFlags=contextFlags;
-			
+
 			if (Wow64GetThreadContext(hThread, &context))
 			{
-				ZeroMemory(pContext, contextSize);				
-				CopyMemory(pContext, &context, min(contextSize, sizeof(context)));				
+				ZeroMemory(pContext, contextSize);
+				CopyMemory(pContext, &context, min(contextSize, sizeof(context)));
 				result=S_OK;
 			}
 		}
 		else
 		if (platform==CORDB_PLATFORM_WINDOWS_AMD64)
-		{			
+		{
 			CONTEXT context;
 			context.ContextFlags=contextFlags;
 
-			
-			
 			if (::GetThreadContext(hThread, &context))
 			{
-				ZeroMemory(pContext, contextSize);				
-				CopyMemory(pContext, &context, min(contextSize, sizeof(context)));				
+				ZeroMemory(pContext, contextSize);
+				CopyMemory(pContext, &context, min(contextSize, sizeof(context)));
 				result=S_OK;
 			}
 		}

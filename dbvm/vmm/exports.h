@@ -1,13 +1,5 @@
-/*
- * exports.h
- *
- *  Created on: Apr 9, 2018
- *      Author: root
- */
-
 #ifndef VMM_EXPORTS_H_
 #define VMM_EXPORTS_H_
-
 
 #define DBVM_EXPORTLISTVERSION 1;
 typedef struct
@@ -32,11 +24,10 @@ typedef struct
   void *setMSRWriteExit;
   void *removeMSRWriteExit;
 
-
 } DBVMExports, *PDBVMExports;
 
-extern PDBVMExports exportlist; //defined in vmma.asm
+extern PDBVMExports exportlist;
 
 void InitExports();
 
-#endif /* VMM_EXPORTS_H_ */
+#endif

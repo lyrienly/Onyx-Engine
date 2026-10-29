@@ -1,4 +1,3 @@
-
 use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::sync::atomic::AtomicBool;
@@ -17,8 +16,6 @@ fn lock_veh() -> MutexGuard<'static, Option<VehDebugger>> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// Returns the tracked debugger for `pid`, rebuilding it when the caller switched
-/// to another process so late calls can never touch the previous target.
 fn ensure_veh<'a>(
     guard: &'a mut MutexGuard<'static, Option<VehDebugger>>,
     pid: u32,
@@ -89,8 +86,6 @@ pub unsafe extern "C" fn onyx_veh_init(process: *mut Process) -> i32 {
     1
 }
 
-/// On success returns the assigned slot index (0..3).
-/// On failure returns a `HwBpError` code (negative), see `OnyxBackend.pas`.
 #[no_mangle]
 pub unsafe extern "C" fn onyx_veh_set_hw_bp(
     process: *mut Process,
@@ -114,7 +109,6 @@ pub unsafe extern "C" fn onyx_veh_set_hw_bp(
     }
 }
 
-/// Returns 1 on success or a `HwBpError` code (negative) on failure.
 #[no_mangle]
 pub unsafe extern "C" fn onyx_veh_clear_hw_bp(process: *mut Process, index: usize) -> i32 {
     if process.is_null() {
@@ -182,8 +176,6 @@ pub unsafe extern "C" fn onyx_veh_monitor_address(
     let b_size = map_bp_size(size);
     let stop = Arc::new(AtomicBool::new(false));
 
-    // Monitor drives the debug registers itself, so it only needs a slot
-    // reservation to stay out of the way of user breakpoints.
     let slot = {
         let mut guard = lock_veh();
         let veh = ensure_veh(&mut guard, p.pid);
@@ -248,8 +240,6 @@ pub unsafe extern "C" fn onyx_veh_monitor_address(
     }
 }
 
-/// Fills `out_slots` with the occupied DR slots of the current target and returns
-/// the total number of used slots (0..4), or 0 when no session is tracked.
 #[no_mangle]
 pub unsafe extern "C" fn onyx_veh_slot_status(
     process: *mut Process,
@@ -295,7 +285,6 @@ pub unsafe extern "C" fn onyx_veh_slot_status(
     used as i32
 }
 
-/// 1 = registro e hardware conferem, 0 = divergência, negativo = erro.
 #[no_mangle]
 pub unsafe extern "C" fn onyx_veh_verify_slots(process: *mut Process) -> i32 {
     if process.is_null() {
@@ -306,7 +295,7 @@ pub unsafe extern "C" fn onyx_veh_verify_slots(process: *mut Process) -> i32 {
     let guard = lock_veh();
     let veh = match guard.as_ref() {
         Some(veh) if veh.target_pid == p.pid => veh,
-        // Sem sessão gerenciada não há nada para divergir.
+
         _ => return 1,
     };
 

@@ -5,7 +5,6 @@
 #include "main.h"
 #include "vmmhelper.h"
 
-
 int handleInvalidEntryState(pcpuinfo currentcpuinfo,VMRegisters *vmregisters);
 
-#endif /*VMEVENT_INVALIDSTATE_H_*/
+#endif

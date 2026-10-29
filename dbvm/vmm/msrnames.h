@@ -1,10 +1,3 @@
-/*
- * msrnames.h
- *
- *  Created on: Sep 7, 2009
- *      Author: erich
- */
-
 #ifndef MSRNAMES_H_
 #define MSRNAMES_H_
 
@@ -20,7 +13,7 @@
 #define IA32_MISC_ENABLE          0x1a0
 #define IA32_DEBUGCTL_MSR         0x1d9
 
-#define IA32_MTRR_PHYSBASE0       0x200 //access using this+x*0x2
+#define IA32_MTRR_PHYSBASE0       0x200
 #define IA32_MTRR_PHYSMASK0       0x201
 #define IA32_MTRR_PHYSBASE1       0x202
 #define IA32_MTRR_PHYSMASK1       0x203
@@ -41,26 +34,21 @@
 #define IA32_MTRR_PHYSBASE9       0x212
 #define IA32_MTRR_PHYSMASK9       0x213
 
-
-#define IA32_MTRR_FIX64K_00000    0x250  //8*64k blocks  (00000000->0007ffff)
-#define IA32_MTRR_FIX16K_80000    0x258  //8*16k blocks  (00080000->0009ffff)
-#define IA32_MTRR_FIX16K_A0000    0x259  //..            (000a0000->000bffff)
-#define IA32_MTRR_FIX4K_C0000     0x268  //8*4k blocks)  (000c0000->000c7fff)
-#define IA32_MTRR_FIX4K_C8000     0x269  //              (000c8000->000cffff)
-#define IA32_MTRR_FIX4K_D0000     0x26a  //              (000d0000->000d7fff)
-#define IA32_MTRR_FIX4K_D8000     0x26b  //              (000d8000->000dffff)
-#define IA32_MTRR_FIX4K_E0000     0x26c  //              (000e0000->000e7fff)
-#define IA32_MTRR_FIX4K_E8000     0x26d  //              (000e8000->000effff)
-#define IA32_MTRR_FIX4K_F0000     0x26e  //              (000f0000->000f7fff)
-#define IA32_MTRR_FIX4K_F8000     0x26f  //              (000f8000->000fffff)
-
-
+#define IA32_MTRR_FIX64K_00000    0x250
+#define IA32_MTRR_FIX16K_80000    0x258
+#define IA32_MTRR_FIX16K_A0000    0x259
+#define IA32_MTRR_FIX4K_C0000     0x268
+#define IA32_MTRR_FIX4K_C8000     0x269
+#define IA32_MTRR_FIX4K_D0000     0x26a
+#define IA32_MTRR_FIX4K_D8000     0x26b
+#define IA32_MTRR_FIX4K_E0000     0x26c
+#define IA32_MTRR_FIX4K_E8000     0x26d
+#define IA32_MTRR_FIX4K_F0000     0x26e
+#define IA32_MTRR_FIX4K_F8000     0x26f
 
 #define IA32_PAT_MSR    0x277
 
 #define IA32_MTRR_DEF_TYPE_MSR    0x2ff
-
-
 
 #define IA32_VMX_BASIC_MSR          0x480
 #define IA32_VMX_PINBASED_CTLS_MSR  0x481
@@ -86,8 +74,6 @@
 #define IA32_X2APIC_ICR_MSR       0x830
 #define IA32_X2APIC_LVT_PMI_MSR   0x834
 
-
-
 #define EFER_MSR				          0xc0000080
 #define IA32_STAR                 0xc0000081
 #define IA32_LSTAR                0xc0000082
@@ -101,6 +87,6 @@
 #define IA32_TSC_AUX_MSR          0xc0000103
 
 #define VM_IGGNE_MSR           0xc0010115
-#define VM_HSAVE_PA_MSR           0xc0010117 //AMD
+#define VM_HSAVE_PA_MSR           0xc0010117
 
-#endif /* MSRNAMES_H_ */
+#endif

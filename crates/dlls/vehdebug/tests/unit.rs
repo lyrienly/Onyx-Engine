@@ -1,5 +1,3 @@
-//! Testes unitarios do registry e disposicoes do dispatcher.
-
 #![cfg(windows)]
 
 use vehdebug_dll::ffi::*;
@@ -50,8 +48,7 @@ fn registration_drop_removes_handler() {
     let raw = reg.raw();
     assert!(!raw.is_null());
     drop(reg);
-    // Nao ha API publica para checar; o teste serve como smoke de que o
-    // caminho Drop nao panica.
+
 }
 
 #[test]

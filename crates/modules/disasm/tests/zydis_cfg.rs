@@ -2,10 +2,7 @@ use onyx_disasm::{build_cfg, cfg_to_dot, disassemble, FlowType};
 
 #[test]
 fn decodes_known_mov_sequence() {
-    // 48 89 5C 24 08 -> mov [rsp+8], rbx
-    // 48 89 74 24 10 -> mov [rsp+10h], rsi
-    // 57            -> push rdi
-    // C3            -> ret
+
     let code: &[u8] = &[
         0x48, 0x89, 0x5C, 0x24, 0x08,
         0x48, 0x89, 0x74, 0x24, 0x10,
@@ -26,11 +23,7 @@ fn decodes_known_mov_sequence() {
 
 #[test]
 fn cfg_splits_on_conditional_jump() {
-    // 0x1000: 83 F8 00         cmp eax, 0
-    // 0x1003: 74 02            je 0x1007
-    // 0x1005: 90               nop
-    // 0x1006: 90               nop         (fallthrough target)
-    // 0x1007: C3               ret         (jump target)
+
     let code: &[u8] = &[
         0x83, 0xF8, 0x00,
         0x74, 0x02,
@@ -45,7 +38,7 @@ fn cfg_splits_on_conditional_jump() {
     assert!(graph.blocks.len() >= 2, "expected at least 2 blocks");
     let first = graph.blocks.get(&0x1000).expect("entry block");
     assert_eq!(first.entry, 0x1000);
-    // Conditional jump has two successors (branch target + fallthrough).
+
     assert_eq!(first.successors.len(), 2);
     assert!(first.successors.contains(&0x1007));
 }
@@ -76,7 +69,6 @@ fn e2e_disassembles_ntdll_function_and_dumps_cfg() {
     let func_addr = func.expect("NtQueryInformationProcess not found") as *const u8;
     let base = func_addr as u64;
 
-    // Safely copy up to 512 bytes from the function prologue.
     let mut raw = vec![0u8; 512];
     unsafe { std::ptr::copy_nonoverlapping(func_addr, raw.as_mut_ptr(), raw.len()); }
 
@@ -92,7 +84,6 @@ fn e2e_disassembles_ntdll_function_and_dumps_cfg() {
     let dot = cfg_to_dot(&graph);
     assert!(dot.contains("digraph"));
 
-    // Dump artifacts to the session scratchpad for the maintainer.
     let scratch = std::path::Path::new(
         r"C:\Users\susboy\AppData\Local\Temp\claude\c--Users-susboy-Documents-Projects-OnyxEngine\1591b72f-b222-4e3c-8a1f-7cf2a08d69d7\scratchpad",
     );

@@ -5,4 +5,4 @@
 
 int getpid(pcpuinfo currentcpuinfo);
 
-#endif /*OSSPECIFIC_H_*/
+#endif

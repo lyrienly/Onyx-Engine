@@ -1,14 +1,5 @@
-//! SmartScan: varredura em passagem unica com inferencia polimorfica de tipos.
-//!
-//! Em vez de o operador decidir previamente se o valor procurado e `i32`, `f32`,
-//! `i64`, etc, o `smart_scan` percorre o buffer uma unica vez e, em cada offset,
-//! avalia simultaneamente todas as interpretacoes compativeis (respeitando
-//! alinhamento e heuristicas de validade). O resultado e uma lista de
-//! [`SmartHit`] com o tipo inferido para cada endereco candidato.
-
 use std::fmt::Write;
 
-/// Tipos de dados inferidos pelo SmartScan.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ScanType {
     I32,
@@ -25,7 +16,7 @@ impl ScanType {
         match self {
             ScanType::I32 | ScanType::F32 => 4,
             ScanType::I64 | ScanType::F64 | ScanType::Pointer => 8,
-            // Strings tem tamanho variavel; width minimo:
+
             ScanType::StringAscii => 4,
             ScanType::StringUtf16 => 8,
         }
@@ -53,20 +44,16 @@ impl ScanType {
     }
 }
 
-/// Alvo de busca.
 #[derive(Debug, Clone)]
 pub enum SmartTarget {
-    /// Bytes exatos; qualquer offset que inicie com `bytes` casa, com
-    /// inferencia do tipo de acordo com o tamanho e alinhamento.
+
     Exact(Vec<u8>),
-    /// Valor numerico; retorna hits em qualquer tipo numerico (i32/i64/f32/f64)
-    /// cujos bytes no offset se decodifiquem para o valor com tolerancia.
+
     Numeric(f64),
-    /// Enumera tudo que pareca ser dado "razoavel" em cada offset.
+
     Any,
 }
 
-/// Resultado de um candidato.
 #[derive(Debug, Clone)]
 pub struct SmartHit {
     pub address: u64,
@@ -75,18 +62,13 @@ pub struct SmartHit {
     pub interpreted: String,
 }
 
-/// Tolerancia relativa para comparacao de floats em `Numeric`.
 const F_EPSILON: f64 = 1e-6;
 
-/// Range razoavel de ponteiros userland x86_64.
 const PTR_MIN: u64 = 0x1_0000;
 const PTR_MAX: u64 = 0x7FFF_FFFF_FFFF;
 
-/// Range razoavel de inteiros (evita 0xFFFFFFFF e similares).
-/// Qualquer coisa fora do intervalo [-2^31+1, 2^31-1] e marcada como "ruim"
-/// para i32 (ou mantida mas filtrada pela heuristica de "palavras suspeitas").
 fn is_reasonable_i32(v: i32) -> bool {
-    // Rejeita valores que parecem padding/magic.
+
     const BAD: &[i32] = &[
         i32::MIN,
         -1,
@@ -143,8 +125,6 @@ fn is_reasonable_pointer(v: u64) -> bool {
     v >= PTR_MIN && v <= PTR_MAX && (v & 0x7) == 0
 }
 
-/// Verifica string ASCII imprimivel terminada em NUL, len minimo >= 4.
-/// Retorna (string, len_total_incluindo_nul).
 fn try_ascii_string(buf: &[u8]) -> Option<(String, usize)> {
     let mut end = None;
     for (i, &b) in buf.iter().enumerate() {
@@ -167,7 +147,6 @@ fn try_ascii_string(buf: &[u8]) -> Option<(String, usize)> {
     Some((s, e + 1))
 }
 
-/// UTF-16LE imprimivel terminada em 0x0000, len minimo >= 4 chars.
 fn try_utf16_string(buf: &[u8]) -> Option<(String, usize)> {
     if buf.len() < 10 {
         return None;
@@ -211,7 +190,7 @@ fn numeric_matches(v: f64, target: f64) -> bool {
     if !v.is_finite() || !target.is_finite() {
         return false;
     }
-    // Comparacao exata para inteiros, tolerancia relativa para floats.
+
     if target == v {
         return true;
     }
@@ -219,10 +198,6 @@ fn numeric_matches(v: f64, target: f64) -> bool {
     (v - target).abs() <= F_EPSILON * scale
 }
 
-/// Scan unico. Percorre `buffer` uma vez e emite hits inferindo o tipo.
-///
-/// - `base_addr`: endereco virtual correspondente ao byte 0 do buffer.
-/// - `target`: filtro de busca.
 pub fn smart_scan(buffer: &[u8], base_addr: u64, target: SmartTarget) -> Vec<SmartHit> {
     match target {
         SmartTarget::Numeric(n) => scan_numeric(buffer, base_addr, n),
@@ -231,14 +206,10 @@ pub fn smart_scan(buffer: &[u8], base_addr: u64, target: SmartTarget) -> Vec<Sma
     }
 }
 
-/// Hot path para busca numerica. Varredura unica alinhada em 4 bytes;
-/// em cada offset alinhado em 4 testa i32/f32; em offsets alinhados em 8
-/// testa adicionalmente i64/f64/pointer. Sem alocacoes por offset.
 fn scan_numeric(buffer: &[u8], base_addr: u64, target: f64) -> Vec<SmartHit> {
     let len = buffer.len();
     let mut hits: Vec<SmartHit> = Vec::new();
 
-    // Para inteiros comparamos sem conversao para f64 quando o target cabe em i64.
     let target_i64 = if target.fract() == 0.0 && target.abs() < 9.22e18 {
         Some(target as i64)
     } else {
@@ -248,7 +219,6 @@ fn scan_numeric(buffer: &[u8], base_addr: u64, target: f64) -> Vec<SmartHit> {
     let scale = target_f.abs().max(1.0);
     let eps = F_EPSILON * scale;
 
-    // Precomputa bits para match exato rapido quando target cabe em i32/f32 exato.
     let target_i32_bits: Option<i32> = target_i64
         .and_then(|t| i32::try_from(t).ok());
     let target_f32_bits: Option<u32> = {
@@ -265,15 +235,14 @@ fn scan_numeric(buffer: &[u8], base_addr: u64, target: f64) -> Vec<SmartHit> {
 
     let p = buffer.as_ptr();
     let mut off = 0usize;
-    // Loop desenrolado: processa chunks de 8 bytes (dois i32 + um i64/f64/ptr).
+
     while off + 8 <= len {
         unsafe {
-            // Primeiro i32 (offset off, alinhado 8 ⇒ alinhado 4).
+
             let v32a = std::ptr::read_unaligned(p.add(off) as *const i32);
             let v32b = std::ptr::read_unaligned(p.add(off + 4) as *const i32);
             let v64 = std::ptr::read_unaligned(p.add(off) as *const i64);
 
-            // ----- i32 match exato -----
             if let Some(t) = target_i32_bits {
                 if v32a == t {
                     hits.push(SmartHit {
@@ -293,7 +262,6 @@ fn scan_numeric(buffer: &[u8], base_addr: u64, target: f64) -> Vec<SmartHit> {
                 }
             }
 
-            // ----- f32 match (bits exato ou tolerante) -----
             let bits_a = v32a as u32;
             let bits_b = v32b as u32;
             if let Some(tb) = target_f32_bits {
@@ -316,7 +284,7 @@ fn scan_numeric(buffer: &[u8], base_addr: u64, target: f64) -> Vec<SmartHit> {
                     });
                 }
             } else {
-                // Fallback: tolerante (apenas quando target nao bate exato em f32).
+
                 let fva = f32::from_bits(bits_a);
                 if fva.is_finite() && (fva as f64 - target_f).abs() <= eps {
                     hits.push(SmartHit {
@@ -337,7 +305,6 @@ fn scan_numeric(buffer: &[u8], base_addr: u64, target: f64) -> Vec<SmartHit> {
                 }
             }
 
-            // ----- i64 match exato -----
             if let Some(t) = target_i64 {
                 if v64 == t {
                     hits.push(SmartHit {
@@ -349,7 +316,6 @@ fn scan_numeric(buffer: &[u8], base_addr: u64, target: f64) -> Vec<SmartHit> {
                 }
             }
 
-            // ----- f64 bits -----
             let u64v = v64 as u64;
             if u64v == target_f64_bits {
                 let fv = f64::from_bits(u64v);
@@ -361,7 +327,6 @@ fn scan_numeric(buffer: &[u8], base_addr: u64, target: f64) -> Vec<SmartHit> {
                 });
             }
 
-            // ----- pointer -----
             if ptr_mode && u64v == target_ptr {
                 hits.push(SmartHit {
                     address: base_addr.wrapping_add(off as u64),
@@ -374,7 +339,6 @@ fn scan_numeric(buffer: &[u8], base_addr: u64, target: f64) -> Vec<SmartHit> {
         off += 8;
     }
 
-    // Cauda: possivel i32 remanescente.
     while off + 4 <= len {
         let v32 = unsafe { std::ptr::read_unaligned(p.add(off) as *const i32) };
         if target_i64.is_some_and(|t| (v32 as i64) == t) {
@@ -437,7 +401,6 @@ fn scan_any(buffer: &[u8], base_addr: u64) -> Vec<SmartHit> {
     let len = buffer.len();
     let mut hits: Vec<SmartHit> = Vec::new();
 
-    // Pass 1: numeric sweep stride 4.
     let mut off = 0usize;
     while off + 4 <= len {
         let p = buffer.as_ptr();
@@ -497,7 +460,6 @@ fn scan_any(buffer: &[u8], base_addr: u64) -> Vec<SmartHit> {
         off += 4;
     }
 
-    // Pass 2: strings byte a byte. Fail-fast: 1o byte precisa ser printable.
     let mut i = 0usize;
     while i < len {
         let b = buffer[i];
@@ -516,7 +478,6 @@ fn scan_any(buffer: &[u8], base_addr: u64) -> Vec<SmartHit> {
         i += 1;
     }
 
-    // Pass 3: UTF-16 em offsets pares com primeiro byte printable + segundo byte 0.
     let mut i = 0usize;
     while i + 10 <= len {
         if buffer[i + 1] == 0 && (0x20..=0x7E).contains(&buffer[i]) {
@@ -537,7 +498,6 @@ fn scan_any(buffer: &[u8], base_addr: u64) -> Vec<SmartHit> {
     hits
 }
 
-/// Formatacao conveniente de hits para logs/debug.
 pub fn format_hits(hits: &[SmartHit]) -> String {
     let mut out = String::new();
     for h in hits {

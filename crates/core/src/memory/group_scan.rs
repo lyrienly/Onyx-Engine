@@ -1,4 +1,3 @@
-
 use crate::memory::scanner::ValType;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -452,4 +451,3 @@ mod tests {
         assert_eq!(offsets, vec![16, 8]);
     }
 }
-

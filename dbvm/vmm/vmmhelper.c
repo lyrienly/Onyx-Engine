@@ -4,9 +4,6 @@
 #include "neward.h"
 #include "mm.h"
 
-/*
-#include "vmmemu.h"
-*/
 #include "vmcall.h"
 #include "vmpaging.h"
 #include "vmeventhandler.h"
@@ -31,18 +28,13 @@
 
 #include "apic.h"
 
-
 #ifndef DEBUG
 #define sendstringf(s,x...)
 #define sendstring(s)
 #endif
 
-//cpu specific stuff, put inside structure and give each cpu one
-
-
 DBVM_PLUGIN_EXIT_PRE *dbvm_plugin_exit_pre;
 DBVM_PLUGIN_EXIT_POST *dbvm_plugin_exit_post;
-
 
 int ISPAGING(pcpuinfo currentcpuinfo)
 {
@@ -78,7 +70,6 @@ int ISREALMODE(pcpuinfo currentcpuinfo)
   }
 }
 
-
 int IS64BITPAGING(pcpuinfo currentcpuinfo)
 {
   if (isAMD)
@@ -101,9 +92,8 @@ int IS64BITCODE(pcpuinfo currentcpuinfo)
     return IS64BITPAGING(currentcpuinfo) && ((vmread(vm_guest_cs_access_rights) >> 13) & 1);
 }
 
-
 int isDebugFault(QWORD dr6, QWORD dr7)
-//returns 1 if this results in a Fault
+
 {
   regDR6 d6;
   regDR7 d7;
@@ -112,9 +102,9 @@ int isDebugFault(QWORD dr6, QWORD dr7)
   d7.DR7=dr7;
 
   if ((d6.BD) && (d7.GD))
-    return 1; //general detect is a fault
+    return 1;
   else
-    return 0; //everything else is a trap
+    return 0;
 
 }
 
@@ -145,7 +135,7 @@ char * getVMExitReassonString(void)
     case 24: return "VMRESUME";
 	  case 25: return "VMWRITE";
 	  case vm_exit_vmxoff: return "VMXOFF";
-	  case vm_exit_vmxon: return "VMXON"; //or: omg it's one bee
+	  case vm_exit_vmxon: return "VMXON";
 	  case 28: return "Controlregister access";
 	  case vm_exit_io_access: return "IO Access";
 
@@ -168,9 +158,7 @@ char * getVMExitReassonString(void)
 }
 
 char * getVMInstructionErrorString(void)
-/*
- * get the last vm error and return a pointer to the string describing that error
- */
+
 {
   int i=vmread(0x4400) & 0x1f;
   char *result;
@@ -205,11 +193,8 @@ char * getVMInstructionErrorString(void)
     default: result="Undefined"; break;
   }
 
-
   return result;
 }
-
-
 
 void setTrap(void)
 {
@@ -227,19 +212,16 @@ void setResumeFlag(void)
   vmwrite(vm_guest_rflags,(UINT64)guestrflags);
 }
 
-
-
 void setupTSS8086(void)
-// sets up the TSS used for realmode emulation
+
 {
   unsigned char *c;
   sendstring("Seting up TSS (for VM8086)\n\r");
 
-    // setup the TSS for virtual 8086 mode
   VirtualMachineTSS_V8086->Previous_Task_Link=0;
   VirtualMachineTSS_V8086->Reserved1=0;
   VirtualMachineTSS_V8086->ESP0=(ULONG)VirtualToPhysical((void *)((UINT64)RealmodeRing0Stack+4096-16));
-  VirtualMachineTSS_V8086->SS0=8; //32-bit code segment
+  VirtualMachineTSS_V8086->SS0=8;
   VirtualMachineTSS_V8086->Reserved2=0;
   VirtualMachineTSS_V8086->ESP1=0;
   VirtualMachineTSS_V8086->SS1=0;
@@ -249,7 +231,7 @@ void setupTSS8086(void)
   VirtualMachineTSS_V8086->Reserved4=0;
   VirtualMachineTSS_V8086->CR3=(ULONG)VirtualToPhysical(nonpagedEmulationPagedir);
   VirtualMachineTSS_V8086->EIP=0;
-  VirtualMachineTSS_V8086->EFLAGS=0x33000; //x86 vm
+  VirtualMachineTSS_V8086->EFLAGS=0x33000;
   VirtualMachineTSS_V8086->EAX=0;
   VirtualMachineTSS_V8086->ECX=0;
   VirtualMachineTSS_V8086->EDX=0;
@@ -278,7 +260,7 @@ void setupTSS8086(void)
 
   zeromemory((void *)((UINT64)VirtualMachineTSS_V8086+ sizeof(TSS)),32);
 
-  *(ULONG *)(VirtualMachineTSS_V8086+ sizeof(TSS))=0x200000; //int 0x15 break
+  *(ULONG *)(VirtualMachineTSS_V8086+ sizeof(TSS))=0x200000;
 
   zeromemory((void *)((UINT64)VirtualMachineTSS_V8086+ sizeof(TSS)+31),8193);
 
@@ -286,70 +268,8 @@ void setupTSS8086(void)
 
   c[sizeof(TSS)+32+8192]=0xff;
 
-  //c[sizeof(TSS)+0]=0xff; //ff; //break on 0 to 7
-  //c[sizeof(TSS)+1]=0xff;
-  //c[sizeof(TSS)+2]=0xff;
-  //c[sizeof(TSS)+3]=0xff;
-  //c[sizeof(TSS)+4]=0xff;
-
-  c[sizeof(TSS)+2]=0x20; //0x20=break on int15*/  // 0x28; //break on int15 and int13
+  c[sizeof(TSS)+2]=0x20;
 }
-/*
-
-
-void exportwholevmstate(void)
-{
-  //this routine will show every vmx register
-  int orig=nosendchar[getAPICID()];
-  unsigned int i;
-  nosendchar[getAPICID()]=0;
-
-  sendstring("\n\r\n\r");
-  sendstring("---------------------------------------------\n\r");
-  for (i=0x800; i<=0x80e; i+=2)
-    sendstringf("%x : %8\n\r", i, vmread(i));
-
-  for (i=0xc00; i<=0xc0c; i+=2)
-    sendstringf("%x : %8\n\r", i, vmread(i));
-
-  for (i=0x2000; i<=0x200d; i++)
-    sendstringf("%x : %8\n\r", i, vmread(i));
-
-  for (i=0x2010; i<=0x2013; i++)
-    sendstringf("%x : %8\n\r", i, vmread(i));
-
-  for (i=0x2800; i<=0x2803; i++)
-    sendstringf("%x : %8\n\r", i, vmread(i));
-
-  for (i=0x4000; i<=0x401c; i+=2)
-    sendstringf("%x : %8\n\r", i, vmread(i));
-
-  for (i=0x4400; i<=0x440e; i+=2)
-    sendstringf("%x : %8\n\r", i, vmread(i));
-
-  for (i=0x4800; i<=0x482a; i+=2)
-    sendstringf("%x : %8\n\r", i, vmread(i));
-
-  sendstringf("%x : %8\n\r", 0x4c00, vmread(0x4c00));
-
-  for (i=0x6000; i<=0x600e; i+=2)
-    sendstringf("%x : %8\n\r", i, vmread(i));
-
-  for (i=0x6400; i<=0x640a; i+=2)
-    sendstringf("%x : %8\n\r", i, vmread(i));
-
-  for (i=vm_guest_cr0; i<=0x6826; i+=2)
-    sendstringf("%x : %8\n\r", i, vmread(i));
-
-  for (i=0x6c00; i<=0x6c16; i+=2)
-    sendstringf("%x : %8\n\r", i, vmread(i));
-
-  sendstring("---------------------------------------------\n\r");
-
-  nosendchar[getAPICID()]=orig;
-}
-
-*/
 
 void StoreVirtualMachineState(pcpuinfo currentcpuinfo UNUSED, VMRegisters *registers UNUSED)
 {
@@ -358,7 +278,6 @@ void StoreVirtualMachineState(pcpuinfo currentcpuinfo UNUSED, VMRegisters *regis
   vmstates[vmstates_pos].rsp=vmread(vm_guest_rsp);
   vmstates[vmstates_pos].rip=vmread(vm_guest_rip);
   vmstates[vmstates_pos].rflags=vmread(vm_guest_rflags);
-
 
   vmstates[vmstates_pos].efer=currentcpuinfo->efer;
 
@@ -380,14 +299,11 @@ void StoreVirtualMachineState(pcpuinfo currentcpuinfo UNUSED, VMRegisters *regis
   vmstates[vmstates_pos].ldtr_base=vmread(vm_guest_ldtr_base);
   vmstates[vmstates_pos].tr_base=vmread(vm_guest_tr_base);
 
-
   vmstates[vmstates_pos].exit_reason=vmread(vm_exit_reason);
   vmstates[vmstates_pos].exit_interruptioninfo=vmread(vm_exit_interruptioninfo);
   vmstates[vmstates_pos].exit_interruptionerror=vmread(vm_exit_interruptionerror);
   vmstates[vmstates_pos].idtvector_information=vmread(vm_idtvector_information);
   vmstates[vmstates_pos].idtvector_error=vmread(vm_idtvector_error);
-
- // vmstates[vmstates_pos].cr3=vmread(vm_guest_cr3);
 
   vmstates_pos++;
   vmstates_pos=vmstates_pos % 4;
@@ -397,8 +313,8 @@ void StoreVirtualMachineState(pcpuinfo currentcpuinfo UNUSED, VMRegisters *regis
 void displayPreviousStates(void)
 {
 #ifdef DEBUG
-  //find previous data
-  int previous_state=(vmstates_pos+2) % 4; //I need the one 2 steps back
+
+  int previous_state=(vmstates_pos+2) % 4;
   int current_state=(vmstates_pos+3) % 4;
   int itterator;
 
@@ -413,13 +329,11 @@ void displayPreviousStates(void)
     sendstringf("%s%d: RAX=%x\n", ((itterator==previous_state)?"*":""), itterator, vmstates[itterator].registers.rax);
     sendstringf("%s%d: Exit reason=%8 (%d) \n\r", ((itterator==previous_state)?"*":""),itterator, vmstates[itterator].exit_reason,vmstates[itterator].exit_reason & 0x0fffffff);
 
-
     sendstringf("%s%d: VM-exit interruption information=%x\n\r", ((itterator==previous_state)?"*":""), itterator, vmstates[itterator].exit_interruptioninfo);
 
     sendstringf("%s%d: VM-exit interruption error code=%x\n\r", ((itterator==previous_state)?"*":""), itterator, vmstates[itterator].exit_interruptionerror);
     sendstringf("%s%d: IDT-vectoring information field=%x\n\r", ((itterator==previous_state)?"*":""), itterator,vmstates[itterator].idtvector_information);
     sendstringf("%s%d: IDT-vectoring error code=%x\n\r", ((itterator==previous_state)?"*":""), itterator,vmstates[itterator].idtvector_error);
-
 
     if (itterator!=current_state)
     {
@@ -432,7 +346,6 @@ void displayPreviousStates(void)
   }
 #endif
 }
-
 
 void sendvmstate(pcpuinfo currentcpuinfo UNUSED, VMRegisters *registers UNUSED)
 {
@@ -460,18 +373,16 @@ void sendvmstate(pcpuinfo currentcpuinfo UNUSED, VMRegisters *registers UNUSED)
     sendstringf("FS_BASE_MSR=%6\n", readMSR(IA32_FS_BASE_MSR));
     sendstringf("GS_BASE_MSR=%6\n", readMSR(IA32_GS_BASE_MSR));
 
-    if (registers)    // print registers
+    if (registers)
     {
       sendstringf("RAX=%6 RBX=%6   R8=%6\n\r", currentcpuinfo->vmcb->RAX, registers->rbx, registers->r8);
       sendstringf("RCX=%6 RDX=%6   R9=%6\n\r", registers->rcx, registers->rdx, registers->r9);
       sendstringf("RSI=%6 RDI=%6  R10=%6\n\r",registers->rsi, registers->rdi,  registers->r10);
       sendstringf("RBP=%6                       R11=%6\n\r",registers->rbp, registers->r11);
 
-
     }
     else
       sendstring("\n...no registers...\n\n");
-
 
     sendstringf("RSP=%6                       R12=%6\n\r",currentcpuinfo->vmcb->RSP, registers?registers->r12:0);
     sendstringf("RIP=%6                       R13=%6\n\r",currentcpuinfo->vmcb->RIP, registers?registers->r13:0);
@@ -480,7 +391,6 @@ void sendvmstate(pcpuinfo currentcpuinfo UNUSED, VMRegisters *registers UNUSED)
 
     sendstringf("rflags=%6 (VM=%d RF=%d IOPL=%d NT=%d)\n\r",rflags,prflags->VM, prflags->RF, prflags->IOPL, prflags->NT);
     sendstringf("(CF=%d PF=%d AF=%d ZF=%d SF=%d TF=%d IF=%d DF=%d OF=%d)\n\r\n\r", prflags->CF, prflags->PF, prflags->AF, prflags->ZF, prflags->SF, prflags->TF, prflags->IF, prflags->DF, prflags->OF);
-
 
     sendstringf("cs=%8  (base=%6 , limit=%8, AT=%8)\n\r",currentcpuinfo->vmcb->cs_selector, currentcpuinfo->vmcb->cs_base, currentcpuinfo->vmcb->cs_limit, currentcpuinfo->vmcb->cs_attrib);
     sendstringf("ss=%8  (base=%6 , limit=%8, AT=%8)\n\r",currentcpuinfo->vmcb->ss_selector, currentcpuinfo->vmcb->ss_base, currentcpuinfo->vmcb->ss_limit, currentcpuinfo->vmcb->ss_attrib);
@@ -517,19 +427,16 @@ void sendvmstate(pcpuinfo currentcpuinfo UNUSED, VMRegisters *registers UNUSED)
 
     sendstringf("IA32_SYSENTER_CS=%x IA32_SYSENTER_EIP=%x IA32_SYSENTER_ESP=%x\n",vmread(vm_guest_IA32_SYSENTER_CS), vmread(vm_guest_IA32_SYSENTER_EIP), vmread(vm_guest_IA32_SYSENTER_ESP) );
 
-
-    if (registers) 		// print registers
+    if (registers)
     {
       sendstringf("RAX=%6 RBX=%6   R8=%6\n\r", registers->rax, registers->rbx, registers->r8);
       sendstringf("RCX=%6 RDX=%6   R9=%6\n\r", registers->rcx, registers->rdx, registers->r9);
       sendstringf("RSI=%6 RDI=%6  R10=%6\n\r",registers->rsi, registers->rdi,  registers->r10);
       sendstringf("RBP=%6                       R11=%6\n\r",registers->rbp, registers->r11);
 
-
     }
     else
       sendstring("\n...no registers...\n\n");
-
 
     sendstringf("RSP=%6                       R12=%6\n\r",vmread(vm_guest_rsp), registers?registers->r12:0);
     sendstringf("RIP=%6                       R13=%6\n\r",vmread(vm_guest_rip), registers?registers->r13:0);
@@ -623,9 +530,7 @@ void sendvmstate(pcpuinfo currentcpuinfo UNUSED, VMRegisters *registers UNUSED)
       if (dr7.LEN3)
         sendstringf("LEN3 ");
 
-
     }
-
 
     sendstringf("host dr7=%6\n\r", getDR7());
     sendstringf("cr2=%6\n\r",getCR2());
@@ -646,7 +551,6 @@ void sendvmstate(pcpuinfo currentcpuinfo UNUSED, VMRegisters *registers UNUSED)
     else
       sendstringf("cr0=%6 cr3=%6 cr4=%6\n\r",vmread(vm_cr0_read_shadow), currentcpuinfo->guestCR3, vmread(vm_cr4_read_shadow));
 
-
   }
 
   if (currentcpuinfo->vmxdata.insideVMXRootMode)
@@ -655,8 +559,6 @@ void sendvmstate(pcpuinfo currentcpuinfo UNUSED, VMRegisters *registers UNUSED)
     sendstringf("VMCS=%6\n\r", currentcpuinfo->vmxdata.guest_activeVMCS);
     sendstringf("running=%d\n\r", currentcpuinfo->vmxdata.runningvmx);
   }
-
-
 
 #endif
 
@@ -673,7 +575,6 @@ void sendvmstate(pcpuinfo currentcpuinfo UNUSED, VMRegisters *registers UNUSED)
     }
   }
 }
-
 
 void sendvmstateFull(pcpuinfo currentcpuinfo UNUSED, VMRegisters *registers UNUSED)
 {
@@ -745,7 +646,6 @@ void sendvmstateFull(pcpuinfo currentcpuinfo UNUSED, VMRegisters *registers UNUS
     sendstringf("vm_host_rsp=%6\n", currentcpuinfo->vmxdata.originalhoststate.RSP);
     sendstringf("vm_host_rip=%6\n", currentcpuinfo->vmxdata.originalhoststate.RIP);
 
-
     sendstring("-----------------------------------------\n");
     sendstring("|               DBVM                    |\n");
     sendstring("-----------------------------------------\n");
@@ -782,10 +682,7 @@ void sendvmstateFull(pcpuinfo currentcpuinfo UNUSED, VMRegisters *registers UNUS
 
 }
 
-
-//int autocont=8;
 int twister=0;
-//int guestwantstoknow=0;
 
 #if DISPLAYDEBUG==1
 int verbosity=10;
@@ -793,16 +690,14 @@ int verbosity=10;
 int verbosity=0;
 #endif
 int rotations=0;
-int cpu2=0; //debug to stop cpu1 when cpu2 is spawned
+int cpu2=0;
 
 int vmeventcount=0;
 criticalSection vmexitlock={.name="vmexitlock", .debuglevel=0};
 
-
 int vmexit_amd(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave UNUSED)
 {
- // displayline("vmexit_amd called. currentcpuinfo=%p\n", currentcpuinfo);
- // displayline("cpunr=%d\n", currentcpuinfo->cpunr);
+
   int result=0;
   currentcpuinfo->insideHandler=1;
 
@@ -817,10 +712,6 @@ int vmexit_amd(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave UNUSED)
   }
   vmeventcount++;
 
-
-
-
-
 #ifdef DEBUG
   csEnter(&vmexitlock);
 
@@ -832,9 +723,6 @@ int vmexit_amd(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave UNUSED)
       sendstringf("lockcount inconsistency 3.  %d != %d  (%d)\n",vmexitlock.apicid,currentcpuinfo->apicid, getAPICID() );
     }
   }
-
-
-  //sendstringf("vmexit_amd for cpu %d\n", currentcpuinfo->cpunr);
 
 #endif
 
@@ -856,8 +744,6 @@ int vmexit_amd(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave UNUSED)
 
   if (dbvm_plugin_exit_post)
     dbvm_plugin_exit_post(exportlist, currentcpuinfo, registers, fxsave, &result);
-
-
 
 #ifdef DEBUG
   if (vmexitlock.lockcount>1)
@@ -908,7 +794,7 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
   {
 	  nosendchar[getAPICID()]=0;
 	  enableserial();
-	  //sendstringf("*Alive*\n");
+
 	  lastbeat=_rdtsc();
   }
 
@@ -923,7 +809,7 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
       nosendchar[getAPICID()]=0;
       sendstringf("NMI %d waiting till done\n", currentcpuinfo->cpunr);
       currentcpuinfo->WaitingTillDone=1;
-      //apic_eoi();
+
       while (currentcpuinfo->WaitTillDone) _pause();
 
       sendstringf("NMI %d done waiting\n", currentcpuinfo->cpunr);
@@ -936,18 +822,12 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
   }
 #endif
 
-
-
-
-  //debug code
   csEnter(&vmexitlock);
   int used_vmstates_pos=vmstates_pos;
 
-  StoreVirtualMachineState(currentcpuinfo, (VMRegisters*)registers); //store the event and all other information
-
+  StoreVirtualMachineState(currentcpuinfo, (VMRegisters*)registers);
 
   result=vmexit2(currentcpuinfo, registers, fxsave);
-
 
   vmstates[used_vmstates_pos].exit_cs=vmread(vm_guest_cs);
   vmstates[used_vmstates_pos].exit_cs_base=vmread(vm_guest_cs_base);
@@ -958,16 +838,11 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
   vmstates[used_vmstates_pos].exit_rsp=vmread(vm_guest_rsp);
   vmstates[used_vmstates_pos].exit_rflags=vmread(vm_guest_rflags);
 
-  //vmstates[used_vmstates_pos].exit_cr3=vmread(vm_guest_cr3);
-
-
-
   if ((result) && ((result >> 8)!=0xce))
   {
     nosendchar[getAPICID()]=0;
     sendvmstate(currentcpuinfo, (VMRegisters*)registers);
   }
-
 
   csLeave(&vmexitlock);
 
@@ -976,7 +851,6 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
 
 int vmexit2(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
 #else
-
 
 int showlife=0;
 
@@ -1006,25 +880,17 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
   }
 #endif
 
-
-
-
-
 #ifdef debuglastexits
   csEnter(&lastexitscs);
   lastexits[lastexitsindex]=vmread(vm_exit_reason);
-  lastexitsindex++; //<----multithreaded issues here
+  lastexitsindex++;
   lastexitsindex=lastexitsindex % 10;
   csLease(&lastexitscs);
 
- // if ((showlife % 2)==0)
   {
     ddDrawRectangle(0,DDVerticalResolution-10,10,10,0x0000ff);
   }
 #endif
-
-
-
 
 #ifdef CHECKAPICID
   if (currentcpuinfo)
@@ -1035,7 +901,6 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
       while(1);
     }
 
-
   }
   else
   {
@@ -1043,8 +908,6 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
     while (1);
   }
 #endif
-
-
 
   if (dbvm_plugin_exit_pre)
   {
@@ -1055,7 +918,6 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
       return 0;
     }
   }
-
 
   if (currentcpuinfo==NULL)
   {
@@ -1080,72 +942,27 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
     return r;
   }
 
-  if (hasUnrestrictedSupport) //do this till I have added support for all efer read spots
+  if (hasUnrestrictedSupport)
   {
-    //currentcpuinfo->efer=vmread(vm_guest_IA32_EFER);
+
     currentcpuinfo->guestCR0=vmread(vm_guest_cr0);
-    //currentcpuinfo->guestCR4=vmread(vm_guest_cr4);
+
   }
-
-
-  //if (ISPAGING(currentcpuinfo)==1)
-  //  currentcpuinfo->guestCR3=vmread(vm_guest_cr3);
-
-
- // nosendchar[getAPICID()]=1;
-  //return handleVMEvent(currentcpuinfo, (VMRegisters*)registers, fxsave);
-
 
   int skip=0;
   vmeventcount++;
-/*
-  //check if it's a (dos)timer event
-  if ((vmread(vm_exit_reason)==0) && (vmread(vm_exit_interruptioninfo)==0x80000b0d) && (vmread(vm_idtvector_information)==0x80000008))
-  {
-    return handleVMEvent(currentcpuinfo, (VMRegisters*)registers, fxsave);
-  }
-
-  //check if it's a pre-emptiontimer event
-  if (vmread(vm_exit_reason)==vm_exit_vmx_preemptiontimer_reachedzero)
-  {
-    return handleVMEvent(currentcpuinfo, (VMRegisters*)registers, fxsave);
-  }
-*/
 
   int result;
 
-
 #ifndef DEBUG
-  volatile int wait=1; //debug var
+  volatile int wait=1;
 
-//  currentdisplayline=currentcpuinfo->cpunr+1;
-//  currentdisplayrow=0;
-//  displayline("%d: %d:%x (%x,%x)                              \n",currentcpuinfo->cpunr,vmeventcount,vmread(vm_exit_reason),vmread(vm_guest_cs),vmread(vm_guest_rip));
-
-  //nosendchar[getAPICID()]=1;
   result=handleVMEvent(currentcpuinfo, (VMRegisters*)registers, fxsave);
 
   if (dbvm_plugin_exit_post)
     dbvm_plugin_exit_post(exportlist, currentcpuinfo, registers, fxsave, &result);
 
-
-  /*
-  if (idtvectorinfo.valid)
-  {
-    VMEntry_interruption_information entryintinfo;
-
-    entryintinfo.interruption_information=vmread(vm_entry_interruptioninfo);
-    if (entryintinfo.valid==0)
-    {
-      while (1);
-    }
-  }*/
-
-
-
-
-
-  if (currentcpuinfo->NMIOccured==2) //nmi occured but no NMI window support
+  if (currentcpuinfo->NMIOccured==2)
   {
     ddDrawRectangle(0,DDVerticalResolution-100,100,100,0x0000ff);
 
@@ -1153,24 +970,19 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
     return raiseNMI();
   }
 
-  //currentcpuinfo->lastTSCTouch=_rdtsc();
-
-
-  //if ((showlife % 2)==0)
   {
     ddDrawRectangle(0,DDVerticalResolution-10,10,10,0x00ff00);
   }
 
   showlife++;
 
-
-  if ((result!=0) && ((result >> 8) != 0xce)  )//on release, if an unexpected event happens, just fail the instruction and hope the OS won't make a too big mess out of it
+  if ((result!=0) && ((result >> 8) != 0xce)  )
   {
     ddDrawRectangle(0,DDVerticalResolution-100,100,100,0xff0000);
-    while (wait) ; //remove for release
+    while (wait) ;
 
-    if ((vmread(vm_exit_reason) & 0x7fffffff)==vm_exit_invalid_guest_state) //invalid state
-      return raiseGeneralProtectionFault(0); //perhaps this can fix it, else fuck
+    if ((vmread(vm_exit_reason) & 0x7fffffff)==vm_exit_invalid_guest_state)
+      return raiseGeneralProtectionFault(0);
     else
       return raiseInvalidOpcodeException(currentcpuinfo);
   }
@@ -1184,65 +996,20 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
     return result;
   }
 
-
 #else
-  //nosendchar[getAPICID()]=0;
-  //sendstringf("%x:%x\n",vmread(vm_guest_cs),vmread(vm_guest_rip));
-  //nosendchar[getAPICID()]=1;
+
 #endif
-
-
 
   UINT64 initialcount UNUSED;
 
-
-  //char lastevent[15];
   int userbreak=0;
-  //DWORD before=*tocheck;
 
   nosendchar[getAPICID()]=0;
-  //sendstring("vmexit\n\r");
-
 
   initialcount=1;
 
-
-
-
-
-
-
-
-
-  //_cpuid(&a,&b,&c,&d);
-  /*
-  if (a)
-  {
-    userbreak=1;
-    nosendchar[getAPICID()]=1;
-  }
-  */
-
-
-
   if (vmread(vm_pending_debug_exceptions))
     userbreak=1;
-
-
-
-  /*
-  if (vmread(0x4402)==30)
-  {
-    nosendchar[getAPICID()]=1;
-    result=handleVMEvent(currentcpuinfo, (VMRegisters*)registers);
-    return result;
-
-  }*/
-
-
-
-
-
 
   if (IntHandlerDebug==0)
   {
@@ -1255,80 +1022,6 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
 
   char command;
 
-
-
-
-
-  //stop all timers
-  /*
-
-  nosendchar[getAPICID()]=0;
-
-  if (i==0)
-    printstring("-",0,2,15,0);
-  else
-  if (i==1)
-    printstring("\\",0,2,15,0);
-  else
-  if (i==2)
-    printstring("|",0,2,15,0);
-  else
-  if (i==3)
-    printstring("/",0,2,15,0);
-  else
-  if (i==4)
-    printstring("-",0,2,15,0);
-  else
-  if (i==5)
-    printstring("\\",0,2,15,0);
-  else
-  if (i==6)
-    printstring("|",0,2,15,0);
-  else
-  if (i==7)
-    printstring("/",0,2,15,0);
-
-  i++;
-  if (i==8)
-  {
-    i=0;
-    rotations++;
-
-    if (rotations==500)
-    {
-      sendstring("+");
-      rotations=0;
-    }
-  }
-
-  twister=i;
-  */
-
-
-
- /*
-  nosendchar[getAPICID()]=1;
-  result=handleVMEvent(currentcpuinfo, (VMRegisters*)registers);
-  nosendchar[getAPICID()]=0;
-  //sendstring("Handled event\n\r");
-  return result;
-  */
-
-
-  //if (vmread(0x6808)==0x2b0000)
-//    userbreak=1;
-
-
-  //if (DidHLT==0)
-
-  //debugbreak();
-
- // showall=1;
-
-
-
-
-
   if (userbreak)
   {
     sendstring("user wants to break\n\r");
@@ -1337,22 +1030,15 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
   else
   if ((vmread(vm_exit_reason)==0) && ((vmread(vm_exit_interruptioninfo) & 0x8000000f)==0x80000001) )
   {
-	  //int1 bp
-	  //sendstringf("Int 1 bp");
 
   }
   else
-  //if (!showall)
+
   {
 
     switch (vmread(vm_exit_reason))
     {
 
-     // case vm_exit_init:
-     //   verbosity=10;
-     //   skip=0;
-     //   break;
-//
       case vm_exit_vmxon:
         skip=1;
         break;
@@ -1378,8 +1064,7 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
         break;
 
       case vm_exit_vmcall:
-    	  //skip=currentcpuinfo->cpunr==0;
-        //sendstring("VMCALL\n");
+
         skip=1;
     	break;
 
@@ -1391,7 +1076,6 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
         skip=1;
         break;
 
-
       case vm_exit_invept:
         skip=1;
         break;
@@ -1400,29 +1084,25 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
         skip=1;
         break;
 
-
       case vm_exit_cpuid:
-        skip=2; //REALLY verbose
+        skip=2;
         break;
-
 
       case vm_exit_vmx_preemptiontimer_reachedzero:
         break;
 
       case vm_exit_invlpg:
-        //skip=1;
+
         break;
 
       case vm_exit_io_access:
-        //skip=1;
+
         break;
 
       case vm_exit_ept_violation:
       {
-        //int cs=vmread(vm_guest_cs);
-        //unsigned long long rip=vmread(vm_guest_rip);
 
-        skip=1; //3=ultra verbose
+        skip=1;
         break;
       }
 
@@ -1432,69 +1112,58 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
         break;
       }
 
-      case vm_exit_interrupt: //interrupt
+      case vm_exit_interrupt:
       {
         switch (vmread(vm_exit_interruptioninfo))
         {
-          case 0x80000300: //div by 0
-            //skip=1;
+          case 0x80000300:
+
             break;
 
-          case 0x80000301: //int1 bp
+          case 0x80000301:
             skip=1;
             break;
 
-          case 0x80000307: //fp exception
-           // skip=1;
+          case 0x80000307:
+
             break;
 
-          case 0x80000b0e: //pagefault
-            //if (currentcpuinfo->cpunr==0)
+          case 0x80000b0e:
+
              skip=1;
             break;
 
           case 0x80000603:
-        	//if (vmread(vmread(vm_idtvector_information))==0)
+
         	  skip=1;
 
             break;
 
           case 0x80000306:
-            //skip=1;
 
             break;
 
-          case 0x80000b0d: //GPF
-            //check if it's a CS:RIP that we know and can skip (for dosmode)
+          case 0x80000b0d:
+
             break;
 
         }
       }
 
-
-
-
       case vm_exit_cr_access:
       {
-        //int cs=vmread(vm_guest_cs);
-        //unsigned long long rip=vmread(vm_guest_rip);
 
-        //if ((vmread(vm_exit_qualification) & 0xf)==3)
         {
           skip=1;
         }
 
-
         break;
       }
 
-
       case vm_exit_sipi:
       {
-        //int cs=vmread(vm_guest_cs);
-        //unsigned long long rip=vmread(vm_guest_rip);
+
         skip=1;
-        //verbosity=10;
 
         break;
       }
@@ -1515,7 +1184,7 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
 
         }
 
-        skip=1; //skip all rdmsr
+        skip=1;
 
         break;
 
@@ -1547,33 +1216,20 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
         skip=1;
         break;
 
-
-
       case vm_exit_invalid_guest_state:
       {
-        //int cs=vmread(vm_guest_cs);
-        //unsigned long long rip=vmread(vm_guest_rip);
+
         nosendchar[getAPICID()]=0;
         sendstringf("invalid guest\n");
 
-        skip=verbosity; //never
-
+        skip=verbosity;
 
         break;
       }
 
-
-
     }
 
-   // if (currentcpuinfo->cpunr) //debug code to test AP cpu's (only use if cpu0 boots properly)
-   //   skip-=5;
-
-
     skip-=verbosity;
-
-
-
 
     if (skip>0)
     {
@@ -1581,7 +1237,7 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
 
       result=handleVMEvent(currentcpuinfo, (VMRegisters*)registers, fxsave);
 
-      if (currentcpuinfo->NMIOccured==2) //nmi occured but no NMI window support
+      if (currentcpuinfo->NMIOccured==2)
       {
         currentcpuinfo->NMIOccured=0;
         return raiseNMI();
@@ -1605,21 +1261,10 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
   while (IntHandlerDebug) ;
 
   nosendchar[getAPICID()]=0;
-  /*
-      if (before!=*tocheck)
-      {
-        nosendchar[getAPICID()]=0;
-        sendstring("It's before enableserial\n\r");
-        asm("hlt");
-        while (1);
-
-      }
-      */
 
   enableserial();
   sendstringf("\n\r------------(%d)------------------\n\r",vmeventcount);
   sendstringf("Hello from vmexit-(cpunr=%d skip=%d)\n",currentcpuinfo->cpunr, skip);
-
 
   sendstringf("currentcpuinfo = %6  : APICID=%d  :  RSP=%6\n\r",(UINT64)currentcpuinfo, getAPICID(), getRSP());
 
@@ -1633,13 +1278,7 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
   sendstringf("VM-exit instruction length=%x\n\r",vmread(vm_exit_instructionlength));
   sendstringf("VMX-instruction information=%x\n\r",vmread(vm_instruction_information));
 
-
   sendstringf("Exit qualification=%6\n\r",vmread(vm_exit_qualification));
-  /*
-  sendstringf("I/O RCX=%6\n\r",vmread(vm_io_rcx));
-  sendstringf("I/O RSI=%6\n\r",vmread(vm_io_rsi));
-  sendstringf("I/O RDI=%6\n\r",vmread(vm_io_rdi));
-  sendstringf("I/O RIP=%6\n\r",vmread(vm_io_rip));*/
 
   sendstringf("Pending debug exceptions = %x\n\r",vmread(vm_pending_debug_exceptions));
   sendstringf("Guest linear   address=%6\n\r",vmread(vm_guest_linear_address));
@@ -1649,8 +1288,6 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
   rflags.value=vmread(vm_guest_rflags);
 
   sendstringf("rflags=%x (IF=%d TF=%d RF=%d)\n",rflags.value, rflags.IF, rflags.TF, rflags.RF);
-
-
 
   sendstringf("csbase=%6\n",vmread(vm_guest_cs_base));
   sendstringf("rip=%6\n",vmread(vm_guest_rip));
@@ -1662,7 +1299,6 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
     sendstringf("Rip=%6", vmread(vm_guest_cs_base)+vmread(vm_guest_rip));
 
   }
-
 
   sendstringf("guest cs=%8\n\r",vmread(vm_guest_cs));
 
@@ -1677,23 +1313,9 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
   sendstring("Instruction = ");
   ShowCurrentInstruction(currentcpuinfo);
 
-  /*
-      if (before!=*tocheck)
-      {
-        nosendchar[getAPICID()]=0;
-        sendstring("It's before the while loop\n\r");
-        asm("hlt");
-        while (1);
-
-      }
-      */
-
-
   while (1)
   {
 
-
-    //menu
     sendstring("/-----------------VM-EXIT --------------\\\n\r");
     sendstring("|   1: resume virtual machine           |\n\r");
     sendstring("|   2: show state of virtual machine    |\n\r");
@@ -1709,8 +1331,6 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
     sendstring("|   d: test if inside another dbvm      |\n\r");
     sendstring("\\---------------------------------------/\n\r");
     sendstring("Your command:");
-
-
 
 #ifdef DELAYEDSERIAL
     if (!useserial)
@@ -1728,9 +1348,7 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
         if (dbvm_plugin_exit_post)
           dbvm_plugin_exit_post(exportlist, currentcpuinfo, registers, fxsave, &result);
 
-
-
-        if (currentcpuinfo->NMIOccured==2) //nmi occured but no NMI window support
+        if (currentcpuinfo->NMIOccured==2)
         {
           currentcpuinfo->NMIOccured=0;
           return raiseNMI();
@@ -1738,15 +1356,8 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
 
         if (currentcpuinfo->cpunr)
         {
-          //sendstring("cpunr!=0");
+
         }
-
-        //setResumeFlag();
-        //sendstringf("Returned from handleVMEvent. result=%d (CR0=%x)\n\r",result,vmread(vm_guest_cr0));
-
-        //if (currentcpuinfo->cpunr==1)
-        //  sendvmstate(currentcpuinfo, (VMRegisters*)registers);
-
 
         if ((result!=0) && ((result >> 8)!=0xce))
         {
@@ -1755,7 +1366,6 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
         }
 
         return result;
-
 
       case  '2' :
   	sendvmstate(currentcpuinfo, (VMRegisters*)registers);
@@ -1778,10 +1388,8 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
         sendstring("Going to show the instruction:\n\r");
         ShowCurrentInstructions(currentcpuinfo);
 
-
         break;
       }
-
 
       case  '7' :
         debugmode=!debugmode;
@@ -1801,12 +1409,11 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
         BreakAddress=atoi2(temps,16,NULL);
         setDR0(BreakAddress);
 
-        //set DR7 of the guest to break on execution of DR0
-        dr7.L0=1; //activate
+        dr7.L0=1;
         dr7.G0=1;
-        dr7.RW0=0; //break on execution
-        dr7.LEN0=0; //1 byte, used for exec breakpoints
-        vmwrite(vm_guest_dr7,(UINT64)dr7.DR7); //dr7
+        dr7.RW0=0;
+        dr7.LEN0=0;
+        vmwrite(vm_guest_dr7,(UINT64)dr7.DR7);
 
         breakpointset=1;
         break;
@@ -1826,12 +1433,11 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
         BreakAddress=atoi2(temps,16,NULL);
         setDR0(BreakAddress);
 
-        //set DR7 of the guest to break on execution of DR0
-        dr7.L0=1; //activate
+        dr7.L0=1;
         dr7.G0=1;
-        dr7.RW0=1; //break on write
-        dr7.LEN0=0; //1 byte, used for exec breakpoints
-        vmwrite(vm_guest_dr7,(UINT64)dr7.DR7); //dr7
+        dr7.RW0=1;
+        dr7.LEN0=0;
+        vmwrite(vm_guest_dr7,(UINT64)dr7.DR7);
 
         breakpointset=1;
         break;
@@ -1852,7 +1458,7 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
 
       case  'a' :
       {
-        //disassemble
+
         char temps[17];
         int bits;
         UINT64 address;
@@ -1862,7 +1468,6 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
         _DecodeType dt=Decode16Bits;
         int i;
         unsigned int used=0;
-
 
         Access_Rights cs_accessright;
         cs_accessright.AccessRights=vmread(vm_guest_cs_access_rights);
@@ -1917,7 +1522,6 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
         sendstringf("Address= %s \n",temps);
         address=atoi2(temps,16,&err2);
 
-
         sendstring("\n\rNumber of bytes:");
         readstring(temps,16,17);
         size=atoi2(temps,10,&err3);
@@ -1935,10 +1539,6 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
           {
             UINT64 currentaddress=address;
 
-
-
-
-
             while ((UINT64)currentaddress<(UINT64)((UINT64)address+(UINT64)size))
             {
               used=0;
@@ -1946,7 +1546,7 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
 
               if (used)
               {
-                //printf("used=%d\n", used);
+
                 for (i=0; (unsigned)i<used; i++)
                 {
                   sendstringf("%8 : %s - %s %s\n\r",
@@ -1966,10 +1566,9 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
               else
               {
                 sendstring("Disassemble failed\n\r");
-                break; //exit while loop
+                break;
               }
             }
-
 
           }
           else
@@ -2013,7 +1612,6 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
         displayPreviousStates();
         break;
 
-
       }
 #endif
 
@@ -2024,48 +1622,16 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
         return 0;
       }
 
-
-
       case  'i' :
       {
-        //test interrupt
-        //vmx_enableNMIWindowExiting();
-        //vmx_enableSingleStepMode();
 
-        //setup a memory watch for physical address 0x7000
-        //int ID;
-        //int r;
-        //sendstringf("Setting write watch at 0x7000 to 0x7fff\n");
-
-
-        //r=ept_watch_activate(0x7000, 4096, 0,0,64, &ID);
-
-        //sendstringf("ept_watch_activate returned %d and ID %d\n", r,ID);
         break;
       }
-
-
-
 
       case  's' :
       {
         vmx_enableSingleStepMode();
-        /*
-        UINT64 address;
-        unsigned char bt;
-        char temps[17];
 
-        sendstring("\n\rAddress:");
-        readstring(temps,16,16);
-        address=atoi2(temps,16,NULL);
-
-        sendstring("\n\rValue=");
-        readstring(temps,2,16);
-        bt=atoi2(temps,16,NULL);
-
-        *(unsigned char *)address=bt;
-        sendstring("\n\r");
-        */
         break;
       }
 
@@ -2098,19 +1664,14 @@ int vmexit(pcpuinfo currentcpuinfo, UINT64 *registers, void *fxsave)
       }
 #endif
 
-
       default:
         sendstring("Unknown command\n\r");
         break;
   	}
   }
 
-
   return 1;
 }
-
-
-
 
 void launchVMX_AMD(pcpuinfo currentcpuinfo, POriginalState originalstate)
 {
@@ -2120,14 +1681,12 @@ void launchVMX_AMD(pcpuinfo currentcpuinfo, POriginalState originalstate)
 
   sendvmstate(currentcpuinfo, NULL);
 
-
   nosendchar[getAPICID()]=0;
   sendstring("Starting...:\n");
 
   writeMSR(IA32_GS_BASE_MSR, (UINT64)0xcece);
 
   void *hoststate=malloc(4096);
-
 
   if (originalstate)
     result=vmxloop_amd(currentcpuinfo, currentcpuinfo->vmcb_PA, VirtualToPhysical(hoststate), &originalstate->rax);
@@ -2144,7 +1703,6 @@ void launchVMX_AMD(pcpuinfo currentcpuinfo, POriginalState originalstate)
 void launchVMX(pcpuinfo currentcpuinfo)
 {
 
-
   int result;
   OriginalState os;
   POriginalState originalstate=NULL;
@@ -2160,18 +1718,12 @@ void launchVMX(pcpuinfo currentcpuinfo)
 
   outportb(0x80,0x01);
 
-
-
   if (isAMD)
     return launchVMX_AMD(currentcpuinfo, originalstate);
-
-
-
 
   displayline("Calling vmxloop with currentcpuinfo=%6\n\r",(UINT64)currentcpuinfo);
 
   sendstring("Right before entering the loop:\n");
-
 
   if (currentcpuinfo->cpunr==0)
   {
@@ -2231,337 +1783,9 @@ void launchVMX(pcpuinfo currentcpuinfo)
     DWORD ctrl_exit UNUSED=vmread(vm_exit_controls);
     sendstringf("VMX_EXIT_CTLS=%6 ctrl_exit=%8\n", VMX_EXIT_CTLS, ctrl_exit);
 
-
-
-
-
   }
 
 }
-/*
-
-void CheckGuest(void)
-{
-	ULONG IA32_VMX_CR0_FIXED0,IA32_VMX_CR0_FIXED1;
-	ULONG IA32_VMX_CR4_FIXED0,IA32_VMX_CR4_FIXED1;
-	ULONG guestcr0,guestcr4,guestrflags;
-	ULONG guestCSlimit,guestSSlimit,guestDSlimit,guestESlimit,guestFSlimit,guestGSlimit,guestIDTlimit,guestGDTlimit;
-	Selector_Field guest_ldtr,guest_tr,guest_cs,guest_ss,guest_ds,guest_es,guest_fs,guest_gs;
-	Access_Rights guest_accessrights_ldtr,guest_accessrights_tr,guest_accessrights_cs,guest_accessrights_ss,guest_accessrights_ds,guest_accessrights_es,guest_accessrights_fs,guest_accessrights_gs;
-
-  ULONG vmentry_ctls;
-	UINT64 guest_IA32_DEBUGCTL;
-
-	ULONG temp;
-	UINT64 temp64;
-
-	int v8086=0;
-
-	sendstringf("checking state. The following are errors in the state that need to be fixed:\n\r");
-
-	IA32_VMX_CR0_FIXED0=(ULONG)readMSR(0x486);
-	IA32_VMX_CR0_FIXED1=(ULONG)readMSR(0x487);
-	IA32_VMX_CR4_FIXED0=(ULONG)readMSR(0x488);
-	IA32_VMX_CR4_FIXED1=(ULONG)readMSR(0x489);
-
-	guest_IA32_DEBUGCTL=((UINT64)vmread(0x2803) << 32)+vmread(0x2802); //IA32_DEBUGCTL (low)
-	vmentry_ctls=vmread(vm_entry_controls);
-	guestcr0=vmread(vm_guest_cr0);
-	guestcr4=vmread(vm_guest_cr4);
-	guestrflags=vmread(vm_guest_rflags);
-
-	guest_accessrights_es.AccessRights=vmread(0x4814);
-	guest_accessrights_cs.AccessRights=vmread(0x4816);
-	guest_accessrights_ss.AccessRights=vmread(0x4818);
-	guest_accessrights_ds.AccessRights=vmread(0x481a);
-	guest_accessrights_fs.AccessRights=vmread(0x481c);
-	guest_accessrights_gs.AccessRights=vmread(0x481e);
-	guest_accessrights_ldtr.AccessRights=vmread(0x4820);
-	guest_accessrights_tr.AccessRights=vmread(0x4822);
-
-	guest_es.Selectorvalue=vmread(0x800);
-	guest_cs.Selectorvalue=vmread(0x802);
-	guest_ss.Selectorvalue=vmread(0x804);
-	guest_ds.Selectorvalue=vmread(0x806);
-	guest_fs.Selectorvalue=vmread(0x808);
-	guest_gs.Selectorvalue=vmread(0x80a);
-	guest_ldtr.Selectorvalue=vmread(0x80c);
-	guest_tr.Selectorvalue=vmread(0x80e);
-
-	guestIDTlimit=vmread(0x4810);
-	guestGDTlimit=vmread(0x4812);
-
-	guestCSlimit=vmread(0x4802);
-	guestSSlimit=vmread(0x4804);
-	guestDSlimit=vmread(0x4806);
-	guestESlimit=vmread(0x4800);
-	guestFSlimit=vmread(0x4808);
-	guestGSlimit=vmread(0x480a);
-
-
-
-	//22.3.1.1:
-	sendstringf("checking 22.3.1.1\n\r");
-	temp=guestcr0 | IA32_VMX_CR0_FIXED0;
-	if (temp != guestcr0)
-		sendstringf("Error: not all required bits are set in cr0 (cr0=%8, cr0 should be %8)\n\r",guestcr0,temp);
-
-	temp=guestcr0 & IA32_VMX_CR0_FIXED1;
-	if (temp != guestcr0)
-		sendstringf("Error: not all required bits are unset in cr0\n\r");
-
-
-	temp=guestcr4 | IA32_VMX_CR4_FIXED0;
-	if (temp != guestcr4)
-		sendstringf("Error: not all required bits are set in cr4(cr4=%8 cr4 should be %8)\n\r",guestcr4,temp);
-
-	temp=guestcr4 & IA32_VMX_CR4_FIXED1;
-	if (temp != guestcr4)
-		sendstringf("Error: not all required bits are unset in cr4 (cr4=%8 should be %8)\n\r",guestcr4,temp);
-
-
-	temp64=(UINT64)((UINT64)0x0FFFFFFFFFFFFE03CULL & (UINT64)guest_IA32_DEBUGCTL);
-	if (temp64 > 0)
-		sendstringf("Error: IA32_DEBUGCTL has reserved bits set\n\r");
-
-	if ((vmentry_ctls & (1 << 9)) == 1 )
-		sendstringf("Error: IA32e mode guest in a 32-bit host\n\r");
-
-
-	//22.3.1.2:
-	sendstringf("checking 22.3.1.2\n\r");
-	sendstringf("guestrflags=%x\n\r",guestrflags);
-	if ((guestrflags & (1<<17))>0)
-	{
-		sendstringf("v8086 mode\n\r");
-		v8086=1;
-	}
-
-
-
-	if (guest_tr.TI==1)
-		sendstringf("Error: TR has the TI bit set\n\r");
-
-	if ((guest_accessrights_ldtr.unusable==0) && (guest_ldtr.TI==1))
-		sendstringf("Error: LDTR is usable and LDTR has the TI bit set\n\r");
-
-	if (v8086==0)
-	{
-		if (( guest_cs.RPL != guest_ss.RPL ))
-			sendstringf("Error: the RPL of ss does not matych the RPL of cs and not in virtual 8086 mode\n\r");
-
-		if ((guest_accessrights_cs.Segment_type & (1 << 0)) == 0)
-			sendstringf("Error: CS is not accessed\n\r");
-
-		if ((guest_accessrights_cs.Segment_type & (1<<3)) == 0)
-			sendstringf("Error: CS is no codesegment\n\r");
-
-		if (guest_accessrights_cs.S!=1)
-			sendstringf("Error: S is not 1 for cs\n\r");
-
-		if (guest_accessrights_cs.P!=1)
-			sendstringf("Error: P is not 1 for cs\n\r");
-
-		if (guest_accessrights_cs.reserved!=0)
-			sendstringf("Error: reserved (8 to 11) is not 0 for cs\n\r");
-
-		if (guest_accessrights_cs.G==0)
-			sendstringf("Error: cs.G==0\n\r");
-
-
-		if (((guest_accessrights_cs.Segment_type>=8) && (guest_accessrights_cs.Segment_type<=11)) && (guest_accessrights_cs.DPL != guest_cs.RPL ))
-			sendstringf("Error: CS: Codesegment is nonconforming and DPL does not match RPL\n\r");
-
-		if (((guest_accessrights_cs.Segment_type>=13) && (guest_accessrights_cs.Segment_type<=15)) && (guest_accessrights_cs.DPL > guest_cs.RPL ))
-			sendstringf("Error: CS: Codesegment is conforming and DPL is bigger than RPL\n\r");
-
-		if (guest_accessrights_ss.unusable==0)
-		{
-			if (!((guest_accessrights_ss.Segment_type == 3) || (guest_accessrights_ss.Segment_type == 7) ))
-				sendstringf("Error: SS type is not 3 or 7\n\r");
-
-			if (guest_accessrights_ss.S!=1)
-				sendstringf("Error: S is not 1 for ss\n\r");
-
-			if (guest_accessrights_ss.P!=1)
-				sendstringf("Error: P is not 1 for ss\n\r");
-
-			if (guest_accessrights_ss.reserved!=0)
-				sendstringf("Error: reserved (8 to 11) is not 0 for ss\n\r");
-
-			if (guest_accessrights_ss.G==0)
-				sendstringf("Error: ss.G==0\n\r");
-		}
-
-		if (guest_accessrights_ds.unusable==0)
-		{
-			if ((guest_accessrights_ds.Segment_type & 1)!=1)
-				sendstringf("Error: DS type is not accessed\n\r");
-
-			if (((guest_accessrights_ds.Segment_type & (1 << 3))>0) && ((guest_accessrights_ds.Segment_type & (1 << 1))==0))
-				sendstringf("Error: DS has a code segment set but is not readable\n\r");
-
-			if (guest_accessrights_ds.S!=1)
-				sendstringf("Error: S is not 1 for ds\n\r");
-
-			if (guest_accessrights_ds.P!=1)
-				sendstringf("Error: P is not 1 for ds\n\r");
-
-			if (guest_accessrights_ds.reserved!=0)
-				sendstringf("Error: reserved (8 to 11) is not 0 for ds\n\r");
-
-			if (guest_accessrights_ds.G==0)
-				sendstringf("Error: ds.G==0\n\r");
-		}
-
-		if (guest_accessrights_es.unusable==0)
-		{
-			if ((guest_accessrights_es.Segment_type & 1)!=1)
-				sendstringf("Error: es type is not accessed\n\r");
-
-			if (((guest_accessrights_es.Segment_type & (1 << 3))>0) && ((guest_accessrights_es.Segment_type & (1 << 1))==0))
-				sendstringf("Error: es has a code segment set but is not readable\n\r");
-
-			if (guest_accessrights_es.S!=1)
-				sendstringf("Error: S is not 1 for es\n\r");
-
-			if (guest_accessrights_es.P!=1)
-				sendstringf("Error: P is not 1 for es\n\r");
-
-			if (guest_accessrights_es.reserved!=0)
-				sendstringf("Error: reserved (8 to 11) is not 0 for es\n\r");
-
-			if (guest_accessrights_es.G==0)
-				sendstringf("Error: es.G==0\n\r");
-
-		}
-
-		if (guest_accessrights_fs.unusable==0)
-		{
-			if ((guest_accessrights_fs.Segment_type & 1)!=1)
-				sendstringf("Error: fs type is not accessed\n\r");
-
-			if (((guest_accessrights_fs.Segment_type & (1 << 3))>0) && ((guest_accessrights_fs.Segment_type & (1 << 1))==0))
-				sendstringf("Error: fs has a code segment set but is not readable\n\r");
-
-			if (guest_accessrights_fs.S!=1)
-				sendstringf("Error: S is not 1 for fs\n\r");
-
-			if (guest_accessrights_fs.P!=1)
-				sendstringf("Error: P is not 1 for fs\n\r");
-
-			if (guest_accessrights_fs.reserved!=0)
-				sendstringf("Error: reserved (8 to 11) is not 0 for fs\n\r");
-
-			if (guest_accessrights_fs.G==0)
-				sendstringf("Error: fs.G==0\n\r");
-		}
-
-		if (guest_accessrights_gs.unusable==0)
-		{
-			sendstringf("GS is USABLE!\n\r");
-			if ((guest_accessrights_gs.Segment_type & 1)!=1)
-				sendstringf("Error: gs type is not accessed\n\r");
-
-			if (((guest_accessrights_gs.Segment_type & (1 << 3))>0) && ((guest_accessrights_gs.Segment_type & (1 << 1))==0))
-				sendstringf("Error: gs has a code segment set but is not readable\n\r");
-
-			if (guest_accessrights_gs.S!=1)
-				sendstringf("Error: S is not 1 for gs\n\r");
-
-			if (guest_accessrights_gs.P!=1)
-				sendstringf("Error: P is not 1 for gs\n\r");
-
-			if (guest_accessrights_gs.reserved!=0)
-				sendstringf("Error: reserved (8 to 11) is not 0 for gs\n\r");
-
-			if (guest_accessrights_gs.G==0)
-				sendstringf("Error: gs.G==0\n\r");
-		}
-	}
-	else
-	{
-		if (guest_accessrights_cs.AccessRights!=0xf3)
-			sendstringf("CS accessrights are not 0xf3\n\r");
-
-		if (guest_accessrights_ss.AccessRights!=0xf3)
-			sendstringf("SS accessrights are not 0xf3\n\r");
-
-		if (guest_accessrights_ds.AccessRights!=0xf3)
-			sendstringf("DS accessrights are not 0xf3\n\r");
-
-		if (guest_accessrights_es.AccessRights!=0xf3)
-			sendstringf("ES accessrights are not 0xf3\n\r");
-
-		if (guest_accessrights_fs.AccessRights!=0xf3)
-			sendstringf("FS accessrights are not 0xf3\n\r");
-
-		if (guest_accessrights_gs.AccessRights!=0xf3)
-			sendstringf("GS accessrights are not 0xf3\n\r");
-
-
-	}
-
-
-
-	if (guest_accessrights_tr.unusable==0)
-	{
-
-		if (v8086==0)
-		{
-			if ((guest_accessrights_tr.Segment_type !=11))
-				sendstringf("Error: TR type is not 11\n\r");
-		}
-		else
-		{
-			if ((guest_accessrights_tr.Segment_type !=3) && (guest_accessrights_tr.Segment_type !=11))
-				sendstringf("Error: TR type is not 3 or 11\n\r");
-		}
-
-		if (guest_accessrights_tr.S!=0)
-			sendstringf("Error: S is not 0 for tr\n\r");
-
-		if (guest_accessrights_tr.P!=1)
-			sendstringf("Error: P is not 1 for tr\n\r");
-
-		if (guest_accessrights_tr.reserved!=0)
-			sendstringf("Error: reserved (8 to 11) is not 0 for tr\n\r");
-
-		if (guest_accessrights_tr.G==1)
-			sendstringf("Error: tr.G==1\n\r");
-	}
-
-
-	if ((v8086==1) && (guestCSlimit>0xffff))
-		sendstringf("CS limit > 0xffff and in virtual 8086 mode\n\r");
-
-	if ((v8086==1) && (guestSSlimit>0xffff))
-		sendstringf("SS limit > 0xffff and in virtual 8086 mode\n\r");
-
-	if ((v8086==1) && (guestDSlimit>0xffff))
-		sendstringf("DS limit > 0xffff and in virtual 8086 mode\n\r");
-
-	if ((v8086==1) && (guestESlimit>0xffff))
-		sendstringf("ES limit > 0xffff and in virtual 8086 mode\n\r");
-
-	if ((v8086==1) && (guestFSlimit>0xffff))
-		sendstringf("FS limit > 0xffff and in virtual 8086 mode\n\r");
-
-	if ((v8086==1) && (guestGSlimit>0xffff))
-		sendstringf("GS limit > 0xffff and in virtual 8086 mode\n\r");
-
-	if (guestIDTlimit>0xffff)
-		sendstringf("IDT limit beyond 0xffff\n\r");
-
-	if (guestGDTlimit>0xffff)
-		sendstringf("GDT limit beyond 0xffff\n\r");
-
-
-	sendstringf("check done\n\r");
-}
-
-
-*/
 
 void displayVMmemory(pcpuinfo currentcpuinfo)
 {
@@ -2588,15 +1812,11 @@ void displayVMmemory(pcpuinfo currentcpuinfo)
     sendstringf("err=%d\n");
   }
 
-
   sendstring("Number of bytes:");
   readstring(temps,8,8);
   sendstring("\n\r");
   nrofbytes=atoi2(temps,10,NULL);
 
-
-  //if virtual machine check 0-00200000
-  //else check pagetables
   for (i=0; i<nrofbytes; i+=16)
   {
 
@@ -2612,7 +1832,7 @@ void displayVMmemory(pcpuinfo currentcpuinfo)
 
     if ((i+16)>nrofbytes)
     {
-      // Get the cursor to the right spot
+
       int currentcol=11+3*(nrofbytes-i);
       int wantedcol=11+3*16;
       for (j=0; j<(wantedcol-currentcol); j++)
@@ -2637,8 +1857,6 @@ void ShowPendingInterrupts()
 {
   int i,j;
 
-//0=0-31
-//1=32-63
   for (i=0; i<8; i++)
   {
     DWORD v=ReadAPICRegister(0x20+i);
@@ -2675,11 +1893,7 @@ void ShowCurrentInstruction(pcpuinfo currentcpuinfo)
       address=vmread(vm_guest_cs_base)+vmread(vm_guest_rip);
   }
 
-  //sendstringf("ShowCurrentInstruction for %6\n", address);
-
-
   int br=ReadVMMemory(currentcpuinfo, address, buf, 60);
- // sendstringf("br=%d\n",br);
 
   if (br)
   {
@@ -2689,7 +1903,6 @@ void ShowCurrentInstruction(pcpuinfo currentcpuinfo)
     Access_Rights cs_accessright;
     unsigned int used=0;
 
-    //find out in which context the system is operating
     if (isAMD)
     {
       Segment_Attribs csa;
@@ -2713,7 +1926,6 @@ void ShowCurrentInstruction(pcpuinfo currentcpuinfo)
     if (ISREALMODE(currentcpuinfo))
       dt=Decode16Bits;
 
-
     distorm_decode(address,buf, 60, dt, disassembled, 22, &used);
     if (used)
     {
@@ -2724,7 +1936,6 @@ void ShowCurrentInstruction(pcpuinfo currentcpuinfo)
                     disassembled[0].operands.p);
 
     }
-
 
   }
   else
@@ -2761,7 +1972,7 @@ void ShowCurrentInstructions(pcpuinfo currentcpuinfo)
 
   readable=ReadVMMemory(currentcpuinfo, startaddress,buf,BUFSIZE);
 
-  while (!readable) //try till bytesinfront=0
+  while (!readable)
   {
     startaddress=address-bytesinfront;
     readable=ReadVMMemory(currentcpuinfo, startaddress,buf,BUFSIZE);
@@ -2769,7 +1980,7 @@ void ShowCurrentInstructions(pcpuinfo currentcpuinfo)
     {
       if (bytesinfront==0)
       {
-        //failed at even 0
+
         sendstringf("%6 is unreadable\n\r",address);
         break;
       }
@@ -2779,14 +1990,12 @@ void ShowCurrentInstructions(pcpuinfo currentcpuinfo)
 
   if (readable)
   {
-    //disassemble
+
     _DecodedInst disassembled[BUFSIZE/2];
     _DecodeType dt=Decode16Bits;
     Access_Rights cs_accessright;
     unsigned int i;
     unsigned int used=0;
-
-    //find out in which context the system is operating
 
     if (isAMD)
     {
@@ -2811,7 +2020,6 @@ void ShowCurrentInstructions(pcpuinfo currentcpuinfo)
     if (ISREALMODE(currentcpuinfo))
       dt=Decode16Bits;
 
-
     distorm_decode64(startaddress,buf, BUFSIZE, dt, disassembled, BUFSIZE / 2, &used);
 
     if (used)
@@ -2835,8 +2043,6 @@ void ShowCurrentInstructions(pcpuinfo currentcpuinfo)
     	sendstring("Disassemble failed\n\r");
     }
 
-
-
   }
 }
 
@@ -2853,7 +2059,6 @@ void displayPhysicalMemory(void)
   temps[16]=0;
   StartAddress=atoi2(temps,16,NULL);
   sendstringf("Startaddress=%6\n\r",StartAddress);
-
 
   sendstring("Number of bytes:");
   readstring(temps,8,17);
@@ -2888,4 +2093,3 @@ void displayPhysicalMemory(void)
   }
   unmapPhysicalMemory(memory, nrofbytes);
 }
-

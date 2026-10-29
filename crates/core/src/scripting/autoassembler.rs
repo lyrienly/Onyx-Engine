@@ -1,4 +1,3 @@
-
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use crate::debugger::assembler::Assembler;
@@ -835,4 +834,3 @@ mod tests {
         assert!(aa.allocations.is_empty());
     }
 }
-

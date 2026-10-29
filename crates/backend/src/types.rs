@@ -1,4 +1,3 @@
-
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct OnyxProcessEntry {
@@ -119,8 +118,6 @@ mod tests {
     use super::OnyxVehSlot;
     use std::mem::{offset_of, size_of};
 
-    /// O record equivalente em Object Pascal (`TOnyxVehSlot`, sem "packed")
-    /// precisa manter exatamente estes offsets.
     #[test]
     fn onyx_veh_slot_layout_matches_pascal() {
         assert_eq!(size_of::<OnyxVehSlot>(), 24);
@@ -252,7 +249,6 @@ pub struct OnyxSignatureResult {
     pub match_count: usize,
     pub is_unique: i32,
 }
-
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]

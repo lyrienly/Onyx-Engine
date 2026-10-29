@@ -120,7 +120,7 @@ code:
   mov rax, SPEED
 "#;
     let script = parse_script(src).unwrap();
-    // confere que a linha de assembly ja veio expandida
+
     let has_expanded = script.sections[0].statements.iter().any(|s| match s {
         Statement::Assembly { line, .. } => line.contains("mov rax, 2"),
         _ => false,

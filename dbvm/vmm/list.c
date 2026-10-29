@@ -1,18 +1,7 @@
-/*
- * list.c
- *
- *  Created on: Jun 25, 2019
- *      Author: eric
- *
- *  Implements a sorted address<>pointerlist 'class'
-
- */
-
 #include "list.h"
 #include "displaydebug.h"
 
-
-int addresslist_findclosestIndex(PAddressList l, QWORD address) //internal function for add
+int addresslist_findclosestIndex(PAddressList l, QWORD address)
 {
   int begin = -1, end = -1;
 
@@ -44,7 +33,7 @@ void addresslist_add(PAddressList l, QWORD address, void *data)
 {
   int s = addresslist_findclosestIndex(l, address);
 
-  if (l->size >= l->capacity) //first make sure there is enough space to add
+  if (l->size >= l->capacity)
   {
     l->list = (PAddressListEntry)realloc(l->list, l->size + 32);
     l->capacity = l->size + 32;
@@ -60,7 +49,7 @@ void addresslist_add(PAddressList l, QWORD address, void *data)
     int i;
     if (l->list[s].address == address)
     {
-      //error, already in the list
+
       nosendchar[getAPICID()]=0;
       sendstringf("addresslist_add: already in the list");
       ddDrawRectangle(0,DDVerticalResolution-100,100,100,0xff0000);
@@ -71,7 +60,7 @@ void addresslist_add(PAddressList l, QWORD address, void *data)
     while ((l->list[s].address < address) && (s < l->size))
       s++;
 
-    for (i = l->size; i > s; i--) //move everything to the right
+    for (i = l->size; i > s; i--)
       l->list[i] = l->list[i - 1];
 
     l->list[s].data = data;
@@ -80,13 +69,10 @@ void addresslist_add(PAddressList l, QWORD address, void *data)
 
   l->size++;
 
-
 }
 
 void *addresslist_find(PAddressList l, QWORD address)
-/*
- * Searches the list for the address and returns the data field.  NULL if not found
- */
+
 {
 
   int begin, end;
@@ -149,8 +135,6 @@ void addresslist_remove(PAddressList l, QWORD address)
     }
   }
 }
-
-
 
 PAddressList addresslist_create()
 {

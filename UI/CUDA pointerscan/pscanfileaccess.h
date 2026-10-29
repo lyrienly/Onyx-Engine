@@ -3,5 +3,4 @@
 
 int pscaninit();
 
-
-#endif//PSCANFILEACCESS_H
+#endif

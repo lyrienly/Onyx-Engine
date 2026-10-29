@@ -44,7 +44,6 @@ fn operand_target(ip: u64, insn: &zydis::Instruction<VisibleOperands>, ops: &[De
     None
 }
 
-/// Disassembles `bytes` starting at virtual address `base_addr`.
 pub fn disassemble(bytes: &[u8], base_addr: u64) -> Vec<Instruction> {
     let decoder = Decoder::new64();
     let formatter = Formatter::intel();
@@ -86,7 +85,6 @@ pub fn disassemble(bytes: &[u8], base_addr: u64) -> Vec<Instruction> {
     out
 }
 
-/// Formats a single instruction into a human-readable line.
 pub fn format_instruction(insn: &Instruction) -> String {
     let hex = insn.bytes.iter().map(|b| format!("{:02X}", b)).collect::<Vec<_>>().join(" ");
     format!("0x{:016X}: {:<24} {} {}", insn.address, hex, insn.mnemonic, insn.operands)

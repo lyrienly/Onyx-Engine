@@ -1,6 +1,5 @@
 #include "stdafx.h"
 
-
 using namespace std;
 map<ULONG_PTR, PSAPI_WORKING_SET_BLOCK> LastMap;
 ULONGLONG LastMapTime = 0;
@@ -15,10 +14,9 @@ DWORD BlockProtectionToPageProtection(int p)
 	return PAGE_EXECUTE_READWRITE;
 #endif
 
-
 	switch (p)
 	{
-		
+
 	   case 0: return PAGE_NOACCESS;
 	   case	1: return PAGE_READONLY;
 	   case	2: return PAGE_EXECUTE;
@@ -51,13 +49,12 @@ DWORD BlockProtectionToPageProtection(int p)
 	   case 28: return PAGE_READWRITE | PAGE_GUARD | PAGE_NOCACHE;
 	   case 29: return PAGE_WRITECOPY | PAGE_GUARD | PAGE_NOCACHE;
 	   case 30: return PAGE_EXECUTE_READWRITE | PAGE_GUARD | PAGE_NOCACHE;
-	   case 31: return PAGE_EXECUTE_WRITECOPY | PAGE_GUARD | PAGE_NOCACHE;	   
+	   case 31: return PAGE_EXECUTE_WRITECOPY | PAGE_GUARD | PAGE_NOCACHE;
 	}
 
 	return PAGE_NOACCESS;
 
 }
-
 
 SIZE_T WINAPI NewVirtualQueryEx(_In_ HANDLE hProcess, _In_opt_ LPCVOID lpAddress, PMEMORY_BASIC_INFORMATION lpBuffer, SIZE_T dwLength)
 {
@@ -78,15 +75,13 @@ SIZE_T WINAPI NewVirtualQueryEx(_In_ HANDLE hProcess, _In_opt_ LPCVOID lpAddress
 			if (info == NULL)
 				return 0;
 
-			//info->VirtualAttributes.
-
 			if (!QueryWorkingSet(hProcess, info, size))
 			{
 				toosmall = (GetLastError() == ERROR_BAD_LENGTH);
 				free(info);
 
 				if (toosmall)
-					size *= 4; //NumberOfEntries does not function in win7	
+					size *= 4;
 			}
 			else
 				toosmall = FALSE;
@@ -106,7 +101,6 @@ SIZE_T WINAPI NewVirtualQueryEx(_In_ HANDLE hProcess, _In_opt_ LPCVOID lpAddress
 		LastMapTime = GetTickCount64();
 	}
 
-	//scan LastMap
 	map<ULONG_PTR, PSAPI_WORKING_SET_BLOCK>::iterator i = LastMap.lower_bound((ULONG_PTR)lpAddress >> 12);
 
 	if (i != LastMap.end())
@@ -116,18 +110,17 @@ SIZE_T WINAPI NewVirtualQueryEx(_In_ HANDLE hProcess, _In_opt_ LPCVOID lpAddress
 
 		if (i->first > (ULONG_PTR)lpAddress >> 12)
 		{
-			//unreadable from lpAddress to i->first
+
 			lpBuffer->AllocationBase = 0;
 			lpBuffer->AllocationProtect = 0;
 			lpBuffer->BaseAddress = (PVOID)((ULONG_PTR)lpAddress & (~0xfff));
 			lpBuffer->Protect = 0;
 			lpBuffer->RegionSize = (i->first << 12) - ((ULONG_PTR)lpAddress & (~0xfff));
 			lpBuffer->State = MEM_FREE;
-			lpBuffer->Type = 0;				
+			lpBuffer->Type = 0;
 			return sizeof(MEMORY_BASIC_INFORMATION);
 		}
 
-		//still here
 		lpBuffer->AllocationBase = (PVOID)((ULONG_PTR)lpAddress & (~0xfff));
 		lpBuffer->AllocationProtect = PAGE_EXECUTE_READWRITE;
 		lpBuffer->BaseAddress = (PVOID)((ULONG_PTR)lpAddress & (~0xfff));
@@ -145,7 +138,7 @@ SIZE_T WINAPI NewVirtualQueryEx(_In_ HANDLE hProcess, _In_opt_ LPCVOID lpAddress
 			ULONG_PTR Page = i->first;
 			PSAPI_WORKING_SET_BLOCK b = i->second;
 
-			if ((Page!=lastPage+1) || (i->second.Protection!=currentprotection)) //different block or protection
+			if ((Page!=lastPage+1) || (i->second.Protection!=currentprotection))
 				return sizeof(MEMORY_BASIC_INFORMATION);
 
 			lpBuffer->RegionSize += 4096;
@@ -161,16 +154,13 @@ SIZE_T WINAPI NewVirtualQueryEx(_In_ HANDLE hProcess, _In_opt_ LPCVOID lpAddress
 
 void __stdcall PointersChanged(int reserved)
 {
-	
-	//OutputDebugStringA("Changed");
-	
+
 	if (*(PVOID *)(g_ef.VirtualQueryEx) != (PVOID)NewVirtualQueryEx)
 	{
 		OriginalVQE = *(PVOID *)(g_ef.VirtualQueryEx);
 		*(PVOID *)(g_ef.VirtualQueryEx) = (PVOID)NewVirtualQueryEx;
 	}
 
-	
 }
 
 BOOL __stdcall CEPlugin_GetVersion(PPluginVersion pv, int sizeofpluginversion)
@@ -196,10 +186,8 @@ BOOL __stdcall CEPlugin_InitializePlugin(PExportedFunctions ef, int pluginid)
 	return TRUE;
 }
 
-
 BOOL __stdcall CEPlugin_DisablePlugin(void)
 {
-	//clean up memory you might have allocated
 
 	g_ef.UnregisterFunction(g_pluginid, callbackid);
 

@@ -1,4 +1,3 @@
-
 use eframe::egui::{self, Color32, RichText, Stroke, Vec2};
 use onyx_core::disasm::format_symbol;
 use crate::app::OnyxEngineApp;
@@ -444,4 +443,3 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
         },
     );
 }
-

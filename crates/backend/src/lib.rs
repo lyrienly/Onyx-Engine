@@ -1,4 +1,3 @@
-
 #![allow(unsafe_op_in_unsafe_fn, unused_mut, static_mut_refs, dead_code)]
 
 pub mod types;
@@ -58,4 +57,3 @@ pub extern "system" fn DllMain(
 
     1
 }
-

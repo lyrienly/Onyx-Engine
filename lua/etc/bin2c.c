@@ -1,12 +1,3 @@
-/*
-* bin2c.c
-* convert files to byte arrays for automatic loading
-* Luiz Henrique de Figueiredo (lhf@tecgraf.puc-rio.br)
-* Fixed to Lua 5.1. Antonio Scuri (scuri@tecgraf.puc-rio.br)
-* Generated files will work also for Lua 5.0
-* 08 Dec 2005
-*/
-
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,7 +7,7 @@ static void dump(FILE* f, int n)
   printf("static const unsigned char B%d[]={\n",n);
   for (n=1;;n++)
   {
-    int c=getc(f); 
+    int c=getc(f);
     if (c==EOF) break;
     printf("%3u,",c);
     if (n==20) { putchar('\n'); n=0; }
@@ -26,7 +17,7 @@ static void dump(FILE* f, int n)
 
 static void fdump(const char* fn, int n)
 {
-  FILE* f= fopen(fn,"rb");		/* must open in binary mode */
+  FILE* f= fopen(fn,"rb");
   if (f==NULL)
   {
     fprintf(stderr,"bin2c: cannot open ");

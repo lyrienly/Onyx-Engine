@@ -1,15 +1,3 @@
-/*
- * server.c
- *
- *  Created on: Aug 25, 2013
- *      Author: eric
- *
- * The communication layer between the process and ceserver
- * This module will be loaded into the game by either a PRELOAD like LD_PRELOAD or a config, or injected using ceserver's module injector
- *
- * When launched the constructor will spawn a thread and open a named shared object/pipe (does linux support that) for communication
- */
-
 #include <errno.h>
 #include <stdio.h>
 #include <pthread.h>
@@ -28,23 +16,19 @@
 #include <sys/un.h>
 #include <sys/mman.h>
 
-
-
 #include "server.h"
 #include "speedhack.h"
 
 int done=0;
 
-#ifndef SUN_LEN //missing in android (copy from linux sys/un.h)
-# include <string.h>    /* For prototype of `strlen'.  */
+#ifndef SUN_LEN
+# include <string.h>
 
-/* Evaluate to actual length of the `sockaddr_un' structure.  */
 # define SUN_LEN(ptr) ((size_t) (((struct sockaddr_un *) 0)->sun_path)        \
           + strlen ((ptr)->sun_path))
 #endif
 
 void dvmJitStats();
-
 
 typedef struct
 {
@@ -55,8 +39,6 @@ typedef struct
 PAllocEntry allocList;
 int allocList_Max;
 int allocList_Pos;
-
-
 
 #ifdef __ANDROID__
   #define LOG_TAG "CESERVER_EXTENSION"
@@ -69,7 +51,6 @@ int debug_log(const char * format , ...)
   va_start(list,format);
   int ret = vprintf(format,list);
   va_end(list);
-
 
   #ifdef __ANDROID__
   va_start(list,format);
@@ -118,9 +99,7 @@ void allocListRemove(uint64_t address)
 }
 
 int allocListFind(uint64_t address)
-/*
- * Return the size. (0 if not found)
- */
+
 {
   int i;
   for (i=0; i<allocList_Pos; i++)
@@ -135,15 +114,11 @@ int allocListFind(uint64_t address)
 
 }
 
-
-
 ssize_t recvall (int s, void *buf, size_t size, int flags)
 {
   ssize_t totalreceived=0;
   ssize_t sizeleft=size;
   unsigned char *buffer=(unsigned char*)buf;
-
-  //printf("enter recvall\n");
 
   flags=flags | MSG_WAITALL;
 
@@ -168,7 +143,7 @@ ssize_t recvall (int s, void *buf, size_t size, int flags)
       else
       {
         debug_log("Error during recvall: %d. errno=%d (%s)\n",(int)i, errno, strerror(errno));
-        return i; //read error, or disconnected
+        return i;
       }
 
     }
@@ -177,7 +152,6 @@ ssize_t recvall (int s, void *buf, size_t size, int flags)
     sizeleft-=i;
   }
 
-  //printf("leave recvall\n");
   return totalreceived;
 }
 
@@ -216,7 +190,6 @@ ssize_t sendall (int s, void *buf, size_t size, int flags)
 
 int DispatchCommand(int currentsocket, unsigned char command)
 {
-  //printf("Handling command %d\n", command);
 
   switch (command)
   {
@@ -229,27 +202,21 @@ int DispatchCommand(int currentsocket, unsigned char command)
         uint32_t prot;
       } params;
 #pragma pack()
-      //printf("EXTCMD_ALLOC. Receiving params:\n");
 
       if (recvall(currentsocket, &params, sizeof(params), 0)>0)
       {
 
-       // debug_log("params.preferedAddress=%lx\n", params.preferedAddress);
-        //printf("params.size=%d\n", params.size);
         if (params.prot==0)
           params.prot=PROT_READ | PROT_WRITE | PROT_EXEC;
 
         uint64_t address=(uint64_t)mmap((void *)params.preferedAddress, params.size, params.prot, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
-        //printf("Actually allocated at %lx\n", address);
         if (address)
           allocListAdd(address, params.size);
 
         sendall(currentsocket, &address, sizeof(address), 0);
 
-
       }
-
 
       break;
     }
@@ -267,20 +234,13 @@ int DispatchCommand(int currentsocket, unsigned char command)
 
       if (recvall(currentsocket, &params, sizeof(params), 0)>0)
       {
-        //printf("EXTCMD_FREE\n");
-        //printf("params.address=%lx\n", params.address);
-        //printf("1: params.size=%d\n", params.size);
 
         if (params.size==0)
           params.size=allocListFind(params.address);
 
-
-
-        //printf("2: params.size=%d\n", params.size);
-
         if (params.size)
         {
-          //printf("Calling munmap\n");
+
           result=munmap((void *)params.address, params.size);
           if (result==-1)
             result=0;
@@ -290,12 +250,9 @@ int DispatchCommand(int currentsocket, unsigned char command)
         else
           result=0;
 
-        //printf("Removing alloc from list\n");
         allocListRemove(params.address);
 
-        //printf("Returning result\n");
         sendall(currentsocket, &result, sizeof(result), 0);
-
 
       }
       break;
@@ -312,9 +269,6 @@ int DispatchCommand(int currentsocket, unsigned char command)
 
       if (recvall(currentsocket, &params, sizeof(params), 0)>0)
       {
-        //printf("EXTCMD_CREATETHREAD\n");
-        //printf("params.startaddress=%lx\n", params.startaddress);
-        //printf("params.parameter=%ld\n", params.parameter);
 
         uint64_t threadhandle=0;
 
@@ -322,7 +276,6 @@ int DispatchCommand(int currentsocket, unsigned char command)
 
         sendall(currentsocket, &threadhandle, sizeof(threadhandle), 0);
       }
-
 
       break;
     }
@@ -395,12 +348,10 @@ int DispatchCommand(int currentsocket, unsigned char command)
         float speed;
       } params;
 
-
       uint32_t result;
 
       if (recvall(currentsocket, &params, sizeof(params), 0)>0)
       {
-        //printf("EXTCMD_SPEEDHACK_SETSPEED(%d)\n", params.speed);
 
         result=speedhack_initializeSpeed(params.speed);
         sendall(currentsocket, &result, sizeof(result), 0);
@@ -440,9 +391,6 @@ void *newconnection(void *arg)
   int sockethandle=(uintptr_t)arg;
   unsigned char command;
   int r;
-  //printf("Hello!\n");
-
-  //wait for a command and dispatch it
 
   r=1;
   while (r>=0)
@@ -452,13 +400,7 @@ void *newconnection(void *arg)
       DispatchCommand(sockethandle, command);
     else
     {
-      //printf("Peer has disconnected");
-      //if (r==-1)
-      //  debug_log(" due to an error");
 
-      //printf("\n");
-
-      //fflush(stdout);
       close(sockethandle);
     }
   }
@@ -480,7 +422,6 @@ void *ServerThread(void *arg)
     a=accept(s, (struct sockaddr *)&addr_client, &clisize);
     debug_log("accept returned\n");
 
-    //printf("accept returned %d\n", a);
     if (a==-1)
     {
       debug_log("accept failed: %d\n", a);
@@ -492,7 +433,6 @@ void *ServerThread(void *arg)
       pthread_create(&pth, NULL, (void *)newconnection, (void *)(uintptr_t)a);
     }
 
-
   }
 
   return NULL;
@@ -500,7 +440,7 @@ void *ServerThread(void *arg)
 
 __attribute__((destructor)) void term(void)
 {
-  //printf("X_X\n");
+
   done=1;
 
 }
@@ -511,41 +451,15 @@ __attribute__((constructor)) void moduleinit(void)
   int s;
 
   int i;
-  //printf("\nServerthread active\n");
 
   speedhack_initializeSpeed(1.0f);
 
   void *X;
   void *module=NULL;
 
-/*
-  __android_log_print(ANDROID_LOG_DEBUG, "CHEATENGING", "Hello \n");
-
-  __android_log_print(ANDROID_LOG_DEBUG, "CHEATENGING", "module1=%p\n", module);
-
-  module=dlopen("libdvm.so", module);
-  __android_log_print(ANDROID_LOG_DEBUG, "CHEATENGING", "module=%p\n", module);
-
-
-  X=dlsym(module, "dvmJitStats");
-  __android_log_print(ANDROID_LOG_DEBUG, "CHEATENGING", "After dlsym\n");
-
-  __android_log_print(ANDROID_LOG_DEBUG, "CHEATENGING", "X=%p\n", X);
-
- // dvmJitStats();
-
-  //if (dvmJitStats)
- // {
- //   debug_log("Calling dvmJitStats\n");
-    //dvmJitStats();
- // }
-*/
   s=socket(AF_UNIX, SOCK_STREAM, 0);
 
   sprintf(name, " ceserver_extension%d", getpid());
-
-  //printf("s=%d\n", s);
-
 
   struct sockaddr_un address;
   address.sun_family=AF_UNIX;
@@ -555,12 +469,11 @@ __attribute__((constructor)) void moduleinit(void)
 
   address.sun_path[0]=0;
 
-
   int optval = 1;
   setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &optval, optval);
 
   i=bind(s, (struct sockaddr *)&address, al);
-  //printf("bind returned %d\n", i);
+
   if (i==0)
   {
 
@@ -568,10 +481,9 @@ __attribute__((constructor)) void moduleinit(void)
     l=listen(s, 32);
     debug_log("listen=%d\n",l);
 
-
     if (l==0)
     {
-      //listen successful, launch the serverthread
+
       pthread_t pth;
       pthread_create(&pth, NULL, (void *)ServerThread, (void *)(uintptr_t)s);
     }
@@ -580,4 +492,3 @@ __attribute__((constructor)) void moduleinit(void)
   else
     debug_log("bind failed: %d\n", errno);
 }
-

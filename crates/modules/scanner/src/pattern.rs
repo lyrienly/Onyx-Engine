@@ -72,17 +72,12 @@ fn matches_at(haystack: &[u8], pos: usize, needle: &[u8], mask: &[bool]) -> bool
     true
 }
 
-/// Boyer-Moore-Horspool com skip table ajustada para wildcards.
-/// Para a montagem da tabela, so consideramos o sufixo contiguo final sem wildcards
-/// (bytes concretos a partir do primeiro byte concreto apos o ultimo wildcard).
-/// Se a pattern inteira for concreta, usamos a tabela cheia.
 pub fn find_pattern_scalar(haystack: &[u8], needle: &[u8], mask: &[bool]) -> Option<usize> {
     let n = needle.len();
     if n == 0 || haystack.len() < n {
         return None;
     }
 
-    // encontra o maior sufixo sem wildcards
     let mut suffix_start = n;
     for i in (0..n).rev() {
         if mask[i] {
@@ -92,13 +87,11 @@ pub fn find_pattern_scalar(haystack: &[u8], needle: &[u8], mask: &[bool]) -> Opt
         }
     }
 
-    // tabela de salto: por padrao, pula n bytes (ou tamanho do sufixo concreto)
-    // use skip baseado no sufixo concreto final
     let suf_len = n - suffix_start;
     let effective = if suf_len == 0 { 1 } else { suf_len };
 
     let mut skip = [effective; 256];
-    // preenche skip usando ultimos bytes concretos
+
     for i in 0..n - 1 {
         if mask[i] {
             let dist_from_end = n - 1 - i;
@@ -114,7 +107,7 @@ pub fn find_pattern_scalar(haystack: &[u8], needle: &[u8], mask: &[bool]) -> Opt
         if matches_at(haystack, pos, needle, mask) {
             return Some(pos);
         }
-        // avanca com base no byte do haystack na posicao final
+
         let shift = skip[haystack[pos + last] as usize];
         pos += shift.max(1);
     }
@@ -156,16 +149,14 @@ mod avx2 {
             return None;
         }
 
-        // encontra primeiro byte concreto como "anchor" para o vetor
         let mut anchor_idx = 0usize;
         while anchor_idx < n && !mask[anchor_idx] {
             anchor_idx += 1;
         }
         if anchor_idx == n {
-            return None; // all wildcards; parser impede
+            return None;
         }
 
-        // segundo byte concreto, se existir, para reduzir falsos positivos
         let mut second_idx = anchor_idx + 1;
         while second_idx < n && !mask[second_idx] {
             second_idx += 1;
@@ -180,8 +171,7 @@ mod avx2 {
         let second_off = second_idx.wrapping_sub(anchor_idx);
 
         let end = haystack.len().saturating_sub(n);
-        // posicao "p" eh o inicio candidato de match
-        // vetorizamos sobre p+anchor_idx .. p+anchor_idx+32
+
         let mut p: usize = 0;
         while p <= end {
             let anchor_pos = p + anchor_idx;
@@ -193,7 +183,7 @@ mod avx2 {
             let mut mask_bits = _mm256_movemask_epi8(eq) as u32;
 
             if has_second {
-                // janela deslocada no second_byte
+
                 let sec_pos = anchor_pos + second_off;
                 if sec_pos + 32 <= haystack.len() {
                     let chunk2 =
@@ -216,7 +206,6 @@ mod avx2 {
             p += 32;
         }
 
-        // fallback escalar na borda
         let fallback_start = if p == 0 { 0 } else { p };
         for q in fallback_start..=end {
             if matches_at(haystack, q, needle, mask) {
@@ -291,7 +280,6 @@ mod avx2 {
             p += 32;
         }
 
-        // borda escalar
         let fallback_start = if p == 0 { 0 } else { p };
         for q in fallback_start..=end {
             if matches_at(haystack, q, needle, mask) {

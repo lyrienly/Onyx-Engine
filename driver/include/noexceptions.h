@@ -1,9 +1,6 @@
 #ifndef NOEXCEPTIONS_H
 #define NOEXCEPTIONS_H
 
-/*
-Will be responsible for temporarily switching out the IDT of the curent CPU with one that doesn't call windows functions on errors
-*/
 #include <ntifs.h>
 #include <wdm.h>
 #include <windef.h>
@@ -11,12 +8,11 @@ Will be responsible for temporarily switching out the IDT of the curent CPU with
 #include "interruptHook.h"
 #include "dbkfunc.h"
 
-
 typedef struct
 {
 	KIRQL entryIRQL;
-	PINT_VECTOR NoExceptionVectorList; //list pointing to an idt table with hooked ints
-	IDT OriginalIDT;	
+	PINT_VECTOR NoExceptionVectorList;
+	IDT OriginalIDT;
 	IDT ModdedIDT;
 } CPUSTATE, *PCPUSTATE;
 

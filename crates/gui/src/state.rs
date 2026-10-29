@@ -1,4 +1,3 @@
-
 use onyx_core::scanner::ValType;
 
 #[derive(Debug, Clone)]
@@ -53,4 +52,3 @@ impl GuiTableEntry {
         !self.offsets.is_empty()
     }
 }
-

@@ -1,10 +1,3 @@
-/*
- * context.h
- *
- *  Created on: May 18, 2015
- *      Author: eric
- */
-
 #ifndef CONTEXT_H_
 #define CONTEXT_H_
 
@@ -23,10 +16,7 @@
 #include <elf.h>
 #endif
 
-
-
 #include <sys/socket.h>
-
 
 #ifdef __i386__
   typedef struct user_regs_struct CONTEXT_REGS;
@@ -38,15 +28,13 @@
   typedef struct user_fpregs_struct CONTEXT_FP;
 #endif
 
-
 #ifdef __arm__
   typedef struct pt_regs CONTEXT_REGS;
   typedef struct pv_fpregs {
     uint64_t regs[32];
-    uint32_t control; //todo: confirm this
+    uint32_t control;
   } CONTEXT_FP;
 #endif
-
 
 #ifdef __aarch64__
   struct pt_regs32 {
@@ -72,12 +60,12 @@ typedef struct
   {
 #ifdef __aarch64__
     struct {
-      struct pt_regs32 regs32; //alt
+      struct pt_regs32 regs32;
       CONTEXT_FP32 fp32;
     };
 #endif
 #ifdef __x86_64__
-    //todo: 32-bit x86 context regs32;
+
 #endif
     struct {
       CONTEXT_REGS regs;
@@ -91,5 +79,4 @@ typedef struct
 int getContext(int tid, CONTEXT *context);
 int setContext(int tid, CONTEXT *context);
 
-
-#endif /* CONTEXT_H_ */
+#endif

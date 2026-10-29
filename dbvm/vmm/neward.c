@@ -28,7 +28,7 @@ QWORD getARDSize(PARD entry)
 
 void fakeARD_insertAtPos(int index, PARD ard)
 {
-  //shift entries after index by one and then place ARD at the free spot
+
   int length;
   int i;
   if (loadedOS)
@@ -42,14 +42,12 @@ void fakeARD_insertAtPos(int index, PARD ard)
 }
 
 void fakeARD_InsertRange(QWORD address, QWORD size, DWORD type)
-//inserts the given range into the list inside an existing type 1 region. If type matches the previous or next item, merges it instead of add
-//requirement: range must be within an existing ARD entry
+
 {
   int i;
-  //find the entry that matches this address
+
   if (loadedOS)
     return;
-
 
   for (i=0; fakeARD[i].Type != 255 ;i++)
   {
@@ -59,20 +57,19 @@ void fakeARD_InsertRange(QWORD address, QWORD size, DWORD type)
 
     if ((address>=a_address) && (address<a_address+a_size))
     {
-      //found the entry
-      if (e->Type==type)
-        return; //it's the same type, no need to add
 
-      if (address==a_address) //start of the range
+      if (e->Type==type)
+        return;
+
+      if (address==a_address)
       {
-        //check if the previous type can be merged
+
         if ((i>0) && (fakeARD[i-1].Type==type) && (getARDAddress(&fakeARD[i-1])==address))
         {
           PARD e2=&fakeARD[i-1];
 
-          //same type as this, merge it instead of insert
-          setARDSize(e2, getARDSize(e2)+size); //grow the one in front
-          setARDAddress(e, getARDAddress(e)+size); //shift and shrink this one
+          setARDSize(e2, getARDSize(e2)+size);
+          setARDAddress(e, getARDAddress(e)+size);
           setARDSize(e, getARDAddress(e)-size);
           return;
         }
@@ -80,20 +77,17 @@ void fakeARD_InsertRange(QWORD address, QWORD size, DWORD type)
 
       if ((address+size)==a_address+a_size)
       {
-        //it's at the end
-        //check if the next type can be merged
+
         PARD e2=&fakeARD[i+1];
-        if ((e2->Type==type) && (getARDAddress(e2)==address+size)) //check if start is here (in case of gap/unordered)
+        if ((e2->Type==type) && (getARDAddress(e2)==address+size))
         {
-          //same type as this, merge it instead of insert
-          setARDSize(e, getARDSize(e)-size); //shrink this one
-          setARDAddress(e2, getARDAddress(e2)-size); //shift the one in front and grow it
+
+          setARDSize(e, getARDSize(e)-size);
+          setARDAddress(e2, getARDAddress(e2)-size);
           setARDSize(e2, getARDSize(e2)+size);
           return;
         }
       }
-
-      //still here so no merge, insert instead
 
       int j;
       ARD newentry;
@@ -103,7 +97,6 @@ void fakeARD_InsertRange(QWORD address, QWORD size, DWORD type)
       ARD before=*e;
       ARD after=*e;
 
-      //adjust before and after to the new state
       setARDSize(&before, address-a_address);
 
       setARDAddress(&after, address+size);
@@ -111,7 +104,7 @@ void fakeARD_InsertRange(QWORD address, QWORD size, DWORD type)
 
       if ((getARDSize(&before)==0) && (getARDSize(&after)==0))
       {
-        //encompasses the whole block
+
         e->Type=type;
         return;
       }
@@ -135,7 +128,7 @@ void fakeARD_InsertRange(QWORD address, QWORD size, DWORD type)
 
 int fakeARD_getConventionalMemory()
 {
-  //return the total contiguos memory between 0 and 0xfffff
+
   int i;
   int size=0;
   if (!loadedOS)
@@ -163,7 +156,7 @@ void sendARD(void)
     {
       tempbase=((unsigned long long)fakeARD[i].BaseAddrHigh << 32)+fakeARD[i].BaseAddrLow;
       templength=((unsigned long long)fakeARD[i].LengthHigh << 32)+fakeARD[i].LengthLow;
-      //sendstringf("i=%d : BaseAddress=%6, Length=%6, Type=%d \n\r",i, tempbase, templength, fakeARD[i].Type);
+
       displayline("i=%d : BaseAddress=%6, Length=%6, Type=%d \n",i, tempbase, templength, fakeARD[i].Type);
     }
 	}

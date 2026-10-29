@@ -1,11 +1,3 @@
-/*
-operands.h
-
-Copyright (C) 2003-2008 Gil Dabah, http://ragestorm.net/distorm/
-This library is licensed under the BSD license. See the file COPYING.
-*/
-
-
 #ifndef OPERANDS_H
 #define OPERANDS_H
 
@@ -16,7 +8,6 @@ This library is licensed under the BSD license. See the file COPYING.
 #include "wstring.h"
 #include "instructions.h"
 
-/* Return codes from extract_operand. */
 typedef enum {EO_HALT, EO_CONTINUE, EO_SUFFIX} _ExOpRCType;
 
 _ExOpRCType extract_operand(_CodeInfo* ci,
@@ -24,4 +15,4 @@ _ExOpRCType extract_operand(_CodeInfo* ci,
                            _OperandNumberType opNum, _iflags instFlags, unsigned int modrm,
                            _PrefixState* ps, _DecodeType dt, int* lockableInstruction);
 
-#endif /* OPERANDS_H */
+#endif

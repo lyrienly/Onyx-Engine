@@ -1,4 +1,3 @@
-
 pub mod pattern;
 pub mod smart;
 
@@ -302,4 +301,3 @@ pub unsafe extern "C" fn onyx_scanner_save_results_file(
 
     total as i64
 }
-

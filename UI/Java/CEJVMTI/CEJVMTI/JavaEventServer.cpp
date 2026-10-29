@@ -1,14 +1,12 @@
 #include "StdAfx.h"
 #include "JavaEventServer.h"
 
-
 CJavaEventServer *old_eventserver=NULL;
 CJavaEventServer *eventserver=NULL;
 
 jvmtiEventCallbacks callbacks;
 
-
-void JNICALL MethodLoad(jvmtiEnv *jvmti_env, jmethodID method, jint code_size, const void* code_addr, jint map_length, 
+void JNICALL MethodLoad(jvmtiEnv *jvmti_env, jmethodID method, jint code_size, const void* code_addr, jint map_length,
 								const jvmtiAddrLocationMap* map, const void* compile_info)
 {
 	if (eventserver)
@@ -38,32 +36,26 @@ void JNICALL FieldModification(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thr
 CJavaEventServer::CJavaEventServer(jvmtiEnv *jvmti_env)
 {
 
-	jvmtiError error;	
+	jvmtiError error;
 	jvmtiCapabilities cap, wantedcap;
 
 	this->jvmti_env=jvmti_env;
- 
-	if (eventserver) //extra check
+
+	if (eventserver)
 	{
 		CJavaEventServer *old=eventserver;
 		eventserver=NULL;
 		delete eventserver;
 	}
 
-
-	
 	swprintf(pipename, 256,L"\\\\.\\pipe\\cejavaevents_pid%d", GetCurrentProcessId());
 	pipehandle=CreateNamedPipe(pipename, PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT, 1,256*1024, 16, INFINITE, NULL);
 	ConnectNamedPipe(pipehandle, NULL);
 
-	
 	eventserver=this;
 
-	
+	jvmti_env->GetPotentialCapabilities(&cap);
 
-	jvmti_env->GetPotentialCapabilities(&cap);	
-	
-	
 	if (cap.can_generate_compiled_method_load_events)
 	{
 
@@ -77,8 +69,6 @@ CJavaEventServer::CJavaEventServer(jvmtiEnv *jvmti_env)
 		else
 		{
 
-
-
 			callbacks.CompiledMethodLoad=::MethodLoad;
 			callbacks.CompiledMethodUnload=::MethodUnload;
 			callbacks.DynamicCodeGenerated=::DynamicCodeGenerated;
@@ -87,12 +77,12 @@ CJavaEventServer::CJavaEventServer(jvmtiEnv *jvmti_env)
 			error=jvmti_env->SetEventCallbacks(&callbacks, sizeof(callbacks));
 
 			if (error==JVMTI_ERROR_NONE)
-			{			
+			{
 				jvmti_env->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_COMPILED_METHOD_LOAD, NULL);
 				jvmti_env->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_COMPILED_METHOD_UNLOAD, NULL);
-				jvmti_env->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_DYNAMIC_CODE_GENERATED, NULL);				
+				jvmti_env->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_DYNAMIC_CODE_GENERATED, NULL);
 				error=jvmti_env->GenerateEvents(JVMTI_EVENT_COMPILED_METHOD_LOAD);
-				error=jvmti_env->GenerateEvents(JVMTI_EVENT_DYNAMIC_CODE_GENERATED);		
+				error=jvmti_env->GenerateEvents(JVMTI_EVENT_DYNAMIC_CODE_GENERATED);
 			}
 
 		}
@@ -102,47 +92,21 @@ CJavaEventServer::CJavaEventServer(jvmtiEnv *jvmti_env)
 		OutputDebugStringA("can_generate_compiled_method_load_events == FALSE");
 	}
 
-
-
-	
-	
 }
 
 CJavaEventServer::~CJavaEventServer(void)
 {
 	Terminate();
 
-	
 }
 
 void CJavaEventServer::MethodLoad(jvmtiEnv *jvmti_env, jmethodID method, jint code_size, const void* code_addr)
 {
-	/*
-OutputDebugStringA("MethodLoad");
-	char *name=NULL, *sig=NULL, *gen=NULL;
-	char *classsig=NULL, *classgen=NULL;
-	
-	jclass klass;
 
-	jvmti_env->GetMethodDeclaringClass(method, &klass);
-	jvmti_env->GetClassSignature(klass, &classsig, &classgen);
-
-	OutputDebugStringA(classsig);
-
-	
-	jvmti_env->GetMethodName(method, &name, &sig, &gen);
-
-	OutputDebugStringA(name);
-	OutputDebugStringA("\n");
-
-	
-
-
-	*/
 	Lock();
 	try
 	{
-		jclass klass; 
+		jclass klass;
 		char *name=NULL, *sig=NULL, *gen=NULL;
 		char *classsig=NULL, *classgen=NULL;
 		WORD len;
@@ -152,7 +116,7 @@ OutputDebugStringA("MethodLoad");
 		WriteDword(code_size);
 		WriteQword((UINT_PTR)code_addr);
 
-		jvmti_env->GetMethodDeclaringClass(method, &klass);  //when this function returns jklass gets dereferenced.  If this was the server I'd have to use DeleteLocalRef on this
+		jvmti_env->GetMethodDeclaringClass(method, &klass);
 		jvmti_env->GetClassSignature(klass, &classsig, &classgen);
 		jvmti_env->GetMethodName(method, &name, &sig, &gen);
 
@@ -167,11 +131,9 @@ OutputDebugStringA("MethodLoad");
 		}
 		else
 			WriteWord(0);
-		
 
 		if (classgen)
 			jvmti_env->Deallocate((unsigned char *)classgen);
-
 
 		if (name)
 		{
@@ -200,16 +162,14 @@ OutputDebugStringA("MethodLoad");
 		if (gen)
 			jvmti_env->Deallocate((unsigned char *)gen);
 
-		
-
 	}
 	catch (char *e)
 	{
 		OutputDebugStringA(e);
-		//no connection yet
+
 	}
 
-	Unlock();	
+	Unlock();
 
 }
 
@@ -225,7 +185,7 @@ void CJavaEventServer::MethodUnload(jvmtiEnv *jvmti_env, jmethodID method, const
 	catch (char *e)
 	{
 		OutputDebugStringA(e);
-		//no connection yet
+
 	}
 	Unlock();
 }
@@ -240,19 +200,19 @@ void CJavaEventServer::DynamicCodeGenerated(jvmtiEnv *jvmti_env, const char* nam
 		WriteDword(length);
 		WriteWord((WORD)strlen(name));
 		Write((void *)name, (int)strlen(name));
-		
+
 	}
 	catch (char *e)
 	{
 		OutputDebugStringA(e);
-		//no connection yet
+
 	}
 	Unlock();
 }
 
 void CJavaEventServer::Terminate(void)
 {
-	
+
 	jvmtiCapabilities caps;
 
 	jvmti_env->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_COMPILED_METHOD_LOAD, NULL);
@@ -263,10 +223,9 @@ void CJavaEventServer::Terminate(void)
 
 	caps.can_generate_compiled_method_load_events=1;
 
-	jvmti_env->RelinquishCapabilities(&caps);	
+	jvmti_env->RelinquishCapabilities(&caps);
 
 	eventserver=NULL;
-
 
 	Lock();
 	try
@@ -284,17 +243,15 @@ void CJavaEventServer::Terminate(void)
 void CJavaEventServer::FieldModification(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread, jmethodID method, jlocation location, jclass field_klass, jobject object, jfieldID field, char signature_type, jvalue new_value)
 {
 	unsigned int i;
-	//go through the list and check which one caused this
 
-	
 	for (i=0; i<FindWhatWritesList.size(); i++)
 	{
 		PFindWhatWritesEntry e=FindWhatWritesList[i];
 		if (e)
-		{			
+		{
 			if ((e->fieldid==field) && ((object==NULL) || (jni_env->IsSameObject(e->object, object))))
 			{
-				//signal ce
+
 				Lock();
 				try
 				{
@@ -302,21 +259,19 @@ void CJavaEventServer::FieldModification(jvmtiEnv *jvmti_env, JNIEnv* jni_env, j
 					jint count;
 
 					WriteByte(EVENTCMD_FIELDMODIFICATION);
-					WriteDword(i); //id
+					WriteDword(i);
 					WriteQword((UINT_PTR)method);
 					WriteQword((UINT_PTR)location);
 
-					//and a stack snapshot as well
-					
 					if (jvmti_env->GetStackTrace(thread, 0, 10, frames, &count)==JVMTI_ERROR_NONE)
-					{						
+					{
 						int i;
 						WriteByte((BYTE)count);
 
 						for (i=0; i<count; i++)
 						{
 							WriteQword((UINT_PTR)frames[i].method);
-							WriteQword((UINT_PTR)frames[i].location);													
+							WriteQword((UINT_PTR)frames[i].location);
 						}
 					}
 					else
@@ -325,11 +280,11 @@ void CJavaEventServer::FieldModification(jvmtiEnv *jvmti_env, JNIEnv* jni_env, j
 				catch (char *e)
 				{
 					OutputDebugStringA(e);
-					//no connection yet
+
 				}
 				Unlock();
 
-			}			
+			}
 		}
 
 	}
@@ -339,9 +294,8 @@ int CJavaEventServer::RegisterFindWhatWrites(JNIEnv* jni, jobject object, jclass
 {
 	int id=-1;
 
-	//find an usable entry in the FindWhatWritesList
 	unsigned int i;
-		
+
 	for (i=0; i<FindWhatWritesList.size(); i++)
 	{
 		if (FindWhatWritesList[i]==NULL)
@@ -351,10 +305,7 @@ int CJavaEventServer::RegisterFindWhatWrites(JNIEnv* jni, jobject object, jclass
 		}
 	}
 
-	
-
-
-	if (id==-1) 
+	if (id==-1)
 	{
 		PFindWhatWritesEntry newentry=(PFindWhatWritesEntry)malloc(sizeof(FindWhatWritesEntry));
 		FindWhatWritesList.push_back(newentry);
@@ -362,24 +313,23 @@ int CJavaEventServer::RegisterFindWhatWrites(JNIEnv* jni, jobject object, jclass
 		id=(int)FindWhatWritesList.size()-1;
 	}
 
-	klass=(jclass)jni->NewGlobalRef(klass); //upgrade to a global
+	klass=(jclass)jni->NewGlobalRef(klass);
 
 	FindWhatWritesList[id]->klass=klass;
 	FindWhatWritesList[id]->fieldid=fieldid;
 	FindWhatWritesList[id]->object=object;
-	
 
 	jvmti_env->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_FIELD_MODIFICATION, NULL);
 
-	if (jvmti_env->SetFieldModificationWatch(klass, fieldid)!=JVMTI_ERROR_NONE)	
-		UnregisterFindWhatWrites(jni, id);		
-		
+	if (jvmti_env->SetFieldModificationWatch(klass, fieldid)!=JVMTI_ERROR_NONE)
+		UnregisterFindWhatWrites(jni, id);
+
 	return id;
 }
 
 void CJavaEventServer::UnregisterFindWhatWrites(JNIEnv* jni, int id)
 {
-	
+
 	if (FindWhatWritesList[id])
 	{
 		jvmti_env->ClearFieldModificationWatch(FindWhatWritesList[id]->klass, FindWhatWritesList[id]->fieldid);
@@ -390,5 +340,4 @@ void CJavaEventServer::UnregisterFindWhatWrites(JNIEnv* jni, int id)
 		FindWhatWritesList[id]=NULL;
 	}
 
-	
 }

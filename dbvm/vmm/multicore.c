@@ -1,8 +1,3 @@
-/*
- * This sourcefile holds the code for setting up and querying other cpu cores
- * on the system
- */
-
 #include "multicore.h"
 #include "common.h"
 #include "apic.h"
@@ -10,11 +5,10 @@
 
 volatile unsigned int cpucount;
 
-
 typedef struct _MPFPS
 {
-        DWORD signature; // 0x5f504d5f : '_MP_'
-        DWORD MPConfigPointer; //
+        DWORD signature;
+        DWORD MPConfigPointer;
         BYTE Length;
         BYTE Version;
         BYTE Checksum;
@@ -27,8 +21,8 @@ typedef struct _MPFPS
 
 typedef struct _MPCONFIG
 {
-        DWORD signature; // 0x504d4350 : 'PCMP'
-        WORD BaseTableLength; //
+        DWORD signature;
+        WORD BaseTableLength;
         BYTE SpecRev;
         BYTE Checksum;
         char OEMID[8];
@@ -56,7 +50,7 @@ typedef struct _MPCONFCPU
 
 typedef struct _RSD_PTR
 {
-        char signature[8]; //'RSD PTR '
+        char signature[8];
         unsigned char checksum;
         char OEMID[6];
         char reserved;
@@ -65,7 +59,7 @@ typedef struct _RSD_PTR
 
 typedef struct _RSDT
 {
-        DWORD signature; //RSDT
+        DWORD signature;
         DWORD length;
         char revision;
         unsigned char checksum;
@@ -79,7 +73,7 @@ typedef struct _RSDT
 
 typedef struct _APICDT
 {
-        DWORD signature; //APIC
+        DWORD signature;
         DWORD length;
         char revision;
         unsigned char checksum;
@@ -95,7 +89,7 @@ typedef struct _APICDT
 
 int checkcrc(UINT64 PhysicalAddress, int size)
 {
-  //everything counted up must be 0 as 1 byte
+
   unsigned char *x=(unsigned char *)mapPhysicalMemory(PhysicalAddress, size);
   unsigned char total=0;
   int i;
@@ -124,7 +118,6 @@ void *find_RSDP_inrange(BYTE *address,int size)
       else
         displayline("Invalid crc\n");
 
-
     }
   }
   return NULL;
@@ -140,7 +133,7 @@ void *find_MP_inrange(BYTE *address,int size)
 	{
 		if (*(DWORD*)address==0x5f504d5f)
 		{
-			//displayline("POSSIBLE FOUND: %8\n",(QWORD)address);
+
 			mp=(PMPFPS)address;
 			mpc=(PMPCONFIG)((QWORD)mp->MPConfigPointer);
 
@@ -148,7 +141,7 @@ void *find_MP_inrange(BYTE *address,int size)
 			{
 				if (mpc->signature==0x504d4350)
 				{
-					return mp; //it's valid
+					return mp;
 				}
 			}
 
@@ -171,8 +164,6 @@ unsigned int initAPcpus(DWORD entrypage)
     a=0;
     _cpuid(&a,&b,&c,&d);
     isAMD=((b==0x68747541) && (d==0x69746e65) && (c==0x444d4163));
-
-
 
 	  if (!isAMD)
 	  {
@@ -197,7 +188,6 @@ unsigned int initAPcpus(DWORD entrypage)
 	displayline("Checking RSDP tables\n");
 	PRSD_PTR rsd_ptr=NULL;
 
-
 	rsd_ptr=find_RSDP_inrange((void*)EDBAlocation,1024);
 	if (!rsd_ptr)
 	  rsd_ptr=find_RSDP_inrange((void*)0x9fc00,1024);
@@ -218,7 +208,6 @@ unsigned int initAPcpus(DWORD entrypage)
 
 	    DWORD rsdtlength;
 
-	    //remap with the actual length
 	    rsdtlength=rsdt->length;
 	    unmapPhysicalMemory(rsdt,sizeof(RSDT));
 
@@ -245,23 +234,22 @@ unsigned int initAPcpus(DWORD entrypage)
               int APICStructure_size=apicdt->length-44;
               displayline("This one holds APIC info\n");
 
-              //remap
               DWORD apicdtlength=apicdt->length;
               unmapPhysicalMemory(apicdt, sizeof(APICDT));
               apicdt=(PAPICDT)mapPhysicalMemory(rsdt->Entries[i],apicdtlength);
 
               while (j<APICStructure_size)
               {
-                //parse the structures
+
                 switch (apicdt->APICStructure[j])
                 {
                   case 0:
                   {
-                    //Processor Local APIC structure (only one i'm interested in)
+
                     displayline("Processor Local APIC structure\n");
                     found++;
 
-                    if (found==2) //multi or threaded, launch them
+                    if (found==2)
                     {
                       void *LAPIC=mapPhysicalMemory(apicdt->LocalAPIC, 4096);
                       SetPageToWriteThrough(LAPIC);
@@ -270,13 +258,12 @@ unsigned int initAPcpus(DWORD entrypage)
                       unmapPhysicalMemory(LAPIC, 4096);
                     }
 
-
                     break;
                   }
 
                   case 1:
                   {
-                    //IO APIC structure
+
                     displayline("IO APIC structure\n");
 
                     break;
@@ -310,10 +297,9 @@ unsigned int initAPcpus(DWORD entrypage)
 
                 }
 
-                j+=apicdt->APICStructure[j+1]; //Length
+                j+=apicdt->APICStructure[j+1];
 
               }
-
 
               if (apicdt)
               {
@@ -347,19 +333,14 @@ unsigned int initAPcpus(DWORD entrypage)
 	else
 	  displayline("No RSD_PTR found\n");
 
-
-
 	if (found>0)
 	  return found;
 
-	//still here
 	displayline("Falling back to MP table");
 	PMPFPS mp;
 	PMPCONFIG mpc;
 	PMPCONFCPU mpcpu;
 
-
-	//check first KB of EDBA
 	mp=find_MP_inrange((void*)EDBAlocation,1024);
 	if (mp!=NULL)
 	{
@@ -425,7 +406,6 @@ unsigned int initAPcpus(DWORD entrypage)
 		displayline("Entry Count=%d\n",mpc->EntryCount);
 		displayline("Address of Local APIC=%8\n",mpc->AddressofLocalAPIC);
 
-
 		displayline("Extended Table Length=%d\n",mpc->ExtendedTableLength);
 		displayline("Extended Table Checksum=%2\n",mpc->ExtendedTableChecksum);
 
@@ -435,7 +415,6 @@ unsigned int initAPcpus(DWORD entrypage)
 		p=(BYTE *)((QWORD)mpc+sizeof(struct _MPCONFIG));
 		while (i<(mpc->EntryCount))
 		{
-		  //displayline("i=%d Checking %8\n",i,p);
 
 		  switch (p[0])
 		  {
@@ -452,7 +431,7 @@ unsigned int initAPcpus(DWORD entrypage)
 		      if (mpcpu->CPUEnabledBit)
 		      {
 		        found++;
-		        if (hasHT) //quick assumption, could be wrong but it's the closest I can guess without acpi
+		        if (hasHT)
 		          found++;
 		      }
 
@@ -460,27 +439,27 @@ unsigned int initAPcpus(DWORD entrypage)
 		      break;
 
 		    case 1:
-		      //displayline("BUS entry at %8\n",p);
+
 		      p+=8;
 		      break;
 
 		    case 2:
-		      //displayline("IO APIC entry at %8\n",p);
+
 		      p+=8;
 		      break;
 
 		    case 3:
-		      //displayline("IO interrupt assignment entry at %8\n",p);
+
 		      p+=8;
 		      break;
 
 		    case 4:
-		      //displayline("Local interrupt assignment entry at %8\n",p);
+
 		      p+=8;
 		      break;
 
 		    default:
-		      //displayline("error\n");
+
 		      p+=8;
 		      break;
 		  }
@@ -500,24 +479,11 @@ unsigned int initAPcpus(DWORD entrypage)
       asm volatile ("": : :"memory");
 
 	    unmapPhysicalMemory(LAPIC, 4096);
-/*
-      int i;
-	    while (1)
-	    {
-	      i++;
-	      if (i%29==0)
-	        sendstringf("i=%d\n",i);
 
-	    }*/
 	  }
-
-
-
 
 	}
 
 	displayline("before return. found=%d\n\r", found);
 	return (found?found:1);
 }
-
-

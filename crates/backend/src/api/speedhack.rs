@@ -1,4 +1,3 @@
-
 use std::fs::OpenOptions;
 use std::io::Write;
 use onyx_core::process::Process;
@@ -56,4 +55,3 @@ pub unsafe extern "C" fn onyx_speedhack_is_active(process: *mut Process) -> i32 
 pub unsafe extern "C" fn onyx_speedhack_reset(process: *mut Process) -> i32 {
     onyx_speedhack_set(process, 1.0)
 }
-

@@ -1,4 +1,3 @@
-
 use std::time::Instant;
 use eframe::egui::{self, Color32, RichText, Vec2};
 use onyx_core::pointer_scanner::{PointerPath, PointerScanner};
@@ -181,4 +180,3 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
         },
     );
 }
-

@@ -1,16 +1,7 @@
-//CMyIclrDebuggingLibraryProvider
-
 #include "stdafx.h"
-
 
 #include "MyIclrDebuggingLibraryProvider.h"
 
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// IUnknown
-//
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 STDMETHODIMP CMyICLRDebuggingLibraryProvider::QueryInterface(__in REFIID InterfaceId, __out PVOID* Interface)
 {
 	*Interface = NULL;
@@ -40,11 +31,11 @@ STDMETHODIMP_(ULONG) CMyICLRDebuggingLibraryProvider::Release()
 	return nCount;
 }
 
-HRESULT STDMETHODCALLTYPE CMyICLRDebuggingLibraryProvider::ProvideLibrary( 
-            /* [in] */ const WCHAR *pwszFileName,
-            /* [in] */ DWORD dwTimestamp,
-            /* [in] */ DWORD dwSizeOfImage,
-            /* [out] */ HMODULE *phModule)
+HRESULT STDMETHODCALLTYPE CMyICLRDebuggingLibraryProvider::ProvideLibrary(
+             const WCHAR *pwszFileName,
+             DWORD dwTimestamp,
+             DWORD dwSizeOfImage,
+             HMODULE *phModule)
 {
 
 	HRESULT r;
@@ -53,13 +44,12 @@ HRESULT STDMETHODCALLTYPE CMyICLRDebuggingLibraryProvider::ProvideLibrary(
 	else
 		r = E_NOTIMPL;
 
-
 	if (r != S_OK)
 	{
 
 		HMODULE m;
 		WCHAR newname[255];
-		
+
 		StrCpyW(newname, dotnetcorepath);
 		StrCatW(newname, pwszFileName);
 
@@ -74,5 +64,3 @@ HRESULT STDMETHODCALLTYPE CMyICLRDebuggingLibraryProvider::ProvideLibrary(
 	}
 
 }
-
-        

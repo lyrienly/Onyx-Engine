@@ -1,4 +1,3 @@
-
 use crate::process::Process;
 
 pub const IMAGE_DOS_SIGNATURE: u16 = 0x5A4D;
@@ -238,4 +237,3 @@ mod tests {
         assert_eq!(IMAGE_NT_SIGNATURE, 0x00004550);
     }
 }
-

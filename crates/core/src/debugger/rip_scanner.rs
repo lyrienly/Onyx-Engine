@@ -1,4 +1,3 @@
-
 use crate::process::Process;
 use crate::debugger::disasm::Disassembler;
 
@@ -127,4 +126,3 @@ mod tests {
         assert_eq!(non_matching.len(), 0);
     }
 }
-

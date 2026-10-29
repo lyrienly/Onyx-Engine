@@ -1,9 +1,4 @@
-/* ------------------------------------------------------------------ */
-/* WARNING: relative order of tokens is important.                    */
-
-/* register */
-
- DEF_ASM(r0)
+DEF_ASM(r0)
  DEF_ASM(r1)
  DEF_ASM(r2)
  DEF_ASM(r3)
@@ -14,27 +9,22 @@
  DEF_ASM(r8)
  DEF_ASM(r9)
  DEF_ASM(r10)
- DEF_ASM(r11) /* fp */
- DEF_ASM(r12) /* ip[c] */
- DEF_ASM(r13) /* sp */
- DEF_ASM(r14) /* lr */
- DEF_ASM(r15) /* pc */
+ DEF_ASM(r11)
+ DEF_ASM(r12)
+ DEF_ASM(r13)
+ DEF_ASM(r14)
+ DEF_ASM(r15)
 
-/* register macros */
-
- DEF_ASM(fp) /* alias for r11 */
- DEF_ASM(ip) /* alias for r12 */
- DEF_ASM(sp) /* alias for r13 */
- DEF_ASM(lr) /* alias for r14 */
- DEF_ASM(pc) /* alias for r15 */
-
- /* data processing directives */
+ DEF_ASM(fp)
+ DEF_ASM(ip)
+ DEF_ASM(sp)
+ DEF_ASM(lr)
+ DEF_ASM(pc)
 
  DEF_ASM(asl)
 
 #define ARM_INSTRUCTION_GROUP(tok) ((((tok) - TOK_ASM_nopeq) & 0xFFFFFFF0) + TOK_ASM_nopeq)
 
-/* Note: condition code is 4 bits */
 #define DEF_ASM_CONDED(x) \
   DEF(TOK_ASM_ ## x ## eq, #x "eq") \
   DEF(TOK_ASM_ ## x ## ne, #x "ne") \
@@ -53,17 +43,12 @@
   DEF(TOK_ASM_ ## x, #x) \
   DEF(TOK_ASM_ ## x ## rsvd, #x "rsvd")
 
-/* Note: add new tokens after nop (MUST always use DEF_ASM_CONDED) */
-
  DEF_ASM_CONDED(nop)
  DEF_ASM_CONDED(wfe)
  DEF_ASM_CONDED(wfi)
  DEF_ASM_CONDED(swi)
 
- /* misc */
  DEF_ASM_CONDED(clz)
-
- /* size conversion */
 
  DEF_ASM_CONDED(sxtb)
  DEF_ASM_CONDED(sxth)
@@ -71,8 +56,6 @@
  DEF_ASM_CONDED(uxth)
  DEF_ASM_CONDED(movt)
  DEF_ASM_CONDED(movw)
-
- /* multiplication */
 
  DEF_ASM_CONDED(mul)
  DEF_ASM_CONDED(muls)
@@ -86,8 +69,6 @@
  DEF_ASM_CONDED(smlals)
  DEF_ASM_CONDED(umlal)
  DEF_ASM_CONDED(umlals)
-
- /* load/store */
 
  DEF_ASM_CONDED(ldr)
  DEF_ASM_CONDED(ldrb)
@@ -113,19 +94,13 @@
  DEF_ASM_CONDED(stmib)
  DEF_ASM_CONDED(ldmib)
 
- /* instruction macros */
-
  DEF_ASM_CONDED(push)
  DEF_ASM_CONDED(pop)
-
- /* branches */
 
  DEF_ASM_CONDED(b)
  DEF_ASM_CONDED(bl)
  DEF_ASM_CONDED(bx)
  DEF_ASM_CONDED(blx)
-
- /* data processing instructions; order is important */
 
  DEF_ASM_CONDED(and)
  DEF_ASM_CONDED(ands)
@@ -144,13 +119,13 @@
  DEF_ASM_CONDED(rsc)
  DEF_ASM_CONDED(rscs)
  DEF_ASM_CONDED(tst)
- DEF_ASM_CONDED(tsts) // necessary here--but not useful to the user
+ DEF_ASM_CONDED(tsts)
  DEF_ASM_CONDED(teq)
- DEF_ASM_CONDED(teqs) // necessary here--but not useful to the user
+ DEF_ASM_CONDED(teqs)
  DEF_ASM_CONDED(cmp)
- DEF_ASM_CONDED(cmps) // necessary here--but not useful to the user
+ DEF_ASM_CONDED(cmps)
  DEF_ASM_CONDED(cmn)
- DEF_ASM_CONDED(cmns) // necessary here--but not useful to the user
+ DEF_ASM_CONDED(cmns)
  DEF_ASM_CONDED(orr)
  DEF_ASM_CONDED(orrs)
  DEF_ASM_CONDED(mov)

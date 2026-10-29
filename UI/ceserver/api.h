@@ -1,10 +1,3 @@
-/*
- * api.h
- *
- *  Created on: Jul 21, 2011
- *      Author: erich
- */
-
 #ifndef API_H_
 #define API_H_
 
@@ -20,14 +13,6 @@
 #ifdef __ANDROID__
   #include<android/log.h>
 #endif
-/*
-
-#if defined(__arm__) || defined(__ANDROID__)
-#include <linux/user.h>
-#else
-#include <sys/user.h>
-#endif
-*/
 
 #ifdef HAS_LINUX_USER_H
   #include <linux/user.h>
@@ -37,12 +22,9 @@
 
 #include <sys/uio.h>
 
-
-
 #define VQE_PAGEDONLY 1
 #define VQE_DIRTYONLY 2
 #define VQE_NOSHARED 4
-
 
 typedef struct
 {
@@ -95,47 +77,30 @@ typedef struct
 
 typedef struct
 {
-  uint8_t num_brps;   //number of instruction breakpoints
-  uint8_t num_wrps;   //number of data breakpoints
-  uint8_t wp_len;     //max length of a data breakpoint
-  uint8_t debug_arch; //debug architecture
+  uint8_t num_brps;
+  uint8_t num_wrps;
+  uint8_t wp_len;
+  uint8_t debug_arch;
 
 } HBP_RESOURCE_INFO, *PHBP_RESOURCE_INFO;
 
 #ifdef __arm__
-/*  struct user_pt_regs
-  {
-    long regs[18];
-  };
 
-  struct user_hwdebug_state {
-   __u32 dbg_info;
-   struct {
-   __u32 addr;
-   __u32 ctrl;
-   } dbg_regs[16];
-  };
-
-#define NT_ARM_HW_WATCH 0x403
-#define PTRACE_GETREGSET 0x4204
-#define PTRACE_SETREGSET 0x4205
-*/
 #endif
-
 
 typedef struct {
   int debugevent;
   int64_t threadid;
   union
   {
-    uint64_t address; //TRAP: Address that caused trap
+    uint64_t address;
     struct {
-      uint8_t maxBreakpointCount; //Number of execute breakpoints this system supports at most
+      uint8_t maxBreakpointCount;
       uint8_t maxWatchpointCount;
-      uint8_t maxSharedBreakpoints; //If the system uses the same kind of breakpoints for execute and watchpoints. 0 otherwise
-    }; //CreateProcess
+      uint8_t maxSharedBreakpoints;
+    };
   };
-//other data
+
 } DebugEvent, *PDebugEvent;
 
 struct DebugEventQueueElement {
@@ -147,29 +112,28 @@ struct DebugEventQueueElement {
 
 TAILQ_HEAD(debugEventQueueHead, DebugEventQueueElement);
 
-
 typedef struct {
   int tid;
   int isPaused;
   int suspendCount;
-  DebugEvent suspendedDevent; //debug event to be injected when resumed
+  DebugEvent suspendedDevent;
 } ThreadData, *PThreadData;
 
 typedef struct {
   int ReferenceCount;
   int pid;
   int is64bit;
-  int mapfd; //file descriptor for /proc/pid/maps
+  int mapfd;
   char *path;
   char *maps;
   int mem;
-  int memrw; //Readwrite when set
-  int hasLoadedExtension; //set to true if the ceserver extension has been loaded in this process
-  int neverForceLoadExtension; //set to true if you don't want to force load the module (if it's loaded, use it, but don't use the injection method)
+  int memrw;
+  int hasLoadedExtension;
+  int neverForceLoadExtension;
   pthread_mutex_t extensionMutex;
-  int extensionFD; //socket to communicate with the target
+  int extensionFD;
 
-  int isDebugged; //if this is true no need to attach/detach constantly, BUT make sure the debugger thread does do it's job
+  int isDebugged;
   pthread_t debuggerThreadID;
 
   PThreadData threadlist;
@@ -178,21 +142,19 @@ typedef struct {
 
   DebugEvent debuggedThreadEvent;
 
-  int debuggerServer; //sockets for communicating with the debugger thread by local threads
+  int debuggerServer;
   int debuggerClient;
 
-  pthread_mutex_t debugEventQueueMutex; //probably not necessary as all queue operations are all done in the debuggerthread of the process
+  pthread_mutex_t debugEventQueueMutex;
 
   struct debugEventQueueHead debugEventQueue;
 
   uintptr_t dlopen;
   uintptr_t dlerror;
-  int dlopenalt; //when not 0 this means that there is a 3th param: caller
+  int dlopenalt;
   uintptr_t dlopencaller;
   uintptr_t mmap;
 } ProcessData, *PProcessData;
-
-
 
 #pragma pack(1)
 typedef struct {
@@ -222,31 +184,11 @@ typedef struct _regDR6
 } __attribute__((__packed__)) regDR6,*PregDR6;
 #endif
 
-
-/*
-//just declaring this works as well, but going for a dynamic load method in case of an earlier libc that doesn't export it
-ssize_t process_vm_readv(pid_t pid,
-                                const struct iovec *local_iov,
-                                unsigned long liovcnt,
-                                const struct iovec *remote_iov,
-                                unsigned long riovcnt,
-                                unsigned long flags);
-
-       ssize_t process_vm_writev(pid_t pid,
-                                 const struct iovec *local_iov,
-                                 unsigned long liovcnt,
-                                 const struct iovec *remote_iov,
-                                 unsigned long riovcnt,
-                                 unsigned long flags);
-                                 */
-
 typedef ssize_t (*PROCESS_VM_READV)(pid_t pid, const struct iovec *local_iov, unsigned long liovcnt, const struct iovec *remote_iov, unsigned long riovcnt, unsigned long flags);
 typedef ssize_t (*PROCESS_VM_WRITEV)(pid_t pid, const struct iovec *local_iov, unsigned long liovcnt, const struct iovec *remote_iov, unsigned long riovcnt, unsigned long flags);
 
-
 extern PROCESS_VM_READV process_vm_readv;
 extern PROCESS_VM_WRITEV process_vm_writev;
-
 
 void CloseHandle(HANDLE h);
 BOOL Process32Next(HANDLE hSnapshot, PProcessListEntry processentry);
@@ -269,7 +211,6 @@ int ContinueFromDebugEvent(HANDLE hProcess, int tid, int ignoresignal);
 int GetDebugPort(HANDLE hProcess);
 
 int getArchitecture(HANDLE hProcess);
-
 
 int SetBreakpoint(HANDLE hProcess, int tid, int debugreg, void *address, int bptype, int bpsize);
 int RemoveBreakpoint(HANDLE hProcess, int tid, int debugreg, int wasWatchpoint);
@@ -297,8 +238,6 @@ void CloseAllPipes();
 
 uint64_t getTickCount();
 
-
-
 void initAPI();
 
 extern pthread_mutex_t debugsocketmutex;
@@ -308,11 +247,11 @@ extern pthread_mutex_t debugsocketmutex;
   #define LOGD(fmt, args...) __android_log_vprint(ANDROID_LOG_DEBUG, LOG_TAG, fmt, ##args)
 #endif
 
-int debug_log(const char * format , ...); 
+int debug_log(const char * format , ...);
 uintptr_t safe_ptrace(int request, pid_t pid, void * addr, void * data);
 extern int ATTACH_TO_ACCESS_MEMORY;
 extern int ATTACH_TO_WRITE_MEMORY;
 extern int MEMORY_SEARCH_OPTION;
 extern int ATTACH_PID;
 extern unsigned char SPECIFIED_ARCH;
-#endif /* API_H_ */
+#endif

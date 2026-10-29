@@ -13,27 +13,21 @@
 #include "IOPLDispatcher.h"
 #include "noexceptions.h"
 
-
 #if (AMD64 && TOBESIGNED)
 #include "sigcheck.h"
 #endif
 
-
 #ifdef CETC
 	#include "cetc.h"
 #endif
-
 
 void UnloadDriver(PDRIVER_OBJECT DriverObject);
 
 NTSTATUS DispatchCreate(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp);
 NTSTATUS DispatchClose(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp);
 
-
 #ifndef AMD64
-//no api hooks for x64
 
-//-----NtUserSetWindowsHookEx----- //prevent global hooks
 typedef ULONG (NTUSERSETWINDOWSHOOKEX)(
     IN HANDLE hmod,
     IN PUNICODE_STRING pstrLib OPTIONAL,
@@ -44,12 +38,10 @@ typedef ULONG (NTUSERSETWINDOWSHOOKEX)(
 );
 NTUSERSETWINDOWSHOOKEX OldNtUserSetWindowsHookEx;
 ULONG NtUserSetWindowsHookEx_callnumber;
-//HHOOK NewNtUserSetWindowsHookEx(IN HANDLE hmod,IN PUNICODE_STRING pstrLib OPTIONAL,IN DWORD idThread,IN int nFilterType, IN PROC pfnFilterProc,IN DWORD dwFlags);
-
 
 typedef NTSTATUS (*ZWSUSPENDPROCESS)
 (
-    IN ULONG ProcessHandle  // Handle to the process
+    IN ULONG ProcessHandle
 );
 ZWSUSPENDPROCESS ZwSuspendProcess;
 
@@ -63,24 +55,15 @@ NTSTATUS ZwCreateThread(
 	IN PVOID  UserStack,
 	IN BOOLEAN  CreateSuspended);
 
-//PVOID GetApiEntry(ULONG FunctionNumber);
 #endif
-
-
-
-
-
-
 
 UNICODE_STRING  uszDeviceString;
 PVOID BufDeviceString=NULL;
 
-
-
 void hideme(PDRIVER_OBJECT DriverObject)
 {
 #ifndef AMD64
-	
+
 	typedef struct _MODULE_ENTRY {
 	LIST_ENTRY le_mod;
 	DWORD  unknown[4];
@@ -93,7 +76,7 @@ void hideme(PDRIVER_OBJECT DriverObject)
 
 	PMODULE_ENTRY pm_current;
 
-	pm_current =  *((PMODULE_ENTRY*)((DWORD)DriverObject + 0x14)); //eeeeew
+	pm_current =  *((PMODULE_ENTRY*)((DWORD)DriverObject + 0x14));
 
 	*((PDWORD)pm_current->le_mod.Blink)        = (DWORD) pm_current->le_mod.Flink;
 	pm_current->le_mod.Flink->Blink            = pm_current->le_mod.Blink;
@@ -102,16 +85,12 @@ void hideme(PDRIVER_OBJECT DriverObject)
 #endif
 }
 
-
 int testfunction(int p1,int p2)
 {
 	DbgPrint("Hello\nParam1=%d\nParam2=%d\n",p1,p2);
-	
-
 
 	return 0x666;
 }
-
 
 void* functionlist[1];
 char  paramsizes[1];
@@ -123,36 +102,18 @@ VOID TestPassive(UINT_PTR param)
 	DbgPrint("passive cpu call for cpu %d\n", KeGetCurrentProcessorNumber());
 }
 
-
 VOID TestDPC(IN struct _KDPC *Dpc, IN PVOID  DeferredContext, IN PVOID  SystemArgument1, IN PVOID  SystemArgument2)
 {
 	EFLAGS e=getEflags();
-	
+
     DbgPrint("Defered cpu call for cpu %d (Dpc=%p  IF=%d IRQL=%d)\n", KeGetCurrentProcessorNumber(), Dpc, e.IF, KeGetCurrentIrql());
 }
 #endif
 
-
 NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 	IN PUNICODE_STRING RegistryPath)
-	/*++
 
-	Routine Description:
-
-	This routine is called when the driver is loaded by NT.
-
-	Arguments:
-
-	DriverObject - Pointer to driver object created by system.
-	RegistryPath - Pointer to the name of the services node for this driver.
-
-	Return Value:
-
-	The function value is the final status from the initialization operation.
-
-	--*/
 {
-
 
 	NTSTATUS        ntStatus;
 	PVOID           BufDriverString = NULL, BufProcessEventString = NULL, BufThreadEventString = NULL;
@@ -169,18 +130,12 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 	WORD this_cs, this_ss, this_ds, this_es, this_fs, this_gs;
 	ULONG cr4reg;
 
-
-
 	criticalSection csTest;
-
-	
 
 	KernelCodeStepping = 0;
 	KernelWritesIgnoreWP = 0;
 
 	InitDynamicKernelOffsets();
-
-
 
 	this_cs = getCS();
 	this_ss = getSS();
@@ -193,10 +148,8 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 	temp.Length = 0;
 	temp.MaximumLength = 100;
 
-	//DbgPrint("Loading driver\n");
 	if (RegistryPath)
 	{
-		//DbgPrint("Registry path = %S\n", RegistryPath->Buffer);
 
 		InitializeObjectAttributes(&oa, RegistryPath, OBJ_KERNEL_HANDLE, NULL, NULL);
 		ntStatus = ZwOpenKey(&reg, KEY_QUERY_VALUE, &oa);
@@ -205,8 +158,6 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 			UNICODE_STRING A, B, C, D;
 			PKEY_VALUE_PARTIAL_INFORMATION bufA, bufB, bufC, bufD;
 			ULONG ActualSize;
-
-			//DbgPrint("Opened the key\n");
 
 			BufDriverString = ExAllocatePool(PagedPool, sizeof(KEY_VALUE_PARTIAL_INFORMATION) + 100);
 			BufDeviceString = ExAllocatePool(PagedPool, sizeof(KEY_VALUE_PARTIAL_INFORMATION) + 100);
@@ -234,7 +185,7 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 
 			if (ntStatus == STATUS_SUCCESS)
 			{
-				//DbgPrint("Read ok\n");
+
 				RtlInitUnicodeString(&uszDriverString, (PCWSTR)bufA->Data);
 				RtlInitUnicodeString(&uszDeviceString, (PCWSTR)bufB->Data);
 				RtlInitUnicodeString(&uszProcessEventString, (PCWSTR)bufC->Data);
@@ -279,18 +230,11 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 
 	ntStatus = STATUS_SUCCESS;
 
-
-
-
-
 	if (!loadedbydbvm)
 	{
 
-		// Point uszDriverString at the driver name
 #ifndef CETC
 
-
-		// Create and initialize device object
 		ntStatus = IoCreateDevice(DriverObject,
 			0,
 			&uszDriverString,
@@ -301,12 +245,11 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 
 		if (ntStatus != STATUS_SUCCESS)
 		{
-			//DbgPrint("IoCreateDevice failed\n");
+
 			ExFreePool(BufDriverString);
 			ExFreePool(BufDeviceString);
 			ExFreePool(BufProcessEventString);
 			ExFreePool(BufThreadEventString);
-
 
 			if (reg)
 				ZwClose(reg);
@@ -314,22 +257,17 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 			return ntStatus;
 		}
 
-		// Point uszDeviceString at the device name
-
-		// Create symbolic link to the user-visible name
 		ntStatus = IoCreateSymbolicLink(&uszDeviceString, &uszDriverString);
 
 		if (ntStatus != STATUS_SUCCESS)
 		{
-			//DbgPrint("IoCreateSymbolicLink failed: %x\n", ntStatus);
-			// Delete device object if not successful
+
 			IoDeleteDevice(pDeviceObject);
 
 			ExFreePool(BufDriverString);
 			ExFreePool(BufDeviceString);
 			ExFreePool(BufProcessEventString);
 			ExFreePool(BufThreadEventString);
-
 
 			if (reg)
 				ZwClose(reg);
@@ -340,12 +278,6 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 #endif
 	}
 
-	//when loaded by dbvm driver object is 'valid' so store the function addresses
-
-
-	//DbgPrint("DriverObject=%p\n", DriverObject);
-
-	// Load structure to point to IRP handlers...
 	DriverObject->DriverUnload = UnloadDriver;
 	DriverObject->MajorFunction[IRP_MJ_CREATE] = DispatchCreate;
 	DriverObject->MajorFunction[IRP_MJ_CLOSE] = DispatchClose;
@@ -355,21 +287,16 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 	else
 		DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = DispatchIoctl;
 
-
-
-	
-
 #ifndef AMD64
-	//determine if PAE is used
+
 	cr4reg=(ULONG)getCR4();
 
 	if ((cr4reg & 0x20)==0x20)
 	{
-		PTESize=8; //pae
+		PTESize=8;
 		PAGE_SIZE_LARGE=0x200000;
 		MAX_PDE_POS=0xC0604000;
 		MAX_PTE_POS=0xC07FFFF8;
-
 
 	}
 	else
@@ -380,29 +307,18 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 		MAX_PTE_POS=0xC03FFFFC;
 	}
 #else
-	PTESize = 8; //pae
+	PTESize = 8;
 	PAGE_SIZE_LARGE = 0x200000;
-	//base was 0xfffff68000000000ULL
 
-	//to 
-	MAX_PTE_POS = 0xFFFFF6FFFFFFFFF8ULL; // base + 0x7FFFFFFFF8
-	MAX_PDE_POS = 0xFFFFF6FB7FFFFFF8ULL; // base + 0x7B7FFFFFF8
+	MAX_PTE_POS = 0xFFFFF6FFFFFFFFF8ULL;
+	MAX_PDE_POS = 0xFFFFF6FB7FFFFFF8ULL;
 #endif
-
-
 
 #ifdef CETC
 	DbgPrint("Going to initialice CETC\n");
 	InitializeCETC();
 #endif
 
-
-	//hideme(DriverObject); //ok, for those that see this, enabling this WILL fuck up try except routines, even in usermode you'll get a blue sreen
-
-	
-
-
-	// Return success (don't do the devicestring, I need it for unload)
 	DbgPrint("Cleaning up initialization buffers\n");
 	if (BufDriverString)
 	{
@@ -428,16 +344,13 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 		reg = 0;
 	}
 
-
-
-	//fetch cpu info
 	{
 		DWORD r[4];
 		DWORD a;
 
 		__cpuid(r, 0);
 		DbgPrint("cpuid.0: r[1]=%x", r[1]);
-		if (r[1] == 0x756e6547) //GenuineIntel
+		if (r[1] == 0x756e6547)
 		{
 
 			__cpuid(r, 1);
@@ -455,7 +368,6 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 			cpu_familyID = cpu_familyID + (cpu_ext_familyID << 4);
 
 			vmx_init_dovmcall(1);
-			
 
 		}
 		else
@@ -469,8 +381,6 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 
 		}
 
-
-
 	}
 
 #ifdef DEBUG1
@@ -479,7 +389,6 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 
 		DebugStackState x;
 		DbgPrint("offset of LBR_Count=%d\n", (UINT_PTR)&x.LBR_Count - (UINT_PTR)&x);
-
 
 		DbgPrint("Testing forEachCpu(...)\n");
 		forEachCpu(TestDPC, NULL, NULL, NULL, NULL);
@@ -500,27 +409,21 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 	{
 		int o = 45678;
 		int x = 0, r = 0;
-		//r=NoExceptions_CopyMemory(&x, &o, sizeof(x));
 
 		r = NoExceptions_CopyMemory(&x, (PVOID)0, sizeof(x));
 
 		DbgPrint("o=%d x=%d r=%d", o, x, r);
-
 
 		DbgPrint("Leaving NoExceptions mode");
 		NoExceptions_Leave();
 	}
 #endif
 
-
-
-	// Auto-cloak: unlink driver from PsLoadedModuleList and wipe PiDDBCacheTable traces
 	HideDriverFromLoadedModuleList(DriverObject);
 	CleanKernelTraces();
 
     return STATUS_SUCCESS;
 }
-
 
 NTSTATUS DispatchCreate(IN PDEVICE_OBJECT DeviceObject,
                        IN PIRP Irp)
@@ -532,7 +435,6 @@ NTSTATUS DispatchCreate(IN PDEVICE_OBJECT DeviceObject,
     return STATUS_SUCCESS;
 }
 
-
 NTSTATUS DispatchClose(IN PDEVICE_OBJECT DeviceObject,
                        IN PIRP Irp)
 {
@@ -543,20 +445,11 @@ NTSTATUS DispatchClose(IN PDEVICE_OBJECT DeviceObject,
     return Irp->IoStatus.Status;
 }
 
-
-
-
-
 void UnloadDriver(PDRIVER_OBJECT DriverObject)
 {
 	cleanupDBVM();
-	
-	
 
 	NoExceptions_Cleanup();
-	
-	
-
 
 	DbgPrint("Driver unloading\n");
 
@@ -564,7 +457,7 @@ void UnloadDriver(PDRIVER_OBJECT DriverObject)
 
 #ifdef CETC
 #ifndef CETC_RELEASE
-	UnloadCETC(); //not possible in the final build
+	UnloadCETC();
 #endif
 #endif
 
@@ -576,8 +469,6 @@ void UnloadDriver(PDRIVER_OBJECT DriverObject)
 	}
 	ExFreePool(BufDeviceString);
 #endif
-
-	
 
 #if (NTDDI_VERSION >= NTDDI_VISTA)
 	if (DRMHandle)

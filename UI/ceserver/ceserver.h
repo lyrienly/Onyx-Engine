@@ -1,10 +1,3 @@
-/*
- * ceserver.h
- *
- *  Created on: Jul 18, 2011
- *      Author: erich
- */
-
 #ifndef CESERVER_H_
 #define CESERVER_H_
 
@@ -49,7 +42,7 @@
 #define CMD_VIRTUALQUERYEXFULL      31
 #define CMD_GETREGIONINFO           32
 #define CMD_GETABI                  33
-//4
+
 #define CMD_SET_CONNECTION_NAME     34
 
 #define CMD_CREATETOOLHELP32SNAPSHOTEX 35
@@ -60,10 +53,8 @@
 #define CMD_GETOPTIONVALUE          38
 #define CMD_SETOPTIONVALUE          39
 
-//when injection won't work but ptrace does:
 #define CMD_PTRACE_MMAP             40
 
-//returns a fake filehandle to be used by CE (handled by the internal handle list)
 #define CMD_OPENNAMEDPIPE           41
 #define CMD_PIPEREAD                42
 #define CMD_PIPEWRITE               43
@@ -85,17 +76,13 @@
 
 #define CMD_AOBSCAN					200
 
-//just in case I ever get over 255 commands this value will be reserved for a secondary command list (FF 00 -  FF 01 - ... - FF FE - FF FF 01 - FF FF 02 - .....
 #define CMD_COMMANDLIST2            255
-
-
-//extern char *versionstring;
 
 #pragma pack(1)
 typedef struct {
 	int version;
 	unsigned char stringsize;
-	//append the versionstring
+
 } CeVersion, *PCeVersion;
 
 typedef struct {
@@ -107,7 +94,7 @@ typedef struct {
     int result;
     int pid;
     int processnamesize;
-    //processname
+
 } CeProcessEntry, *PCeProcessEntry;
 
 typedef struct {
@@ -161,11 +148,9 @@ typedef struct {
   int32_t size;
 } CeWriteProcessMemoryInput, *PCeWriteProcessMemoryInput;
 
-
 typedef struct {
   int32_t written;
 } CeWriteProcessMemoryOutput, *PCeWriteProcessMemoryOutput;
-
 
 typedef struct {
   HANDLE hProcess;
@@ -175,7 +160,6 @@ typedef struct {
   int bptype;
   int bpsize;
 } CeSetBreapointInput, *PCeSetBreakpointInput;
-
 
 typedef struct {
   int result;
@@ -188,7 +172,6 @@ typedef struct {
   uint32_t wasWatchpoint;
 } CeRemoveBreapointInput, *PCeRemoveBreakpointInput;
 
-
 typedef struct {
   int result;
 } CeRemoveBreapointOutput, *PCeRemoveBreakpointOutput;
@@ -198,7 +181,6 @@ typedef struct {
   int tid;
 } CeSuspendThreadInput, *PCeSuspendThreadInput;
 
-
 typedef struct {
   int result;
 } CeSuspendThreadOutput, *PCeSuspendThreadOutput;
@@ -207,7 +189,6 @@ typedef struct {
   HANDLE hProcess;
   int tid;
 } CeResumeThreadInput, *PCeResumeThreadInput;
-
 
 typedef struct {
   int result;
@@ -220,9 +201,8 @@ typedef struct {
   uint32_t windowsprotection;
 } CeAllocInput, *PCeAllocInput;
 
-
 typedef struct {
-  uint64_t address; //0=fail
+  uint64_t address;
 } CeAllocOutput, *PCeAllocOutput;
 
 typedef struct {
@@ -230,7 +210,6 @@ typedef struct {
   uint64_t address;
   uint32_t size;
 } CeFreeInput, *PCeFreeInput;
-
 
 typedef struct {
   uint32_t result;
@@ -242,7 +221,6 @@ typedef struct {
   uint64_t parameter;
 } CeCreateThreadInput, *PCeCreateThreadInput;
 
-
 typedef struct {
   HANDLE threadhandle;
 } CeCreateThreadOutput, *PCeCreateThreadOutput;
@@ -250,27 +228,24 @@ typedef struct {
 typedef struct {
   HANDLE hProcess;
   uint32_t modulepathlength;
-  //modulepath
+
 } CeLoadModuleInput, *PCeLoadModuleInput;
 
 typedef struct {
   HANDLE hProcess;
   uint64_t dlopenaddress;
   uint32_t modulepathlength;
-  //modulepath
-} CeLoadModuleInputEx, *PCeLoadModuleInputEx;
 
+} CeLoadModuleInputEx, *PCeLoadModuleInputEx;
 
 typedef struct {
   uint32_t result;
 } CeLoadModuleOutput, *PCeLoadModuleOutput;
 
-
 typedef struct {
   HANDLE hProcess;
   float speed;
 } CeSpeedhackSetSpeedInput, *PCeSpeedhackSetSpeedInput;
-
 
 typedef struct {
   uint32_t result;
@@ -293,9 +268,8 @@ typedef struct {
   HANDLE hPipe;
   uint32_t size;
   uint32_t timeout;
-  //data[size]
-} CeWritePipe, *PCeWritePipe;
 
+} CeWritePipe, *PCeWritePipe;
 
 typedef struct {
 	HANDLE hProcess;
@@ -305,8 +279,6 @@ typedef struct {
 	int protection;
 	int scansize;
 } CeAobScanInput, * PCeAobScanInput;
-
-
 
 #pragma pack()
 
@@ -328,9 +300,8 @@ extern int ALLOC_WITHOUT_EXTENSION;
 extern int PORT;
 extern __thread char* threadname;
 
-
 #if BUILD_OPTION == 1
   #define SHARED_LIBRARY
 #endif
 
-#endif /* CESERVER_H_ */
+#endif

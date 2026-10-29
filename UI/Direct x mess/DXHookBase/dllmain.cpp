@@ -1,4 +1,3 @@
-// dllmain.cpp : Defines the entry point for the DLL application.
 #include "stdafx.h"
 
 DWORD tid;
@@ -11,15 +10,14 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 	switch (ul_reason_for_call)
 	{
 	case DLL_PROCESS_ATTACH:
-		CreateThread(NULL, 0, InitializeD3DHookDll, NULL, NULL, &tid);//spawn a thread that will start running when the dll init exits
+		CreateThread(NULL, 0, InitializeD3DHookDll, NULL, NULL, &tid);
 		break;
 
 	case DLL_THREAD_ATTACH:
-		
+
 	case DLL_THREAD_DETACH:
 	case DLL_PROCESS_DETACH:
 		break;
 	}
 	return TRUE;
 }
-

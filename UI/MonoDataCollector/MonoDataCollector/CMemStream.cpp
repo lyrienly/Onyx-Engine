@@ -12,7 +12,7 @@ void CMemStream::Read(PVOID buf, unsigned int count)
 void CMemStream::Write(PVOID buf, unsigned int count)
 {
 	while ((position + count) > memorysize)
-	{			
+	{
 		if (memorysize > 2*1024 * 1024)
 			growTo(memorysize + 2*1024 * 1024);
 		else
@@ -58,7 +58,7 @@ UINT64 CMemStream::ReadQword()
 }
 
 void CMemStream::WriteByte(BYTE b)
-{	
+{
 	Write(&b, sizeof(b));
 }
 
@@ -122,13 +122,12 @@ void CMemStream::growTo(unsigned int newsize)
 }
 
 CMemStream::CMemStream()
-{	
+{
 	size = 0;
 	position = 0;
 	memory = (char*)malloc(4096);
 	memorysize = 4096;
 }
-
 
 CMemStream::~CMemStream()
 {

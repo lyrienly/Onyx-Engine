@@ -51,19 +51,19 @@ typedef volatile union
 {
   struct
   {
-    unsigned int vector: 8; //0-7
-    unsigned int deliverymode: 3; //8-10
-    unsigned int destinationmode: 1; //11
-    unsigned int deliverystatus: 1; //12  (removed in x2apic)
-    unsigned int reserved1: 1; //13
-    unsigned int level: 1; //14
-    unsigned int triggermode: 1; //15
-    unsigned int reserved2: 2; //16-17
-    unsigned int destination_shorthand: 2; //18-19
-    unsigned int reserved3: 12; //20-31
+    unsigned int vector: 8;
+    unsigned int deliverymode: 3;
+    unsigned int destinationmode: 1;
+    unsigned int deliverystatus: 1;
+    unsigned int reserved1: 1;
+    unsigned int level: 1;
+    unsigned int triggermode: 1;
+    unsigned int reserved2: 2;
+    unsigned int destination_shorthand: 2;
+    unsigned int reserved3: 12;
     union{
       struct{
-        unsigned int reserved4: 24; //32-55
+        unsigned int reserved4: 24;
         unsigned int destination: 8;
       };
       DWORD x2destination;
@@ -73,7 +73,7 @@ typedef volatile union
   struct
   {
     DWORD lower;
-    DWORD higher; //write this first
+    DWORD higher;
   };
 } APIC_ICR, *PAPIC_ICR;
 
@@ -81,8 +81,6 @@ extern unsigned int apic_getBootID(void);
 extern void apic_enableSVR(void);
 extern void initcpus(QWORD apic_base, DWORD entrypage);
 extern void apic_eoi(void);
-
-
 
 extern void APbootcode(void);
 extern void APbootcodeEnd(void);
@@ -95,4 +93,4 @@ int getHighestPendingInterrupt();
 
 DWORD ReadAPICRegister(DWORD reg);
 
-#endif /*APIC_H_*/
+#endif

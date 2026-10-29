@@ -11,15 +11,6 @@
 #define SYMBOL(x) x
 #endif
 
-/////////////////////////////////////////////////////////////////////////
-//////////                TRAP FRAMEWORK
-/////////////////////////////////////////////////////////////////////////
-// if you cast 'TRAP' to a function pointer and call it,
-//   it will save all 8 registers,
-//   and jump into C-code (previously set using 'SET_TRAP_HANDLER(x)'),
-//   in C-code you can pop DWORDs from stack and modify registers
-//
-
 void *SYMBOL(trap_handler);
 
 extern unsigned char SYMBOL(trap)[];
@@ -42,7 +33,6 @@ asm (
 struct trapframe {
     unsigned edi, esi, ebp, esp, ebx, edx, ecx, eax;
 };
-
 
 #define M_FLOAT(addr) (*(float *)(addr))
 #define M_DWORD(addr) (*(unsigned *)(addr))
@@ -84,16 +74,6 @@ struct trapframe {
 #define SET_TRAP_HANDLER(x) ((SYMBOL(trap_handler)) = (x))
 #define TRAP ((void *) &SYMBOL(trap))
 
-
-
-/////////////////////////////////////////////////////////////////////////
-//////////                SAFECALL FRAMEWORK
-/////////////////////////////////////////////////////////////////////////
-// this framework will convert any calling convention to cdecl
-// usage: first set call target with 'SET_SAFECALL_TARGET(x)'
-//        then cast 'SAFECALL' to target function pointer type and invoke it
-//        after calling, 'ESPDIFF' is the difference of old and new esp
-
 void *SYMBOL(sc_call_target);
 unsigned SYMBOL(sc_retn_addr);
 unsigned SYMBOL(sc_old_esp);
@@ -115,33 +95,28 @@ asm (
 #define SAFECALL ((void *) &SYMBOL(safecall))
 #define ESPDIFF (SYMBOL(sc_new_esp) - SYMBOL(sc_old_esp))
 
-
-/////////////////////////////////////////////////////////////////////////
-//////////                TEST FASTCALL INVOKE
-/////////////////////////////////////////////////////////////////////////
-
 void check_fastcall_invoke_0(struct trapframe *tf)
 {
-    //DUMP();
+
     RETN(0);
 }
 
 void check_fastcall_invoke_1(struct trapframe *tf)
 {
-    //DUMP();
+
     assert(R_ECX == 0x11111111);
     RETN(0);
 }
 void check_fastcall_invoke_2(struct trapframe *tf)
 {
-    //DUMP();
+
     assert(R_ECX == 0x11111111);
     assert(R_EDX == 0x22222222);
     RETN(0);
 }
 void check_fastcall_invoke_3(struct trapframe *tf)
 {
-    //DUMP();
+
     assert(R_ECX == 0x11111111);
     assert(R_EDX == 0x22222222);
     assert(ARG(1) == 0x33333333);
@@ -149,7 +124,7 @@ void check_fastcall_invoke_3(struct trapframe *tf)
 }
 void check_fastcall_invoke_4(struct trapframe *tf)
 {
-    //DUMP();
+
     assert(R_ECX == 0x11111111);
     assert(R_EDX == 0x22222222);
     assert(ARG(1) == 0x33333333);
@@ -159,7 +134,7 @@ void check_fastcall_invoke_4(struct trapframe *tf)
 
 void check_fastcall_invoke_5(struct trapframe *tf)
 {
-    //DUMP();
+
     assert(R_ECX == 0x11111111);
     assert(R_EDX == 0x22222222);
     assert(ARG(1) == 0x33333333);
@@ -188,11 +163,6 @@ void test_fastcall_invoke()
     SET_TRAP_HANDLER(check_fastcall_invoke_5);
     ((void __fastcall (*)(unsigned, unsigned, unsigned, unsigned, unsigned)) TRAP)(0x11111111, 0x22222222, 0x33333333, 0x44444444, 0x55555555);
 }
-
-
-/////////////////////////////////////////////////////////////////////////
-//////////                TEST FUNCTION CODE GENERATION
-/////////////////////////////////////////////////////////////////////////
 
 int __fastcall check_fastcall_espdiff_0(void)
 {

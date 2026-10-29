@@ -1,4 +1,3 @@
-
 pub mod atomic;
 
 pub use atomic::{AtomicFreezer, FreezeEntry, FreezeId, FreezeMode, FreezerStats};
@@ -124,4 +123,3 @@ pub unsafe extern "C" fn onyx_freezer_clear(freezer: *mut Freezer) {
         f.clear();
     }
 }
-

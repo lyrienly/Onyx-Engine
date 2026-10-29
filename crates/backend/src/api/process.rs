@@ -1,4 +1,3 @@
-
 use std::ffi::{c_void, CStr};
 use std::os::raw::c_char;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -639,4 +638,3 @@ pub unsafe extern "C" fn onyx_kernel_enum_vad(
         -1
     }
 }
-

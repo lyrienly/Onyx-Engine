@@ -1,9 +1,3 @@
-/*
- * options.c
- *
- *  Created on: Oct 31, 2022
- *      Author: eric
- */
 #include <stdio.h>
 #include <string.h>
 #include <stddef.h>
@@ -12,7 +6,6 @@
 #include "options.h"
 #include "ceserver.h"
 
-//OPTIONS
 int optioncount;
 
 CEServerOption optMRO={.optname="optMSO", .parent=NULL, .description="Memory search option",  .acceptablevalues="0=/proc/pid/mem reads;1=ptrace read;2=process_vm_readv;3=process_vm_readv syscall", .type=2, .data=&MEMORY_SEARCH_OPTION};
@@ -20,10 +13,8 @@ CEServerOption optATAM={.optname="optATAM", .parent=NULL, .description="Attach t
 CEServerOption optATWM={.optname="optATWM", .parent=NULL, .description="Attach to write memory",  .acceptablevalues=NULL, .type=1, .data=&ATTACH_TO_WRITE_MEMORY};
 CEServerOption optAWSO={.optname="optAWSO", .parent=NULL, .description="Allocate memory without extension injection",  .acceptablevalues=NULL, .type=1, .data=&ALLOC_WITHOUT_EXTENSION};
 
-
 PCEServerOption options[] = {&optMRO, &optATAM, &optATWM, &optAWSO, NULL};
 
-//0=file, 1=ptrace, 2=use process_vm_readv
 void handleGetOptions(int currentsocket)
 {
   int i;
@@ -61,7 +52,6 @@ PCEServerOption getOption(char *name)
   return NULL;
 }
 
-
 void handleSetOption(int currentsocket)
 {
   char *optname=receivestring16(currentsocket);
@@ -76,7 +66,7 @@ void handleSetOption(int currentsocket)
     {
       switch (o->type)
       {
-        case 1: //boolean
+        case 1:
           i=atoi(newvalue);
           if (i)
             *(BOOL *)(o->data)=1;
@@ -85,19 +75,19 @@ void handleSetOption(int currentsocket)
 
           break;
 
-        case 2: //int
+        case 2:
           *(int *)(o->data)=atoi(newvalue);
           break;
 
-        case 3: //float
+        case 3:
           *(float *)(o->data)=atof(newvalue);
           break;
 
-        case 4: //double
+        case 4:
           *(double *)(o->data)=atof(newvalue);
           break;
 
-        case 5: //text
+        case 5:
         {
           char *olds=*(char **)(o->data);
           *(char **)(o->data)=strdup(newvalue);
@@ -108,7 +98,6 @@ void handleSetOption(int currentsocket)
 
       }
 
-
     }
 
     free(optname);
@@ -117,7 +106,7 @@ void handleSetOption(int currentsocket)
 }
 
 char *getOptionValue(PCEServerOption o)
-//allocates a new string with the given value.  Free this yourself when done using
+
 {
   int i;
   float f;
@@ -126,36 +115,35 @@ char *getOptionValue(PCEServerOption o)
 
   switch (o->type)
   {
-    case 1: //boolean
+    case 1:
       i=*(BOOL *)(o->data);
       if (i)
         return strdup("1");
       else
         return strdup("0");
 
-    case 2: //int
+    case 2:
       i=*(int *)(o->data);
       str=malloc(32);
       snprintf(str,31,"%d", i);
       return str;
 
-    case 3: //float
+    case 3:
       f=*(float *)(o->data);
       str=malloc(64);
       snprintf(str,63,"%f", f);
       return str;
 
-    case 4: //double
+    case 4:
       d=*(double *)(o->data);
       str=malloc(64);
       snprintf(str,63,"%f", d);
       return str;
 
-
-    case 5: //pointer to a pointer to a string
+    case 5:
       return strdup(*(char **)(o->data));
 
-    case 0: //label/parent. Invalid
+    case 0:
     default:
       return NULL;
   }
@@ -165,7 +153,6 @@ void handleGetOption(int currentsocket)
 {
   char *optname=receivestring16(currentsocket);
   char *tempstring;
-
 
   if (optname)
   {
@@ -177,11 +164,8 @@ void handleGetOption(int currentsocket)
       free(tempstring);
     }
     else
-      sendstring16(currentsocket, NULL,0); //invalid name
+      sendstring16(currentsocket, NULL,0);
 
     free(optname);
   }
 }
-
-
-

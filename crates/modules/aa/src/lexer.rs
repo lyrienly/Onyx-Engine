@@ -1,15 +1,3 @@
-//! Pre-processador e tokenizador leve para scripts Auto Assembler.
-//!
-//! O AA do Cheat Engine e orientado a linhas: cada linha e um comentario,
-//! um cabecalho de secao `[ENABLE]`/`[DISABLE]`, uma diretiva (ex.
-//! `alloc(mem, 1024)`), um `label`, uma linha de assembly ou um label de
-//! destino `symbol:`. Este modulo:
-//!
-//! * remove comentarios `//linha` e `{bloco}`,
-//! * preserva numero de linha original para mensagens de erro,
-//! * expoe uma tokenizacao fina (`Token`) que o parser usa quando precisa
-//!   decompor uma diretiva.
-
 use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,8 +15,7 @@ impl fmt::Display for Span {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenKind {
     Ident(String),
-    /// Numero ja parseado. `wide` sinaliza immediate que nao cabe em 32 bits —
-    /// requisito importante para instrucoes como `mov rax, 0xDEADBEEFCAFEBABE`.
+
     Number { value: u64, wide: bool },
     Str(String),
     LParen,
@@ -48,16 +35,12 @@ pub struct Token {
     pub span: Span,
 }
 
-/// Linha logica apos stripping de comentarios.
 #[derive(Debug, Clone)]
 pub struct Line {
     pub line_no: usize,
     pub text: String,
 }
 
-/// Tira comentarios `//...` e `{...}` preservando numeracao de linha.
-/// Blocos `{...}` podem ser multilinha. Linhas em branco sao mantidas (com
-/// texto vazio) para que o parser possa referenciar o numero original.
 pub fn strip_comments(src: &str) -> Vec<Line> {
     let mut out = Vec::new();
     let mut buf = String::new();
@@ -102,7 +85,7 @@ pub fn strip_comments(src: &str) -> Vec<Line> {
                 i += 1;
             }
             b'"' => {
-                // mantem string literal intacta
+
                 buf.push('"');
                 i += 1;
                 while i < bytes.len() && bytes[i] != b'"' && bytes[i] != b'\n' {
@@ -130,8 +113,6 @@ pub fn strip_comments(src: &str) -> Vec<Line> {
     out
 }
 
-/// Tokeniza uma unica linha (ja sem comentarios) para o parser decompor
-/// uma diretiva como `alloc(mem, 2048, "game.exe"+0x1234)`.
 pub fn tokenize_line(line_no: usize, text: &str) -> Result<Vec<Token>, LexError> {
     let bytes = text.as_bytes();
     let mut out = Vec::new();
@@ -234,7 +215,7 @@ pub fn tokenize_line(line_no: usize, text: &str) -> Result<Vec<Token>, LexError>
                 col += 1;
             }
             b'$' => {
-                // $DEADBEEF — hex ao estilo Pascal
+
                 i += 1;
                 col += 1;
                 let start = i;
@@ -289,8 +270,7 @@ pub fn tokenize_line(line_no: usize, text: &str) -> Result<Vec<Token>, LexError>
                     col += 1;
                 }
                 let txt = &text[start..i];
-                // Se so tem digitos decimais, trata como decimal; se contem
-                // caracteres hex, assume hex "nu" (padrao AA/CE).
+
                 let is_decimal = txt.chars().all(|c| c.is_ascii_digit());
                 let (value, wide) = if is_decimal {
                     let v: u64 = txt.parse().map_err(|_| LexError {
@@ -357,7 +337,6 @@ impl fmt::Display for LexError {
 
 impl std::error::Error for LexError {}
 
-/// Compatibilidade com testes legados que ainda referenciam `Lexer::new(..).tokenize()`.
 pub struct Lexer<'a> {
     src: &'a str,
 }

@@ -1,9 +1,3 @@
-/*
-** $Id: ldump.c,v 2.8.1.1 2007/12/27 13:02:25 roberto Exp $
-** save precompiled Lua chunks
-** See Copyright Notice in lua.h
-*/
-
 #include <stddef.h>
 
 #define ldump_c
@@ -74,7 +68,7 @@ static void DumpString(const TString* s, DumpState* D)
  }
  else
  {
-  size_t size=s->tsv.len+1;		/* include trailing '\0' */
+  size_t size=s->tsv.len+1;
   DumpVar(size,D);
   DumpBlock(getstr(s),size,D);
  }
@@ -111,7 +105,7 @@ static void DumpConstants(const Proto* f, DumpState* D)
 	DumpString(rawtsvalue(o),D);
 	break;
    default:
-	lua_assert(0);			/* cannot happen */
+	lua_assert(0);
 	break;
   }
  }
@@ -159,9 +153,6 @@ static void DumpHeader(DumpState* D)
  DumpBlock(h,LUAC_HEADERSIZE,D);
 }
 
-/*
-** dump Lua function as precompiled chunk
-*/
 int luaU_dump (lua_State* L, const Proto* f, lua_Writer w, void* data, int strip)
 {
  DumpState D;

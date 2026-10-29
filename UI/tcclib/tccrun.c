@@ -1,33 +1,11 @@
-/*
- *  TCC - Tiny C Compiler - Support for -run switch
- *
- *  Copyright (c) 2001-2004 Fabrice Bellard
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
-
 #include "tcc.h"
 
-
-/* only native compiler supports -run */
 #ifdef TCC_IS_NATIVE
 
 #ifdef CONFIG_TCC_BACKTRACE
 typedef struct rt_context
 {
-    /* --> tccelf.c:tcc_add_btstub wants those below in that order: */
+
     Stab_Sym *stab_sym, *stab_sym_end;
     char *stab_str;
     ElfW(Sym) *esym_start, *esym_end;
@@ -35,7 +13,7 @@ typedef struct rt_context
     addr_t prog_base;
     void *bounds_start;
     struct rt_context *next;
-    /* <-- */
+
     int num_callers;
     addr_t ip, fp, sp;
     void *top_func;
@@ -47,9 +25,8 @@ static rt_context g_rtctxt;
 static void set_exception_handler(void);
 static int _rt_error(void *fp, void *ip, const char *fmt, va_list ap);
 static void rt_exit(int code);
-#endif /* CONFIG_TCC_BACKTRACE */
+#endif
 
-/* defined when included from lib/bt-exe.c */
 #ifndef CONFIG_TCC_BACKTRACE_ONLY
 
 #ifndef _WIN32
@@ -66,10 +43,6 @@ static void win64_del_function_table(void *);
 #endif
 #endif
 
-/* ------------------------------------------------------------- */
-/* Do all relocations (needed before using tcc_get_symbol())
-   Returns -1 on error. */
-
 LIBTCCAPI int tcc_relocate(TCCState *s1, void *ptr)
 {
     int size;
@@ -84,7 +57,7 @@ LIBTCCAPI int tcc_relocate(TCCState *s1, void *ptr)
 
 #ifdef HAVE_SELINUX
 {
-    /* Using mmap instead of malloc */
+
     void *prx;
     char tmpfname[] = "/tmp/.tccrunXXXXXX";
     int fd = mkstemp(tmpfname);
@@ -93,19 +66,19 @@ LIBTCCAPI int tcc_relocate(TCCState *s1, void *ptr)
 
     size = (size + (PAGESIZE-1)) & ~(PAGESIZE-1);
     ptr = mmap(NULL, size * 2, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-    /* mmap RX memory at a fixed distance */
+
     prx = mmap((char*)ptr + size, size, PROT_READ|PROT_EXEC, MAP_SHARED|MAP_FIXED, fd, 0);
     if (ptr == MAP_FAILED || prx == MAP_FAILED)
 	tcc_error("tccrun: could not map memory");
     dynarray_add(&s1->runtime_mem, &s1->nb_runtime_mem, (void*)(addr_t)(size*2));
     ptr_diff = (char*)prx - (char*)ptr;
     close(fd);
-    //printf("map %p %p %p\n", ptr, prx, (void*)ptr_diff);
+
 }
 #else
 	ptr = tcc_malloc(size);
 #endif
-    tcc_relocate_ex(s1, ptr, ptr_diff); /* no more errors expected */
+    tcc_relocate_ex(s1, ptr, ptr_diff);
     dynarray_add(&s1->runtime_mem, &s1->nb_runtime_mem, ptr);
     return 0;
 }
@@ -139,7 +112,6 @@ static void run_cdtors(TCCState *s1, const char *start, const char *end,
         ((void(*)(int, char **, char **))*a++)(argc, argv, envp);
 }
 
-/* launch the compiled program with the given arguments */
 LIBTCCAPI int tcc_run(TCCState *s1, int argc, char **argv)
 {
     int (*prog_main)(int, char **, char **), ret;
@@ -164,7 +136,7 @@ LIBTCCAPI int tcc_run(TCCState *s1, int argc, char **argv)
         tcc_add_symbol(s1, "exit", rt_exit);
 #endif
     if (tcc_relocate(s1, TCC_RELOCATE_AUTO) < 0)
-	//if (tcc_relocate(s1, 0xce000000) < 0)
+
         return -1;
     prog_main = (void*)get_sym_addr(s1, s1->runtime_main, 1, 1);
 
@@ -196,10 +168,10 @@ LIBTCCAPI int tcc_run(TCCState *s1, int argc, char **argv)
     }
 #endif
 
-    errno = 0; /* clean errno value */
+    errno = 0;
     fflush(stdout);
     fflush(stderr);
-    /* These aren't C symbols, so don't need leading underscore handling.  */
+
     run_cdtors(s1, "__init_array_start", "__init_array_end", argc, argv, envp);
 #ifdef CONFIG_TCC_BACKTRACE
     if (!rc->do_jmp || !(ret = setjmp(rc->jmp_buf)))
@@ -214,11 +186,9 @@ LIBTCCAPI int tcc_run(TCCState *s1, int argc, char **argv)
 }
 
 #if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64
-/* To avoid that x86 processors would reload cached instructions
-   each time when data is written in the near, we need to make
-   sure that code and data do not share the same 64 byte unit */
+
   #if defined(__APPLE__)
-    #define RUN_SECTION_ALIGNMENT 4093 //apple rosetta doesn't do data inside the code segment well
+    #define RUN_SECTION_ALIGNMENT 4093
   #else
    #define RUN_SECTION_ALIGNMENT 63
   #endif
@@ -226,27 +196,21 @@ LIBTCCAPI int tcc_run(TCCState *s1, int argc, char **argv)
  #define RUN_SECTION_ALIGNMENT 0
 #endif
 
-
 #if defined (TCC_TARGET_ARM64) && defined(__APPLE__)
   #define RUN_SECTION_ALIGNMENT (16*1024)-1
 #endif
 
-
-/* relocate code. Return -1 on error, required size if ptr is NULL,
-   otherwise copy code into buffer passed by the caller */
 static int tcc_relocate_ex(TCCState *s1, void *ptr, addr_t ptr_diff)
 {
     Section *s;
     unsigned offset, length, align, max_align, i, k, f;
     addr_t mem, addr;
 
-	//Cheat Engine modification
 	unsigned run_section_alignment;
 	if (s1->section_align > RUN_SECTION_ALIGNMENT)
 		run_section_alignment = s1->section_align-1;
 	else
 		run_section_alignment = RUN_SECTION_ALIGNMENT;
-	//Cheat Engine modificiation
 
     if (NULL == ptr) {
         s1->nb_errors = 0;
@@ -263,8 +227,8 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr, addr_t ptr_diff)
 
     offset = max_align = 0, mem = (addr_t)ptr;
 #ifdef _WIN64
-	if (s1->binary_writer_func == 0)  //Cheat Engine does not put that there
-      offset += sizeof (void*); /* space for function_table pointer */
+	if (s1->binary_writer_func == 0)
+      offset += sizeof (void*);
 #endif
     for (k = 0; k < 2; ++k) {
         f = 0, addr = k ? mem : mem + ptr_diff;
@@ -275,7 +239,7 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr, addr_t ptr_diff)
             if (k != !(s->sh_flags & SHF_EXECINSTR))
                 continue;
             align = s->sh_addralign - 1;
-            if (++f == 1 && align < run_section_alignment) //cheat engine modification:  RUN_SECTION_ALIGNMENT->run_section_alignment
+            if (++f == 1 && align < run_section_alignment)
                 align = run_section_alignment;
             if (max_align < align)
                 max_align = align;
@@ -290,7 +254,6 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr, addr_t ptr_diff)
         }
     }
 
-    /* relocate symbols */
     relocate_syms(s1, s1->symtab, !(s1->nostdlib));
     if (s1->nb_errors)
         return -1;
@@ -302,7 +265,6 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr, addr_t ptr_diff)
     s1->pe_imagebase = mem;
 #endif
 
-    /* relocate each section */
     for(i = 1; i < s1->nb_sections; i++) {
         s = s1->sections[i];
         if (s->reloc)
@@ -316,76 +278,73 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr, addr_t ptr_diff)
         s = s1->sections[i];
 		if (0 == (s->sh_flags & SHF_ALLOC))
 			continue;
-		
+
         length = s->data_offset;
         ptr = (void*)s->sh_addr;
         if (s->sh_flags & SHF_EXECINSTR)
             ptr = (char*)((addr_t)ptr - ptr_diff);
 		if (NULL == s->data || s->sh_type == SHT_NOBITS)
 		{
-			//cheat engine binary writer addition start
+
 			if (s1->binary_writer_func)
 			{
 				if (length)
 				{
 					void *zeromem = tcc_malloc(length);
                     memset(zeromem, 0, length);
-					//ZeroMemory(zeromem, length);
+
 					s1->binary_writer_func(s1->binary_writer_param, ptr, zeromem, length,2);
 					tcc_free(zeromem);
 				}
-				
+
 			}
 			else
-		    //cheat engine binary writer addition stop
+
 				memset(ptr, 0, length);
 		}
 		else
 		{
-			//cheat engine binary writer addition start
+
 			if (s1->binary_writer_func)
 			{
-				//MessageBoxA(0, "BLA", "BLA", 0);
+
 				if (length)
                 {
                     int protection=0;
 
-					//MessageBoxA(0, "Checking if EXECUTABLE", "BLA", 0);
 					if (s->sh_flags & SHF_EXECINSTR)
 					{
-						//MessageBoxA(0, "IT IS!!!!", "BLA", 0);
+
 						protection = 1;
 					}
 					else
 					{
-						//MessageBoxA(0, "IT IS NOT!!!", "BLA", 0);
 
 					}
-                    
-					//MessageBoxA(0, "Checking if WRITABLE", "BLA", 0);
+
 					if (s->sh_flags & SHF_WRITE)
 					{
-					//	MessageBoxA(0, "IT IS!!!!", "BLA", 0);
+
 						protection = 2;
 					}
 					else
 					{
-					//	MessageBoxA(0, "IT IS NOT!!!!", "BLA", 0);
+
 					}
 
 					if (protection == 0)
 					{
-						//MessageBoxA(0, "IT IS 0!!!! FUUUUUUUUUCK", "BLA", 0);
+
 					}
-                    
+
 					s1->binary_writer_func(s1->binary_writer_param, ptr, s->data, length, protection);
                 }
 			}
 			else
-			//cheat engine binary writer addition stop
+
 				memcpy(ptr, s->data, length);
 		}
-        /* mark executable sections as executable in memory */
+
         if (s->sh_flags & SHF_EXECINSTR)
             set_pages_executable(s1, (char*)((addr_t)ptr + ptr_diff), length);
     }
@@ -400,16 +359,10 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr, addr_t ptr_diff)
     return 0;
 }
 
-/* ------------------------------------------------------------- */
-/* allow to run code in memory */
-
 static void set_pages_executable(TCCState *s1, void *ptr, unsigned long length)
 {
-  //Cheat Engine modification:  This code is not needed
+
   return;
-  //Cheat Engine modification end
-
-
 
 #ifdef _WIN32
     unsigned long old_protect;
@@ -424,7 +377,7 @@ static void set_pages_executable(TCCState *s1, void *ptr, unsigned long length)
     if (mprotect((void *)start, end - start, PROT_READ | PROT_WRITE | PROT_EXEC))
         tcc_error("mprotect failed: did you mean to configure --with-selinux?");
 # endif
-/* XXX: BSD sometimes dump core with bad system call */
+
 # if (defined(TCC_TARGET_ARM) && \
       !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__NetBSD__)) || \
      defined(TCC_TARGET_ARM64)
@@ -438,23 +391,10 @@ static void set_pages_executable(TCCState *s1, void *ptr, unsigned long length)
 static void *win64_add_function_table(TCCState *s1)
 {
 	void *p = NULL;
-	//cheat engine
-/*
-    if (s1->uw_pdata) {
-        p = (void*)s1->uw_pdata->sh_addr;
-        RtlAddFunctionTable(
-            (RUNTIME_FUNCTION*)p,
-            s1->uw_pdata->data_offset / sizeof (RUNTIME_FUNCTION),
-            s1->pe_imagebase
-            );
-        s1->uw_pdata = NULL;
-    }
-	*/
+
     return p;
 
-	//cheat engine stop
 }
-
 
 #endif
 
@@ -467,8 +407,8 @@ static void win64_del_function_table(void *p)
 }
 #endif
 #endif
-#endif //ndef CONFIG_TCC_BACKTRACE_ONLY
-/* ------------------------------------------------------------- */
+#endif
+
 #ifdef CONFIG_TCC_BACKTRACE
 
 static int rt_vprintf(const char *fmt, va_list ap)
@@ -490,8 +430,6 @@ static int rt_printf(const char *fmt, ...)
 
 #define INCLUDE_STACK_SIZE 32
 
-/* print the position in the source file of PC value 'pc' by reading
-   the stabs debug information */
 static addr_t rt_printline (rt_context *rc, addr_t wanted_pc,
     const char *msg, const char *skip)
 {
@@ -523,11 +461,11 @@ next:
         case N_SOL:
             goto abs_pc;
         case N_FUN:
-            if (sym->n_strx == 0) /* end of function */
+            if (sym->n_strx == 0)
                 goto rel_pc;
         abs_pc:
 #if PTR_SIZE == 8
-            /* Stab_Sym.n_value is only 32bits */
+
             pc += rc->prog_base;
 #endif
             goto check_pc;
@@ -540,7 +478,7 @@ next:
         }
 
         switch(sym->n_type) {
-            /* function start or end */
+
         case N_FUN:
             if (sym->n_strx == 0)
                 goto reset_func;
@@ -550,13 +488,13 @@ next:
             pstrcpy(func_name, len, str);
             func_addr = pc;
             break;
-            /* line number info */
+
         case N_SLINE:
             last_pc = pc;
             last_line_num = sym->n_desc;
             last_incl_index = incl_index;
             break;
-            /* include files */
+
         case N_BINCL:
             if (incl_index < INCLUDE_STACK_SIZE)
                 incl_files[incl_index++] = str;
@@ -565,11 +503,11 @@ next:
             if (incl_index > 1)
                 incl_index--;
             break;
-            /* start/end of translation unit */
+
         case N_SO:
             incl_index = 0;
             if (sym->n_strx) {
-                /* do not add path */
+
                 len = strlen(str);
                 if (len > 0 && str[len - 1] != '/')
                     incl_files[incl_index++] = str;
@@ -579,7 +517,7 @@ next:
             func_addr = 0;
             last_pc = (addr_t)-1;
             break;
-            /* alternative file name (from #line or #include directives) */
+
         case N_SOL:
             if (incl_index)
                 incl_files[incl_index-1] = str;
@@ -591,7 +529,6 @@ next:
     func_addr = 0;
     last_incl_index = 0;
 
-    /* we try symtab symbols (no line number info) */
     for (esym = rc->esym_start + 1; esym < rc->esym_end; ++esym) {
         int type = ELFW(ST_TYPE)(esym->st_info);
         if (type == STT_FUNC || type == STT_GNU_IFUNC) {
@@ -644,17 +581,17 @@ static int _rt_error(void *fp, void *ip, const char *fmt, va_list ap)
     const char *a, *b, *msg;
 
     if (fp) {
-        /* we're called from tcc_backtrace. */
+
         rc->fp = (addr_t)fp;
         rc->ip = (addr_t)ip;
         msg = "";
     } else {
-        /* we're called from signal/exception handler */
+
         msg = "RUNTIME ERROR: ";
     }
 
     skip[0] = 0;
-    /* If fmt is like "^file.c^..." then skip calls from 'file.c' */
+
     if (fmt[0] == '^' && (b = strchr(a = fmt + 1, fmt[0]))) {
         memcpy(skip, a, b - a), skip[b - a] = 0;
         fmt = b + 1;
@@ -685,7 +622,6 @@ static int _rt_error(void *fp, void *ip, const char *fmt, va_list ap)
     return 0;
 }
 
-/* emit a run time error at position 'pc' */
 static int rt_error(const char *fmt, ...)
 {
     va_list ap;
@@ -704,8 +640,6 @@ static void rt_exit(int code)
     exit(code);
 }
 
-/* ------------------------------------------------------------- */
-
 #ifndef _WIN32
 # include <signal.h>
 # ifndef __OpenBSD__
@@ -715,7 +649,6 @@ static void rt_exit(int code)
 # define ucontext_t CONTEXT
 #endif
 
-/* translate from ucontext_t* to internal rt_context * */
 static void rt_getcontext(ucontext_t *uc, rt_context *rc)
 {
 #if defined _WIN64
@@ -742,7 +675,7 @@ static void rt_getcontext(ucontext_t *uc, rt_context *rc)
 # elif defined(__OpenBSD__)
     rc->ip = uc->sc_eip;
     rc->fp = uc->sc_ebp;
-# elif !defined REG_EIP && defined EIP /* fix for glibc 2.1 */
+# elif !defined REG_EIP && defined EIP
     rc->ip = uc->uc_mcontext.gregs[EIP];
     rc->fp = uc->uc_mcontext.gregs[EBP];
 # else
@@ -779,7 +712,7 @@ static void rt_getcontext(ucontext_t *uc, rt_context *rc)
     rc->ip = uc->uc_mcontext.arm_pc;
     rc->fp = uc->uc_mcontext.arm_fp;
 #elif defined(__aarch64__) && defined(__FreeBSD__)
-    rc->ip = uc->uc_mcontext.mc_gpregs.gp_elr; /* aka REG_PC */
+    rc->ip = uc->uc_mcontext.mc_gpregs.gp_elr;
     rc->fp = uc->uc_mcontext.mc_gpregs.gp_x[29];
 #elif defined(__aarch64__) && defined(__NetBSD__)
     rc->ip = uc->uc_mcontext.__gregs[_REG_PC];
@@ -787,18 +720,17 @@ static void rt_getcontext(ucontext_t *uc, rt_context *rc)
 #elif defined(__aarch64__) && defined(__OpenBSD__)
     rc->ip = uc->sc_elr;
     rc->fp = uc->sc_x[29];
-#elif defined(__aarch64__) //darwin in this case  (Cheat engine modification start)
+#elif defined(__aarch64__)
     rc->ip = uc->uc_mcontext->__ss.__pc;
-    rc->fp = uc->uc_mcontext->__ss.__fp;  // (Cheat engine modification stop)
+    rc->fp = uc->uc_mcontext->__ss.__fp;
 #elif defined(__riscv)
     rc->ip = uc->uc_mcontext.__gregs[REG_PC];
     rc->fp = uc->uc_mcontext.__gregs[REG_S0];
 #endif
 }
 
-/* ------------------------------------------------------------- */
 #ifndef _WIN32
-/* signal handler for fatal errors */
+
 static void sig_error(int signum, siginfo_t *siginf, void *puc)
 {
     rt_context *rc = &g_rtctxt;
@@ -837,14 +769,12 @@ static void sig_error(int signum, siginfo_t *siginf, void *puc)
 # define SA_SIGINFO 0x00000004u
 #endif
 
-/* Generate a stack backtrace when a CPU exception occurs. */
 static void set_exception_handler(void)
 {
     struct sigaction sigact;
-    /* install TCC signal handlers to print debug info on fatal
-       runtime errors */
+
     sigact.sa_flags = SA_SIGINFO | SA_RESETHAND;
-#if 0//def SIGSTKSZ // this causes signals not to work at all on some (older) linuxes
+#if 0
     sigact.sa_flags |= SA_ONSTACK;
 #endif
     sigact.sa_sigaction = sig_error;
@@ -854,8 +784,8 @@ static void set_exception_handler(void)
     sigaction(SIGSEGV, &sigact, NULL);
     sigaction(SIGBUS, &sigact, NULL);
     sigaction(SIGABRT, &sigact, NULL);
-#if 0//def SIGSTKSZ
-    /* This allows stack overflow to be reported instead of a SEGV */
+#if 0
+
     {
         stack_t ss;
         static unsigned char stack[SIGSTKSZ] __attribute__((aligned(16)));
@@ -868,9 +798,8 @@ static void set_exception_handler(void)
 #endif
 }
 
-#else /* WIN32 */
+#else
 
-/* signal handler for fatal errors */
 static long __stdcall cpu_exception_handler(EXCEPTION_POINTERS *ex_info)
 {
     rt_context *rc = &g_rtctxt;
@@ -901,7 +830,6 @@ static long __stdcall cpu_exception_handler(EXCEPTION_POINTERS *ex_info)
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
-/* Generate a stack backtrace when a CPU exception occurs. */
 static void set_exception_handler(void)
 {
     SetUnhandledExceptionFilter(cpu_exception_handler);
@@ -909,8 +837,6 @@ static void set_exception_handler(void)
 
 #endif
 
-/* ------------------------------------------------------------- */
-/* return the PC at frame level 'level'. Return negative if not found */
 #if defined(__i386__) || defined(__x86_64__)
 static int rt_get_caller_pc(addr_t *paddr, rt_context *rc, int level)
 {
@@ -921,7 +847,7 @@ static int rt_get_caller_pc(addr_t *paddr, rt_context *rc, int level)
         ip = 0;
         fp = rc->fp;
         while (--level) {
-            /* XXX: check address validity with program info */
+
             if (fp <= 0x1000)
                 break;
             fp = ((addr_t *)fp)[0];
@@ -938,7 +864,7 @@ static int rt_get_caller_pc(addr_t *paddr, rt_context *rc, int level)
 #elif defined(__arm__)
 static int rt_get_caller_pc(addr_t *paddr, rt_context *rc, int level)
 {
-    /* XXX: only supports linux/bsd */
+
 #if !defined(__linux__) && \
     !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__NetBSD__)
     return -1;
@@ -993,11 +919,10 @@ static int rt_get_caller_pc(addr_t *paddr, rt_context *rc, int level)
 }
 
 #endif
-#endif /* CONFIG_TCC_BACKTRACE */
-/* ------------------------------------------------------------- */
+#endif
+
 #ifdef CONFIG_TCC_STATIC
 
-/* dummy function for profiling */
 ST_FUNC void *dlopen(const char *filename, int flag)
 {
     return NULL;
@@ -1017,8 +942,6 @@ typedef struct TCCSyms {
     void *ptr;
 } TCCSyms;
 
-
-/* add the symbol you want here if no dynamic linking is done */
 static TCCSyms tcc_syms[] = {
 #if !defined(CONFIG_TCCBOOT)
 #define TCCSYM(a) { #a, &a, },
@@ -1043,6 +966,5 @@ ST_FUNC void *dlsym(void *handle, const char *symbol)
     return NULL;
 }
 
-#endif /* CONFIG_TCC_STATIC */
-#endif /* TCC_IS_NATIVE */
-/* ------------------------------------------------------------- */
+#endif
+#endif

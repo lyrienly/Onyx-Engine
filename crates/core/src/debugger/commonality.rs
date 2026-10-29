@@ -1,4 +1,3 @@
-
 use crate::process::Process;
 
 pub const REGISTER_NAMES: [&str; 16] = [
@@ -228,4 +227,3 @@ mod tests {
         assert!(rsi_comp.distinguishes_groups);
     }
 }
-

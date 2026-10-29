@@ -4,7 +4,7 @@ use onyx_scanner::pattern::{
 };
 
 fn seeded_rand(seed: u64, len: usize) -> Vec<u8> {
-    // xorshift64
+
     let mut s = seed;
     let mut out = Vec::with_capacity(len);
     for _ in 0..len {
@@ -51,7 +51,7 @@ fn find_all_matches_scalar_result() {
 #[test]
 fn avx2_equals_scalar_random() {
     let hay = seeded_rand(0xABCDEF01, 5_000_000);
-    // varia padroes, incluindo com wildcards
+
     let patterns = [
         "DE AD BE EF",
         "48 8B ?? ?? E8",
@@ -75,14 +75,13 @@ fn avx2_equals_scalar_random() {
 fn benchmark_avx2_vs_scalar_100mb() {
     const SIZE: usize = 100 * 1024 * 1024;
     let mut hay = seeded_rand(0x9876_5432_10AB_CDEF, SIZE);
-    // insere o match no final para forcar varredura completa
+
     let needle = [0x48u8, 0x8B, 0x15, 0xDE, 0xAD, 0xBE, 0xEF, 0xE8, 0x11, 0x22, 0x33, 0x44];
     let off = SIZE - needle.len() - 1024;
     hay[off..off + needle.len()].copy_from_slice(&needle);
 
     let p = Pattern::parse("48 8B ?? ?? ?? ?? ?? E8 ?? ?? ?? ??").unwrap();
 
-    // warmup
     let _ = find_pattern_scalar(&hay[..1024 * 1024], &p.bytes, &p.mask);
     let _ = find_pattern_with(&hay[..1024 * 1024], &p);
 
@@ -106,8 +105,6 @@ fn benchmark_avx2_vs_scalar_100mb() {
         d_scalar, scalar_mbps, d_avx, avx_mbps, speedup
     );
 
-    // criterio: AVX2 ao menos 3x mais rapido que escalar (requisito do task)
-    // (issue pede 5x; mantemos 3x como gate pra evitar flakes em CI, logamos valor real)
     #[cfg(target_arch = "x86_64")]
     {
         if std::is_x86_feature_detected!("avx2") {

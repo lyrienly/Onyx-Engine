@@ -1,10 +1,3 @@
-//! Parser de scripts Auto Assembler (AA).
-//!
-//! Entrada: fonte do script como string.
-//! Saida: AST `Script` com secoes `[ENABLE]`/`[DISABLE]` e lista de
-//! `Statement` em cada uma. Em caso de erro, retorna um `AaError` com
-//! linha+coluna originais.
-
 use crate::analyzer::AaError;
 use crate::lexer::{strip_comments, tokenize_line, Span};
 
@@ -25,61 +18,59 @@ pub struct Section {
 #[derive(Debug, Clone)]
 pub struct Script {
     pub sections: Vec<Section>,
-    /// Statements fora de qualquer secao (preamble). O Cheat Engine aceita
-    /// algumas diretivas globais, como `define` e `include`, antes de
-    /// `[ENABLE]`.
+
     pub preamble: Vec<Statement>,
 }
 
 #[derive(Debug, Clone)]
 pub enum Statement {
-    /// `alloc(symbol, size)` ou `alloc(symbol, size, nearAddress)`.
+
     Alloc {
         symbol: String,
         size: u64,
         near_addr: Option<String>,
         span: Span,
     },
-    /// `label(name)` — reserva um simbolo que sera endereco de uma linha.
+
     Label { name: String, span: Span },
-    /// `aobscanmodule(symbol, module, pattern)` — nome mantido como ident/string.
+
     AobScanModule {
         symbol: String,
         module: String,
         pattern: String,
         span: Span,
     },
-    /// `aobscan(symbol, pattern)`.
+
     AobScan {
         symbol: String,
         pattern: String,
         span: Span,
     },
-    /// `assert(address, bytes)` — valida bytes antes de injetar.
+
     Assert {
         address: String,
         bytes: String,
         span: Span,
     },
-    /// `registersymbol(symbol)`.
+
     RegisterSymbol { name: String, span: Span },
-    /// `unregistersymbol(symbol)`.
+
     UnregisterSymbol { name: String, span: Span },
-    /// `dealloc(symbol)`.
+
     Dealloc { name: String, span: Span },
-    /// `define(name, value)` — macro de substituicao textual.
+
     Define {
         name: String,
         value: String,
         span: Span,
     },
-    /// `include "arquivo.aa"` ou `include(arquivo.aa)`.
+
     Include { path: String, span: Span },
-    /// Definicao de label de destino: `symbol:` em uma linha propria.
+
     LabelTarget { name: String, span: Span },
-    /// Linha de assembly bruta (mov, jmp, nop, db ...). Pos-expansao de macros.
+
     Assembly { line: String, span: Span },
-    /// Bloco literal entre `{...}` que o parser nao decompos (reservado).
+
     RawBlock { text: String, span: Span },
 }
 
@@ -103,11 +94,9 @@ impl Statement {
     }
 }
 
-/// Ponto de entrada principal.
 pub fn parse_script(source: &str) -> Result<Script, AaError> {
     let lines = strip_comments(source);
 
-    // Pass 1: coleta `define` para substituicao textual simples.
     let mut defines: Vec<(String, String)> = Vec::new();
     for l in &lines {
         if let Some(d) = try_capture_define(l.line_no, &l.text)? {
@@ -115,7 +104,6 @@ pub fn parse_script(source: &str) -> Result<Script, AaError> {
         }
     }
 
-    // Pass 2: parse em secoes, aplicando defines no corpo de assembly.
     let mut script = Script {
         sections: Vec::new(),
         preamble: Vec::new(),
@@ -128,7 +116,6 @@ pub fn parse_script(source: &str) -> Result<Script, AaError> {
             continue;
         }
 
-        // Cabecalho de secao `[ENABLE]`/`[DISABLE]`/`[OTHER]`.
         if text.starts_with('[') && text.ends_with(']') {
             if let Some(section) = current.take() {
                 script.sections.push(section);
@@ -170,9 +157,7 @@ fn try_capture_define(line_no: usize, text: &str) -> Result<Option<(String, Stri
     if !trimmed.to_ascii_lowercase().starts_with("define") {
         return Ok(None);
     }
-    // Duas sintaxes aceitas no CE:
-    //   define(name, value)
-    //   define name value
+
     let rest = &trimmed[6..];
     let rest_trim = rest.trim_start();
 
@@ -189,7 +174,6 @@ fn try_capture_define(line_no: usize, text: &str) -> Result<Option<(String, Stri
         return Ok(Some((name.trim().to_string(), value.trim().to_string())));
     }
 
-    // forma `define NAME VALOR`
     let mut parts = rest_trim.splitn(2, char::is_whitespace);
     let name = parts.next().unwrap_or("").trim();
     let value = parts.next().unwrap_or("").trim();
@@ -200,7 +184,7 @@ fn try_capture_define(line_no: usize, text: &str) -> Result<Option<(String, Stri
 }
 
 fn split_pair(s: &str) -> Option<(&str, &str)> {
-    // Divide no primeiro `,` em nivel 0 (sem respeitar aninhamento, suficiente aqui).
+
     let mut depth = 0i32;
     for (i, c) in s.char_indices() {
         match c {
@@ -220,7 +204,6 @@ fn parse_statement(
 ) -> Result<Statement, AaError> {
     let span = Span { line: line_no, col: 1 };
 
-    // Label target: "symbol:" sozinho na linha.
     if let Some(name) = text.strip_suffix(':') {
         let n = name.trim();
         if is_identifier(n) {
@@ -236,7 +219,6 @@ fn parse_statement(
         .unwrap_or(text.len());
     let head_lc = text[..first_word_end].to_ascii_lowercase();
 
-    // `include "arquivo"` ou `include(arquivo)`.
     if head_lc == "include" {
         let rest = text[first_word_end..].trim();
         let path = if let Some(stripped) = rest.strip_prefix('(') {
@@ -251,7 +233,6 @@ fn parse_statement(
         return Ok(Statement::Include { path, span });
     }
 
-    // Diretivas no formato `nome(args)`.
     if text.ends_with(')') {
         if let Some(open) = text.find('(') {
             let head = text[..open].trim().to_ascii_lowercase();
@@ -325,14 +306,13 @@ fn parse_statement(
                         span,
                     });
                 }
-                _ => { /* cai para assembly com validacao de tokens */ }
+                _ => {  }
             }
         }
     }
 
-    // Caso contrario, trata como linha de assembly apos expansao de defines.
     let expanded = expand_defines(text, defines);
-    // Valida sintaxe lexica para capturar numeros/strings mal formados cedo.
+
     let _ = tokenize_line(line_no, &expanded).map_err(|e| AaError {
         msg: e.msg,
         span: e.span,
@@ -458,9 +438,7 @@ fn parse_number(text: &str) -> Option<u64> {
     } else if t.chars().all(|c| c.is_ascii_digit()) {
         t.parse().ok()
     } else if t.chars().all(|c| c.is_ascii_hexdigit()) {
-        // AA aceita hex "nu" sem prefixo. Usamos a convencao de so aceitar
-        // dessa forma quando ha pelo menos um caractere nao-decimal, para
-        // nao ambiguar `1024`.
+
         u64::from_str_radix(t, 16).ok()
     } else {
         None
@@ -479,8 +457,6 @@ fn is_identifier(s: &str) -> bool {
     chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
-/// Expansao textual de `define`. Case-sensitive, substituicao de palavra
-/// inteira (nao substitui dentro de identificadores maiores).
 pub fn expand_defines(line: &str, defines: &[(String, String)]) -> String {
     if defines.is_empty() {
         return line.to_string();

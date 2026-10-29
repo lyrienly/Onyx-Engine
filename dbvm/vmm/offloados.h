@@ -1,10 +1,3 @@
-/*
- * offloados.h
- *
- *  Created on: Sep 2, 2009
- *      Author: erich
- */
-
 #ifndef OFFLOADOS_H_
 #define OFFLOADOS_H_
 
@@ -67,8 +60,8 @@ typedef struct
 
   UINT64    fsbase;
   UINT64    gsbase;
-  UINT64    APEntryPage; //page below 1MB (for AP cpu bootcode)
-  UINT64    FrameBufferBase; //in case of uefi boot the framebuffer address for output
+  UINT64    APEntryPage;
+  UINT64    FrameBufferBase;
   UINT64    FrameBufferSize;
   UINT64    HorizontalResolution;
   UINT64    VerticalResolution;
@@ -76,11 +69,10 @@ typedef struct
   UINT64    PixelFormat;
 } __attribute__((__packed__)) OriginalState, *POriginalState;
 
-
 typedef struct
 {
   UINT64 startAddress;
   UINT64 byteSize;
 } __attribute__((__packed__)) UncachedRegion, *PUncachedRegion;
 
-#endif /* OFFLOADOS_H_ */
+#endif

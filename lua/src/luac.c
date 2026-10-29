@@ -1,9 +1,3 @@
-/*
-** $Id: luac.c,v 1.54 2006/06/02 17:37:11 lhf Exp $
-** Lua compiler (saves bytecodes to files; also list bytecodes)
-** See Copyright Notice in lua.h
-*/
-
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,15 +17,15 @@
 #include "lstring.h"
 #include "lundump.h"
 
-#define PROGNAME	"luac"		/* default program name */
-#define	OUTPUT		PROGNAME ".out"	/* default output file */
+#define PROGNAME	"luac"
+#define	OUTPUT		PROGNAME ".out"
 
-static int listing=0;			/* list bytecodes? */
-static int dumping=1;			/* dump bytecodes? */
-static int stripping=0;			/* strip debug information? */
-static char Output[]={ OUTPUT };	/* default output file name */
-static const char* output=Output;	/* actual output file name */
-static const char* progname=PROGNAME;	/* actual program name */
+static int listing=0;
+static int dumping=1;
+static int stripping=0;
+static char Output[]={ OUTPUT };
+static const char* output=Output;
+static const char* progname=PROGNAME;
 
 static void fatal(const char* message)
 {
@@ -74,31 +68,31 @@ static int doargs(int argc, char* argv[])
  if (argv[0]!=NULL && *argv[0]!=0) progname=argv[0];
  for (i=1; i<argc; i++)
  {
-  if (*argv[i]!='-')			/* end of options; keep it */
+  if (*argv[i]!='-')
    break;
-  else if (IS("--"))			/* end of options; skip it */
+  else if (IS("--"))
   {
    ++i;
    if (version) ++version;
    break;
   }
-  else if (IS("-"))			/* end of options; use stdin */
+  else if (IS("-"))
    break;
-  else if (IS("-l"))			/* list */
+  else if (IS("-l"))
    ++listing;
-  else if (IS("-o"))			/* output file */
+  else if (IS("-o"))
   {
    output=argv[++i];
    if (output==NULL || *output==0) usage(LUA_QL("-o") " needs argument");
    if (IS("-")) output=NULL;
   }
-  else if (IS("-p"))			/* parse only */
+  else if (IS("-p"))
    dumping=0;
-  else if (IS("-s"))			/* strip debug information */
+  else if (IS("-s"))
    stripping=1;
-  else if (IS("-v"))			/* show version */
+  else if (IS("-v"))
    ++version;
-  else					/* unknown option */
+  else
    usage(argv[i]);
  }
  if (i==argc && (listing || !dumping))

@@ -1,4 +1,3 @@
-
 use crate::process::Process;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -164,4 +163,3 @@ mod tests {
         assert_eq!(caves[1].byte_value, 0x90);
     }
 }
-

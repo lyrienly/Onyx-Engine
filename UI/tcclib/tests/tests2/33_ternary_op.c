@@ -22,7 +22,6 @@ void call_fp()
     (fp?f:&f)();
     _Generic((__typeof(fp?0L:(void)0)*){0}, void*: (void)0);
 
-    /* The following line causes a warning */
     void *xx = fp?f:1;
 }
 
@@ -67,14 +66,7 @@ int main()
     struct condstruct cs = { 38 };
     printf("%d\n", getme(&cs, 0));
 
-    // the following lines contain type mismatch errors in every ternary expression
-    //printf("comparing double with pointer : size = %d\n", sizeof(0 ? &c : 0.0));
-    //printf("'%c' <> '%c'\n", (0 ? a : d).x, (1 ? a : d).x);
-    //0 ? a : 0.0;
    }
-
 
    return 0;
 }
-
-/* vim: set expandtab ts=4 sw=3 sts=3 tw=80 :*/

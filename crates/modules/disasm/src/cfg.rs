@@ -15,9 +15,6 @@ pub struct ControlFlowGraph {
     pub blocks: BTreeMap<u64, BasicBlock>,
 }
 
-/// Builds a Control Flow Graph by splitting the instruction stream into basic
-/// blocks at branches, calls and returns, and at every intra-range branch
-/// target.
 pub fn build_cfg(instructions: &[Instruction]) -> ControlFlowGraph {
     if instructions.is_empty() {
         return ControlFlowGraph { entry: 0, blocks: BTreeMap::new() };
@@ -26,7 +23,6 @@ pub fn build_cfg(instructions: &[Instruction]) -> ControlFlowGraph {
     let entry = instructions[0].address;
     let addr_set: BTreeSet<u64> = instructions.iter().map(|i| i.address).collect();
 
-    // Collect block leaders.
     let mut leaders: BTreeSet<u64> = BTreeSet::new();
     leaders.insert(entry);
 
@@ -50,7 +46,6 @@ pub fn build_cfg(instructions: &[Instruction]) -> ControlFlowGraph {
         }
     }
 
-    // Walk and assemble blocks.
     let mut blocks: BTreeMap<u64, BasicBlock> = BTreeMap::new();
     let mut current: Option<BasicBlock> = None;
 
@@ -103,7 +98,7 @@ pub fn build_cfg(instructions: &[Instruction]) -> ControlFlowGraph {
                         }
                     }
                     FlowType::Call => {
-                        // Call returns to the following instruction.
+
                         if let Some(next) = next_addr {
                             block.successors.push(next);
                         }
@@ -129,7 +124,6 @@ pub fn build_cfg(instructions: &[Instruction]) -> ControlFlowGraph {
     ControlFlowGraph { entry, blocks }
 }
 
-/// Exports the CFG as a Graphviz DOT document.
 pub fn cfg_to_dot(cfg: &ControlFlowGraph) -> String {
     let mut s = String::new();
     s.push_str("digraph cfg {\n");

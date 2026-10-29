@@ -1,4 +1,3 @@
-
 use std::fs::File;
 use std::io::Write;
 use crate::process::Process;
@@ -126,4 +125,3 @@ impl CheatTable {
         Ok(())
     }
 }
-

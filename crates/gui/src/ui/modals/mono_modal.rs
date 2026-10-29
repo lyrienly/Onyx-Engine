@@ -1,4 +1,3 @@
-
 use eframe::egui::{self, Color32, RichText, Stroke, Vec2};
 use onyx_core::mono::MonoDissector;
 use onyx_core::scanner::ValType;
@@ -351,4 +350,3 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
         },
     );
 }
-

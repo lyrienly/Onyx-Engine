@@ -1,4 +1,3 @@
-
 pub mod process_modal;
 pub mod memory_view;
 pub mod pointer_scanner;
@@ -25,4 +24,3 @@ pub fn render_all_modals(app: &mut OnyxEngineApp, ctx: &egui::Context) {
     edit_byte_modal::render(app, ctx);
     settings_modal::render(app, ctx);
 }
-

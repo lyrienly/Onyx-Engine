@@ -1,4 +1,3 @@
-
 use std::time::Instant;
 use crate::hook::Hook;
 use crate::process::Process;
@@ -83,4 +82,3 @@ impl SpeedhackInjector {
         !self.installed_hooks.is_empty()
     }
 }
-

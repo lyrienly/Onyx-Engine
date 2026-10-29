@@ -1,4 +1,3 @@
-
 use eframe::egui::{self, Color32, RichText, Vec2};
 use onyx_core::process::Process;
 use crate::app::OnyxEngineApp;
@@ -90,4 +89,3 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
         app.show_plugins_modal = false;
     }
 }
-

@@ -1,6 +1,3 @@
-// This program is designed to test some arm64-specific things, such as the
-// calling convention, but should give the same results on any architecture.
-
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -232,10 +229,7 @@ void ret(void)
 
 void*
 va_arg_with_struct_ptr(va_list ap) {
-        /*
-         * This was a BUG identified with FFTW-3.3.8 on arm64.
-         * The test case only checks it compiles.
-         */
+
         struct X { int _x; };
         struct X *x = va_arg(ap, struct X *);
         return x;

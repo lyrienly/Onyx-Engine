@@ -1,4 +1,3 @@
-
 use crate::disasm::Disassembler;
 use crate::process::Process;
 use crate::win32::*;
@@ -91,4 +90,3 @@ pub fn make_absolute_jmp_64(destination: usize) -> Vec<u8> {
     code.extend_from_slice(&(destination as u64).to_le_bytes());
     code
 }
-

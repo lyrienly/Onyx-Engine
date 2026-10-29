@@ -1,4 +1,3 @@
-
 use eframe::egui::{self, Color32, RichText, Rounding, Stroke, Vec2};
 use onyx_core::process::ProcessAccessMode;
 use crate::app::OnyxEngineApp;
@@ -323,4 +322,3 @@ fn render_extra_tab(app: &mut OnyxEngineApp, ui: &mut egui::Ui) {
         ui.label("Mono / IL2CPP generic method and parameter lookup");
     });
 }
-

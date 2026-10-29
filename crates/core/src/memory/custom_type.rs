@@ -1,4 +1,3 @@
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CustomTypeKind {
     Integer,
@@ -101,4 +100,3 @@ mod tests {
         assert_eq!(internal[0].name, "Internal XOR8 Masked");
     }
 }
-

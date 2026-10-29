@@ -1,11 +1,3 @@
-/*
-decoder.h
-
-Copyright (C) 2003-2008 Gil Dabah, http://ragestorm.net/distorm/
-This library is licensed under the BSD license. See the file COPYING.
-*/
-
-
 #ifndef DECODER_H
 #define DECODER_H
 
@@ -15,7 +7,6 @@ This library is licensed under the BSD license. See the file COPYING.
 
 typedef unsigned int _iflags;
 
-/* DEFAULT instructions decoding mode. */
 typedef enum {Decode16Bits = 0, Decode32Bits = 1, Decode64Bits = 2} _DecodeType;
 
 typedef OFFSET_INTEGER _OffsetType;
@@ -40,4 +31,4 @@ _DecodeResult internal_decode(_OffsetType codeOffset, const uint8_t* code, int c
 _DecodeType ADDR_SIZE_AFFECT(_DecodeType dt, _iflags totalPrefixes);
 _DecodeType OP_SIZE_AFFECT(_DecodeType dt, _iflags totalPrefixes, unsigned int rex, _iflags instFlags);
 
-#endif /* DECODER_H */
+#endif

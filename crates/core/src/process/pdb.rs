@@ -1,4 +1,3 @@
-
 use std::ffi::{c_void, OsStr};
 use std::os::windows::ffi::OsStrExt;
 use std::ptr::{null, null_mut};
@@ -237,4 +236,3 @@ mod tests {
         assert!(eng.initialized);
     }
 }
-

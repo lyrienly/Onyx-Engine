@@ -1,4 +1,3 @@
-
 use crate::memory::scanner::AobByte;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

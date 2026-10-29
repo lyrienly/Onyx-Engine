@@ -1,20 +1,3 @@
-//! Harness manual de integracao para hardware breakpoints (issue #16).
-//!
-//! Uso:
-//!   cargo build -p onyx_core --example hw_bp_target
-//!   cargo run   -p onyx_core --example hw_bp_harness
-//!
-//! O harness inicia `hw_bp_target`, anexa no processo e valida:
-//!   1. ocupacao dos 4 slots (DR0..DR3);
-//!   2. conflito ao pedir o quinto breakpoint (-2 / NoFreeSlot);
-//!   3. liberacao do slot do meio e reuso pelo proximo breakpoint;
-//!   4. slot invalido (-3 / InvalidSlot);
-//!   5. limpeza total do registro;
-//!   6. um hit real capturado por `HardwareBreakpointMonitor`.
-//!
-//! Rode em VM com snapshot: o alvo e suspenso varias vezes e o debugger e
-//! anexado/desanexado do processo.
-
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
@@ -124,7 +107,6 @@ fn run() -> Result<(), String> {
 
     let mut veh = VehDebugger::new(target.pid);
 
-    // 1. Ocupa os quatro slots.
     let mut indices = Vec::new();
     for offset in 0..4 {
         let address = target.address + offset * 8;
@@ -138,7 +120,6 @@ fn run() -> Result<(), String> {
     }
     println!("1/6 quatro slots ocupados: {indices:?}");
 
-    // 1b. Confere fisicamente DR0..DR3 na primeira thread.
     let dr = read_thread_debug_registers(threads[0])
         .map_err(|error| format!("leitura dos DRs falhou: {error}"))?;
     let expected = [
@@ -163,7 +144,6 @@ fn run() -> Result<(), String> {
         dr.dr0, dr.dr1, dr.dr2, dr.dr3, dr.dr7
     );
 
-    // 2. Quinto breakpoint deve ser recusado.
     match veh.set_stealth_breakpoint(
         &proc,
         target.address,
@@ -174,7 +154,6 @@ fn run() -> Result<(), String> {
         other => return Err(format!("esperava NoFreeSlot, obteve {other:?}")),
     }
 
-    // 3. Libera o slot do meio e reutiliza.
     veh.clear_stealth_breakpoint(&proc, 1)
         .map_err(|error| format!("clear do slot 1: {error}"))?;
     if veh.used_slots() != 3 {
@@ -197,13 +176,11 @@ fn run() -> Result<(), String> {
     }
     println!("3/6 slot 1 liberado e reutilizado");
 
-    // 4. Slot fora do intervalo deve ser recusado.
     match veh.clear_stealth_breakpoint(&proc, 4) {
         Err(HwBpError::InvalidSlot) => println!("4/6 slot 4 recusado com InvalidSlot (-3)"),
         other => return Err(format!("esperava InvalidSlot, obteve {other:?}")),
     }
 
-    // 5. Limpeza total.
     veh.clear_all(&proc);
     if veh.used_slots() != 0 {
         return Err(format!(
@@ -213,7 +190,6 @@ fn run() -> Result<(), String> {
     }
     println!("5/6 registro de slots limpo");
 
-    // 6. Hit real: o alvo comeca a escrever no contador.
     target.send("GO")?;
     let stop = Arc::new(AtomicBool::new(false));
     let hits = HardwareBreakpointMonitor::monitor_address(

@@ -1,5 +1,3 @@
-//! Instalacao e remocao de hooks inline.
-
 use crate::trampoline::{absolute_jmp, build_trampoline, TrampolineError, PATCH_SIZE};
 
 #[cfg(windows)]
@@ -41,8 +39,6 @@ impl From<TrampolineError> for HookError {
     }
 }
 
-/// Representa um hook ativo. Enquanto este objeto estiver vivo o alvo
-/// permanece patchado; chame [`Hook::remove`] para restaurar.
 pub struct Hook {
     target: *mut u8,
     original_bytes: [u8; PATCH_SIZE],
@@ -53,28 +49,20 @@ pub struct Hook {
     active: bool,
 }
 
-// SAFETY: todos os acessos escrevem via APIs do SO em enderecos ja validados;
-// nao ha estado interior compartilhado alem dos ponteiros brutos.
 unsafe impl Send for Hook {}
 unsafe impl Sync for Hook {}
 
 impl Hook {
-    /// Instala um hook inline substituindo o prologue de `target_fn` por um
-    /// JMP para `hook_fn`. O trampolim retornado pode ser invocado via
-    /// [`Hook::original`] para executar o comportamento original.
+
     #[cfg(windows)]
     pub fn new(target_fn: *const u8, hook_fn: *const u8) -> Result<Self, HookError> {
         if target_fn.is_null() || hook_fn.is_null() {
             return Err(HookError::Alloc);
         }
 
-        // Le o maximo que pode precisar para decodificar: 15 bytes maximos
-        // por instrucao x86-64, ate acumular PATCH_SIZE bytes.
         let probe_len = PATCH_SIZE + 15;
         let prologue = unsafe { core::slice::from_raw_parts(target_fn, probe_len) }.to_vec();
 
-        // Aloca code cave RWX. Tamanho generoso: ate 15 bytes por instrucao
-        // relocada mais o JMP de 14 bytes.
         let alloc_size: usize = 128;
         let cave = unsafe {
             VirtualAlloc(
@@ -101,18 +89,15 @@ impl Hook {
             return Err(HookError::Alloc);
         }
 
-        // Escreve trampolim.
         unsafe {
             core::ptr::copy_nonoverlapping(tramp.bytes.as_ptr(), cave as *mut u8, tramp.bytes.len());
         }
 
-        // Backup dos bytes originais que serao sobrescritos.
         let mut original_bytes = [0u8; PATCH_SIZE];
         unsafe {
             core::ptr::copy_nonoverlapping(target_fn, original_bytes.as_mut_ptr(), PATCH_SIZE);
         }
 
-        // Patch do alvo com JMP absoluto para hook.
         let patch = absolute_jmp(hook_fn as u64);
         let mut old_protect: u32 = 0;
         let ok = unsafe {
@@ -158,13 +143,10 @@ impl Hook {
         Err(HookError::Unsupported)
     }
 
-    /// Retorna o ponteiro para o trampolim, que pode ser chamado como se
-    /// fosse a funcao original.
     pub fn original(&self) -> *const u8 {
         self.trampoline_ptr as *const u8
     }
 
-    /// Restaura os bytes originais do alvo e libera a code cave.
     #[cfg(windows)]
     pub fn remove(mut self) -> Result<(), HookError> {
         self.restore_in_place()
@@ -211,7 +193,7 @@ impl Hook {
             VirtualFree(self.trampoline_ptr as *mut _, 0, MEM_RELEASE);
         }
         self.active = false;
-        // Silencia aviso de variavel nao usada.
+
         let _ = PAGE_EXECUTE_READ;
         let _ = self.trampoline_len;
         let _ = self.trampoline_alloc_size;

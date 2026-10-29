@@ -1,4 +1,3 @@
-
 use eframe::egui::{self, Color32, RichText, Vec2};
 use onyx_core::autoassembler::AutoAssembler;
 use crate::app::OnyxEngineApp;
@@ -84,4 +83,3 @@ dealloc(newmem)
         app.show_aa_modal = false;
     }
 }
-

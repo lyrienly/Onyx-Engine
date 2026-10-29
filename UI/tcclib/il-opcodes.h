@@ -1,22 +1,3 @@
-/*
- *  CIL opcode definition
- * 
- *  Copyright (c) 2002 Fabrice Bellard
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
- */
 OP(NOP, "nop", 0x00)
 OP(BREAK, "break", 0x01)
 OP(LDARG_0, "ldarg.0", 0x02)
@@ -216,8 +197,6 @@ OP(LEAVE, "leave", 0xdd)
 OP(LEAVE_S, "leave.s", 0xde)
 OP(STIND_I, "stind.i", 0xdf)
 OP(CONV_U, "conv.u", 0xe0)
-
-/* prefix instructions. we use an opcode >= 256 to ease coding */
 
 OP(ARGLIST, "arglist", 0x100)
 OP(CEQ, "ceq", 0x101)

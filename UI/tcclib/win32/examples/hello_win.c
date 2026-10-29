@@ -1,34 +1,17 @@
-//+---------------------------------------------------------------------------
-//
-//  HELLO_WIN.C - Windows GUI 'Hello World!' Example
-//
-//+---------------------------------------------------------------------------
-
 #include <windows.h>
 
 #define APPNAME "HELLO_WIN"
 
-char szAppName[] = APPNAME; // The name of this application
-char szTitle[]   = APPNAME; // The title bar text
+char szAppName[] = APPNAME;
+char szTitle[]   = APPNAME;
 const char *pWindowText;
 
 void CenterWindow(HWND hWnd);
-
-//+---------------------------------------------------------------------------
-//
-//  Function:   WndProc
-//
-//  Synopsis:   very unusual type of function - gets called by system to
-//              process windows messages.
-//
-//  Arguments:  same as always.
-//----------------------------------------------------------------------------
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message) {
 
-        // ----------------------- first and last
         case WM_CREATE:
             CenterWindow(hwnd);
             break;
@@ -37,7 +20,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
             PostQuitMessage(0);
             break;
 
-        // ----------------------- get out of it...
         case WM_RBUTTONUP:
             DestroyWindow(hwnd);
             break;
@@ -47,7 +29,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
                 DestroyWindow(hwnd);
             break;
 
-        // ----------------------- display our minimal info
         case WM_PAINT:
         {
             PAINTSTRUCT ps;
@@ -64,20 +45,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
             break;
         }
 
-        // ----------------------- let windows do all other stuff
         default:
             return DefWindowProc(hwnd, message, wParam, lParam);
     }
     return 0;
 }
 
-//+---------------------------------------------------------------------------
-//
-//  Function:   WinMain
-//
-//  Synopsis:   standard entrypoint for GUI Win32 apps
-//
-//----------------------------------------------------------------------------
 int APIENTRY WinMain(
         HINSTANCE hInstance,
         HINSTANCE hPrevInstance,
@@ -91,9 +64,6 @@ int APIENTRY WinMain(
 
     pWindowText = lpCmdLine[0] ? lpCmdLine : "Hello Windows!";
 
-    // Fill in window class structure with parameters that describe
-    // the main window.
-
     ZeroMemory(&wc, sizeof wc);
     wc.hInstance     = hInstance;
     wc.lpszClassName = szAppName;
@@ -106,15 +76,14 @@ int APIENTRY WinMain(
     if (FALSE == RegisterClass(&wc))
         return 0;
 
-    // create the browser
     hwnd = CreateWindow(
         szAppName,
         szTitle,
         WS_OVERLAPPEDWINDOW|WS_VISIBLE,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
-        360,//CW_USEDEFAULT,
-        240,//CW_USEDEFAULT,
+        360,
+        240,
         0,
         0,
         hInstance,
@@ -123,7 +92,6 @@ int APIENTRY WinMain(
     if (NULL == hwnd)
         return 0;
 
-    // Main message loop:
     while (GetMessage(&msg, NULL, 0, 0) > 0) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
@@ -131,10 +99,6 @@ int APIENTRY WinMain(
 
     return msg.wParam;
 }
-
-//+---------------------------------------------------------------------------
-
-//+---------------------------------------------------------------------------
 
 void CenterWindow(HWND hwnd_self)
 {
@@ -159,5 +123,3 @@ void CenterWindow(HWND hwnd_self)
         SWP_NOSIZE|SWP_NOZORDER|SWP_NOACTIVATE
         );
 }
-
-//+---------------------------------------------------------------------------

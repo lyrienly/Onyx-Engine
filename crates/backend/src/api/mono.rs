@@ -1,4 +1,3 @@
-
 use std::ffi::CStr;
 use std::os::raw::c_char;
 use onyx_core::mono::{MonoDissector, RuntimeType};
@@ -307,4 +306,3 @@ pub unsafe extern "C" fn onyx_mono_dissect_clr_object(
         Err(_) => 0,
     }
 }
-

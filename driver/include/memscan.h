@@ -2,7 +2,7 @@
 
 #ifdef AMD64
 #define PAGETABLEBASE 0xfffff68000000000ULL
-//win10 1607 it's random
+
 #else
 #define PAGETABLEBASE 0xc0000000
 #endif
@@ -14,24 +14,23 @@ BOOLEAN frozen;
 PVOID frozendata;
 } ADDRESSENTRY;
 
-typedef struct _MEMREGION //only holds regions that are allowed
+typedef struct _MEMREGION
 {
 	DWORD BaseAddress;
 	DWORD Size;
 } MEMREGION;
 
-
 typedef struct _MEMSCANOPTIONS
 {
-BYTE ShowAsSigned; //obsolete (clientside now)
-BYTE BinariesAsDecimal; //obsolete (clientside now)
+BYTE ShowAsSigned;
+BYTE BinariesAsDecimal;
 WORD max;
 DWORD buffersize;
-BYTE skip_page_no_cache; //hmmmm
+BYTE skip_page_no_cache;
 BYTE UseDebugRegs;
-BYTE UseDBKQueryMemoryRegion; //always true
-BYTE UseDBKReadWriteMemory; //always true
-BYTE UseDBKOpenProcess; //always true
+BYTE UseDBKQueryMemoryRegion;
+BYTE UseDBKReadWriteMemory;
+BYTE UseDBKOpenProcess;
 } MEMSCANOPTIONS;
 MEMSCANOPTIONS MemscanOptions;
 
@@ -49,7 +48,7 @@ BOOLEAN ThreadActive;
 } SCANDATA;
 
 SCANDATA CurrentScan;
-					  
+
 typedef struct
 {
 	UINT64 StartAddress;
@@ -84,7 +83,7 @@ unsigned int AddressListSize;
 unsigned int AddressListEntries;
 KSPIN_LOCK AddressListSpinlock;
 
-PVOID FrozenData; //holds the buffer of all frozen data records
+PVOID FrozenData;
 int FrozenDataSize;
 LARGE_INTEGER FreezeInterval;
 HANDLE addressfile;
@@ -92,8 +91,6 @@ HANDLE valuefile;
 
 BOOLEAN HiddenDriver;
 
-
-//scanoptions
 #define SO_FASTSCAN		(0x1)
 #define SO_HEXADECIMAL	(0x2)
 #define SO_READONLY		(0x4)
@@ -101,7 +98,6 @@ BOOLEAN HiddenDriver;
 #define SO_ISBINARY		(0x10)
 #define SO_UNICODE		(0x20)
 
-//scantype
 #define  ST_Exact_value			0
 #define  ST_Increased_value		1
 #define  ST_Increased_value_by	2
@@ -115,7 +111,6 @@ BOOLEAN HiddenDriver;
 #define  ST_BiggerThan			10
 #define  ST_Userdefined			11
 
-//scanerrors
 #define SE_IncorrectType -1
 #define SE_NotSupported -2
 #define SE_NoMemoryFound -3

@@ -1,7 +1,6 @@
 #ifndef NEWARD_H_
 #define NEWARD_H_
 
-
 #include "common.h"
 
 extern PARD fakeARD;

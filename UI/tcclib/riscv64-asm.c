@@ -1,9 +1,3 @@
-/*************************************************************/
-/*
- *  RISCV64 dummy assembler for TCC
- *
- */
-
 #ifdef TARGET_DEFS_ONLY
 
 #define CONFIG_TCC_ASM
@@ -13,9 +7,8 @@ ST_FUNC void g(int c);
 ST_FUNC void gen_le16(int c);
 ST_FUNC void gen_le32(int c);
 
-/*************************************************************/
 #else
-/*************************************************************/
+
 #define USING_GLOBALS
 #include "tcc.h"
 
@@ -24,7 +17,6 @@ static void asm_error(void)
     tcc_error("RISCV64 asm not implemented.");
 }
 
-/* XXX: make it faster ? */
 ST_FUNC void g(int c)
 {
     int ind1;
@@ -64,7 +56,6 @@ ST_FUNC void subst_asm_operand(CString *add_str, SValue *sv, int modifier)
     asm_error();
 }
 
-/* generate prolog and epilog code for asm statement */
 ST_FUNC void asm_gen_code(ASMOperand *operands, int nb_operands,
                          int nb_outputs, int is_output,
                          uint8_t *clobber_regs,
@@ -90,5 +81,4 @@ ST_FUNC int asm_parse_regvar (int t)
     return -1;
 }
 
-/*************************************************************/
-#endif /* ndef TARGET_DEFS_ONLY */
+#endif

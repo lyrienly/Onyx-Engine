@@ -1,10 +1,3 @@
-/*
- * displaydebug.h
- *
- *  Created on: Aug 18, 2019
- *      Author: eric
- */
-
 #ifndef VMM_DISPLAYDEBUG_H_
 #define VMM_DISPLAYDEBUG_H_
 
@@ -17,4 +10,4 @@ extern unsigned long long    DDPixelsPerScanLine;
 
 void ddDrawRectangle(int x, int y, int width, int height, DWORD color);
 
-#endif /* VMM_DISPLAYDEBUG_H_ */
+#endif

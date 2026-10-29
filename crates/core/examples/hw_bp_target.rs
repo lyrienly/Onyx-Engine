@@ -1,17 +1,3 @@
-//! Processo-alvo do harness de hardware breakpoints (issue #16).
-//!
-//! Uso:
-//!   cargo run -p onyx_core --example hw_bp_target -- [threads]
-//!
-//! Imprime `PID`, `ADDR` e `THREADS` na inicializacao e depois aceita comandos
-//! pelo stdin:
-//!   GO    - as threads passam a escrever no contador
-//!   STOP  - as threads param de escrever
-//!   QUIT  - encerra o processo
-//!
-//! As threads ficam ociosas ate receber `GO`, o que permite configurar e
-//! remover breakpoints de escrita sem que o alvo seja atingido.
-
 use std::io::{self, BufRead, Write};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::thread;

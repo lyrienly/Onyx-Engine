@@ -1,8 +1,3 @@
-/**
- * This file has no copyright assigned and is placed in the Public Domain.
- * This file is part of the w64 mingw-runtime package.
- * No warranty is given; refer to the file DISCLAIMER within this package.
- */
 #ifndef _WINNT_
 #define _WINNT_
 
@@ -12,8 +7,6 @@ extern "C" {
 
 #include <ctype.h>
 #define ANYSIZE_ARRAY 1
-
-//gr #include <specstrings.h>
 
 #define RESTRICTED_POINTER
 
@@ -46,7 +39,6 @@ extern "C" {
 #define _IA64_
 #endif
 #endif
-
 
 #ifdef _WIN64
 #define MAX_NATURAL_ALIGNMENT sizeof(ULONGLONG)
@@ -1049,7 +1041,7 @@ typedef DWORD LCID;
 	: : "r"(Value),"m"(*Destination) : "memory");
       return *Destination;
     }
-    //		$$$$
+
     __CRT_INLINE LONG64 InterlockedAnd64(LONG64 volatile *Destination,LONG64 Value) {
       __asm__ __volatile__("lock ; andq %0,%1"
 	: : "r"(Value),"m"(*Destination) : "memory");
@@ -1160,8 +1152,6 @@ typedef DWORD LCID;
 
     VOID __faststorefence(VOID);
     VOID _m_prefetchw(volatile CONST VOID *Source);
-
-//!__TINYC__: #include <intrin.h>
 
 #define YieldProcessor _mm_pause
 #define MemoryBarrier __faststorefence
@@ -1975,8 +1965,6 @@ typedef DWORD LCID;
     typedef EXCEPTION_ROUTINE *PEXCEPTION_ROUTINE;
 #endif
 
-    /* http://msdn.microsoft.com/en-us/library/ms680597(VS.85).aspx */
-
 #define UNWIND_HISTORY_TABLE_SIZE 12
 
   typedef struct _UNWIND_HISTORY_TABLE_ENTRY {
@@ -1996,8 +1984,6 @@ typedef DWORD LCID;
     UNWIND_HISTORY_TABLE_ENTRY Entry[UNWIND_HISTORY_TABLE_SIZE];
   } UNWIND_HISTORY_TABLE, *PUNWIND_HISTORY_TABLE;
 
-  /* http://msdn.microsoft.com/en-us/library/b6sf5kbd(VS.80).aspx */
-
   struct _DISPATCHER_CONTEXT;
   typedef struct _DISPATCHER_CONTEXT DISPATCHER_CONTEXT;
   typedef struct _DISPATCHER_CONTEXT *PDISPATCHER_CONTEXT;
@@ -2011,20 +1997,18 @@ typedef DWORD LCID;
     PCONTEXT ContextRecord;
     PEXCEPTION_ROUTINE LanguageHandler;
     PVOID HandlerData;
-    /* http://www.nynaeve.net/?p=99 */
+
     PUNWIND_HISTORY_TABLE HistoryTable;
     ULONG ScopeIndex;
     ULONG Fill0;
   };
-
-  /* http://msdn.microsoft.com/en-us/library/ms680617(VS.85).aspx */
 
   typedef struct _KNONVOLATILE_CONTEXT_POINTERS
   {
     PM128A FloatingContext[16];
     PULONG64 IntegerContext[16];
   } KNONVOLATILE_CONTEXT_POINTERS, *PKNONVOLATILE_CONTEXT_POINTERS;
-#endif /* defined(__x86_64) */
+#endif
 
     typedef PVOID PACCESS_TOKEN;
     typedef PVOID PSECURITY_DESCRIPTOR;
