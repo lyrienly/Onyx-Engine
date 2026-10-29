@@ -533,6 +533,62 @@ Este documento detalha o roteiro prático e passo a passo para você testar manu
 
 ---
 
+---
+
+## 26. Modernização do CEServer (LZ4, TLS, Pinning TOFU) (Issue #12)
+
+### O que foi feito
+- Compressão LZ4 em tempo real no protocolo do `ceserver` (`COMPRESSION_LZ4 = 10`), com decoder nativo no cliente Pascal (`UI/lz4decode.pas`).
+- Canal TLS opcional com pinning de fingerprint SHA-256 (TOFU - Trust On First Use) persistido no registro (`HKCU\Software\OnyxEngine\TLS\<host>`).
+- Suporte a flags `-T`, `-c <cert.pem>`, `-k <key.pem>` no `ceserver`.
+- Opções "LZ4 (fast)" e "Use TLS" adicionadas na interface gráfica.
+
+### Passo a Passo
+1. No servidor Linux / WSL:
+   ```bash
+   cd UI/ceserver
+   make -f gcc/makefile
+   ./ceserver -T -c server.crt -k server.key
+   ```
+2. Na UI do OnyxEngine:
+   - Abra a aba **Network / Settings**.
+   - Marque a caixa de seleção **Use TLS**.
+   - Na janela de compressão, selecione **LZ4 (fast)**.
+   - Conecte ao host do ceserver.
+3. No primeiro handshake, observe o registro do fingerprint SHA-256 no log de debug e no Registro do Windows.
+
+### Critérios de Sucesso
+- A conexão é estabelecida de forma criptografada via TLS.
+- Conexões com certificados alterados são rejeitadas pelo pinning TOFU.
+- Leitura e varredura de blocos de memória remota utilizam compressão LZ4 com throughput acelerado.
+
+---
+
+## 27. Grafo Reverso de Referências de Ponteiros (Issue #103)
+
+### O que foi feito
+- Estrutura de dados `ReferenceGraph` em `crates/core/src/memory/reference_graph.rs` para indexação reversa (`endereço_alvo -> [endereços_que_apontam]`).
+- Algoritmo BFS para descoberta de caminhos de ponteiros (`find_path`) a partir de múltiplos endereços raiz com limite de profundidade (`max_depth`) e prevenção de ciclos.
+- Suporte a arquiteturas 32-bit e 64-bit, alinhamento customizável e integração direta com o processo alvo via `build_from_process`.
+
+### Passo a Passo
+1. Execute os testes unitários do grafo reverso:
+   ```powershell
+   cargo test -p onyx_core --lib memory::reference_graph
+   ```
+2. Para testar em código/script Rust:
+   ```rust
+   use onyx_core::memory::reference_graph::ReferenceGraph;
+   
+   let graph = ReferenceGraph::build(&buffer, base_address, 8, 8);
+   let referrers = graph.referrers(player_addr);
+   let path = graph.find_path(&[module_base], player_addr, 5);
+   ```
+
+### Critérios de Sucesso
+- `cargo test -p onyx_core --lib memory::reference_graph` passa 100% (10 testes cobrindo ciclos, caminhos múltiplos, 32-bit e 64-bit).
+- Resolução rápida de cadeias de ponteiros sem loop infinito em grafos cíclicos.
+
 ## Roteiro Rápido para Teste Geral do Workspace
 
 Caso queira rodar uma validação total de uma só vez em sua máquina antes de abrir os jogos:
