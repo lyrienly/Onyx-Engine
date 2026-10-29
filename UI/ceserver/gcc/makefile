@@ -1,9 +1,9 @@
 COMPILER  = gcc
 CFLAGS    =  -g -MMD -MP -Wall -Wextra -Winit-self -Wno-missing-field-initializers -Doff64_t=__off64_t 
 ifeq "$(shell getconf LONG_BIT)" "64"
-  LDFLAGS = -lz -llz4 -ldl -pthread
+  LDFLAGS = -lz -llz4 -lssl -lcrypto -ldl -pthread
 else
-  LDFLAGS = -lz -llz4 -ldl -pthread
+  LDFLAGS = -lz -llz4 -lssl -lcrypto -ldl -pthread
 endif
 LIBS      =
 INCLUDE   = -I../
