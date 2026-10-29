@@ -1,0 +1,33 @@
+name: Clippy
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  clippy:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: x86_64-pc-windows-msvc
+        components: clippy, rustfmt
+
+    - name: Install CMake
+      uses: lukka/get-cmake@latest
+
+    - name: Cargo fmt check
+      run: cargo fmt --all -- --check
+      continue-on-error: true
+
+    - name: Clippy (deny warnings)
+      run: cargo clippy --workspace --all-targets -- -D warnings
