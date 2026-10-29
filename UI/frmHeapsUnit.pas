@@ -12,7 +12,7 @@ type TFillHeapList=class(tthread)
   private
     c: integer;
     list: array [0..63] of record
-      address: dword;
+      address: ptruint;
       size: integer;
     end;
     expanded: boolean;
@@ -45,7 +45,7 @@ var
 implementation
 
 
-uses MemoryBrowserFormUnit;
+uses MemoryBrowserFormUnit, ProcessHandlerUnit, parsers;
 
 procedure TFillHeapList.updatelist;
 var i:integer;
@@ -62,7 +62,10 @@ begin
       for i:=0 to c-1 do
       begin
         li:=listview1.Items.Add;
-        li.Caption:=inttohex(list[i].address,8);
+        if processhandler.is64bit then
+          li.Caption:=inttohex(list[i].address, 16)
+        else
+          li.Caption:=inttohex(list[i].address, 8);
         li.SubItems.Add(inttostr(list[i].size));
       end;
 
@@ -75,10 +78,16 @@ end;
 
 procedure TFillHeapList.enumerateHeapList(const memreclist: PMemRecTableArray; level: integer);
 var i: integer;
+    targetLevel: integer;
 begin
   if terminated then exit;
   
-  if level=7 then
+  if processhandler.is64bit then
+    targetLevel:=15
+  else
+    targetLevel:=7;
+
+  if level=targetLevel then
   begin
     //add all <>nil entries
     for i:=0 to 15 do
@@ -161,7 +170,7 @@ end;
 procedure TfrmHeaps.ListView1DblClick(Sender: TObject);
 begin
   if listview1.ItemIndex<>-1 then
-    memorybrowser.memoryaddress:=strtoint('$'+listview1.Items[listview1.ItemIndex].Caption);
+    memorybrowser.memoryaddress:=StrToQWordEx('$'+listview1.Items[listview1.ItemIndex].Caption);
 end;
 
 initialization
