@@ -1,6 +1,40 @@
 
 use onyx_core::disasm::Disassembler;
 
+pub mod zydis_backend;
+pub mod cfg;
+
+pub use zydis_backend::{disassemble, format_instruction, FlowType, Instruction};
+pub use cfg::{build_cfg, cfg_to_dot, BasicBlock, ControlFlowGraph};
+
+/// Disassembles `length` bytes starting at `base_addr` using Zydis and
+/// returns a Graphviz DOT representation of the Control Flow Graph via
+/// `out_buf`. Returns the number of bytes written (not including the NUL
+/// terminator) or 0 on error / insufficient buffer.
+#[no_mangle]
+pub unsafe extern "C" fn onyx_disasm_cfg_dot(
+    base_addr: u64,
+    bytes: *const u8,
+    length: usize,
+    out_buf: *mut u8,
+    out_cap: usize,
+) -> usize {
+    if bytes.is_null() || length == 0 || out_buf.is_null() || out_cap == 0 {
+        return 0;
+    }
+    let slice = std::slice::from_raw_parts(bytes, length);
+    let insns = zydis_backend::disassemble(slice, base_addr);
+    let graph = cfg::build_cfg(&insns);
+    let dot = cfg::cfg_to_dot(&graph);
+    let data = dot.as_bytes();
+    if data.len() + 1 > out_cap {
+        return 0;
+    }
+    std::ptr::copy_nonoverlapping(data.as_ptr(), out_buf, data.len());
+    *out_buf.add(data.len()) = 0;
+    data.len()
+}
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct OnyxDisasmInsn {
