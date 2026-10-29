@@ -24,7 +24,7 @@ impl CodeViewInfo {
 
     pub fn pdb_basename(&self) -> &str {
         let p = self.pdb_name.as_str();
-        if let Some(idx) = p.rfind(|c| c == '\\' || c == '/') {
+        if let Some(idx) = p.rfind(['\\', '/']) {
             &p[idx + 1..]
         } else {
             p

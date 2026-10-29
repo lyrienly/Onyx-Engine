@@ -96,7 +96,7 @@ impl StructSpider {
         while off < total_size {
             let remaining = total_size - off;
 
-            if off % 8 == 0 && remaining >= 8 {
+            if off.is_multiple_of(8) && remaining >= 8 {
                 let bytes = &buf[off..off + 8];
                 let u = u64::from_le_bytes(bytes.try_into().unwrap());
                 let s = i64::from_le_bytes(bytes.try_into().unwrap());
@@ -106,7 +106,7 @@ impl StructSpider {
 
                     let start = off;
                     let mut end = off + 8;
-                    while end + 8 <= total_size && end % 8 == 0 {
+                    while end + 8 <= total_size && end.is_multiple_of(8) {
                         let next = &buf[end..end + 8];
                         if u64::from_le_bytes(next.try_into().unwrap()) == 0 {
                             end += 8;
@@ -125,7 +125,7 @@ impl StructSpider {
                 }
 
                 let ptr = u as usize;
-                let looks_like_pointer = u >= 0x10000 && u <= 0x7FFF_FFFF_FFFF;
+                let looks_like_pointer = (0x10000..=0x7FFF_FFFF_FFFF).contains(&u);
                 if looks_like_pointer {
                     if in_region(ptr, executable) {
                         fields.push(InferredField {
@@ -150,9 +150,9 @@ impl StructSpider {
                     }
                 }
 
-                if f.is_finite() && f.abs() >= 1e-3 && f.abs() <= 1e5 {
+                if f.is_finite() && f.abs() >= 1e-3 && f.abs() <= 1e5
 
-                    if !(s.abs() < 1_000_000 && (u & 0xFFFF_FFFF_0000_0000) == 0) {
+                    && !(s.abs() < 1_000_000 && (u & 0xFFFF_FFFF_0000_0000) == 0) {
                         fields.push(InferredField {
                             offset: off,
                             size: 8,
@@ -162,7 +162,6 @@ impl StructSpider {
                         off += 8;
                         continue;
                     }
-                }
 
                 let upper = &buf[off + 4..off + 8];
                 if upper == [0, 0, 0, 0] {
@@ -207,7 +206,7 @@ impl StructSpider {
                 continue;
             }
 
-            if off % 4 == 0 && remaining >= 4 {
+            if off.is_multiple_of(4) && remaining >= 4 {
                 let lower = &buf[off..off + 4];
                 let i = i32::from_le_bytes(lower.try_into().unwrap());
                 let fl = f32::from_le_bytes(lower.try_into().unwrap());
@@ -293,13 +292,12 @@ impl StructSpider {
         for f in layout.fields.iter_mut() {
             if let InferredKind::Pointer(p) = f.kind {
 
-                if let Ok(s) = proc.read_string(p, 64, false) {
-                    if is_printable_ascii(&s) && s.len() >= 2 {
+                if let Ok(s) = proc.read_string(p, 64, false)
+                    && is_printable_ascii(&s) && s.len() >= 2 {
                         f.kind = InferredKind::StringPointer(p, s.clone());
                         f.value_hint = format!("\"{}\"", s);
                         continue;
                     }
-                }
 
                 if let Ok(first) = proc.read::<usize>(p) {
                     let is_code = executable.iter().any(|(b, s)| first >= *b && first < b.saturating_add(*s));
@@ -325,9 +323,9 @@ impl StructSpider {
             } else {
                 format!("field_0x{:X}", f.offset)
             };
-            let array = if matches!(f.kind, InferredKind::Padding) && f.size > 1 {
-                format!("[{}]", f.size)
-            } else if matches!(f.kind, InferredKind::InlineString(_)) {
+            let array = if (matches!(f.kind, InferredKind::Padding) && f.size > 1)
+                || matches!(f.kind, InferredKind::InlineString(_))
+            {
                 format!("[{}]", f.size)
             } else {
                 String::new()
@@ -357,9 +355,9 @@ impl StructSpider {
             } else {
                 format!("field_0x{:X}", f.offset)
             };
-            let ty = if matches!(f.kind, InferredKind::Padding) && f.size > 1 {
-                format!("[u8; {}]", f.size)
-            } else if matches!(f.kind, InferredKind::InlineString(_)) {
+            let ty = if (matches!(f.kind, InferredKind::Padding) && f.size > 1)
+                || matches!(f.kind, InferredKind::InlineString(_))
+            {
                 format!("[u8; {}]", f.size)
             } else {
                 f.kind.rust_type().to_string()

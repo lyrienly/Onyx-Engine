@@ -208,11 +208,7 @@ pub fn parse_mem_operand(s: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> O
 
         let num_val = if let Some(n) = parse_int_or_hex(t) {
             Some(n)
-        } else if let Some(sym_addr) = resolver(t) {
-            Some(sym_addr as i64)
-        } else {
-            None
-        };
+        } else { resolver(t).map(|sym_addr| sym_addr as i64) };
 
         if let Some(val) = num_val {
             if is_pos {
@@ -235,20 +231,20 @@ pub fn parse_mem_operand(s: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> O
 
 pub fn parse_int_or_hex(s: &str) -> Option<i64> {
     let t = s.trim();
-    if t.starts_with("0x") || t.starts_with("0X") {
-        i64::from_str_radix(&t[2..], 16).ok()
-    } else if t.starts_with('$') {
-        i64::from_str_radix(&t[1..], 16).ok()
-    } else if t.starts_with('#') {
-        t[1..].trim().parse::<i64>().ok()
-    } else if t.starts_with('-') {
-        let rest = &t[1..].trim();
-        if rest.starts_with("0x") || rest.starts_with("0X") {
-            i64::from_str_radix(&rest[2..], 16).ok().map(|n| -n)
-        } else if rest.starts_with('$') {
-            i64::from_str_radix(&rest[1..], 16).ok().map(|n| -n)
-        } else if rest.starts_with('#') {
-            rest[1..].trim().parse::<i64>().ok().map(|n| -n)
+    if let Some(rest) = t.strip_prefix("0x").or_else(|| t.strip_prefix("0X")) {
+        i64::from_str_radix(rest, 16).ok()
+    } else if let Some(rest) = t.strip_prefix('$') {
+        i64::from_str_radix(rest, 16).ok()
+    } else if let Some(rest) = t.strip_prefix('#') {
+        rest.trim().parse::<i64>().ok()
+    } else if let Some(after_minus) = t.strip_prefix('-') {
+        let rest = after_minus.trim();
+        if let Some(hex) = rest.strip_prefix("0x").or_else(|| rest.strip_prefix("0X")) {
+            i64::from_str_radix(hex, 16).ok().map(|n| -n)
+        } else if let Some(hex) = rest.strip_prefix('$') {
+            i64::from_str_radix(hex, 16).ok().map(|n| -n)
+        } else if let Some(dec) = rest.strip_prefix('#') {
+            dec.trim().parse::<i64>().ok().map(|n| -n)
         } else {
             rest.parse::<i64>().ok().map(|n| -n)
         }
@@ -328,7 +324,7 @@ impl Assembler {
                         return Ok(vec![0x50 + reg.id]);
                     }
                 } else if let Some(imm) = parse_int_or_hex(ops_str).or_else(|| resolver(ops_str).map(|a| a as i64)) {
-                    if imm >= -128 && imm <= 127 {
+                    if (-128..=127).contains(&imm) {
                         return Ok(vec![0x6A, imm as u8]);
                     } else {
                         let mut b = vec![0x68];
@@ -462,7 +458,7 @@ fn assemble_branch(
 
     let rel2 = (target as i64) - ((current_ip + 2) as i64);
     if is_explicit_short {
-        if rel2 >= -128 && rel2 <= 127 {
+        if (-128..=127).contains(&rel2) {
             return Ok(vec![short_op, rel2 as u8]);
         } else {
             return Err(format!("Short jump out of range: rel={}", rel2));
@@ -501,7 +497,7 @@ fn assemble_cond_jump(
 
     let rel2 = (target as i64) - ((current_ip + 2) as i64);
     if is_explicit_short {
-        if rel2 >= -128 && rel2 <= 127 {
+        if (-128..=127).contains(&rel2) {
             return Ok(vec![short_op, rel2 as u8]);
         } else {
             return Err(format!("Short conditional jump out of range: rel={}", rel2));
@@ -545,8 +541,8 @@ fn assemble_mov(ops_str: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> Resu
         return Ok(bytes);
     }
 
-    if let (Some(dst), None) = (dst_reg, src_reg) {
-        if let Some(imm) = parse_int_or_hex(src_str).or_else(|| resolver(src_str).map(|a| a as i64)) {
+    if let (Some(dst), None) = (dst_reg, src_reg)
+        && let Some(imm) = parse_int_or_hex(src_str).or_else(|| resolver(src_str).map(|a| a as i64)) {
             let mut bytes = Vec::new();
             match dst.size {
                 RegSize::Qword => {
@@ -580,27 +576,22 @@ fn assemble_mov(ops_str: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> Resu
             }
             return Ok(bytes);
         }
-    }
 
-    if let (Some(dst), None) = (dst_reg, src_reg) {
-        if let Some(mem) = parse_mem_operand(src_str, resolver) {
+    if let (Some(dst), None) = (dst_reg, src_reg)
+        && let Some(mem) = parse_mem_operand(src_str, resolver) {
             return encode_modrm_insn(0x8B, 0x8A, dst, &mem, false);
         }
-    }
 
-    if let (None, Some(src)) = (dst_reg, src_reg) {
-        if let Some(mem) = parse_mem_operand(dst_str, resolver) {
+    if let (None, Some(src)) = (dst_reg, src_reg)
+        && let Some(mem) = parse_mem_operand(dst_str, resolver) {
             return encode_modrm_insn(0x89, 0x88, src, &mem, true);
         }
-    }
 
-    if dst_reg.is_none() && src_reg.is_none() {
-        if let Some(mem) = parse_mem_operand(dst_str, resolver) {
-            if let Some(imm) = parse_int_or_hex(src_str).or_else(|| resolver(src_str).map(|a| a as i64)) {
+    if dst_reg.is_none() && src_reg.is_none()
+        && let Some(mem) = parse_mem_operand(dst_str, resolver)
+            && let Some(imm) = parse_int_or_hex(src_str).or_else(|| resolver(src_str).map(|a| a as i64)) {
                 return encode_mem_imm(0xC7, 0xC6, 0, &mem, imm);
             }
-        }
-    }
 
     Err(format!("Cannot assemble mov instruction: '{}'", ops_str))
 }
@@ -642,20 +633,18 @@ fn assemble_alu(base_opcode: u8, reg_op: u8, ops_str: &str, resolver: &dyn Fn(&s
         return Ok(bytes);
     }
 
-    if let (Some(dst), None) = (dst_reg, src_reg) {
-        if let Some(mem) = parse_mem_operand(src_str, resolver) {
+    if let (Some(dst), None) = (dst_reg, src_reg)
+        && let Some(mem) = parse_mem_operand(src_str, resolver) {
             return encode_modrm_insn(base_opcode + 3, base_opcode + 2, dst, &mem, false);
         }
-    }
 
-    if let (None, Some(src)) = (dst_reg, src_reg) {
-        if let Some(mem) = parse_mem_operand(dst_str, resolver) {
+    if let (None, Some(src)) = (dst_reg, src_reg)
+        && let Some(mem) = parse_mem_operand(dst_str, resolver) {
             return encode_modrm_insn(base_opcode + 1, base_opcode, src, &mem, true);
         }
-    }
 
-    if let (Some(dst), None) = (dst_reg, src_reg) {
-        if let Some(imm) = parse_int_or_hex(src_str).or_else(|| resolver(src_str).map(|a| a as i64)) {
+    if let (Some(dst), None) = (dst_reg, src_reg)
+        && let Some(imm) = parse_int_or_hex(src_str).or_else(|| resolver(src_str).map(|a| a as i64)) {
             let mut bytes = Vec::new();
             let is_qword = dst.size == RegSize::Qword;
             let rex = make_rex(is_qword, false, false, dst.id >= 8);
@@ -669,7 +658,7 @@ fn assemble_alu(base_opcode: u8, reg_op: u8, ops_str: &str, resolver: &dyn Fn(&s
                 bytes.push(0x80);
                 bytes.push(0xC0 | (reg_op << 3) | (dst.id & 7));
                 bytes.push(imm as u8);
-            } else if imm >= -128 && imm <= 127 {
+            } else if (-128..=127).contains(&imm) {
                 bytes.push(0x83);
                 bytes.push(0xC0 | (reg_op << 3) | (dst.id & 7));
                 bytes.push(imm as u8);
@@ -680,15 +669,12 @@ fn assemble_alu(base_opcode: u8, reg_op: u8, ops_str: &str, resolver: &dyn Fn(&s
             }
             return Ok(bytes);
         }
-    }
 
-    if dst_reg.is_none() && src_reg.is_none() {
-        if let Some(mem) = parse_mem_operand(dst_str, resolver) {
-            if let Some(imm) = parse_int_or_hex(src_str).or_else(|| resolver(src_str).map(|a| a as i64)) {
+    if dst_reg.is_none() && src_reg.is_none()
+        && let Some(mem) = parse_mem_operand(dst_str, resolver)
+            && let Some(imm) = parse_int_or_hex(src_str).or_else(|| resolver(src_str).map(|a| a as i64)) {
                 return encode_mem_imm(0x81, 0x80, reg_op, &mem, imm);
             }
-        }
-    }
 
     Err(format!("Cannot assemble ALU instruction: '{}'", ops_str))
 }
@@ -868,7 +854,7 @@ fn encode_mem_imm(
         bytes.push(r);
     }
 
-    let use_imm8 = !is_byte && opcode_std == 0x81 && imm >= -128 && imm <= 127;
+    let use_imm8 = !is_byte && opcode_std == 0x81 && (-128..=127).contains(&imm);
     let actual_opcode = if is_byte {
         opcode_byte
     } else if use_imm8 {

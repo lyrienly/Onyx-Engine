@@ -102,11 +102,10 @@ impl SymSrvClient {
         let resp = agent
             .get(url)
             .call()
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("http: {e}")))?;
+            .map_err(|e| io::Error::other(format!("http: {e}")))?;
 
         if resp.status() != 200 {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
+            return Err(io::Error::other(
                 format!("http status {} for {}", resp.status(), url),
             ));
         }

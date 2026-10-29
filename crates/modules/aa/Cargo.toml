@@ -8,3 +8,6 @@ name = "onyx_aa"
 crate-type = ["rlib"]
 
 [dependencies]
+
+[lints]
+workspace = true

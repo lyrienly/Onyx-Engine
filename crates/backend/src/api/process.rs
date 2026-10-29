@@ -365,10 +365,7 @@ pub unsafe extern "C" fn onyx_symbol_load_module(
         Ok(s) => s,
         Err(_) => return 0,
     };
-    match (*engine).load_module(path_str, base, size) {
-        Ok(base_res) => base_res,
-        Err(_) => 0,
-    }
+    (*engine).load_module(path_str, base, size).unwrap_or_default()
 }
 
 #[no_mangle]

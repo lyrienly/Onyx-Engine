@@ -10,3 +10,6 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 
 [dev-dependencies]
+
+[lints]
+workspace = true

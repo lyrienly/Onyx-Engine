@@ -739,8 +739,8 @@ fn parse_modrm_operands(
     let mut is_rip_relative = false;
     let mut sib_str = String::new();
 
-    if (rm & 0x07) == 4 {
-        if *idx < code.len() {
+    if (rm & 0x07) == 4
+        && *idx < code.len() {
             let sib = code[*idx];
             *idx += 1;
             let scale = 1 << ((sib >> 6) & 0x03);
@@ -758,7 +758,6 @@ fn parse_modrm_operands(
                 sib_str = format!("{}{}", seg, reg64_name(base));
             }
         }
-    }
 
     if md == 0 && (rm & 0x07) == 5 {
 
@@ -775,14 +774,13 @@ fn parse_modrm_operands(
             *idx += 1;
             has_disp = true;
         }
-    } else if md == 2 {
-        if *idx + 4 <= code.len() {
+    } else if md == 2
+        && *idx + 4 <= code.len() {
             let d = i32::from_le_bytes([code[*idx], code[*idx+1], code[*idx+2], code[*idx+3]]);
             *idx += 4;
             disp = d as i64;
             has_disp = true;
         }
-    }
 
     let mut target_addr = None;
     let desc = if is_rip_relative {

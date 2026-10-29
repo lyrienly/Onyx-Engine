@@ -8,3 +8,6 @@ crate-type = ["cdylib"]
 name = "taskmgr_cloak"
 
 [dependencies]
+
+[lints]
+workspace = true

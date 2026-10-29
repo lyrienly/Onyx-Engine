@@ -159,10 +159,7 @@ pub unsafe extern "system" fn OnyxPlugin_ValidateAOB(
         }
     };
 
-    let modules = match proc.modules() {
-        Ok(m) => m,
-        Err(_) => Vec::new(),
-    };
+    let modules = proc.modules().unwrap_or_default();
 
     let target_modules: Vec<_> = if !module_filter.is_empty() {
         modules

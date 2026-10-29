@@ -163,3 +163,9 @@ impl Freezer {
         lock.clear();
     }
 }
+
+impl Default for Freezer {
+    fn default() -> Self {
+        Self::new()
+    }
+}

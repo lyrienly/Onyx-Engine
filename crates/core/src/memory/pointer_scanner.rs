@@ -107,8 +107,8 @@ impl PointerScanner {
                 let cur_size = (region.size - offset).min(buf.len());
                 let cur_addr = region.base + offset;
 
-                if let Ok(read) = proc.read_raw(cur_addr, &mut buf[..cur_size]) {
-                    if read >= ptr_size {
+                if let Ok(read) = proc.read_raw(cur_addr, &mut buf[..cur_size])
+                    && read >= ptr_size {
                         let max_i = read - ptr_size;
                         let mut i = 0;
                         while i <= max_i {
@@ -137,7 +137,6 @@ impl PointerScanner {
                             i += align;
                         }
                     }
-                }
 
                 offset += cur_size;
                 processed_bytes += cur_size;
@@ -247,7 +246,7 @@ impl PointerScanner {
                                 final_address: final_target,
                             });
 
-                            if results.len() % 50 == 0 {
+                            if results.len().is_multiple_of(50) {
                                 let _ = progress_cb(50.0, results.len());
                             }
                         } else if depth_left > 1 && results.len() < max_results {
@@ -312,13 +311,12 @@ impl PointerScanner {
         let total = paths.len();
 
         for (idx, p) in paths.iter().enumerate() {
-            if let Ok(resolved) = Self::evaluate_path(proc, p) {
-                if resolved == new_target_addr {
+            if let Ok(resolved) = Self::evaluate_path(proc, p)
+                && resolved == new_target_addr {
                     let mut updated = p.clone();
                     updated.final_address = resolved;
                     valid_paths.push(updated);
                 }
-            }
 
             if idx % 100 == 0 && total > 0 {
                 let pct = (idx as f32 / total as f32) * 100.0;
@@ -348,17 +346,14 @@ impl PointerScanner {
         let mut read_buf = vec![0u8; val_len];
 
         for (idx, p) in paths.iter().enumerate() {
-            if let Ok(resolved) = Self::evaluate_path(proc, p) {
-                if resolved != 0 {
-                    if let Ok(n) = proc.read_raw(resolved, &mut read_buf) {
-                        if n == val_len && read_buf == expected_bytes {
+            if let Ok(resolved) = Self::evaluate_path(proc, p)
+                && resolved != 0
+                    && let Ok(n) = proc.read_raw(resolved, &mut read_buf)
+                        && n == val_len && read_buf == expected_bytes {
                             let mut updated = p.clone();
                             updated.final_address = resolved;
                             valid_paths.push(updated);
                         }
-                    }
-                }
-            }
 
             if idx % 100 == 0 && total > 0 {
                 let pct = (idx as f32 / total as f32) * 100.0;
@@ -622,6 +617,12 @@ impl PointerScanner {
     }
 }
 
+impl Default for PointerScanner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -651,7 +652,7 @@ mod tests {
         let file_path = std::env::temp_dir().join("test_save_load.onyxptr");
         let file_str = file_path.to_str().unwrap();
 
-        assert!(PointerScanner::save_to_file(&[path.clone()], file_str).is_ok());
+        assert!(PointerScanner::save_to_file(std::slice::from_ref(&path), file_str).is_ok());
         let loaded = PointerScanner::load_from_file(file_str).unwrap();
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].module_name, "test.dll");

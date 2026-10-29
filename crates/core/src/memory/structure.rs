@@ -351,15 +351,14 @@ impl StructureDissector {
                         _ => None,
                     };
 
-                    if let Some(target) = child_addr {
-                        if target > 0x10000 && !visited.contains(&target) {
+                    if let Some(target) = child_addr
+                        && target > 0x10000 && !visited.contains(&target) {
                             child_pointers.push((f.offset, target));
                             if depth + 1 < max_depth {
                                 visited.insert(target);
                                 queue.push_back((target, depth + 1));
                             }
                         }
-                    }
                 }
 
                 graph.nodes.push(SpiderNode {

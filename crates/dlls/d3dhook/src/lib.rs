@@ -90,10 +90,8 @@ unsafe extern "system" fn hook_present(
     sync_interval: u32,
     flags: u32,
 ) -> HRESULT {
-    let count = COMMAND_COUNT.load(Ordering::Relaxed);
-    if count > 0 {
-
-    }
+    let _count = COMMAND_COUNT.load(Ordering::Relaxed);
+    
 
     if let Some(orig) = ORIG_PRESENT {
         orig(p_swap_chain, sync_interval, flags)

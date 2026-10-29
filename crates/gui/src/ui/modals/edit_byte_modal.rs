@@ -40,13 +40,12 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                     });
 
                     if submit {
-                        if let Ok(b) = u8::from_str_radix(app.edit_byte_val_text.trim(), 16) {
-                            if let Some(proc) = &app.attached_proc {
+                        if let Ok(b) = u8::from_str_radix(app.edit_byte_val_text.trim(), 16)
+                            && let Some(proc) = &app.attached_proc {
                                 let _ = proc.protect(app.edit_byte_addr, 1, 0x40);
                                 let _ = proc.write_raw(app.edit_byte_addr, &[b]);
                                 app.update_memory_view();
                             }
-                        }
                         close_modal = true;
                     }
                 });

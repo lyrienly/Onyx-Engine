@@ -44,7 +44,7 @@ impl StringReferencer {
         }
 
         let mut u16_chars = Vec::new();
-        for chunk in bytes.chunks_exact(2) {
+        for chunk in bytes.as_chunks::<2>().0 {
             let val = u16::from_le_bytes([chunk[0], chunk[1]]);
             if val == 0 {
                 break;
@@ -97,9 +97,9 @@ impl StringReferencer {
                 let insn = Disassembler::decode_one(insn_addr, &code[offset..]);
                 let len = insn.length.max(1);
 
-                if let Some(target) = insn.target_addr {
+                if let Some(target) = insn.target_addr
 
-                    if let Ok(target_bytes) = proc.read_bytes(target, 128) {
+                    && let Ok(target_bytes) = proc.read_bytes(target, 128) {
                         if let Some(ascii_str) = Self::try_extract_ascii(&target_bytes, min_string_len) {
                             results.push(StringReferenceMatch {
                                 instruction_address: insn_addr,
@@ -120,7 +120,6 @@ impl StringReferencer {
                             });
                         }
                     }
-                }
 
                 offset += len;
             }

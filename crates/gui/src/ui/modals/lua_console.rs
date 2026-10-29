@@ -35,14 +35,13 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
 
                     ui.add_space(4.0);
                     ui.horizontal(|ui| {
-                        if ui.button(RichText::new("[Run Lua]").strong().color(Color32::GREEN)).clicked() {
-                            if let Some(lua) = &app.lua_engine {
+                        if ui.button(RichText::new("[Run Lua]").strong().color(Color32::GREEN)).clicked()
+                            && let Some(lua) = &app.lua_engine {
                                 match lua.execute(&app.lua_script) {
                                     Ok(res) => app.lua_output.push(format!("[Out]: {}", res)),
                                     Err(e) => app.lua_output.push(format!("[Err]: {}", e)),
                                 }
                             }
-                        }
                         if ui.button("Clear Log").clicked() {
                             app.lua_output.clear();
                         }

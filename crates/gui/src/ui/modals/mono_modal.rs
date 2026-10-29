@@ -34,11 +34,10 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                     ui.add(egui::TextEdit::singleline(&mut app.mono_search_text).hint_text("Filter classes & fields...").desired_width(220.0));
 
                     ui.add_space(6.0);
-                    if ui.button("[Re-Dissect]").clicked() {
-                        if let Some(proc) = &app.attached_proc {
+                    if ui.button("[Re-Dissect]").clicked()
+                        && let Some(proc) = &app.attached_proc {
                             let _ = app.mono_dissector.dissect(proc);
                         }
-                    }
 
                     if ui.button("[Copy Report]").clicked() {
                         let rep = app.mono_dissector.generate_report();
@@ -192,11 +191,10 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                                         ui.label(RichText::new("Instance Pointer (Hex):").color(Color32::LIGHT_GRAY));
                                         ui.add(egui::TextEdit::singleline(&mut app.mono_instance_addr_text).hint_text("0x00000000").desired_width(170.0).font(egui::TextStyle::Monospace));
 
-                                        if ui.button("Paste from Table").clicked() {
-                                            if let Some(entry) = app.cheat_table.first() {
+                                        if ui.button("Paste from Table").clicked()
+                                            && let Some(entry) = app.cheat_table.first() {
                                                 app.mono_instance_addr_text = format!("0x{:08X}", entry.address);
                                             }
-                                        }
                                         if ui.button("Clear").clicked() {
                                             app.mono_instance_addr_text.clear();
                                         }

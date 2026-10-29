@@ -1,4 +1,11 @@
 #![allow(non_snake_case, non_camel_case_types, dead_code, unsafe_op_in_unsafe_fn, static_mut_refs)]
+#![allow(
+    clippy::missing_safety_doc,
+    clippy::not_unsafe_ptr_arg_deref,
+    clippy::upper_case_acronyms,
+    clippy::too_many_arguments,
+    clippy::manual_c_str_literals
+)]
 
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU64, Ordering};
@@ -130,14 +137,13 @@ unsafe extern "system" fn hook_nt_allocate_virtual_memory(
     let orig = ORIG_NT_ALLOC.expect("orig NtAlloc missing");
     let status = orig(process_handle, base_address, zero_bits, region_size, allocation_type, protect);
 
-    if status == STATUS_SUCCESS && !base_address.is_null() && !region_size.is_null() {
-        if !IN_HOOK.swap(true, Ordering::SeqCst) {
+    if status == STATUS_SUCCESS && !base_address.is_null() && !region_size.is_null()
+        && !IN_HOOK.swap(true, Ordering::SeqCst) {
             let addr = *base_address as u64;
             let sz = *region_size as u64;
             push_record(0, addr, sz, allocation_type, protect);
             IN_HOOK.store(false, Ordering::SeqCst);
         }
-    }
 
     status
 }
@@ -155,12 +161,11 @@ unsafe extern "system" fn hook_nt_free_virtual_memory(
 
     let status = orig(process_handle, base_address, region_size, free_type);
 
-    if status == STATUS_SUCCESS {
-        if !IN_HOOK.swap(true, Ordering::SeqCst) {
+    if status == STATUS_SUCCESS
+        && !IN_HOOK.swap(true, Ordering::SeqCst) {
             push_record(1, addr, sz, free_type, 0);
             IN_HOOK.store(false, Ordering::SeqCst);
         }
-    }
 
     status
 }
@@ -173,12 +178,11 @@ unsafe extern "system" fn hook_rtl_allocate_heap(
     let orig = ORIG_RTL_ALLOC.expect("orig RtlAlloc missing");
     let ptr = orig(heap_handle, flags, size);
 
-    if !ptr.is_null() {
-        if !IN_HOOK.swap(true, Ordering::SeqCst) {
+    if !ptr.is_null()
+        && !IN_HOOK.swap(true, Ordering::SeqCst) {
             push_record(2, ptr as u64, size as u64, flags, 0);
             IN_HOOK.store(false, Ordering::SeqCst);
         }
-    }
 
     ptr
 }
@@ -190,12 +194,11 @@ unsafe extern "system" fn hook_rtl_free_heap(
 ) -> BOOL {
     let orig = ORIG_RTL_FREE.expect("orig RtlFree missing");
 
-    if !base_address.is_null() {
-        if !IN_HOOK.swap(true, Ordering::SeqCst) {
+    if !base_address.is_null()
+        && !IN_HOOK.swap(true, Ordering::SeqCst) {
             push_record(3, base_address as u64, 0, flags, 0);
             IN_HOOK.store(false, Ordering::SeqCst);
         }
-    }
 
     orig(heap_handle, flags, base_address)
 }

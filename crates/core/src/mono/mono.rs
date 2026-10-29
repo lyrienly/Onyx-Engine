@@ -166,7 +166,7 @@ impl Ecma335Parser {
             let name = String::from_utf8_lossy(&md_bytes[name_start..cur]).to_string();
 
             cur += 1;
-            while cur % 4 != 0 && cur < md_bytes.len() {
+            while !cur.is_multiple_of(4) && cur < md_bytes.len() {
                 cur += 1;
             }
 
@@ -189,12 +189,11 @@ impl Ecma335Parser {
             let mut table_rows = [0u32; 64];
             let mut row_cur = 24;
             for i in 0..64 {
-                if (valid_mask & (1u64 << i)) != 0 {
-                    if row_cur + 4 <= tables_buf.len() {
+                if (valid_mask & (1u64 << i)) != 0
+                    && row_cur + 4 <= tables_buf.len() {
                         table_rows[i] = u32::from_le_bytes(tables_buf[row_cur..row_cur + 4].try_into().unwrap());
                         row_cur += 4;
                     }
-                }
             }
 
             let str_sz = if (heap_sizes & 1) != 0 { 4 } else { 2 };
@@ -576,9 +575,9 @@ impl MonoDissector {
         let mut domain_addr = 0usize;
         if let Some((_, addr)) = resolved_exports.iter().find(|(name, _)| *name == "il2cpp_domain_get") {
             let mut insn_buf = [0u8; 16];
-            if proc.read_raw(*addr, &mut insn_buf).is_ok() {
+            if proc.read_raw(*addr, &mut insn_buf).is_ok()
 
-                if insn_buf[0] == 0x48 && insn_buf[1] == 0x8B && insn_buf[2] == 0x05 {
+                && insn_buf[0] == 0x48 && insn_buf[1] == 0x8B && insn_buf[2] == 0x05 {
                     let disp = i32::from_le_bytes([insn_buf[3], insn_buf[4], insn_buf[5], insn_buf[6]]);
                     let target_rip = addr + 7;
                     let target_addr = (target_rip as i64 + disp as i64) as usize;
@@ -586,7 +585,6 @@ impl MonoDissector {
                         domain_addr = ptr;
                     }
                 }
-            }
         }
 
         let mut assembly_csharp = ManagedAssembly {
@@ -802,8 +800,8 @@ impl MonoDissector {
             for m in modules {
 
                 let mut hdr_buf = [0u8; 4096];
-                if proc.read_raw(m.base, &mut hdr_buf).is_ok() {
-                    if let Some(parser) = Ecma335Parser::parse_from_image(&hdr_buf) {
+                if proc.read_raw(m.base, &mut hdr_buf).is_ok()
+                    && let Some(parser) = Ecma335Parser::parse_from_image(&hdr_buf) {
                         let classes = parser.extract_classes(m.base);
                         if !classes.is_empty() {
                             self.assemblies.push(ManagedAssembly {
@@ -815,7 +813,6 @@ impl MonoDissector {
                             parsed_any = true;
                         }
                     }
-                }
             }
         }
 
@@ -1055,7 +1052,7 @@ dealloc(newmem)
 
     pub fn generate_report(&self) -> String {
         let mut report = String::new();
-        report.push_str(&format!("# .NET / Mono Runtime Dissection Report\n\n"));
+        report.push_str("# .NET / Mono Runtime Dissection Report\n\n");
         report.push_str(&format!("- **Runtime Type**: {}\n", self.runtime_type.as_str()));
         report.push_str(&format!("- **Module Base**: 0x{:016X}\n", self.module_base));
         report.push_str(&format!("- **Assemblies Count**: {}\n\n", self.assemblies.len()));
@@ -1073,7 +1070,7 @@ dealloc(newmem)
                     for f in &cls.fields {
                         report.push_str(&format!("| `{}` | `+0x{:X}` | `{}` | {} |\n", f.name, f.offset, f.type_name, f.is_static));
                     }
-                    report.push_str("\n");
+                    report.push('\n');
                 }
 
                 if !cls.methods.is_empty() {
@@ -1081,12 +1078,18 @@ dealloc(newmem)
                     for m in &cls.methods {
                         report.push_str(&format!("| `{}` | `{}` | `0x{:016X}` |\n", m.name, m.return_type, m.address));
                     }
-                    report.push_str("\n");
+                    report.push('\n');
                 }
             }
         }
 
         report
+    }
+}
+
+impl Default for MonoDissector {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

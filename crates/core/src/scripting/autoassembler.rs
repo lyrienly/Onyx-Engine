@@ -306,12 +306,11 @@ impl AutoAssembler {
                     self.symbols.insert(target_part.to_string(), ip);
                 }
 
-                if !rest.is_empty() {
-                    if let Some(ip) = current_ip {
+                if !rest.is_empty()
+                    && let Some(ip) = current_ip {
                         let len = self.estimate_code_len(proc, rest, ip, &resolver)?;
                         current_ip = Some(ip + len);
                     }
-                }
                 continue;
             }
 
@@ -633,8 +632,8 @@ impl AutoAssembler {
 
             let off = parse_number(off_part)?;
             return Some(base.wrapping_add(off));
-        } else if let Some(pos) = trimmed.rfind('-') {
-            if pos > 0 {
+        } else if let Some(pos) = trimmed.rfind('-')
+            && pos > 0 {
                 let mod_part = trimmed[..pos].trim().trim_matches('"');
                 let off_part = trimmed[pos + 1..].trim();
 
@@ -649,7 +648,6 @@ impl AutoAssembler {
                 let off = parse_number(off_part)?;
                 return Some(base.wrapping_sub(off));
             }
-        }
 
         if let Some(addr) = resolver.resolve(proc, trimmed) {
             return Some(addr);
@@ -682,30 +680,35 @@ impl AutoAssembler {
     }
 }
 
+impl Default for AutoAssembler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn strip_comments(line: &str) -> &str {
     let mut s = line.trim();
     if let Some(pos) = s.find("//") {
         s = s[..pos].trim();
     }
-    if let Some(pos) = s.find('#') {
-        if pos == 0 || s[..pos].ends_with(|c: char| c.is_whitespace() || c == ',') {
+    if let Some(pos) = s.find('#')
+        && (pos == 0 || s[..pos].ends_with(|c: char| c.is_whitespace() || c == ',')) {
             let after = s[pos + 1..].trim();
             if after.starts_with(|c: char| c.is_ascii_alphabetic()) || after.is_empty() {
                 s = s[..pos].trim();
             }
         }
-    }
     s
 }
 
 fn parse_number(s: &str) -> Option<usize> {
     let t = s.trim();
-    if t.starts_with("0x") || t.starts_with("0X") {
-        usize::from_str_radix(&t[2..], 16).ok()
-    } else if t.starts_with('$') {
-        usize::from_str_radix(&t[1..], 16).ok()
-    } else if t.starts_with('#') {
-        t[1..].trim().parse::<usize>().ok()
+    if let Some(rest) = t.strip_prefix("0x").or_else(|| t.strip_prefix("0X")) {
+        usize::from_str_radix(rest, 16).ok()
+    } else if let Some(rest) = t.strip_prefix('$') {
+        usize::from_str_radix(rest, 16).ok()
+    } else if let Some(rest) = t.strip_prefix('#') {
+        rest.trim().parse::<usize>().ok()
     } else {
         usize::from_str_radix(t, 16).or_else(|_| t.parse::<usize>()).ok()
     }

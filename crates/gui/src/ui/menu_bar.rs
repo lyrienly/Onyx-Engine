@@ -250,8 +250,8 @@ pub fn render_header_bar(app: &mut OnyxEngineApp, ui: &mut egui::Ui) {
                         .stroke(Stroke::new(1.0_f32, Color32::from_rgb(48, 54, 66)))
                         .min_size(Vec2::new(32.0, 30.0))
                         .rounding(Rounding::same(2.0));
-                    if ui.add(open_btn).on_hover_text("Open Cheat Table (.CT)").clicked() {
-                        if let Ok(table) = CtParser::load_ct_file("onyx_table.CT") {
+                    if ui.add(open_btn).on_hover_text("Open Cheat Table (.CT)").clicked()
+                        && let Ok(table) = CtParser::load_ct_file("onyx_table.CT") {
                             for e in table.entries {
                                 app.cheat_table.push(crate::state::GuiTableEntry {
                                     active: false,
@@ -267,7 +267,6 @@ pub fn render_header_bar(app: &mut OnyxEngineApp, ui: &mut egui::Ui) {
                             }
                             app.status_msg = "Table loaded successfully.".to_string();
                         }
-                    }
 
                     let save_img = egui::Image::new(&icons.save).fit_to_exact_size(Vec2::splat(22.0));
                     let save_btn = egui::Button::image(save_img)
@@ -293,14 +292,12 @@ pub fn render_header_bar(app: &mut OnyxEngineApp, ui: &mut egui::Ui) {
 
                 let text_color = if is_attached { Color32::from_rgb(110, 240, 140) } else { Color32::from_rgb(220, 225, 235) };
                 ui.horizontal(|ui| {
-                    if is_attached {
-                        if let Some(ref proc) = app.attached_proc {
-                            if let Some(texture) = app.get_icon(&proc.name) {
+                    if is_attached
+                        && let Some(ref proc) = app.attached_proc
+                            && let Some(texture) = app.get_icon(&proc.name) {
                                 ui.add(egui::Image::new(texture).fit_to_exact_size(Vec2::splat(16.0)));
                                 ui.add_space(2.0);
                             }
-                        }
-                    }
 
                     ui.label(
                         RichText::new(&app.proc_name)
