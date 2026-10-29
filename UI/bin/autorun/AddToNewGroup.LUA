@@ -2,7 +2,9 @@ local pm=AddressList.PopupMenu
 local pmAddToNewGroup=createMenuItem(pm)
 pmAddToNewGroup.Caption=translate('Add to new group')
 pmAddToNewGroup.ImageIndex=MainForm.CreateGroup.ImageIndex
-pm.Items.insert(MainForm.CreateGroup.MenuIndex, pmAddToNewGroup)
+local groupIndex = MainForm.CreateGroup and MainForm.CreateGroup.MenuIndex or -1
+if groupIndex < 0 then groupIndex = pm.Items.Count end
+pm.Items.insert(groupIndex, pmAddToNewGroup)
 
 local oldOnPopup=AddressList.PopupMenu.OnPopup
 AddressList.PopupMenu.OnPopup=function(s)
