@@ -879,11 +879,7 @@ impl Process {
     pub fn inject_dll(&self, dll_path: &str) -> Result<usize, String> {
         let full_path = Self::resolve_dll_path(dll_path)?;
         let full_path_str = full_path.to_str().ok_or("Invalid UTF-8 DLL path")?;
-        let clean_path = if full_path_str.starts_with(r"\\?\") {
-            &full_path_str[4..]
-        } else {
-            full_path_str
-        };
+        let clean_path = full_path_str.strip_prefix(r"\\?\").unwrap_or(full_path_str);
 
         let wide_path: Vec<u16> = clean_path.encode_utf16().chain(std::iter::once(0)).collect();
         let path_bytes = wide_path.len() * 2;

@@ -231,20 +231,20 @@ pub fn parse_mem_operand(s: &str, resolver: &dyn Fn(&str) -> Option<usize>) -> O
 
 pub fn parse_int_or_hex(s: &str) -> Option<i64> {
     let t = s.trim();
-    if t.starts_with("0x") || t.starts_with("0X") {
-        i64::from_str_radix(&t[2..], 16).ok()
-    } else if t.starts_with('$') {
-        i64::from_str_radix(&t[1..], 16).ok()
-    } else if t.starts_with('#') {
-        t[1..].trim().parse::<i64>().ok()
-    } else if t.starts_with('-') {
-        let rest = &t[1..].trim();
-        if rest.starts_with("0x") || rest.starts_with("0X") {
-            i64::from_str_radix(&rest[2..], 16).ok().map(|n| -n)
-        } else if rest.starts_with('$') {
-            i64::from_str_radix(&rest[1..], 16).ok().map(|n| -n)
-        } else if rest.starts_with('#') {
-            rest[1..].trim().parse::<i64>().ok().map(|n| -n)
+    if let Some(rest) = t.strip_prefix("0x").or_else(|| t.strip_prefix("0X")) {
+        i64::from_str_radix(rest, 16).ok()
+    } else if let Some(rest) = t.strip_prefix('$') {
+        i64::from_str_radix(rest, 16).ok()
+    } else if let Some(rest) = t.strip_prefix('#') {
+        rest.trim().parse::<i64>().ok()
+    } else if let Some(after_minus) = t.strip_prefix('-') {
+        let rest = after_minus.trim();
+        if let Some(hex) = rest.strip_prefix("0x").or_else(|| rest.strip_prefix("0X")) {
+            i64::from_str_radix(hex, 16).ok().map(|n| -n)
+        } else if let Some(hex) = rest.strip_prefix('$') {
+            i64::from_str_radix(hex, 16).ok().map(|n| -n)
+        } else if let Some(dec) = rest.strip_prefix('#') {
+            dec.trim().parse::<i64>().ok().map(|n| -n)
         } else {
             rest.parse::<i64>().ok().map(|n| -n)
         }

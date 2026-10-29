@@ -395,10 +395,10 @@ impl GroupScanConfig {
 
 fn parse_int(s: &str) -> Option<u64> {
     let t = s.trim();
-    if t.starts_with('$') {
-        u64::from_str_radix(&t[1..], 16).ok()
-    } else if t.starts_with("0x") || t.starts_with("0X") {
-        u64::from_str_radix(&t[2..], 16).ok()
+    if let Some(rest) = t.strip_prefix('$') {
+        u64::from_str_radix(rest, 16).ok()
+    } else if let Some(rest) = t.strip_prefix("0x").or_else(|| t.strip_prefix("0X")) {
+        u64::from_str_radix(rest, 16).ok()
     } else {
         t.parse::<u64>().ok()
     }

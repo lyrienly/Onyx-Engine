@@ -703,12 +703,12 @@ fn strip_comments(line: &str) -> &str {
 
 fn parse_number(s: &str) -> Option<usize> {
     let t = s.trim();
-    if t.starts_with("0x") || t.starts_with("0X") {
-        usize::from_str_radix(&t[2..], 16).ok()
-    } else if t.starts_with('$') {
-        usize::from_str_radix(&t[1..], 16).ok()
-    } else if t.starts_with('#') {
-        t[1..].trim().parse::<usize>().ok()
+    if let Some(rest) = t.strip_prefix("0x").or_else(|| t.strip_prefix("0X")) {
+        usize::from_str_radix(rest, 16).ok()
+    } else if let Some(rest) = t.strip_prefix('$') {
+        usize::from_str_radix(rest, 16).ok()
+    } else if let Some(rest) = t.strip_prefix('#') {
+        rest.trim().parse::<usize>().ok()
     } else {
         usize::from_str_radix(t, 16).or_else(|_| t.parse::<usize>()).ok()
     }

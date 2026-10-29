@@ -267,13 +267,10 @@ impl ScanValue {
 
     pub fn parse(val_type: ValType, text: &str) -> Result<Self, String> {
         let trimmed = text.trim();
-        let hex_stripped = if trimmed.starts_with('$') {
-            Some(&trimmed[1..])
-        } else if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
-            Some(&trimmed[2..])
-        } else {
-            None
-        };
+        let hex_stripped = trimmed
+            .strip_prefix('$')
+            .or_else(|| trimmed.strip_prefix("0x"))
+            .or_else(|| trimmed.strip_prefix("0X"));
 
         match val_type {
             ValType::I8 => {

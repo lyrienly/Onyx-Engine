@@ -165,7 +165,7 @@ impl HardwareBreakpointMonitor {
         }
 
         let mut result: Vec<AccessHit> = hits.into_values().collect();
-        result.sort_by(|a, b| b.count.cmp(&a.count));
+        result.sort_by_key(|h| std::cmp::Reverse(h.count));
         Ok(result)
     }
 }

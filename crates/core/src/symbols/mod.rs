@@ -12,10 +12,14 @@ pub mod symsrv;
 pub use codeview::{CodeViewInfo, read_codeview_from_file};
 pub use symsrv::{SymSrvClient, DEFAULT_SYMBOL_SERVER};
 
+type ResolvedEntry = (u32, u32, String);
+type ResolvedMap = HashMap<String, Vec<ResolvedEntry>>;
+type NamesMap = HashMap<String, HashMap<String, u32>>;
+
 pub struct SymbolCache {
     client: SymSrvClient,
-    resolved: Mutex<HashMap<String, Vec<(u32, u32, String)>>>,
-    names: Mutex<HashMap<String, HashMap<String, u32>>>,
+    resolved: Mutex<ResolvedMap>,
+    names: Mutex<NamesMap>,
 }
 
 impl SymbolCache {

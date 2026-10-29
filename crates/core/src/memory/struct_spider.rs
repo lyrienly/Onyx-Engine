@@ -323,9 +323,9 @@ impl StructSpider {
             } else {
                 format!("field_0x{:X}", f.offset)
             };
-            let array = if matches!(f.kind, InferredKind::Padding) && f.size > 1 {
-                format!("[{}]", f.size)
-            } else if matches!(f.kind, InferredKind::InlineString(_)) {
+            let array = if (matches!(f.kind, InferredKind::Padding) && f.size > 1)
+                || matches!(f.kind, InferredKind::InlineString(_))
+            {
                 format!("[{}]", f.size)
             } else {
                 String::new()
@@ -355,9 +355,9 @@ impl StructSpider {
             } else {
                 format!("field_0x{:X}", f.offset)
             };
-            let ty = if matches!(f.kind, InferredKind::Padding) && f.size > 1 {
-                format!("[u8; {}]", f.size)
-            } else if matches!(f.kind, InferredKind::InlineString(_)) {
+            let ty = if (matches!(f.kind, InferredKind::Padding) && f.size > 1)
+                || matches!(f.kind, InferredKind::InlineString(_))
+            {
                 format!("[u8; {}]", f.size)
             } else {
                 f.kind.rust_type().to_string()
