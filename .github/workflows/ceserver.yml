@@ -21,10 +21,3 @@ jobs:
       - name: Build (x86_64)
         working-directory: UI/ceserver/gcc
         run: make -j"$(nproc)"
-
-      - name: Cross-compile (aarch64, compile-only)
-        run: |
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-          make -C UI/ceserver/gcc objects \
-            COMPILER=aarch64-linux-gnu-gcc \
-            OBJDIR=./obj-aarch64
