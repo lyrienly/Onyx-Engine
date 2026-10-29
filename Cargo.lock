@@ -1687,6 +1687,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "onyx_dotnet"
+version = "0.1.0"
+dependencies = [
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "onyx_freezer"
 version = "0.1.0"
 dependencies = [
