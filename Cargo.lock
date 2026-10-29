@@ -2347,6 +2347,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "syscalls-indirect"
+version = "0.1.0"
+dependencies = [
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "taskmgr_cloak_dll"
 version = "0.1.0"
 
