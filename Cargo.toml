@@ -6,6 +6,7 @@ members = [
     "crates/modules/pointer",
     "crates/modules/scanner",
     "crates/modules/disasm",
+    "crates/modules/gdb_server",
     "crates/modules/freezer",
     "crates/dlls/allochook",
     "crates/dlls/d3dhook",

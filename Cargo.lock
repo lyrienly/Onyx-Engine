@@ -1691,6 +1691,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "onyx_gdb_server"
+version = "0.1.0"
+
+[[package]]
 name = "onyx_gui"
 version = "0.2.0"
 dependencies = [
