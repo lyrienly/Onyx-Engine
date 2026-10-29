@@ -12,6 +12,7 @@ members = [
     "crates/modules/dotnet",
     "crates/modules/hook",
     "crates/modules/mono",
+    "crates/modules/mono_hook",
     "crates/dlls/allochook",
     "crates/dlls/d3dhook",
     "crates/dlls/luaclient",
