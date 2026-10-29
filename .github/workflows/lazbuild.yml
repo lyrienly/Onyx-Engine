@@ -1,0 +1,31 @@
+name: Lazbuild
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'UI/**'
+      - '.github/workflows/lazbuild.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'UI/**'
+      - '.github/workflows/lazbuild.yml'
+
+jobs:
+  lazbuild:
+    name: lazbuild UI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lazarus and Free Pascal
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lazarus fpc fpc-source
+
+      - name: lazbuild cheatengine.lpi
+        run: lazbuild --build-mode=Release "UI/cheatengine.lpi"
+
+      - name: lazbuild cecore.lpi
+        run: lazbuild --build-mode=Release "UI/cecore.lpi"
