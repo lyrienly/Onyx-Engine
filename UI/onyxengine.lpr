@@ -125,7 +125,7 @@ uses
   LuaNetworkInterface, libcepack, symbolsync, gdbserverconnectdialog,
   GDBServerDebuggerInterface;
 
-{$R cheatengine.res}
+{$R onyxengine.res}
 {$IFDEF windows}
 //{$R manifest.res}  //lazarus now has this build in (but sucks as it explicitly turns of dpi aware)
 //{$R Sounds.rc}

@@ -1351,7 +1351,7 @@ resourcestring
   rsBusy = '<busy>';
   rsFileInUse = '<File in use>';
   rsPleaseWait = '<Processing>';
-  rsCEError = 'CE Error:';
+  rsCEError = 'OnyxEngine Error:';
   rsPart = ' part ';
   rsChangeValue = 'Change value';
   rsGiveTheNewValueForTheSelectedAddressEs = 'Give the new value for the selected address(es)';
@@ -2532,7 +2532,7 @@ begin
 
     DumpExceptionBackTrace;
 
-    s:=s+#13#10'Please send the cedebug.txt file to Dark Byte. Thanks';
+    s:=s+#13#10'Please send the onyxdebug.txt file to Dark Byte. Thanks';
   end;
 
   if showingException then exit; //don't bother showing another one. Just read the log
@@ -3623,9 +3623,9 @@ begin
     llf.CloseLogFileBetweenWrites:=true; // change LazLogger to use non-buffered output
     if miEnableLCLDebug.checked then
     begin
-      deletefile('cedebug.txt');
+      deletefile('onyxdebug.txt');
 
-      llf.LogName:='cedebug.txt';
+      llf.LogName:='onyxdebug.txt';
       llf.Init;
 
 
@@ -4005,9 +4005,9 @@ end;
 procedure TMainForm.miLuaDocumentationClick(Sender: TObject);
 begin
   {$ifdef darwin}
-  OpenDocument(pchar(ExtractFilePath(application.ExeName)+'../Lua/celua.txt'));
+  OpenDocument(pchar(ExtractFilePath(application.ExeName)+'../Lua/onyxlua.txt'));
   {$else}
-  ShellExecute(0,'open',pchar(ExtractFilePath(application.ExeName)+'celua.txt'),nil,nil,SW_SHOW);
+  ShellExecute(0,'open',pchar(ExtractFilePath(application.ExeName)+'onyxlua.txt'),nil,nil,SW_SHOW);
   {$endif}
 
 end;
@@ -4174,7 +4174,7 @@ end;
 procedure TMainForm.miMCPCopyConfigClick(Sender: TObject);
 begin
   if LuaVM <> nil then
-    lua_dostring(LuaVM, 'local ceDir = getCheatEngineDir(); local bridgePath = (ceDir .. "mcp\\mcp_cheatengine.py"):gsub("\\", "\\\\"); local configJson = string.format("{\n  \"mcpServers\": {\n    \"cheatengine\": {\n      \"command\": \"python\",\n      \"args\": [\n        \"%s\"\n      ],\n      \"env\": {\n        \"CE_MCP_TIMEOUT\": \"30\"\n      }\n    }\n  }\n}", bridgePath); if writeToClipboard then writeToClipboard(configJson); showMessage("Configuracao do servidor MCP copiada para a area de transferencia!\n\n" .. configJson) end');
+    lua_dostring(LuaVM, 'local ceDir = getCheatEngineDir(); local bridgePath = (ceDir .. "mcp\\mcp_onyxengine.py"):gsub("\\", "\\\\"); local configJson = string.format("{\n  \"mcpServers\": {\n    \"onyxengine\": {\n      \"command\": \"python\",\n      \"args\": [\n        \"%s\"\n      ],\n      \"env\": {\n        \"CE_MCP_TIMEOUT\": \"30\"\n      }\n    }\n  }\n}", bridgePath); if writeToClipboard then writeToClipboard(configJson); showMessage("Configuracao do servidor MCP copiada para a area de transferencia!\n\n" .. configJson) end');
 end;
 
 procedure TMainForm.miMCPAboutClick(Sender: TObject);
@@ -6042,7 +6042,7 @@ begin
 
     {$ifdef windows}
     if wikiurl='' then //no wikilink given
-      HtmlHelpA(Win32WidgetSet.AppHandle, PChar(cheatenginedir + 'cheatengine.chm'), HH_HELP_CONTEXT, Data)
+      HtmlHelpA(Win32WidgetSet.AppHandle, PChar(cheatenginedir + 'onyxengine.chm'), HH_HELP_CONTEXT, Data)
     else
     {$endif}
       ShellExecute(0,'open',pchar(wikipath+wikiurl),nil,nil,SW_SHOW);

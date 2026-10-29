@@ -101,7 +101,7 @@ O artefato compilado sera gerado em `target\release\onyx_backend.dll`.
 
 ### 2. Compilacao do Frontend em Free Pascal
 ```cmd
-lazbuild --build-mode="Release 64-Bit" "UI\cheatengine.lpi"
+lazbuild --build-mode="Release 64-Bit" "UI\onyxengine.lpi"
 ```
 O executavel principal sera gerado em `UI\bin\OnyxEngine-x86_64.exe`.
 

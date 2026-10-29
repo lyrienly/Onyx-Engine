@@ -44,10 +44,16 @@ begin
   deleteKey('\Software\Wow6432Node\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\Cheat Engine.exe');
   deleteKey('\Software\Wow6432Node\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\cheatengine-i386.exe');
   deleteKey('\Software\Wow6432Node\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\cheatengine-x86_64.exe');
+  deleteKey('\Software\Wow6432Node\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\OnyxEngine.exe');
+  deleteKey('\Software\Wow6432Node\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\OnyxEngine-x86_64.exe');
+  deleteKey('\Software\Wow6432Node\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\OnyxEngine-CE.exe');
 
   deleteKey('\Software\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\Cheat Engine.exe');
   deleteKey('\Software\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\cheatengine-i386.exe');
   deleteKey('\Software\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\cheatengine-x86_64.exe');
+  deleteKey('\Software\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\OnyxEngine.exe');
+  deleteKey('\Software\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\OnyxEngine-x86_64.exe');
+  deleteKey('\Software\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\OnyxEngine-CE.exe');
 
   reg:=Tregistry.Create;
   try
@@ -57,6 +63,9 @@ begin
       reg.deletekey('Cheat Engine.exe');
       reg.deletekey('cheatengine-i386.exe');
       reg.deletekey('cheatengine-x86_64.exe');
+      reg.deletekey('OnyxEngine.exe');
+      reg.deletekey('OnyxEngine-x86_64.exe');
+      reg.deletekey('OnyxEngine-CE.exe');
     end;
 
     if reg.OpenKey('\Software\Microsoft\Windows NT\CurrentVersion\Image File Execution Options',false) then
@@ -64,12 +73,15 @@ begin
       reg.deletekey('Cheat Engine.exe');
       reg.deletekey('cheatengine-i386.exe');
       reg.deletekey('cheatengine-x86_64.exe');
+      reg.deletekey('OnyxEngine.exe');
+      reg.deletekey('OnyxEngine-x86_64.exe');
+      reg.deletekey('OnyxEngine-CE.exe');
     end;
   finally
     reg.free;
   end;
 
   if (ParamCount=0) or (ParamStr(1)<>'/s') then
-    messagebox(0,'Your windows install should be repaired. Try running Cheat Engine now', 'Windows Repair (CE)',0);
+    messagebox(0,'Your windows install should be repaired. Try running OnyxEngine now', 'Windows Repair (OnyxEngine)',0);
 end.
 

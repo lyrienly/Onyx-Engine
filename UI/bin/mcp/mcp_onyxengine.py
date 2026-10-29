@@ -137,7 +137,7 @@ def format_result(result):
 
 # Bridge wire protocol endpoint
 PIPE_NAME = r"\\.\pipe\CE_MCP_Bridge_v99"
-MCP_SERVER_NAME = "cheatengine"
+MCP_SERVER_NAME = "onyxengine"
 MAX_RESPONSE_SIZE_BYTES = 32 * 1024 * 1024
 DEFAULT_TCP_HOST = "127.0.0.1"
 DEFAULT_TCP_PORT = 9876

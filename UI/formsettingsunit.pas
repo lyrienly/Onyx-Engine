@@ -1824,7 +1824,7 @@ begin
   for i:=0 to f.Count-1 do
   begin
     n:=f[i];
-    if not (fileexists(n+pathsep+'cheatengine.po') or fileexists(n+PathDelim+'cheatengine-x86_64.po') or fileexists(n+PathDelim+'cheatengine-i386.po')) then
+    if not (fileexists(n+pathsep+'onyxengine.po') or fileexists(n+PathDelim+'onyxengine-x86_64.po') or fileexists(n+PathDelim+'onyxengine-i386.po')) then
       continue;
 
 

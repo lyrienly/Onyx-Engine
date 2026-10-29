@@ -7,7 +7,7 @@ object About: TAbout
   AutoSize = True
   BorderIcons = [biSystemMenu]
   BorderStyle = bsDialog
-  Caption = 'About Cheat Engine'
+  Caption = 'About OnyxEngine'
   ClientHeight = 310
   ClientWidth = 488
   OnClose = FormClose
@@ -22,7 +22,7 @@ object About: TAbout
     Width = 488
     Align = alClient
     AutoSize = True
-    Caption = 'Cheat Engine'
+    Caption = 'OnyxEngine'
     ClientHeight = 290
     ClientWidth = 484
     TabOrder = 0
@@ -455,7 +455,7 @@ object About: TAbout
           AnchorSideTop.Control = Panel2
           Left = 6
           Height = 25
-          Hint = 'If you like Cheat Engine and want to contribute something to the development, join CE''s Patreon'
+          Hint = 'If you like OnyxEngine and want to contribute to the development, join the project on GitHub'
           Top = 6
           Width = 67
           AutoSize = True
@@ -463,7 +463,7 @@ object About: TAbout
           BorderSpacing.Top = 2
           BorderSpacing.Right = 2
           BorderSpacing.Around = 3
-          Caption = 'Patreon'
+          Caption = 'GitHub'
           OnClick = Label4Click
           ParentShowHint = False
           ShowHint = True
@@ -652,7 +652,7 @@ object About: TAbout
         Height = 15
         Top = 15
         Width = 80
-        Caption = 'Message Board'
+        Caption = 'Issues'
         Font.Color = clBlue
         Font.Style = [fsUnderline]
         ParentColor = False

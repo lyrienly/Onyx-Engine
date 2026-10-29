@@ -3,7 +3,7 @@ r"""TCP-to-named-pipe relay for the Cheat Engine MCP bridge.
 
 Run this script on Windows while ``ce_mcp_bridge.lua`` is loaded in Cheat
 Engine. It accepts the same length-prefixed JSON-RPC frames used by
-``mcp_cheatengine.py`` and forwards them to ``\\.\pipe\CE_MCP_Bridge_v99``.
+``mcp_onyxengine.py`` and forwards them to ``\\.\pipe\CE_MCP_Bridge_v99``.
 
 Use this when the MCP server cannot open the Windows named pipe directly, such
 as from WSL, a container, or another host.
@@ -21,7 +21,7 @@ Issue #5 — resilience additions:
   * Pipe access is serialized by a per-connection ``threading.Lock`` so the
     heartbeat sender and the client-forwarder cannot interleave frames.
   * Framing stays 4-byte little-endian length prefix + body — unchanged, so
-    ``test_mcp.py`` and ``mcp_cheatengine.py`` keep working byte-for-byte.
+    ``test_mcp.py`` and ``mcp_onyxengine.py`` keep working byte-for-byte.
 """
 
 from __future__ import annotations
