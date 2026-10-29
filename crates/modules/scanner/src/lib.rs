@@ -1,6 +1,7 @@
 
 pub mod pattern;
 pub mod smart;
+pub mod value_scan;
 
 use std::ffi::CStr;
 use std::os::raw::c_char;
