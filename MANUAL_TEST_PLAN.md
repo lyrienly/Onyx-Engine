@@ -589,6 +589,31 @@ Este documento detalha o roteiro prático e passo a passo para você testar manu
 - `cargo test -p onyx_core --lib memory::reference_graph` passa 100% (10 testes cobrindo ciclos, caminhos múltiplos, 32-bit e 64-bit).
 - Resolução rápida de cadeias de ponteiros sem loop infinito em grafos cíclicos.
 
+---
+
+## 28. AllocHook x64 (Trampolins 16-byte, VAD Stealth) (Issue #9)
+
+### O que foi feito
+- Trampolins x64 seguros de 16 bytes na NTDLL (`NtAllocateVirtualMemory` e `NtFreeVirtualMemory`) com padding NOP, eliminando crash `0xC0000005` e sincronizando cache via `FlushInstructionCache`.
+- Captura de `caller_ip` via `RtlCaptureStackBackTrace(2, 1, ...)` sem unwinding pesado.
+- Mascaramento furtivo VAD com tag `STEALTH_FLAG_MASKED_RWX` (`0x8000_0000`) para alocações RWX com toggles `CeSetStealthMasking` e `CeIsStealthMaskingEnabled`.
+- Ring buffer circular atômico lock-free de 4.096 posições com gravação O(1) e enumeração inicial de heaps via `perform_initial_heap_walk` (`HeapWalk`).
+- Interface Pascal (`UI/frmHeapsUnit.pas`) com suporte total a árvores Radix de 16 níveis (`targetLevel := 15`) para processos de 64 bits.
+
+### Passo a Passo
+1. Execute os testes unitários do allochook:
+   ```powershell
+   cargo test -p allochook_dll
+   ```
+2. Abra a interface do OnyxEngine (`onyxengine.exe`) e anexe a um processo 64-bit (ex: Unity / Unreal).
+3. Abra **Memory Viewer -> Tools -> Heaplist / Allocations**.
+4. Verifique a listagem em tempo real de blocos alocados com endereços de 16 dígitos hexadecimais (64-bit) sem crash e com duplo clique navegando corretamente na memória.
+
+### Critérios de Sucesso
+- `cargo test -p allochook_dll` passa 100% dos testes.
+- Alocações virtuais e de heap são interceptadas sem crash `0xC0000005`.
+- A Radix Tree navega corretamente os nós de 64 bits no Memory Viewer.
+
 ## Roteiro Rápido para Teste Geral do Workspace
 
 Caso queira rodar uma validação total de uma só vez em sua máquina antes de abrir os jogos:
