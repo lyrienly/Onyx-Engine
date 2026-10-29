@@ -153,7 +153,7 @@ impl RelocationEngine {
                     let next_ip = new_address.wrapping_add(insn.length);
                     let new_disp = target as i64 - next_ip as i64;
 
-                    if new_disp >= -128 && new_disp <= 127 {
+                    if (-128..=127).contains(&new_disp) {
                         bytes[fixup.offset] = new_disp as i8 as u8;
                     } else {
                         let far_next_ip = new_address.wrapping_add(widened_len);

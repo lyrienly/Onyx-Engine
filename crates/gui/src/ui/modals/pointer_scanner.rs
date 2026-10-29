@@ -40,11 +40,10 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                 ui.horizontal(|ui| {
                     ui.add(egui::TextEdit::singleline(&mut app.ptr_target_addr_text).desired_width(180.0).font(egui::TextStyle::Monospace));
 
-                    if ui.button("Paste Target from Table").clicked() {
-                        if let Some(entry) = app.cheat_table.first() {
+                    if ui.button("Paste Target from Table").clicked()
+                        && let Some(entry) = app.cheat_table.first() {
                             app.ptr_target_addr_text = format!("0x{:08X}", entry.address);
                         }
-                    }
                 });
 
                 ui.add_space(4.0);
@@ -86,8 +85,8 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                         }
                     }
 
-                    if ui.button(RichText::new("2. Scan for Pointers").color(Color32::GREEN).strong()).clicked() {
-                        if let Some(proc) = &app.attached_proc {
+                    if ui.button(RichText::new("2. Scan for Pointers").color(Color32::GREEN).strong()).clicked()
+                        && let Some(proc) = &app.attached_proc {
                             if app.ptr_map_nodes == 0 {
                                 let _ = app.pointer_scanner.generate_map(proc);
                             }
@@ -103,20 +102,18 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                                 }
                             }
                         }
-                    }
 
                     ui.separator();
                     ui.label("Rescan Filter Address:");
                     ui.add(egui::TextEdit::singleline(&mut app.ptr_rescan_addr_text).desired_width(120.0).font(egui::TextStyle::Monospace));
 
-                    if ui.button("Rescan").clicked() {
-                        if let Some(proc) = &app.attached_proc {
+                    if ui.button("Rescan").clicked()
+                        && let Some(proc) = &app.attached_proc {
                             let new_target = OnyxEngineApp::parse_hex_addr(&app.ptr_rescan_addr_text, 0);
                             let filtered = PointerScanner::rescan_paths(proc, &app.ptr_results, new_target);
                             app.ptr_status = format!("Rescan complete: {} of {} survived.", filtered.len(), app.ptr_results.len());
                             app.ptr_results = filtered;
                         }
-                    }
                 });
 
                 ui.label(RichText::new(&app.ptr_status).color(Color32::from_rgb(200, 200, 100)));

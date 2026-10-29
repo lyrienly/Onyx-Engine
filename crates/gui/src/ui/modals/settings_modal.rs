@@ -160,12 +160,11 @@ fn render_general_settings(app: &mut OnyxEngineApp, ui: &mut egui::Ui) {
         });
         ui.horizontal(|ui| {
             ui.label("Freeze interval:");
-            if ui.add(egui::Slider::new(&mut app.freeze_interval_ms, 10..=500).text("ms")).changed() {
-                if let Some(ref proc) = app.attached_proc {
+            if ui.add(egui::Slider::new(&mut app.freeze_interval_ms, 10..=500).text("ms")).changed()
+                && let Some(ref proc) = app.attached_proc {
                     app.freezer.stop();
                     app.freezer.start(proc, app.freeze_interval_ms);
                 }
-            }
         });
         ui.horizontal(|ui| {
             ui.label("Found address list update interval:");

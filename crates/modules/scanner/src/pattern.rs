@@ -282,11 +282,10 @@ mod avx2 {
 
         let fallback_start = if p == 0 { 0 } else { p };
         for q in fallback_start..=end {
-            if matches_at(haystack, q, needle, mask) {
-                if !out.last().map_or(false, |&l| l == q) {
+            if matches_at(haystack, q, needle, mask)
+                && !out.last().is_some_and(|&l| l == q) {
                     out.push(q);
                 }
-            }
         }
         out.sort_unstable();
         out.dedup();

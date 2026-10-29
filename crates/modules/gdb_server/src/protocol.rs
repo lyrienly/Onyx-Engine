@@ -105,7 +105,7 @@ pub fn bytes_to_hex(data: &[u8]) -> String {
 
 pub fn hex_to_bytes(s: &str) -> Result<Vec<u8>, ParseError> {
     let bytes = s.as_bytes();
-    if bytes.len() % 2 != 0 {
+    if !bytes.len().is_multiple_of(2) {
         return Err(ParseError::BadHex);
     }
     let mut out = Vec::with_capacity(bytes.len() / 2);

@@ -115,8 +115,8 @@ pub fn find_embedded_pe(buf: &[u8]) -> Vec<usize> {
 
     let mut i = 0;
     while i + 2 <= buf.len() {
-        if buf[i] == 0x4D && buf[i + 1] == 0x5A {
-            if i + 0x40 <= buf.len() {
+        if buf[i] == 0x4D && buf[i + 1] == 0x5A
+            && i + 0x40 <= buf.len() {
                 let pe_off = u32::from_le_bytes([
                     buf[i + 0x3C],
                     buf[i + 0x3D],
@@ -127,7 +127,6 @@ pub fn find_embedded_pe(buf: &[u8]) -> Vec<usize> {
                     out.push(i);
                 }
             }
-        }
         i += 1;
     }
 

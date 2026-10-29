@@ -386,7 +386,7 @@ mod e2e_windows {
 
         let hits = smart_scan(&readback, base, SmartTarget::Numeric(42.0));
         assert!(
-            hits.iter().any(|h| h.scan_type == ScanType::I32 && h.address == base + 0x00),
+            hits.iter().any(|h| h.scan_type == ScanType::I32 && h.address == base),
             "nao encontrou i32=42 em +0x00"
         );
 

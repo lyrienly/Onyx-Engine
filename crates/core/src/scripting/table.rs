@@ -125,3 +125,9 @@ impl CheatTable {
         Ok(())
     }
 }
+
+impl Default for CheatTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}

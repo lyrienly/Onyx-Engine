@@ -82,3 +82,9 @@ impl SpeedhackInjector {
         !self.installed_hooks.is_empty()
     }
 }
+
+impl Default for SpeedhackInjector {
+    fn default() -> Self {
+        Self::new()
+    }
+}

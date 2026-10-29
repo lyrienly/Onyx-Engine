@@ -145,7 +145,7 @@ impl MemorySnapshot {
         let raw = self.collect_changed_pairs(other);
         let mut flat: Vec<(usize, usize)> =
             raw.iter().map(|c| (c.address, c.address + c.size)).collect();
-        merge_changed(flat.drain(..).collect())
+        merge_changed(std::mem::take(&mut flat))
     }
 
     pub fn diff_detailed(&self, other: &Self) -> Vec<ChangedChunkDiff> {
@@ -261,14 +261,13 @@ fn merge_changed(mut raw: Vec<(usize, usize)>) -> Vec<ChangedRegion> {
     let mut out: Vec<ChangedRegion> = Vec::new();
 
     for (s, e) in raw {
-        if let Some(last) = out.last_mut() {
-            if s <= last.end {
+        if let Some(last) = out.last_mut()
+            && s <= last.end {
                 if e > last.end {
                     last.end = e;
                 }
                 continue;
             }
-        }
         out.push(ChangedRegion { start: s, end: e });
     }
 
