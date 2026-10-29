@@ -12,6 +12,7 @@
 #include <sys/select.h>
 
 #include <zlib.h>
+#include <lz4.h>
 
 #include <errno.h>
 #include <elf.h>
@@ -761,12 +762,39 @@ case CMD_SETTHREADCONTEXT:
 
         if (c.compress)
         {
-
-#define COMPRESS_BLOCKSIZE (64*1024)
-          int i;
           unsigned char *uncompressed=(unsigned char *)&o[1];
           uint32_t uncompressedSize=o->read;
           uint32_t compressedSize=0;
+          int i;
+
+          if (c.compress == COMPRESSION_LZ4)
+          {
+            int bound=LZ4_compressBound((int)uncompressedSize);
+            char *lz4block=NULL;
+            int lz4size=0;
+
+            if (bound>0)
+            {
+              lz4block=(char*)malloc((size_t)bound);
+              if (lz4block)
+                lz4size=LZ4_compress_default((const char*)uncompressed, lz4block, (int)uncompressedSize, bound);
+            }
+
+            if (lz4size>0)
+            {
+              compressedSize=(uint32_t)lz4size;
+              sendall(currentsocket, &uncompressedSize, sizeof(uncompressedSize), MSG_MORE);
+              sendall(currentsocket, &compressedSize, sizeof(compressedSize), MSG_MORE);
+              sendall(currentsocket, lz4block, lz4size, 0);
+            }
+            else
+              debug_log("Error while compressing with LZ4\n");
+
+            free(lz4block);
+          }
+          else
+          {
+#define COMPRESS_BLOCKSIZE (64*1024)
           int maxBlocks=1+(c.size / COMPRESS_BLOCKSIZE);
 
           unsigned char **compressedBlocks=malloc(maxBlocks*sizeof(unsigned char *) );
@@ -863,6 +891,7 @@ case CMD_SETTHREADCONTEXT:
             free(compressedBlocks[i]);
           }
           free(compressedBlocks);
+          }
         }
         else
           sendall(currentsocket, o, sizeof(CeReadProcessMemoryOutput)+o->read, 0);

@@ -19,7 +19,7 @@ uses
   {$endif}
   Classes, SysUtils, Sockets, resolve, ctypes, networkconfig,
   cefuncproc, newkernelhandler, math, zstream, syncobjs, ProcessHandlerUnit,
-  VirtualQueryExCache, gutil, gmap;
+  VirtualQueryExCache, gutil, gmap, lz4decode;
   {$endif}
 
 
@@ -974,14 +974,26 @@ begin
           compressedbuffer.Size:=compressedresult.compressedsize;
           if receive(compressedbuffer.Memory, compressedresult.compressedsize)>0 then
           begin
-            //decompress this
-            d:=Tdecompressionstream.create(compressedbuffer, false);
-            try
-              d.ReadBuffer(lpbuffer^, compressedresult.uncompressedsize);
-              result:=compressedresult.uncompressedsize>0;
-              lpNumberOfBytesRead:=compressedresult.uncompressedsize;
-            finally
-              d.free;
+            if input.compressed = COMPRESSION_LZ4 then
+            begin
+              if LZ4_Decompress(PByte(compressedbuffer.Memory), compressedresult.compressedsize,
+                                PByte(lpBuffer), compressedresult.uncompressedsize) = PtrInt(compressedresult.uncompressedsize) then
+              begin
+                result := compressedresult.uncompressedsize > 0;
+                lpNumberOfBytesRead := compressedresult.uncompressedsize;
+              end;
+            end
+            else
+            begin
+              //decompress this
+              d:=Tdecompressionstream.create(compressedbuffer, false);
+              try
+                d.ReadBuffer(lpbuffer^, compressedresult.uncompressedsize);
+                result:=compressedresult.uncompressedsize>0;
+                lpNumberOfBytesRead:=compressedresult.uncompressedsize;
+              finally
+                d.free;
+              end;
             end;
 
           end;
