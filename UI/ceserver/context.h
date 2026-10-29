@@ -12,10 +12,6 @@
 #include <sys/ptrace.h>
 #include <linux/socket.h>
 
-#ifdef __aarch64__
-#include <elf.h>
-#endif
-
 #include <sys/socket.h>
 
 #ifdef __i386__
