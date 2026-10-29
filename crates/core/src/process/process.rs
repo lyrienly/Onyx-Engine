@@ -1,10 +1,10 @@
+use crate::kernel::DbkDriver;
+use crate::win32::*;
 use std::ffi::c_void;
 use std::mem::{size_of, zeroed};
-use std::ptr::{null, null_mut};
 use std::path::{Path, PathBuf};
+use std::ptr::{null, null_mut};
 use std::sync::Arc;
-use crate::win32::*;
-use crate::kernel::DbkDriver;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProcessAccessMode {
@@ -70,7 +70,15 @@ impl MemoryRegion {
         if (self.protect & PAGE_GUARD) != 0 || (self.protect & PAGE_NOACCESS) != 0 {
             return false;
         }
-        (self.protect & (PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)) != 0
+        (self.protect
+            & (PAGE_READONLY
+                | PAGE_READWRITE
+                | PAGE_WRITECOPY
+                | PAGE_EXECUTE
+                | PAGE_EXECUTE_READ
+                | PAGE_EXECUTE_READWRITE
+                | PAGE_EXECUTE_WRITECOPY))
+            != 0
     }
 
     #[inline]
@@ -81,7 +89,9 @@ impl MemoryRegion {
         if (self.protect & PAGE_GUARD) != 0 || (self.protect & PAGE_NOACCESS) != 0 {
             return false;
         }
-        (self.protect & (PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)) != 0
+        (self.protect
+            & (PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY))
+            != 0
     }
 
     #[inline]
@@ -89,7 +99,9 @@ impl MemoryRegion {
         if !self.is_committed() {
             return false;
         }
-        (self.protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)) != 0
+        (self.protect
+            & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY))
+            != 0
     }
 }
 
@@ -120,7 +132,10 @@ impl Process {
                     buffer_size = return_len.max(buffer_size * 2) + 64 * 1024;
                     buffer.resize(buffer_size as usize, 0);
                 } else if status < 0 {
-                    return Err(format!("NtQuerySystemInformation failed with NTSTATUS: {:#X}", status));
+                    return Err(format!(
+                        "NtQuerySystemInformation failed with NTSTATUS: {:#X}",
+                        status
+                    ));
                 } else {
                     break;
                 }
@@ -171,9 +186,10 @@ impl Process {
 
     pub fn list_all() -> Result<Vec<ProcessEntry>, String> {
         if let Ok(entries) = Self::list_all_nt()
-            && !entries.is_empty() {
-                return Ok(entries);
-            }
+            && !entries.is_empty()
+        {
+            return Ok(entries);
+        }
 
         let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
         if snapshot == INVALID_HANDLE_VALUE {
@@ -187,7 +203,11 @@ impl Process {
         unsafe {
             if Process32FirstW(snapshot, &mut pe) == TRUE {
                 loop {
-                    let name_len = pe.szExeFile.iter().position(|&c| c == 0).unwrap_or(pe.szExeFile.len());
+                    let name_len = pe
+                        .szExeFile
+                        .iter()
+                        .position(|&c| c == 0)
+                        .unwrap_or(pe.szExeFile.len());
                     let name = String::from_utf16_lossy(&pe.szExeFile[..name_len]);
 
                     entries.push(ProcessEntry {
@@ -239,11 +259,14 @@ impl Process {
 
         if mode == ProcessAccessMode::KernelDbk
             && let Some(ref driver) = dbk
-                && let Ok(h) = driver.open_process(pid) {
-                    handle = h;
-                }
+            && let Ok(h) = driver.open_process(pid)
+        {
+            handle = h;
+        }
 
-        if handle.is_null() && (mode == ProcessAccessMode::NtApi || mode == ProcessAccessMode::KernelDbk) {
+        if handle.is_null()
+            && (mode == ProcessAccessMode::NtApi || mode == ProcessAccessMode::KernelDbk)
+        {
             let mut client_id = CLIENT_ID {
                 UniqueProcess: pid as usize as HANDLE,
                 UniqueThread: null_mut(),
@@ -264,8 +287,10 @@ impl Process {
             if status == STATUS_SUCCESS && !proc_handle.is_null() {
                 handle = proc_handle;
             } else {
-
-                let fallback_access = PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION | PROCESS_QUERY_INFORMATION;
+                let fallback_access = PROCESS_VM_READ
+                    | PROCESS_VM_WRITE
+                    | PROCESS_VM_OPERATION
+                    | PROCESS_QUERY_INFORMATION;
                 let status_fb = unsafe {
                     NtOpenProcess(
                         &mut proc_handle,
@@ -283,11 +308,17 @@ impl Process {
         if handle.is_null() {
             let h = unsafe { OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid) };
             if h.is_null() {
-                let fallback_access = PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION | PROCESS_QUERY_INFORMATION;
+                let fallback_access = PROCESS_VM_READ
+                    | PROCESS_VM_WRITE
+                    | PROCESS_VM_OPERATION
+                    | PROCESS_QUERY_INFORMATION;
                 let fallback_h = unsafe { OpenProcess(fallback_access, FALSE, pid) };
                 if fallback_h.is_null() {
                     let err = unsafe { GetLastError() };
-                    return Err(format!("Failed to open process PID {} via NtOpenProcess/OpenProcess (Error: 0x{:X})", pid, err));
+                    return Err(format!(
+                        "Failed to open process PID {} via NtOpenProcess/OpenProcess (Error: 0x{:X})",
+                        pid, err
+                    ));
                 }
                 handle = fallback_h;
             } else {
@@ -326,8 +357,8 @@ impl Process {
     }
 
     pub fn attach_by_name(name: &str) -> Result<Self, String> {
-        let found = Self::find_by_name(name)?
-            .ok_or_else(|| format!("Process '{}' not found", name))?;
+        let found =
+            Self::find_by_name(name)?.ok_or_else(|| format!("Process '{}' not found", name))?;
         Self::attach(found.pid)
     }
 
@@ -350,24 +381,26 @@ impl Process {
     }
 
     pub fn modules(&self) -> Result<Vec<ModuleEntry>, String> {
-
         if self.access_mode == ProcessAccessMode::KernelDbk
             && let Some(ref dbk) = self.dbk
-                && let Ok(vad_mods) = dbk.enum_vad_modules(self.pid)
-                    && !vad_mods.is_empty() {
-                        return Ok(vad_mods);
-                    }
+            && let Ok(vad_mods) = dbk.enum_vad_modules(self.pid)
+            && !vad_mods.is_empty()
+        {
+            return Ok(vad_mods);
+        }
 
-        let snapshot = unsafe {
-            CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, self.pid)
-        };
+        let snapshot =
+            unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, self.pid) };
         if snapshot == INVALID_HANDLE_VALUE {
-
             if let Some(ref dbk) = self.dbk
-                && let Ok(vad_mods) = dbk.enum_vad_modules(self.pid) {
-                    return Ok(vad_mods);
-                }
-            return Err(format!("Failed to create module snapshot for PID {}", self.pid));
+                && let Ok(vad_mods) = dbk.enum_vad_modules(self.pid)
+            {
+                return Ok(vad_mods);
+            }
+            return Err(format!(
+                "Failed to create module snapshot for PID {}",
+                self.pid
+            ));
         }
 
         let mut mods = Vec::new();
@@ -377,10 +410,18 @@ impl Process {
         unsafe {
             if Module32FirstW(snapshot, &mut me) == TRUE {
                 loop {
-                    let name_len = me.szModule.iter().position(|&c| c == 0).unwrap_or(me.szModule.len());
+                    let name_len = me
+                        .szModule
+                        .iter()
+                        .position(|&c| c == 0)
+                        .unwrap_or(me.szModule.len());
                     let name = String::from_utf16_lossy(&me.szModule[..name_len]);
 
-                    let path_len = me.szExePath.iter().position(|&c| c == 0).unwrap_or(me.szExePath.len());
+                    let path_len = me
+                        .szExePath
+                        .iter()
+                        .position(|&c| c == 0)
+                        .unwrap_or(me.szExePath.len());
                     let path = String::from_utf16_lossy(&me.szExePath[..path_len]);
 
                     mods.push(ModuleEntry {
@@ -404,20 +445,28 @@ impl Process {
     pub fn find_module(&self, mod_name: &str) -> Option<ModuleEntry> {
         let lower = mod_name.to_lowercase();
         self.modules().ok()?.into_iter().find(|m| {
-            m.name.to_lowercase() == lower || m.name.to_lowercase() == format!("{}.dll", lower) || m.name.to_lowercase() == format!("{}.exe", lower)
+            m.name.to_lowercase() == lower
+                || m.name.to_lowercase() == format!("{}.dll", lower)
+                || m.name.to_lowercase() == format!("{}.exe", lower)
         })
     }
 
     pub fn regions(&self, writable_only: bool) -> Result<Vec<MemoryRegion>, String> {
         let mut regions = Vec::new();
         let mut addr: usize = 0x10000;
-        let max_addr: usize = if size_of::<usize>() == 8 { 0x7FFF_FFFF_FFFF } else { 0x7FFF_FFFF };
+        let max_addr: usize = if size_of::<usize>() == 8 {
+            0x7FFF_FFFF_FFFF
+        } else {
+            0x7FFF_FFFF
+        };
 
         let mut mbi: MEMORY_BASIC_INFORMATION = unsafe { zeroed() };
 
         while addr < max_addr {
             let mut return_len: SIZE_T = 0;
-            let success = if self.access_mode == ProcessAccessMode::NtApi || self.access_mode == ProcessAccessMode::KernelDbk {
+            let success = if self.access_mode == ProcessAccessMode::NtApi
+                || self.access_mode == ProcessAccessMode::KernelDbk
+            {
                 let status = unsafe {
                     NtQueryVirtualMemory(
                         self.handle,
@@ -442,7 +491,6 @@ impl Process {
             };
 
             if !success {
-
                 addr += 0x1000;
                 continue;
             }
@@ -455,10 +503,9 @@ impl Process {
                 mem_type: mbi.Type,
             };
 
-            if reg.is_readable()
-                && (!writable_only || reg.is_writable()) {
-                    regions.push(reg);
-                }
+            if reg.is_readable() && (!writable_only || reg.is_writable()) {
+                regions.push(reg);
+            }
 
             let next_addr = (mbi.BaseAddress as usize).saturating_add(mbi.RegionSize);
             if next_addr <= addr {
@@ -476,23 +523,26 @@ impl Process {
         }
 
         if self.access_mode == ProcessAccessMode::KernelDbk
-            && let Some(ref dbk) = self.dbk {
-
-                if let Ok(bytes) = dbk.bulk_dump_cr3(self.pid, address as u64, buf.len())
-                    && !bytes.is_empty() {
-                        let to_copy = bytes.len().min(buf.len());
-                        buf[..to_copy].copy_from_slice(&bytes[..to_copy]);
-                        return Ok(to_copy);
-                    }
-
-                if let Ok(bytes) = dbk.read_memory(self.pid, address, buf.len()) {
-                    let to_copy = bytes.len().min(buf.len());
-                    buf[..to_copy].copy_from_slice(&bytes[..to_copy]);
-                    return Ok(to_copy);
-                }
+            && let Some(ref dbk) = self.dbk
+        {
+            if let Ok(bytes) = dbk.bulk_dump_cr3(self.pid, address as u64, buf.len())
+                && !bytes.is_empty()
+            {
+                let to_copy = bytes.len().min(buf.len());
+                buf[..to_copy].copy_from_slice(&bytes[..to_copy]);
+                return Ok(to_copy);
             }
 
-        if self.access_mode == ProcessAccessMode::NtApi || self.access_mode == ProcessAccessMode::KernelDbk {
+            if let Ok(bytes) = dbk.read_memory(self.pid, address, buf.len()) {
+                let to_copy = bytes.len().min(buf.len());
+                buf[..to_copy].copy_from_slice(&bytes[..to_copy]);
+                return Ok(to_copy);
+            }
+        }
+
+        if self.access_mode == ProcessAccessMode::NtApi
+            || self.access_mode == ProcessAccessMode::KernelDbk
+        {
             let mut bytes_read: SIZE_T = 0;
             let status = unsafe {
                 NtReadVirtualMemory(
@@ -543,7 +593,12 @@ impl Process {
         Ok(val)
     }
 
-    pub fn read_string(&self, address: usize, max_len: usize, utf16: bool) -> Result<String, String> {
+    pub fn read_string(
+        &self,
+        address: usize,
+        max_len: usize,
+        utf16: bool,
+    ) -> Result<String, String> {
         if utf16 {
             let mut words = vec![0u16; max_len];
             let buf = unsafe {
@@ -567,11 +622,14 @@ impl Process {
 
         if self.access_mode == ProcessAccessMode::KernelDbk
             && let Some(ref dbk) = self.dbk
-                && let Ok(written) = dbk.write_memory(self.pid, address, data) {
-                    return Ok(written);
-                }
+            && let Ok(written) = dbk.write_memory(self.pid, address, data)
+        {
+            return Ok(written);
+        }
 
-        if self.access_mode == ProcessAccessMode::NtApi || self.access_mode == ProcessAccessMode::KernelDbk {
+        if self.access_mode == ProcessAccessMode::NtApi
+            || self.access_mode == ProcessAccessMode::KernelDbk
+        {
             let mut base_addr = address as PVOID;
             let mut region_size: SIZE_T = data.len();
             let mut old_protect: ULONG = 0;
@@ -661,15 +719,16 @@ impl Process {
     }
 
     pub fn write<T: Copy>(&self, address: usize, val: &T) -> Result<(), String> {
-        let slice = unsafe {
-            std::slice::from_raw_parts(val as *const T as *const u8, size_of::<T>())
-        };
+        let slice =
+            unsafe { std::slice::from_raw_parts(val as *const T as *const u8, size_of::<T>()) };
         self.write_raw(address, slice)?;
         Ok(())
     }
 
     pub fn alloc(&self, size: usize, protect: u32) -> Result<usize, String> {
-        if self.access_mode == ProcessAccessMode::NtApi || self.access_mode == ProcessAccessMode::KernelDbk {
+        if self.access_mode == ProcessAccessMode::NtApi
+            || self.access_mode == ProcessAccessMode::KernelDbk
+        {
             let mut base_addr: PVOID = null_mut();
             let mut region_size: SIZE_T = size;
             let status = unsafe {
@@ -703,7 +762,12 @@ impl Process {
         }
     }
 
-    pub fn alloc_near(&self, preferred_addr: usize, size: usize, protect: u32) -> Result<usize, String> {
+    pub fn alloc_near(
+        &self,
+        preferred_addr: usize,
+        size: usize,
+        protect: u32,
+    ) -> Result<usize, String> {
         if preferred_addr == 0 {
             return self.alloc(size, protect);
         }
@@ -716,7 +780,13 @@ impl Process {
             if preferred_addr + delta < max_addr {
                 let target = preferred_addr + delta;
                 let addr = unsafe {
-                    VirtualAllocEx(self.handle, target as LPVOID, size, MEM_COMMIT | MEM_RESERVE, protect)
+                    VirtualAllocEx(
+                        self.handle,
+                        target as LPVOID,
+                        size,
+                        MEM_COMMIT | MEM_RESERVE,
+                        protect,
+                    )
                 };
                 if !addr.is_null() {
                     return Ok(addr as usize);
@@ -725,7 +795,13 @@ impl Process {
             if preferred_addr > min_addr + delta {
                 let target = preferred_addr - delta;
                 let addr = unsafe {
-                    VirtualAllocEx(self.handle, target as LPVOID, size, MEM_COMMIT | MEM_RESERVE, protect)
+                    VirtualAllocEx(
+                        self.handle,
+                        target as LPVOID,
+                        size,
+                        MEM_COMMIT | MEM_RESERVE,
+                        protect,
+                    )
                 };
                 if !addr.is_null() {
                     return Ok(addr as usize);
@@ -738,16 +814,13 @@ impl Process {
     }
 
     pub fn free(&self, address: usize) -> Result<(), String> {
-        if self.access_mode == ProcessAccessMode::NtApi || self.access_mode == ProcessAccessMode::KernelDbk {
+        if self.access_mode == ProcessAccessMode::NtApi
+            || self.access_mode == ProcessAccessMode::KernelDbk
+        {
             let mut base_addr = address as PVOID;
             let mut region_size: SIZE_T = 0;
             let status = unsafe {
-                NtFreeVirtualMemory(
-                    self.handle,
-                    &mut base_addr,
-                    &mut region_size,
-                    MEM_RELEASE,
-                )
+                NtFreeVirtualMemory(self.handle, &mut base_addr, &mut region_size, MEM_RELEASE)
             };
             if status == STATUS_SUCCESS {
                 return Ok(());
@@ -763,7 +836,9 @@ impl Process {
     }
 
     pub fn protect(&self, address: usize, size: usize, new_protect: u32) -> Result<u32, String> {
-        if self.access_mode == ProcessAccessMode::NtApi || self.access_mode == ProcessAccessMode::KernelDbk {
+        if self.access_mode == ProcessAccessMode::NtApi
+            || self.access_mode == ProcessAccessMode::KernelDbk
+        {
             let mut base_addr = address as PVOID;
             let mut region_size: SIZE_T = size;
             let mut old_protect: ULONG = 0;
@@ -832,18 +907,19 @@ impl Process {
         }
 
         if let Ok(exe_path) = std::env::current_exe()
-            && let Some(exe_dir) = exe_path.parent() {
-                let candidate = exe_dir.join(p);
-                if candidate.exists() {
-                    return std::fs::canonicalize(&candidate).map_err(|e| e.to_string());
-                }
-                if let Some(filename) = p.file_name() {
-                    let candidate2 = exe_dir.join(filename);
-                    if candidate2.exists() {
-                        return std::fs::canonicalize(&candidate2).map_err(|e| e.to_string());
-                    }
+            && let Some(exe_dir) = exe_path.parent()
+        {
+            let candidate = exe_dir.join(p);
+            if candidate.exists() {
+                return std::fs::canonicalize(&candidate).map_err(|e| e.to_string());
+            }
+            if let Some(filename) = p.file_name() {
+                let candidate2 = exe_dir.join(filename);
+                if candidate2.exists() {
+                    return std::fs::canonicalize(&candidate2).map_err(|e| e.to_string());
                 }
             }
+        }
 
         if p.exists() {
             return std::fs::canonicalize(p).map_err(|e| e.to_string());
@@ -873,7 +949,10 @@ impl Process {
             }
         }
 
-        Err(format!("Could not locate DLL '{}' in executable directory, CWD, or build folders", path_str))
+        Err(format!(
+            "Could not locate DLL '{}' in executable directory, CWD, or build folders",
+            path_str
+        ))
     }
 
     pub fn inject_dll(&self, dll_path: &str) -> Result<usize, String> {
@@ -881,13 +960,15 @@ impl Process {
         let full_path_str = full_path.to_str().ok_or("Invalid UTF-8 DLL path")?;
         let clean_path = full_path_str.strip_prefix(r"\\?\").unwrap_or(full_path_str);
 
-        let wide_path: Vec<u16> = clean_path.encode_utf16().chain(std::iter::once(0)).collect();
+        let wide_path: Vec<u16> = clean_path
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
         let path_bytes = wide_path.len() * 2;
 
         let remote_buf = self.alloc(path_bytes, PAGE_READWRITE)?;
-        let slice: &[u8] = unsafe {
-            std::slice::from_raw_parts(wide_path.as_ptr() as *const u8, path_bytes)
-        };
+        let slice: &[u8] =
+            unsafe { std::slice::from_raw_parts(wide_path.as_ptr() as *const u8, path_bytes) };
 
         if let Err(e) = self.write_raw(remote_buf, slice) {
             let _ = self.free(remote_buf);
@@ -901,9 +982,8 @@ impl Process {
             return Err("Failed to get kernel32.dll handle".to_string());
         }
 
-        let loadlib_proc = unsafe {
-            crate::win32::GetProcAddress(h_k32, b"LoadLibraryW\0".as_ptr())
-        };
+        let loadlib_proc =
+            unsafe { crate::win32::GetProcAddress(h_k32, b"LoadLibraryW\0".as_ptr()) };
         if loadlib_proc.is_null() {
             let _ = self.free(remote_buf);
             return Err("Failed to resolve LoadLibraryW".to_string());
@@ -927,7 +1007,9 @@ impl Process {
 
         if h_thread.is_null() || h_thread == INVALID_HANDLE_VALUE {
             let _ = self.free(remote_buf);
-            return Err(format!("CreateRemoteThread failed (Error: {})", unsafe { GetLastError() }));
+            return Err(format!("CreateRemoteThread failed (Error: {})", unsafe {
+                GetLastError()
+            }));
         }
 
         unsafe {
@@ -947,7 +1029,9 @@ impl Process {
 
     pub fn create_thread(&self, start_address: usize) -> Result<usize, String> {
         let thread_start = unsafe {
-            std::mem::transmute::<LPVOID, unsafe extern "system" fn(LPVOID) -> DWORD>(start_address as LPVOID)
+            std::mem::transmute::<LPVOID, unsafe extern "system" fn(LPVOID) -> DWORD>(
+                start_address as LPVOID,
+            )
         };
         let mut thread_id: DWORD = 0;
         let h_thread = unsafe {
@@ -962,7 +1046,9 @@ impl Process {
             )
         };
         if h_thread.is_null() || h_thread == INVALID_HANDLE_VALUE {
-            Err(format!("CreateRemoteThread failed (Error: {})", unsafe { GetLastError() }))
+            Err(format!("CreateRemoteThread failed (Error: {})", unsafe {
+                GetLastError()
+            }))
         } else {
             unsafe { CloseHandle(h_thread) };
             Ok(thread_id as usize)
@@ -983,7 +1069,12 @@ impl Drop for Process {
 pub fn enable_debug_privilege() -> Result<(), String> {
     let mut token: HANDLE = null_mut();
     unsafe {
-        if OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &mut token) != TRUE {
+        if OpenProcessToken(
+            GetCurrentProcess(),
+            TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
+            &mut token,
+        ) != TRUE
+        {
             return Err("OpenProcessToken failed".to_string());
         }
 
@@ -1000,7 +1091,14 @@ pub fn enable_debug_privilege() -> Result<(), String> {
         tp.Privileges[0].Luid = luid;
         tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
 
-        let ok = AdjustTokenPrivileges(token, FALSE, &tp, size_of::<TOKEN_PRIVILEGES>() as DWORD, null_mut(), null_mut());
+        let ok = AdjustTokenPrivileges(
+            token,
+            FALSE,
+            &tp,
+            size_of::<TOKEN_PRIVILEGES>() as DWORD,
+            null_mut(),
+            null_mut(),
+        );
         CloseHandle(token);
 
         if ok == TRUE {
@@ -1041,7 +1139,11 @@ mod tests {
     fn test_nt_api_attach_and_read_current_process() {
         let current_pid = std::process::id();
         let proc = Process::attach_with_mode(current_pid, ProcessAccessMode::NtApi, None);
-        assert!(proc.is_ok(), "Failed to attach via NtOpenProcess: {:?}", proc.err());
+        assert!(
+            proc.is_ok(),
+            "Failed to attach via NtOpenProcess: {:?}",
+            proc.err()
+        );
 
         let p = proc.unwrap();
         assert_eq!(p.access_mode, ProcessAccessMode::NtApi);
@@ -1049,7 +1151,11 @@ mod tests {
         let magic: u64 = 0xDEADBEEFCAFE1337;
         let addr = &magic as *const u64 as usize;
         let val: Result<u64, String> = p.read(addr);
-        assert!(val.is_ok(), "Failed to read via NtReadVirtualMemory: {:?}", val.err());
+        assert!(
+            val.is_ok(),
+            "Failed to read via NtReadVirtualMemory: {:?}",
+            val.err()
+        );
         assert_eq!(val.unwrap(), 0xDEADBEEFCAFE1337);
     }
 }

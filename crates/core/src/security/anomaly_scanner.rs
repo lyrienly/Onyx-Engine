@@ -159,15 +159,14 @@ mod tests {
         bytes[mz + 0x3C..mz + 0x40].copy_from_slice(&0x80u32.to_le_bytes());
         bytes[mz + 0x80..mz + 0x84].copy_from_slice(b"PE\0\0");
 
-        let found = MemoryAnomalyScanner::inspect(
-            &region(PAGE_EXECUTE_READ, MEM_PRIVATE),
-            &bytes,
-            0,
-        );
+        let found =
+            MemoryAnomalyScanner::inspect(&region(PAGE_EXECUTE_READ, MEM_PRIVATE), &bytes, 0);
 
-        assert!(found
-            .iter()
-            .any(|a| a.kind == AnomalyKind::EmbeddedPe && a.base == 0x1000 + mz));
+        assert!(
+            found
+                .iter()
+                .any(|a| a.kind == AnomalyKind::EmbeddedPe && a.base == 0x1000 + mz)
+        );
     }
 
     #[test]
@@ -179,11 +178,8 @@ mod tests {
             }
         }
 
-        let found = MemoryAnomalyScanner::inspect(
-            &region(PAGE_READWRITE, MEM_PRIVATE),
-            &bytes,
-            256,
-        );
+        let found =
+            MemoryAnomalyScanner::inspect(&region(PAGE_READWRITE, MEM_PRIVATE), &bytes, 256);
 
         assert!(found.iter().any(|a| a.kind == AnomalyKind::HighEntropy));
     }
@@ -191,11 +187,8 @@ mod tests {
     #[test]
     fn test_inspect_ignores_low_entropy() {
         let bytes = vec![0u8; 1024];
-        let found = MemoryAnomalyScanner::inspect(
-            &region(PAGE_READWRITE, MEM_PRIVATE),
-            &bytes,
-            256,
-        );
+        let found =
+            MemoryAnomalyScanner::inspect(&region(PAGE_READWRITE, MEM_PRIVATE), &bytes, 256);
         assert!(!found.iter().any(|a| a.kind == AnomalyKind::HighEntropy));
     }
 }

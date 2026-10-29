@@ -7,9 +7,7 @@ use core::slice;
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-use windows_sys::Win32::System::Diagnostics::Debug::{
-    IMAGE_NT_HEADERS64, IMAGE_SECTION_HEADER,
-};
+use windows_sys::Win32::System::Diagnostics::Debug::{IMAGE_NT_HEADERS64, IMAGE_SECTION_HEADER};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleA;
 use windows_sys::Win32::System::SystemServices::{
     IMAGE_DOS_HEADER, IMAGE_DOS_SIGNATURE, IMAGE_EXPORT_DIRECTORY, IMAGE_NT_SIGNATURE,
@@ -40,7 +38,7 @@ pub fn get_ssn(name: &str) -> Option<u32> {
 }
 
 unsafe fn load_ntdll() -> Option<NtdllInfo> {
-    let h = GetModuleHandleA(b"ntdll.dll\0".as_ptr());
+    let h = GetModuleHandleA(c"ntdll.dll".as_ptr() as *const u8);
     if h == 0 {
         return None;
     }
@@ -77,7 +75,7 @@ unsafe fn load_ntdll() -> Option<NtdllInfo> {
 
     let mut map: HashMap<String, u32> = HashMap::new();
     for i in 0..names.len() {
-        let name_ptr = base.add(names[i] as usize) as *const u8;
+        let name_ptr = base.add(names[i] as usize);
         let name = read_cstr(name_ptr);
         if !(name.starts_with("Nt") || name.starts_with("Zw")) {
             continue;
@@ -125,12 +123,7 @@ unsafe fn extract_ssn(stub: *const u8) -> Option<u32> {
     let bytes = slice::from_raw_parts(stub, 48);
     for i in 0..24 {
         if bytes[i] == 0xB8 {
-            let imm = u32::from_le_bytes([
-                bytes[i + 1],
-                bytes[i + 2],
-                bytes[i + 3],
-                bytes[i + 4],
-            ]);
+            let imm = u32::from_le_bytes([bytes[i + 1], bytes[i + 2], bytes[i + 3], bytes[i + 4]]);
             // sanity: SSN typically < 0x1000
             if imm > 0x2000 {
                 continue;
@@ -145,13 +138,10 @@ unsafe fn extract_ssn(stub: *const u8) -> Option<u32> {
     None
 }
 
-unsafe fn find_syscall_gadget(
-    base: *const u8,
-    nt: &IMAGE_NT_HEADERS64,
-) -> Option<*const u8> {
+unsafe fn find_syscall_gadget(base: *const u8, nt: &IMAGE_NT_HEADERS64) -> Option<*const u8> {
     let sections = slice::from_raw_parts(
-        (nt as *const IMAGE_NT_HEADERS64 as *const u8)
-            .add(size_of::<IMAGE_NT_HEADERS64>()) as *const IMAGE_SECTION_HEADER,
+        (nt as *const IMAGE_NT_HEADERS64 as *const u8).add(size_of::<IMAGE_NT_HEADERS64>())
+            as *const IMAGE_SECTION_HEADER,
         nt.FileHeader.NumberOfSections as usize,
     );
     for s in sections {
@@ -348,7 +338,11 @@ mod tests {
 
     #[test]
     fn ssn_resolves_core_nts() {
-        for name in ["NtQuerySystemInformation", "NtOpenProcess", "NtReadVirtualMemory"] {
+        for name in [
+            "NtQuerySystemInformation",
+            "NtOpenProcess",
+            "NtReadVirtualMemory",
+        ] {
             let v = get_ssn(name);
             assert!(v.is_some(), "SSN not found for {name}");
             let ssn = v.unwrap();

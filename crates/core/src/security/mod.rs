@@ -1,24 +1,25 @@
-pub mod taskmgr_cloak;
+pub mod analysis_hunter;
+pub mod anomaly_scanner;
 pub mod anti_attach;
 pub mod anti_debug;
 pub mod anti_dump;
+pub mod hook_detection;
 pub mod pe_remap;
 pub mod sk_crypt;
-pub mod analysis_hunter;
-pub mod hook_detection;
-pub mod anomaly_scanner;
+pub mod taskmgr_cloak;
 
-pub use taskmgr_cloak::{TaskmgrCloakManager, filter_system_process_information};
+pub use analysis_hunter::AnalysisHunter;
+pub use anomaly_scanner::{AnomalyKind, MemoryAnomalyScanner, RegionAnomaly};
 pub use anti_attach::AntiAttach;
 pub use anti_debug::{AntiDebug, AntiDebugReport};
 pub use anti_dump::AntiDump;
+pub use hook_detection::{
+    HookKind, HookReport, PatchRange, classify_hook, detect_patches, find_embedded_pe,
+    scan_module_hooks,
+};
 pub use pe_remap::{PeRemap, SectionBounds};
 pub use sk_crypt::SkCrypt;
-pub use analysis_hunter::AnalysisHunter;
-pub use hook_detection::{
-    detect_patches, find_embedded_pe, scan_module_hooks, classify_hook, HookKind, HookReport, PatchRange,
-};
-pub use anomaly_scanner::{AnomalyKind, MemoryAnomalyScanner, RegionAnomaly};
+pub use taskmgr_cloak::{TaskmgrCloakManager, filter_system_process_information};
 
 pub fn activate_process_shield() -> Result<(), String> {
     AntiAttach::enable()?;

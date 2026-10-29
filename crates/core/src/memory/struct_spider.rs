@@ -20,37 +20,37 @@ pub enum InferredKind {
 impl InferredKind {
     pub fn c_type(&self) -> &'static str {
         match self {
-            InferredKind::Padding      => "uint8_t",
-            InferredKind::Bool(_)      => "bool",
-            InferredKind::U8(_)        => "uint8_t",
-            InferredKind::I32(_)       => "int32_t",
-            InferredKind::F32(_)       => "float",
-            InferredKind::I64(_)       => "int64_t",
-            InferredKind::F64(_)       => "double",
-            InferredKind::Pointer(_)   => "void*",
+            InferredKind::Padding => "uint8_t",
+            InferredKind::Bool(_) => "bool",
+            InferredKind::U8(_) => "uint8_t",
+            InferredKind::I32(_) => "int32_t",
+            InferredKind::F32(_) => "float",
+            InferredKind::I64(_) => "int64_t",
+            InferredKind::F64(_) => "double",
+            InferredKind::Pointer(_) => "void*",
             InferredKind::VTablePointer(_) => "void**",
-            InferredKind::CodePointer(_)   => "void(*)()",
+            InferredKind::CodePointer(_) => "void(*)()",
             InferredKind::StringPointer(_, _) => "char*",
-            InferredKind::InlineString(_)     => "char",
-            InferredKind::Unknown      => "uint8_t",
+            InferredKind::InlineString(_) => "char",
+            InferredKind::Unknown => "uint8_t",
         }
     }
 
     pub fn rust_type(&self) -> &'static str {
         match self {
-            InferredKind::Padding      => "u8",
-            InferredKind::Bool(_)      => "bool",
-            InferredKind::U8(_)        => "u8",
-            InferredKind::I32(_)       => "i32",
-            InferredKind::F32(_)       => "f32",
-            InferredKind::I64(_)       => "i64",
-            InferredKind::F64(_)       => "f64",
-            InferredKind::Pointer(_)   => "*mut u8",
+            InferredKind::Padding => "u8",
+            InferredKind::Bool(_) => "bool",
+            InferredKind::U8(_) => "u8",
+            InferredKind::I32(_) => "i32",
+            InferredKind::F32(_) => "f32",
+            InferredKind::I64(_) => "i64",
+            InferredKind::F64(_) => "f64",
+            InferredKind::Pointer(_) => "*mut u8",
             InferredKind::VTablePointer(_) => "*mut *mut u8",
-            InferredKind::CodePointer(_)   => "usize",
+            InferredKind::CodePointer(_) => "usize",
             InferredKind::StringPointer(_, _) => "*mut u8",
-            InferredKind::InlineString(_)     => "u8",
-            InferredKind::Unknown      => "u8",
+            InferredKind::InlineString(_) => "u8",
+            InferredKind::Unknown => "u8",
         }
     }
 }
@@ -74,7 +74,6 @@ pub struct StructLayout {
 pub struct StructSpider;
 
 impl StructSpider {
-
     pub fn infer_bytes(base: usize, buf: &[u8]) -> StructLayout {
         Self::infer_from_slice(base, buf, &[], &[])
     }
@@ -90,7 +89,8 @@ impl StructSpider {
         let mut off = 0usize;
 
         let in_region = |addr: usize, regs: &[(usize, usize)]| -> bool {
-            regs.iter().any(|(b, s)| addr >= *b && addr < b.saturating_add(*s))
+            regs.iter()
+                .any(|(b, s)| addr >= *b && addr < b.saturating_add(*s))
         };
 
         while off < total_size {
@@ -103,7 +103,6 @@ impl StructSpider {
                 let f = f64::from_le_bytes(bytes.try_into().unwrap());
 
                 if u == 0 {
-
                     let start = off;
                     let mut end = off + 8;
                     while end + 8 <= total_size && end.is_multiple_of(8) {
@@ -138,7 +137,6 @@ impl StructSpider {
                         continue;
                     }
                     if in_region(ptr, readable) {
-
                         fields.push(InferredField {
                             offset: off,
                             size: 8,
@@ -150,25 +148,29 @@ impl StructSpider {
                     }
                 }
 
-                if f.is_finite() && f.abs() >= 1e-3 && f.abs() <= 1e5
-
-                    && !(s.abs() < 1_000_000 && (u & 0xFFFF_FFFF_0000_0000) == 0) {
-                        fields.push(InferredField {
-                            offset: off,
-                            size: 8,
-                            kind: InferredKind::F64(f),
-                            value_hint: format!("{:.6}", f),
-                        });
-                        off += 8;
-                        continue;
-                    }
+                if f.is_finite()
+                    && f.abs() >= 1e-3
+                    && f.abs() <= 1e5
+                    && !(s.abs() < 1_000_000 && (u & 0xFFFF_FFFF_0000_0000) == 0)
+                {
+                    fields.push(InferredField {
+                        offset: off,
+                        size: 8,
+                        kind: InferredKind::F64(f),
+                        value_hint: format!("{:.6}", f),
+                    });
+                    off += 8;
+                    continue;
+                }
 
                 let upper = &buf[off + 4..off + 8];
                 if upper == [0, 0, 0, 0] {
                     let lower = &buf[off..off + 4];
                     let i = i32::from_le_bytes(lower.try_into().unwrap());
                     let fl = f32::from_le_bytes(lower.try_into().unwrap());
-                    if fl.is_finite() && fl.abs() >= 1e-3 && fl.abs() <= 1e5
+                    if fl.is_finite()
+                        && fl.abs() >= 1e-3
+                        && fl.abs() <= 1e5
                         && (fl.fract() != 0.0 || (i.abs() > 1000 && fl.abs() > 1.0))
                     {
                         fields.push(InferredField {
@@ -265,7 +267,12 @@ impl StructSpider {
             1
         };
 
-        StructLayout { base, total_size, alignment, fields }
+        StructLayout {
+            base,
+            total_size,
+            alignment,
+            fields,
+        }
     }
 
     pub fn infer_struct(
@@ -291,16 +298,19 @@ impl StructSpider {
 
         for f in layout.fields.iter_mut() {
             if let InferredKind::Pointer(p) = f.kind {
-
                 if let Ok(s) = proc.read_string(p, 64, false)
-                    && is_printable_ascii(&s) && s.len() >= 2 {
-                        f.kind = InferredKind::StringPointer(p, s.clone());
-                        f.value_hint = format!("\"{}\"", s);
-                        continue;
-                    }
+                    && is_printable_ascii(&s)
+                    && s.len() >= 2
+                {
+                    f.kind = InferredKind::StringPointer(p, s.clone());
+                    f.value_hint = format!("\"{}\"", s);
+                    continue;
+                }
 
                 if let Ok(first) = proc.read::<usize>(p) {
-                    let is_code = executable.iter().any(|(b, s)| first >= *b && first < b.saturating_add(*s));
+                    let is_code = executable
+                        .iter()
+                        .any(|(b, s)| first >= *b && first < b.saturating_add(*s));
                     if is_code {
                         f.kind = InferredKind::VTablePointer(p);
                         f.value_hint = format!("vtable @ 0x{:X} (m0=0x{:X})", p, first);
@@ -381,7 +391,6 @@ mod tests {
     use super::*;
 
     fn build_buf() -> ([u8; 48], usize, usize) {
-
         let mut b = [0u8; 48];
         b[0..8].copy_from_slice(&0x1122334455667788i64.to_le_bytes());
         b[8..12].copy_from_slice(&42i32.to_le_bytes());
@@ -405,15 +414,27 @@ mod tests {
         assert_eq!(f0.size, 8);
         assert!(matches!(f0.kind, InferredKind::I64(0x1122334455667788)));
 
-        let f_i32_42 = layout.fields.iter().find(|f| f.offset == 8).expect("field @ 0x8");
+        let f_i32_42 = layout
+            .fields
+            .iter()
+            .find(|f| f.offset == 8)
+            .expect("field @ 0x8");
         assert_eq!(f_i32_42.size, 4);
         assert!(matches!(f_i32_42.kind, InferredKind::I32(42)));
 
-        let pad_c = layout.fields.iter().find(|f| f.offset == 0xC).expect("pad @ 0xC");
+        let pad_c = layout
+            .fields
+            .iter()
+            .find(|f| f.offset == 0xC)
+            .expect("pad @ 0xC");
         assert_eq!(pad_c.size, 4);
         assert!(matches!(pad_c.kind, InferredKind::Padding));
 
-        let f_f32 = layout.fields.iter().find(|f| f.offset == 0x10).expect("field @ 0x10");
+        let f_f32 = layout
+            .fields
+            .iter()
+            .find(|f| f.offset == 0x10)
+            .expect("field @ 0x10");
         assert_eq!(f_f32.size, 4);
         if let InferredKind::F32(v) = f_f32.kind {
             assert!((v - 2.5f32).abs() < 1e-6);
@@ -421,7 +442,11 @@ mod tests {
             panic!("expected F32 at +0x10, got {:?}", f_f32.kind);
         }
 
-        let f_i64_neg = layout.fields.iter().find(|f| f.offset == 0x18).expect("i64 @ 0x18");
+        let f_i64_neg = layout
+            .fields
+            .iter()
+            .find(|f| f.offset == 0x18)
+            .expect("i64 @ 0x18");
         assert_eq!(f_i64_neg.size, 8);
         assert!(matches!(f_i64_neg.kind, InferredKind::I64(-9999)));
 
@@ -449,7 +474,6 @@ mod tests {
 
     #[test]
     fn detects_pointer_as_code_vs_heap() {
-
         let (mut buf, readable_base, exec_base) = build_buf();
         buf[0..8].copy_from_slice(&(exec_base + 0x400).to_le_bytes());
         buf[8..16].copy_from_slice(&(readable_base + 0x200).to_le_bytes());
@@ -461,12 +485,20 @@ mod tests {
         let f0 = &layout.fields[0];
         assert_eq!(f0.offset, 0);
         assert_eq!(f0.size, 8);
-        assert!(matches!(f0.kind, InferredKind::CodePointer(_)), "got {:?}", f0.kind);
+        assert!(
+            matches!(f0.kind, InferredKind::CodePointer(_)),
+            "got {:?}",
+            f0.kind
+        );
 
         let f1 = &layout.fields[1];
         assert_eq!(f1.offset, 8);
         assert_eq!(f1.size, 8);
-        assert!(matches!(f1.kind, InferredKind::Pointer(_)), "got {:?}", f1.kind);
+        assert!(
+            matches!(f1.kind, InferredKind::Pointer(_)),
+            "got {:?}",
+            f1.kind
+        );
     }
 
     #[test]
@@ -491,24 +523,47 @@ mod tests {
         let layout = StructSpider::infer_struct(&proc, addr, 64).expect("infer");
 
         let f8 = layout.fields.iter().find(|f| f.offset == 8).expect("i32@8");
-        assert!(matches!(f8.kind, InferredKind::I32(42)), "got {:?}", f8.kind);
+        assert!(
+            matches!(f8.kind, InferredKind::I32(42)),
+            "got {:?}",
+            f8.kind
+        );
 
-        let fc = layout.fields.iter().find(|f| f.offset == 0xC).expect("pad@C");
+        let fc = layout
+            .fields
+            .iter()
+            .find(|f| f.offset == 0xC)
+            .expect("pad@C");
         assert!(matches!(fc.kind, InferredKind::Padding));
 
-        let f10 = layout.fields.iter().find(|f| f.offset == 0x10).expect("f32@10");
+        let f10 = layout
+            .fields
+            .iter()
+            .find(|f| f.offset == 0x10)
+            .expect("f32@10");
         if let InferredKind::F32(v) = f10.kind {
             assert!((v - 2.5f32).abs() < 1e-5);
         } else {
             panic!("expected F32@0x10, got {:?}", f10.kind);
         }
 
-        let f18 = layout.fields.iter().find(|f| f.offset == 0x18).expect("i64@18");
+        let f18 = layout
+            .fields
+            .iter()
+            .find(|f| f.offset == 0x18)
+            .expect("i64@18");
         assert!(matches!(f18.kind, InferredKind::I64(-1000)));
 
-        let f20 = layout.fields.iter().find(|f| f.offset == 0x20).expect("ptr@20");
+        let f20 = layout
+            .fields
+            .iter()
+            .find(|f| f.offset == 0x20)
+            .expect("ptr@20");
         assert!(
-            matches!(f20.kind, InferredKind::Pointer(_) | InferredKind::VTablePointer(_)),
+            matches!(
+                f20.kind,
+                InferredKind::Pointer(_) | InferredKind::VTablePointer(_)
+            ),
             "expected pointer-like at +0x20, got {:?}",
             f20.kind
         );

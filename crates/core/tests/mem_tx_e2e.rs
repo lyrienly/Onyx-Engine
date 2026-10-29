@@ -9,8 +9,8 @@ use std::time::Duration;
 use onyx_core::memory::transaction::MemoryTransaction;
 use onyx_core::process::Process;
 use onyx_core::win32::{
-    MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_READWRITE,
-    VirtualAllocEx, VirtualFreeEx, CloseHandle, HANDLE, LPVOID,
+    CloseHandle, HANDLE, LPVOID, MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_READWRITE,
+    VirtualAllocEx, VirtualFreeEx,
 };
 
 #[link(name = "kernel32")]
@@ -61,7 +61,10 @@ struct ProcessInformation {
 }
 
 fn to_wide(s: &str) -> Vec<u16> {
-    OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
+    OsStr::new(s)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect()
 }
 
 struct NotepadGuard {
@@ -144,14 +147,16 @@ fn e2e_notepad_write_then_rollback() {
     tx.write(addr, &payload).expect("tx write");
 
     let mut after_write = [0u8; 8];
-    proc.read_raw(addr, &mut after_write).expect("read after write");
+    proc.read_raw(addr, &mut after_write)
+        .expect("read after write");
     println!("[e2e] after write bytes={:X?}", after_write);
     assert_eq!(&after_write, &payload);
 
     tx.rollback().expect("rollback");
 
     let mut after_rollback = [0u8; 8];
-    proc.read_raw(addr, &mut after_rollback).expect("read after rb");
+    proc.read_raw(addr, &mut after_rollback)
+        .expect("read after rb");
     println!("[e2e] after rollback bytes={:X?}", after_rollback);
     assert_eq!(&after_rollback, &initial[..8]);
     println!("[e2e] PASS: rollback restored original bytes on remote process");

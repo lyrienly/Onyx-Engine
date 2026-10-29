@@ -75,7 +75,7 @@ impl AobValidator {
                         token_index: index,
                         token: token.to_string(),
                         message,
-                    })
+                    });
                 }
             }
         }

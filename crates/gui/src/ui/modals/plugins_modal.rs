@@ -1,6 +1,6 @@
+use crate::app::OnyxEngineApp;
 use eframe::egui::{self, Color32, RichText, Vec2};
 use onyx_core::process::Process;
-use crate::app::OnyxEngineApp;
 
 pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
     if !app.show_plugins_modal {
@@ -22,19 +22,42 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
             }
 
             egui::CentralPanel::default()
-                .frame(egui::Frame::none().fill(Color32::from_rgb(26, 29, 36)).inner_margin(egui::Margin::same(8.0)))
+                .frame(
+                    egui::Frame::none()
+                        .fill(Color32::from_rgb(26, 29, 36))
+                        .inner_margin(egui::Margin::same(8.0)),
+                )
                 .show(ctx, |ui| {
-                    ui.label(RichText::new("Auxiliary Engine DLLs").strong().color(Color32::from_rgb(120, 200, 255)));
+                    ui.label(
+                        RichText::new("Auxiliary Engine DLLs")
+                            .strong()
+                            .color(Color32::from_rgb(120, 200, 255)),
+                    );
                     ui.label("Inject modular subsystems into the attached target process:");
 
                     ui.separator();
 
                     let dlls = [
-                        ("d3dhook_dll.dll", "Direct3D Overlay, In-Game HUD, Frame Counter"),
-                        ("speedhack_dll.dll", "High-Precision QPC / GetTickCount Time Scaler"),
-                        ("vehdebug_dll.dll", "Vectored Exception Handler Debugger Engine"),
-                        ("allochook_dll.dll", "Heap & VirtualAlloc Memory Allocator Interceptor"),
-                        ("luaclient_dll.dll", "Remote Lua IPC Client for Live Automation"),
+                        (
+                            "d3dhook_dll.dll",
+                            "Direct3D Overlay, In-Game HUD, Frame Counter",
+                        ),
+                        (
+                            "speedhack_dll.dll",
+                            "High-Precision QPC / GetTickCount Time Scaler",
+                        ),
+                        (
+                            "vehdebug_dll.dll",
+                            "Vectored Exception Handler Debugger Engine",
+                        ),
+                        (
+                            "allochook_dll.dll",
+                            "Heap & VirtualAlloc Memory Allocator Interceptor",
+                        ),
+                        (
+                            "luaclient_dll.dll",
+                            "Remote Lua IPC Client for Live Automation",
+                        ),
                     ];
 
                     let scroll_h = (ui.available_height() - 44.0).max(160.0);
@@ -61,15 +84,29 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                                         let resolved = Process::resolve_dll_path(name);
                                         match resolved {
                                             Ok(p) => {
-                                                let filename = p.file_name().unwrap_or_default().to_string_lossy();
-                                                ui.label(RichText::new(format!("[Found] {}", filename)).color(Color32::GREEN));
+                                                let filename = p
+                                                    .file_name()
+                                                    .unwrap_or_default()
+                                                    .to_string_lossy();
+                                                ui.label(
+                                                    RichText::new(format!("[Found] {}", filename))
+                                                        .color(Color32::GREEN),
+                                                );
                                             }
                                             Err(_) => {
-                                                ui.label(RichText::new("[Missing]").color(Color32::RED));
+                                                ui.label(
+                                                    RichText::new("[Missing]").color(Color32::RED),
+                                                );
                                             }
                                         }
 
-                                        if ui.button(RichText::new("[Inject]").color(Color32::from_rgb(100, 220, 255))).clicked() {
+                                        if ui
+                                            .button(
+                                                RichText::new("[Inject]")
+                                                    .color(Color32::from_rgb(100, 220, 255)),
+                                            )
+                                            .clicked()
+                                        {
                                             app.inject_aux_dll(name);
                                         }
                                         ui.end_row();

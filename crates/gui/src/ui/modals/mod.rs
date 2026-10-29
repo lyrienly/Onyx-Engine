@@ -1,16 +1,16 @@
-pub mod process_modal;
-pub mod memory_view;
-pub mod pointer_scanner;
-pub mod mono_modal;
-pub mod auto_assembler;
-pub mod lua_console;
-pub mod plugins_modal;
 pub mod address_modal;
+pub mod auto_assembler;
 pub mod edit_byte_modal;
+pub mod lua_console;
+pub mod memory_view;
+pub mod mono_modal;
+pub mod plugins_modal;
+pub mod pointer_scanner;
+pub mod process_modal;
 pub mod settings_modal;
 
-use eframe::egui;
 use crate::app::OnyxEngineApp;
+use eframe::egui;
 
 pub fn render_all_modals(app: &mut OnyxEngineApp, ctx: &egui::Context) {
     process_modal::render(app, ctx);

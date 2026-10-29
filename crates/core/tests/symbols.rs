@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use onyx_core::symbols::{read_codeview_from_file, SymbolCache};
+use onyx_core::symbols::{SymbolCache, read_codeview_from_file};
 
 fn ntdll_path() -> PathBuf {
     let sys = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".to_string());

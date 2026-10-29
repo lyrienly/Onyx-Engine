@@ -2,15 +2,14 @@ pub mod atomic;
 
 pub use atomic::{AtomicFreezer, FreezeEntry, FreezeId, FreezeMode, FreezerStats};
 
-use std::ffi::CStr;
-use std::os::raw::c_char;
 use onyx_core::freeze::Freezer;
 use onyx_core::process::Process;
 use onyx_core::scanner::{ScanValue, ValType};
+use std::ffi::CStr;
+use std::os::raw::c_char;
 
 fn map_val_type(idx: i32) -> ValType {
     match idx {
-
         0 => ValType::I8,
         1 => ValType::I16,
         2 => ValType::I32,
@@ -29,7 +28,10 @@ pub extern "C" fn onyx_freezer_module_ping() -> i32 {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn onyx_freezer_create(process: *mut Process, interval_ms: u64) -> *mut Freezer {
+pub unsafe extern "C" fn onyx_freezer_create(
+    process: *mut Process,
+    interval_ms: u64,
+) -> *mut Freezer {
     if process.is_null() {
         return std::ptr::null_mut();
     }
@@ -41,7 +43,10 @@ pub unsafe extern "C" fn onyx_freezer_create(process: *mut Process, interval_ms:
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn onyx_freezer_set_process(freezer: *mut Freezer, process: *mut Process) -> i32 {
+pub unsafe extern "C" fn onyx_freezer_set_process(
+    freezer: *mut Freezer,
+    process: *mut Process,
+) -> i32 {
     if freezer.is_null() || process.is_null() {
         return 0;
     }
@@ -102,7 +107,13 @@ pub unsafe extern "C" fn onyx_freezer_update(
     let s = CStr::from_ptr(val_str).to_string_lossy();
 
     match ScanValue::parse(vt, s.trim()) {
-        Ok(v) => if f.update(entry_id, v) { 1 } else { 0 },
+        Ok(v) => {
+            if f.update(entry_id, v) {
+                1
+            } else {
+                0
+            }
+        }
         Err(_) => 0,
     }
 }
@@ -113,7 +124,11 @@ pub unsafe extern "C" fn onyx_freezer_remove(freezer: *mut Freezer, entry_id: us
         return 0;
     }
     let f = &*freezer;
-    if f.unfreeze(entry_id) { 1 } else { 0 }
+    if f.unfreeze(entry_id) {
+        1
+    } else {
+        0
+    }
 }
 
 #[no_mangle]

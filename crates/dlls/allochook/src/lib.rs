@@ -1,4 +1,10 @@
-#![allow(non_snake_case, non_camel_case_types, dead_code, unsafe_op_in_unsafe_fn, static_mut_refs)]
+#![allow(
+    non_snake_case,
+    non_camel_case_types,
+    dead_code,
+    unsafe_op_in_unsafe_fn,
+    static_mut_refs
+)]
 #![allow(
     clippy::missing_safety_doc,
     clippy::not_unsafe_ptr_arg_deref,
@@ -8,8 +14,8 @@
 )]
 
 use std::ffi::c_void;
+use std::ptr::{copy_nonoverlapping, null_mut};
 use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU64, Ordering};
-use std::ptr::{null_mut, copy_nonoverlapping};
 
 type HANDLE = *mut c_void;
 type HMODULE = *mut c_void;
@@ -52,8 +58,18 @@ static IN_HOOK: AtomicBool = AtomicBool::new(false);
 unsafe extern "system" {
     fn GetModuleHandleA(lpModuleName: *const u8) -> HMODULE;
     fn GetProcAddress(hModule: HMODULE, lpProcName: *const u8) -> *mut c_void;
-    fn VirtualProtect(lpAddress: *mut c_void, dwSize: usize, flNewProtect: DWORD, lpflOldProtect: *mut DWORD) -> BOOL;
-    fn VirtualAlloc(lpAddress: *mut c_void, dwSize: usize, flAllocationType: DWORD, flProtect: DWORD) -> *mut c_void;
+    fn VirtualProtect(
+        lpAddress: *mut c_void,
+        dwSize: usize,
+        flNewProtect: DWORD,
+        lpflOldProtect: *mut DWORD,
+    ) -> BOOL;
+    fn VirtualAlloc(
+        lpAddress: *mut c_void,
+        dwSize: usize,
+        flAllocationType: DWORD,
+        flProtect: DWORD,
+    ) -> *mut c_void;
     fn GetCurrentProcessId() -> DWORD;
     fn GetTickCount64() -> u64;
     fn CreateFileA(
@@ -76,20 +92,20 @@ unsafe extern "system" {
 }
 
 type FnNtAllocateVirtualMemory = unsafe extern "system" fn(
-    HANDLE, *mut *mut c_void, usize, *mut usize, DWORD, DWORD
+    HANDLE,
+    *mut *mut c_void,
+    usize,
+    *mut usize,
+    DWORD,
+    DWORD,
 ) -> NTSTATUS;
 
-type FnNtFreeVirtualMemory = unsafe extern "system" fn(
-    HANDLE, *mut *mut c_void, *mut usize, DWORD
-) -> NTSTATUS;
+type FnNtFreeVirtualMemory =
+    unsafe extern "system" fn(HANDLE, *mut *mut c_void, *mut usize, DWORD) -> NTSTATUS;
 
-type FnRtlAllocateHeap = unsafe extern "system" fn(
-    *mut c_void, DWORD, usize
-) -> *mut c_void;
+type FnRtlAllocateHeap = unsafe extern "system" fn(*mut c_void, DWORD, usize) -> *mut c_void;
 
-type FnRtlFreeHeap = unsafe extern "system" fn(
-    *mut c_void, DWORD, *mut c_void
-) -> BOOL;
+type FnRtlFreeHeap = unsafe extern "system" fn(*mut c_void, DWORD, *mut c_void) -> BOOL;
 
 static mut ORIG_NT_ALLOC: Option<FnNtAllocateVirtualMemory> = None;
 static mut ORIG_NT_FREE: Option<FnNtFreeVirtualMemory> = None;
@@ -121,7 +137,13 @@ fn push_record(event_type: u32, address: u64, size: u64, flags: u32, protection:
         let h = h_val as HANDLE;
         let mut written: DWORD = 0;
         unsafe {
-            WriteFile(h, &rec as *const _ as *const c_void, std::mem::size_of::<AllocRecord>() as DWORD, &mut written, null_mut());
+            WriteFile(
+                h,
+                &rec as *const _ as *const c_void,
+                std::mem::size_of::<AllocRecord>() as DWORD,
+                &mut written,
+                null_mut(),
+            );
         }
     }
 }
@@ -135,15 +157,25 @@ unsafe extern "system" fn hook_nt_allocate_virtual_memory(
     protect: DWORD,
 ) -> NTSTATUS {
     let orig = ORIG_NT_ALLOC.expect("orig NtAlloc missing");
-    let status = orig(process_handle, base_address, zero_bits, region_size, allocation_type, protect);
+    let status = orig(
+        process_handle,
+        base_address,
+        zero_bits,
+        region_size,
+        allocation_type,
+        protect,
+    );
 
-    if status == STATUS_SUCCESS && !base_address.is_null() && !region_size.is_null()
-        && !IN_HOOK.swap(true, Ordering::SeqCst) {
-            let addr = *base_address as u64;
-            let sz = *region_size as u64;
-            push_record(0, addr, sz, allocation_type, protect);
-            IN_HOOK.store(false, Ordering::SeqCst);
-        }
+    if status == STATUS_SUCCESS
+        && !base_address.is_null()
+        && !region_size.is_null()
+        && !IN_HOOK.swap(true, Ordering::SeqCst)
+    {
+        let addr = *base_address as u64;
+        let sz = *region_size as u64;
+        push_record(0, addr, sz, allocation_type, protect);
+        IN_HOOK.store(false, Ordering::SeqCst);
+    }
 
     status
 }
@@ -156,16 +188,23 @@ unsafe extern "system" fn hook_nt_free_virtual_memory(
 ) -> NTSTATUS {
     let orig = ORIG_NT_FREE.expect("orig NtFree missing");
 
-    let addr = if !base_address.is_null() { *base_address as u64 } else { 0 };
-    let sz = if !region_size.is_null() { *region_size as u64 } else { 0 };
+    let addr = if !base_address.is_null() {
+        *base_address as u64
+    } else {
+        0
+    };
+    let sz = if !region_size.is_null() {
+        *region_size as u64
+    } else {
+        0
+    };
 
     let status = orig(process_handle, base_address, region_size, free_type);
 
-    if status == STATUS_SUCCESS
-        && !IN_HOOK.swap(true, Ordering::SeqCst) {
-            push_record(1, addr, sz, free_type, 0);
-            IN_HOOK.store(false, Ordering::SeqCst);
-        }
+    if status == STATUS_SUCCESS && !IN_HOOK.swap(true, Ordering::SeqCst) {
+        push_record(1, addr, sz, free_type, 0);
+        IN_HOOK.store(false, Ordering::SeqCst);
+    }
 
     status
 }
@@ -178,11 +217,10 @@ unsafe extern "system" fn hook_rtl_allocate_heap(
     let orig = ORIG_RTL_ALLOC.expect("orig RtlAlloc missing");
     let ptr = orig(heap_handle, flags, size);
 
-    if !ptr.is_null()
-        && !IN_HOOK.swap(true, Ordering::SeqCst) {
-            push_record(2, ptr as u64, size as u64, flags, 0);
-            IN_HOOK.store(false, Ordering::SeqCst);
-        }
+    if !ptr.is_null() && !IN_HOOK.swap(true, Ordering::SeqCst) {
+        push_record(2, ptr as u64, size as u64, flags, 0);
+        IN_HOOK.store(false, Ordering::SeqCst);
+    }
 
     ptr
 }
@@ -194,18 +232,21 @@ unsafe extern "system" fn hook_rtl_free_heap(
 ) -> BOOL {
     let orig = ORIG_RTL_FREE.expect("orig RtlFree missing");
 
-    if !base_address.is_null()
-        && !IN_HOOK.swap(true, Ordering::SeqCst) {
-            push_record(3, base_address as u64, 0, flags, 0);
-            IN_HOOK.store(false, Ordering::SeqCst);
-        }
+    if !base_address.is_null() && !IN_HOOK.swap(true, Ordering::SeqCst) {
+        push_record(3, base_address as u64, 0, flags, 0);
+        IN_HOOK.store(false, Ordering::SeqCst);
+    }
 
     orig(heap_handle, flags, base_address)
 }
 
 unsafe fn install_detour64(target: *mut c_void, detour: *mut c_void) -> *mut c_void {
-
-    let trampoline = VirtualAlloc(null_mut(), 64, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    let trampoline = VirtualAlloc(
+        null_mut(),
+        64,
+        MEM_COMMIT | MEM_RESERVE,
+        PAGE_EXECUTE_READWRITE,
+    );
     if trampoline.is_null() {
         return null_mut();
     }
@@ -218,7 +259,11 @@ unsafe fn install_detour64(target: *mut c_void, detour: *mut c_void) -> *mut c_v
     jump_back[1] = 0x25;
     jump_back[2..6].copy_from_slice(&0u32.to_ne_bytes());
     jump_back[6..14].copy_from_slice(&(return_addr as u64).to_ne_bytes());
-    copy_nonoverlapping(jump_back.as_ptr(), (trampoline as usize + 14) as *mut u8, 14);
+    copy_nonoverlapping(
+        jump_back.as_ptr(),
+        (trampoline as usize + 14) as *mut u8,
+        14,
+    );
 
     let mut old_protect: DWORD = 0;
     VirtualProtect(target, 14, PAGE_EXECUTE_READWRITE, &mut old_protect);
@@ -266,7 +311,8 @@ pub unsafe extern "system" fn CeInitializeAllocHook() -> BOOL {
     if !p_nt_alloc.is_null() {
         let tramp = install_detour64(p_nt_alloc, hook_nt_allocate_virtual_memory as *mut c_void);
         if !tramp.is_null() {
-            ORIG_NT_ALLOC = Some(std::mem::transmute::<*mut c_void, FnNtAllocateVirtualMemory>(tramp));
+            ORIG_NT_ALLOC =
+                Some(std::mem::transmute::<*mut c_void, FnNtAllocateVirtualMemory>(tramp));
         }
     }
 
@@ -274,7 +320,9 @@ pub unsafe extern "system" fn CeInitializeAllocHook() -> BOOL {
     if !p_nt_free.is_null() {
         let tramp = install_detour64(p_nt_free, hook_nt_free_virtual_memory as *mut c_void);
         if !tramp.is_null() {
-            ORIG_NT_FREE = Some(std::mem::transmute::<*mut c_void, FnNtFreeVirtualMemory>(tramp));
+            ORIG_NT_FREE = Some(std::mem::transmute::<*mut c_void, FnNtFreeVirtualMemory>(
+                tramp,
+            ));
         }
     }
 

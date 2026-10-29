@@ -19,7 +19,6 @@ pub struct GdbServer {
 }
 
 impl GdbServer {
-
     pub fn listen<A, T>(addr: A, target: Arc<Mutex<T>>) -> io::Result<Self>
     where
         A: ToSocketAddrs,
@@ -50,7 +49,6 @@ where
     let mut tmp = [0u8; 4096];
 
     loop {
-
         loop {
             match parse_packet(&buf) {
                 Ok((pkt, used)) => {
@@ -77,7 +75,6 @@ where
                 }
                 Err(ParseError::Incomplete) => break,
                 Err(ParseError::MissingStart) => {
-
                     if !buf.is_empty() {
                         buf.remove(0);
                     } else {
@@ -85,7 +82,6 @@ where
                     }
                 }
                 Err(ParseError::BadChecksum { .. }) | Err(ParseError::BadHex) => {
-
                     writer.write_all(b"-")?;
                     writer.flush()?;
                     if let Some(pos) = buf.iter().position(|&b| b == b'#') {
@@ -137,7 +133,6 @@ fn handle_packet<T: GdbTarget>(pkt: &Packet, target: &Arc<Mutex<T>>) -> Resp {
             }
         }
         b'm' => {
-
             let rest = &text[1..];
             let (addr_s, len_s) = match rest.split_once(',') {
                 Some(x) => x,
@@ -157,7 +152,6 @@ fn handle_packet<T: GdbTarget>(pkt: &Packet, target: &Arc<Mutex<T>>) -> Resp {
             }
         }
         b'M' => {
-
             let rest = &text[1..];
             let (head, data_hex) = match rest.split_once(':') {
                 Some(x) => x,
@@ -181,7 +175,6 @@ fn handle_packet<T: GdbTarget>(pkt: &Packet, target: &Arc<Mutex<T>>) -> Resp {
             }
         }
         b'p' => {
-
             let idx = match parse_hex_u64(&text[1..]) {
                 Ok(v) => v as usize,
                 Err(_) => return Resp::Reply(b"E22".to_vec()),
@@ -196,7 +189,6 @@ fn handle_packet<T: GdbTarget>(pkt: &Packet, target: &Arc<Mutex<T>>) -> Resp {
             }
         }
         b'P' => {
-
             let rest = &text[1..];
             let (n_s, v_s) = match rest.split_once('=') {
                 Some(x) => x,
@@ -256,7 +248,6 @@ fn handle_packet<T: GdbTarget>(pkt: &Packet, target: &Arc<Mutex<T>>) -> Resp {
 }
 
 fn handle_breakpoint<T: GdbTarget>(text: &str, target: &Arc<Mutex<T>>) -> Resp {
-
     let add = text.starts_with('Z');
     let rest = &text[1..];
     let mut parts = rest.split(',');
@@ -320,7 +311,9 @@ fn handle_query<T: GdbTarget>(text: &str, _target: &Arc<Mutex<T>>) -> Resp {
         return Resp::Reply(b"T0".to_vec());
     }
     if text.starts_with("qXfer:features:read:target.xml") {
-        return Resp::Reply(b"l<target version=\"1.0\"><architecture>i386:x86-64</architecture></target>".to_vec());
+        return Resp::Reply(
+            b"l<target version=\"1.0\"><architecture>i386:x86-64</architecture></target>".to_vec(),
+        );
     }
     Resp::Empty
 }

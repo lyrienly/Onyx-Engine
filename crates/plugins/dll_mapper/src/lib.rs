@@ -37,15 +37,11 @@ pub struct OnyxPluginHostAPI {
     pub struct_size: u32,
     pub get_target_pid: Option<unsafe extern "system" fn() -> u32>,
     pub get_target_handle: Option<unsafe extern "system" fn() -> *mut std::ffi::c_void>,
-    pub read_memory: Option<
-        unsafe extern "system" fn(u64, *mut std::ffi::c_void, usize, *mut usize) -> i32,
-    >,
-    pub write_memory: Option<
-        unsafe extern "system" fn(u64, *const std::ffi::c_void, usize, *mut usize) -> i32,
-    >,
-    pub resolve_symbol: Option<
-        unsafe extern "system" fn(u64, *mut c_char, usize, *mut u64) -> i32,
-    >,
+    pub read_memory:
+        Option<unsafe extern "system" fn(u64, *mut std::ffi::c_void, usize, *mut usize) -> i32>,
+    pub write_memory:
+        Option<unsafe extern "system" fn(u64, *const std::ffi::c_void, usize, *mut usize) -> i32>,
+    pub resolve_symbol: Option<unsafe extern "system" fn(u64, *mut c_char, usize, *mut u64) -> i32>,
     pub log_message: Option<unsafe extern "system" fn(i32, *const c_char)>,
 }
 

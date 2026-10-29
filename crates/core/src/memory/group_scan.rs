@@ -30,7 +30,9 @@ impl GroupScanType {
             GroupScanType::Byte | GroupScanType::Str | GroupScanType::Wildcard => 1,
             GroupScanType::Word => 2,
             GroupScanType::Dword | GroupScanType::Float => 4,
-            GroupScanType::Qword | GroupScanType::Double | GroupScanType::Pointer => ptr_size.min(8),
+            GroupScanType::Qword | GroupScanType::Double | GroupScanType::Pointer => {
+                ptr_size.min(8)
+            }
         }
     }
 
@@ -119,8 +121,7 @@ impl GroupElement {
                     return false;
                 }
                 let v = u64::from_ne_bytes([
-                    buf[0], buf[1], buf[2], buf[3],
-                    buf[4], buf[5], buf[6], buf[7],
+                    buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7],
                 ]);
                 if self.range {
                     if self.signed {
@@ -149,8 +150,7 @@ impl GroupElement {
                     return false;
                 }
                 let v = f64::from_ne_bytes([
-                    buf[0], buf[1], buf[2], buf[3],
-                    buf[4], buf[5], buf[6], buf[7],
+                    buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7],
                 ]);
                 if v.is_nan() || v.is_infinite() {
                     return false;
@@ -224,7 +224,12 @@ impl GroupScanConfig {
             let (scan_type, mut bytesize) = match first_char {
                 '1' | 'B' => (GroupScanType::Byte, 1),
                 '2' | 'W' => (GroupScanType::Word, 2),
-                '4' | 'D' if cmd_part.starts_with('D') && (cmd_part == "D" || cmd_part.starts_with("DR") || cmd_part.starts_with("DP")) => {
+                '4' | 'D'
+                    if cmd_part.starts_with('D')
+                        && (cmd_part == "D"
+                            || cmd_part.starts_with("DR")
+                            || cmd_part.starts_with("DP")) =>
+                {
                     (GroupScanType::Double, 8)
                 }
                 '4' => (GroupScanType::Dword, 4),
@@ -342,7 +347,6 @@ impl GroupScanConfig {
         matched_offsets.clear();
 
         if !self.out_of_order {
-
             for elem in &self.elements {
                 if elem.offset + elem.bytesize > buf.len() {
                     return false;
@@ -354,7 +358,6 @@ impl GroupScanConfig {
             }
             true
         } else {
-
             let mut used_ranges: Vec<(usize, usize)> = Vec::new();
 
             for elem in &self.elements {
@@ -374,7 +377,9 @@ impl GroupScanConfig {
                 let mut cur = 0;
 
                 while cur <= max_off {
-                    let overlaps = used_ranges.iter().any(|&(s, e)| cur < e && (cur + elem.bytesize) > s);
+                    let overlaps = used_ranges
+                        .iter()
+                        .any(|&(s, e)| cur < e && (cur + elem.bytesize) > s);
                     if !overlaps && elem.matches(&buf[cur..cur + elem.bytesize]) {
                         found_offset = Some(cur);
                         used_ranges.push((cur, cur + elem.bytesize));

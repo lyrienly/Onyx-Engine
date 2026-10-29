@@ -3,7 +3,9 @@ use std::os::raw::c_char;
 use onyx_aa::{analyze, parse_script, Script, Section, SectionKind, Statement};
 use serde_json::{json, Value};
 
-use crate::api::abi_util::{cstr_to_str, guard, string_to_c, ERR_INTERNAL, ERR_INVALID_UTF8, ERR_NULL, OK};
+use crate::api::abi_util::{
+    cstr_to_str, guard, string_to_c, ERR_INTERNAL, ERR_INVALID_UTF8, ERR_NULL, OK,
+};
 
 fn section_kind_to_str(k: &SectionKind) -> Value {
     match k {
@@ -15,22 +17,40 @@ fn section_kind_to_str(k: &SectionKind) -> Value {
 
 fn stmt_to_json(s: &Statement) -> Value {
     match s {
-        Statement::Alloc { symbol, size, near_addr, span } => json!({
+        Statement::Alloc {
+            symbol,
+            size,
+            near_addr,
+            span,
+        } => json!({
             "kind": "Alloc", "symbol": symbol, "size": size, "near": near_addr,
             "line": span.line, "col": span.col,
         }),
         Statement::Label { name, span } => json!({
             "kind": "Label", "name": name, "line": span.line, "col": span.col,
         }),
-        Statement::AobScanModule { symbol, module, pattern, span } => json!({
+        Statement::AobScanModule {
+            symbol,
+            module,
+            pattern,
+            span,
+        } => json!({
             "kind": "AobScanModule", "symbol": symbol, "module": module,
             "pattern": pattern, "line": span.line, "col": span.col,
         }),
-        Statement::AobScan { symbol, pattern, span } => json!({
+        Statement::AobScan {
+            symbol,
+            pattern,
+            span,
+        } => json!({
             "kind": "AobScan", "symbol": symbol, "pattern": pattern,
             "line": span.line, "col": span.col,
         }),
-        Statement::Assert { address, bytes, span } => json!({
+        Statement::Assert {
+            address,
+            bytes,
+            span,
+        } => json!({
             "kind": "Assert", "address": address, "bytes": bytes,
             "line": span.line, "col": span.col,
         }),
@@ -78,10 +98,7 @@ fn script_to_json(s: &Script) -> Value {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn onyx_aa_parse(
-    src: *const c_char,
-    out_json: *mut *mut c_char,
-) -> i32 {
+pub unsafe extern "C" fn onyx_aa_parse(src: *const c_char, out_json: *mut *mut c_char) -> i32 {
     guard(|| {
         if src.is_null() || out_json.is_null() {
             return ERR_NULL;
@@ -114,10 +131,7 @@ pub unsafe extern "C" fn onyx_aa_parse(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn onyx_aa_analyze(
-    src: *const c_char,
-    out_err: *mut *mut c_char,
-) -> i32 {
+pub unsafe extern "C" fn onyx_aa_analyze(src: *const c_char, out_err: *mut *mut c_char) -> i32 {
     guard(|| {
         if src.is_null() {
             return ERR_NULL;
@@ -130,7 +144,10 @@ pub unsafe extern "C" fn onyx_aa_analyze(
             Ok(s) => s,
             Err(e) => {
                 if !out_err.is_null() {
-                    let msg = format!("parse: {} (linha {}, col {})", e.msg, e.span.line, e.span.col);
+                    let msg = format!(
+                        "parse: {} (linha {}, col {})",
+                        e.msg, e.span.line, e.span.col
+                    );
                     *out_err = string_to_c(msg);
                 }
                 return 1;
@@ -140,7 +157,10 @@ pub unsafe extern "C" fn onyx_aa_analyze(
             Ok(()) => OK,
             Err(e) => {
                 if !out_err.is_null() {
-                    let msg = format!("analyze: {} (linha {}, col {})", e.msg, e.span.line, e.span.col);
+                    let msg = format!(
+                        "analyze: {} (linha {}, col {})",
+                        e.msg, e.span.line, e.span.col
+                    );
                     *out_err = string_to_c(msg);
                 }
                 2

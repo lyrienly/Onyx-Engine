@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
 use crate::debugger::assembler::Assembler;
 use crate::disasm::Disassembler;
 use crate::hook::make_absolute_jmp_64;
@@ -7,6 +5,8 @@ use crate::process::Process;
 use crate::scanner::{ScanCondition, ScanValue, Scanner, ValType};
 use crate::symbol::SymbolResolver;
 use crate::win32::*;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
 pub struct AaScriptResult {
@@ -132,7 +132,8 @@ impl AutoAssembler {
                     .ok_or_else(|| format!("Invalid alloc size '{}'", parts[1]))?;
 
                 let addr = if parts.len() >= 3 {
-                    let near_target = self.resolve_address(proc, parts[2], &mut resolver.borrow_mut());
+                    let near_target =
+                        self.resolve_address(proc, parts[2], &mut resolver.borrow_mut());
                     if let Some(preferred) = near_target {
                         proc.alloc_near(preferred, size, PAGE_EXECUTE_READWRITE)?
                     } else {
@@ -178,7 +179,9 @@ impl AutoAssembler {
                 let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
                 if parts.len() >= 2 {
                     let name = parts[0];
-                    if let Some(val) = self.resolve_address(proc, parts[1], &mut resolver.borrow_mut()) {
+                    if let Some(val) =
+                        self.resolve_address(proc, parts[1], &mut resolver.borrow_mut())
+                    {
                         self.symbols.insert(name.to_string(), val);
                     }
                 }
@@ -232,7 +235,13 @@ impl AutoAssembler {
                 let inner = &line[16..line.len() - 1];
                 let parts: Vec<&str> = inner.splitn(3, ',').map(|s| s.trim()).collect();
                 if parts.len() >= 3 {
-                    self.execute_aobscanfunction_command(proc, parts[0], parts[1], parts[2], &mut resolver.borrow_mut())?;
+                    self.execute_aobscanfunction_command(
+                        proc,
+                        parts[0],
+                        parts[1],
+                        parts[2],
+                        &mut resolver.borrow_mut(),
+                    )?;
                     continue;
                 }
             }
@@ -241,8 +250,11 @@ impl AutoAssembler {
                 let inner = &line[7..line.len() - 1];
                 let parts: Vec<&str> = inner.splitn(2, ',').map(|s| s.trim()).collect();
                 if parts.len() >= 2 {
-                    let addr = self.resolve_address(proc, parts[0], &mut resolver.borrow_mut())
-                        .ok_or_else(|| format!("Could not resolve assert address '{}'", parts[0]))?;
+                    let addr = self
+                        .resolve_address(proc, parts[0], &mut resolver.borrow_mut())
+                        .ok_or_else(|| {
+                            format!("Could not resolve assert address '{}'", parts[0])
+                        })?;
                     let expected = parse_hex_bytes(parts[1])?;
                     let current = proc.read_bytes(addr, expected.len())?;
                     if current != expected {
@@ -256,7 +268,13 @@ impl AutoAssembler {
                 let inner = &line[5..line.len() - 1];
                 let parts: Vec<&str> = inner.splitn(3, ',').map(|s| s.trim()).collect();
                 if parts.len() >= 3 {
-                    self.execute_hook_command(proc, parts[0], parts[1], parts[2], &mut resolver.borrow_mut())?;
+                    self.execute_hook_command(
+                        proc,
+                        parts[0],
+                        parts[1],
+                        parts[2],
+                        &mut resolver.borrow_mut(),
+                    )?;
                     continue;
                 }
             }
@@ -299,18 +317,20 @@ impl AutoAssembler {
                     if let Some(ip) = current_ip {
                         self.symbols.insert(target_part.to_string(), ip);
                     }
-                } else if let Some(addr) = self.resolve_address(proc, target_part, &mut resolver.borrow_mut()) {
+                } else if let Some(addr) =
+                    self.resolve_address(proc, target_part, &mut resolver.borrow_mut())
+                {
                     current_ip = Some(addr);
                 } else if let Some(ip) = current_ip {
-
                     self.symbols.insert(target_part.to_string(), ip);
                 }
 
                 if !rest.is_empty()
-                    && let Some(ip) = current_ip {
-                        let len = self.estimate_code_len(proc, rest, ip, &resolver)?;
-                        current_ip = Some(ip + len);
-                    }
+                    && let Some(ip) = current_ip
+                {
+                    let len = self.estimate_code_len(proc, rest, ip, &resolver)?;
+                    current_ip = Some(ip + len);
+                }
                 continue;
             }
 
@@ -345,8 +365,11 @@ impl AutoAssembler {
 
             if lower.starts_with("createthread(") && line.ends_with(')') {
                 let addr_str = line[12..line.len() - 1].trim();
-                let target_addr = self.resolve_address(proc, addr_str, &mut resolver.borrow_mut())
-                    .ok_or_else(|| format!("createthread: could not resolve address '{}'", addr_str))?;
+                let target_addr = self
+                    .resolve_address(proc, addr_str, &mut resolver.borrow_mut())
+                    .ok_or_else(|| {
+                        format!("createthread: could not resolve address '{}'", addr_str)
+                    })?;
                 proc.create_thread(target_addr)?;
                 continue;
             }
@@ -355,8 +378,11 @@ impl AutoAssembler {
                 let inner = &line[8..line.len() - 1];
                 let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
                 if parts.len() >= 2 {
-                    let src_addr = self.resolve_address(proc, parts[0], &mut resolver.borrow_mut())
-                        .ok_or_else(|| format!("readmem: could not resolve src address '{}'", parts[0]))?;
+                    let src_addr = self
+                        .resolve_address(proc, parts[0], &mut resolver.borrow_mut())
+                        .ok_or_else(|| {
+                            format!("readmem: could not resolve src address '{}'", parts[0])
+                        })?;
                     let size = parse_number(parts[1])
                         .ok_or_else(|| format!("Invalid readmem size '{}'", parts[1]))?;
 
@@ -376,12 +402,15 @@ impl AutoAssembler {
                     current_ip = Some(*addr);
                 } else if let Some(&sym_addr) = self.symbols.get(target_part) {
                     current_ip = Some(sym_addr);
-                } else if let Some(addr) = self.resolve_address(proc, target_part, &mut resolver.borrow_mut()) {
+                } else if let Some(addr) =
+                    self.resolve_address(proc, target_part, &mut resolver.borrow_mut())
+                {
                     current_ip = Some(addr);
                 }
 
                 if !rest.is_empty() {
-                    let ip = current_ip.ok_or_else(|| format!("No active address for instruction '{}'", rest))?;
+                    let ip = current_ip
+                        .ok_or_else(|| format!("No active address for instruction '{}'", rest))?;
                     let bytes = self.assemble_instruction(proc, rest, ip, &resolver)?;
                     self.write_code_bytes(proc, ip, &bytes)?;
                     current_ip = Some(ip + bytes.len());
@@ -417,7 +446,6 @@ impl AutoAssembler {
             } else if let Some(addr) = self.resolve_address(proc, s, &mut resolver.borrow_mut()) {
                 Some(addr)
             } else {
-
                 Some(ip.wrapping_add(0x1000))
             }
         };
@@ -445,7 +473,12 @@ impl AutoAssembler {
         Assembler::assemble_line(line, ip, &full_resolver)
     }
 
-    fn write_code_bytes(&mut self, proc: &Process, address: usize, bytes: &[u8]) -> Result<(), String> {
+    fn write_code_bytes(
+        &mut self,
+        proc: &Process,
+        address: usize,
+        bytes: &[u8],
+    ) -> Result<(), String> {
         if bytes.is_empty() {
             return Ok(());
         }
@@ -458,7 +491,6 @@ impl AutoAssembler {
         if is_allocated {
             proc.write_raw(address, bytes)?;
         } else {
-
             if let Ok(orig_bytes) = proc.read_bytes(address, bytes.len()) {
                 self.patches.push((address, orig_bytes));
             }
@@ -478,9 +510,11 @@ impl AutoAssembler {
         orig_sym: &str,
         resolver: &mut SymbolResolver,
     ) -> Result<(), String> {
-        let target_addr = self.resolve_address(proc, target_str, resolver)
+        let target_addr = self
+            .resolve_address(proc, target_str, resolver)
             .ok_or_else(|| format!("hook: could not resolve target address '{}'", target_str))?;
-        let dest_addr = self.resolve_address(proc, dest_str, resolver)
+        let dest_addr = self
+            .resolve_address(proc, dest_str, resolver)
             .ok_or_else(|| format!("hook: could not resolve destination address '{}'", dest_str))?;
 
         const MIN_HOOK_SIZE: usize = 14;
@@ -513,7 +547,8 @@ impl AutoAssembler {
 
         let orig_name = orig_sym.trim();
         self.symbols.insert(orig_name.to_string(), orig_alloc);
-        self.allocations.insert(orig_name.to_string(), (orig_alloc, total_orig_size));
+        self.allocations
+            .insert(orig_name.to_string(), (orig_alloc, total_orig_size));
 
         let mut detour = make_absolute_jmp_64(dest_addr);
         while detour.len() < stolen_len {
@@ -535,17 +570,26 @@ impl AutoAssembler {
         target_str: &str,
         resolver: &mut SymbolResolver,
     ) -> Result<(), String> {
-        let target_addr = self.resolve_address(proc, target_str, resolver)
+        let target_addr = self
+            .resolve_address(proc, target_str, resolver)
             .ok_or_else(|| format!("unhook: could not resolve address '{}'", target_str))?;
 
-        if let Some(pos) = self.patches.iter().position(|(addr, _)| *addr == target_addr) {
+        if let Some(pos) = self
+            .patches
+            .iter()
+            .position(|(addr, _)| *addr == target_addr)
+        {
             let (_, original_bytes) = self.patches.remove(pos);
-            let old_protect = proc.protect(target_addr, original_bytes.len(), PAGE_EXECUTE_READWRITE)?;
+            let old_protect =
+                proc.protect(target_addr, original_bytes.len(), PAGE_EXECUTE_READWRITE)?;
             proc.write_raw(target_addr, &original_bytes)?;
             let _ = proc.protect(target_addr, original_bytes.len(), old_protect);
             Ok(())
         } else {
-            Err(format!("unhook: no active hook found for address 0x{:X}", target_addr))
+            Err(format!(
+                "unhook: no active hook found for address 0x{:X}",
+                target_addr
+            ))
         }
     }
 
@@ -557,15 +601,25 @@ impl AutoAssembler {
         aob_str: &str,
         resolver: &mut SymbolResolver,
     ) -> Result<(), String> {
-        let fn_start = self.resolve_address(proc, fn_start_str, resolver)
-            .ok_or_else(|| format!("aobscanfunction: could not resolve function start '{}'", fn_start_str))?;
+        let fn_start = self
+            .resolve_address(proc, fn_start_str, resolver)
+            .ok_or_else(|| {
+                format!(
+                    "aobscanfunction: could not resolve function start '{}'",
+                    fn_start_str
+                )
+            })?;
 
         const MAX_FN_SCAN: usize = 4096;
-        let read_buf = proc.read_bytes(fn_start, MAX_FN_SCAN)
+        let read_buf = proc
+            .read_bytes(fn_start, MAX_FN_SCAN)
             .unwrap_or_else(|_| proc.read_bytes(fn_start, 512).unwrap_or_default());
 
         if read_buf.is_empty() {
-            return Err(format!("aobscanfunction: failed to read memory at 0x{:X}", fn_start));
+            return Err(format!(
+                "aobscanfunction: failed to read memory at 0x{:X}",
+                fn_start
+            ));
         }
 
         let insns = Disassembler::disassemble_block(fn_start, &read_buf, 256);
@@ -599,7 +653,10 @@ impl AutoAssembler {
             }
         }
 
-        Err(format!("aobscanfunction: pattern '{}' not found in function at 0x{:X}", aob_str, fn_start))
+        Err(format!(
+            "aobscanfunction: pattern '{}' not found in function at 0x{:X}",
+            aob_str, fn_start
+        ))
     }
 
     pub fn resolve_address(
@@ -633,21 +690,22 @@ impl AutoAssembler {
             let off = parse_number(off_part)?;
             return Some(base.wrapping_add(off));
         } else if let Some(pos) = trimmed.rfind('-')
-            && pos > 0 {
-                let mod_part = trimmed[..pos].trim().trim_matches('"');
-                let off_part = trimmed[pos + 1..].trim();
+            && pos > 0
+        {
+            let mod_part = trimmed[..pos].trim().trim_matches('"');
+            let off_part = trimmed[pos + 1..].trim();
 
-                let base = if let Some(m) = proc.find_module(mod_part) {
-                    m.base
-                } else if let Some(&sym_addr) = self.symbols.get(mod_part) {
-                    sym_addr
-                } else {
-                    return None;
-                };
+            let base = if let Some(m) = proc.find_module(mod_part) {
+                m.base
+            } else if let Some(&sym_addr) = self.symbols.get(mod_part) {
+                sym_addr
+            } else {
+                return None;
+            };
 
-                let off = parse_number(off_part)?;
-                return Some(base.wrapping_sub(off));
-            }
+            let off = parse_number(off_part)?;
+            return Some(base.wrapping_sub(off));
+        }
 
         if let Some(addr) = resolver.resolve(proc, trimmed) {
             return Some(addr);
@@ -692,12 +750,13 @@ fn strip_comments(line: &str) -> &str {
         s = s[..pos].trim();
     }
     if let Some(pos) = s.find('#')
-        && (pos == 0 || s[..pos].ends_with(|c: char| c.is_whitespace() || c == ',')) {
-            let after = s[pos + 1..].trim();
-            if after.starts_with(|c: char| c.is_ascii_alphabetic()) || after.is_empty() {
-                s = s[..pos].trim();
-            }
+        && (pos == 0 || s[..pos].ends_with(|c: char| c.is_whitespace() || c == ','))
+    {
+        let after = s[pos + 1..].trim();
+        if after.starts_with(|c: char| c.is_ascii_alphabetic()) || after.is_empty() {
+            s = s[..pos].trim();
         }
+    }
     s
 }
 
@@ -710,7 +769,9 @@ fn parse_number(s: &str) -> Option<usize> {
     } else if let Some(rest) = t.strip_prefix('#') {
         rest.trim().parse::<usize>().ok()
     } else {
-        usize::from_str_radix(t, 16).or_else(|_| t.parse::<usize>()).ok()
+        usize::from_str_radix(t, 16)
+            .or_else(|_| t.parse::<usize>())
+            .ok()
     }
 }
 
@@ -718,8 +779,8 @@ fn parse_hex_bytes(s: &str) -> Result<Vec<u8>, String> {
     let mut bytes = Vec::new();
     for part in s.split_whitespace() {
         let clean = part.trim_start_matches("0x").trim_start_matches("0X");
-        let b = u8::from_str_radix(clean, 16)
-            .map_err(|_| format!("Invalid hex byte: '{}'", part))?;
+        let b =
+            u8::from_str_radix(clean, 16).map_err(|_| format!("Invalid hex byte: '{}'", part))?;
         bytes.push(b);
     }
     Ok(bytes)
@@ -772,7 +833,10 @@ mod tests {
 
         let saveable = aa.get_table_saveable_symbols();
         assert!(saveable.contains_key("normal_sym"));
-        assert!(!saveable.contains_key("global_sym"), "CE 7.7: globalalloc symbols must not save in tables");
+        assert!(
+            !saveable.contains_key("global_sym"),
+            "CE 7.7: globalalloc symbols must not save in tables"
+        );
     }
 
     #[test]
@@ -789,8 +853,12 @@ mod tests {
         };
 
         let mut resolver = SymbolResolver::new();
-        let addr_plus = aa.resolve_address(&dummy_proc, "base_sym+0x20", &mut resolver).unwrap();
-        let addr_minus = aa.resolve_address(&dummy_proc, "base_sym-0x10", &mut resolver).unwrap();
+        let addr_plus = aa
+            .resolve_address(&dummy_proc, "base_sym+0x20", &mut resolver)
+            .unwrap();
+        let addr_minus = aa
+            .resolve_address(&dummy_proc, "base_sym-0x10", &mut resolver)
+            .unwrap();
 
         assert_eq!(addr_plus, 0x1020);
         assert_eq!(addr_minus, 0x0FF0);
@@ -819,7 +887,10 @@ mod tests {
 
         let res = aa.execute(&proc, script, true).expect("execute AA script");
         let newmem_addr = *res.registered_symbols.get("newmem").expect("newmem symbol");
-        let returnhere_addr = *res.registered_symbols.get("returnhere").expect("returnhere symbol");
+        let returnhere_addr = *res
+            .registered_symbols
+            .get("returnhere")
+            .expect("returnhere symbol");
         let exit_addr = *res.registered_symbols.get("exit").expect("exit symbol");
 
         assert_eq!(returnhere_addr, newmem_addr + 0x100);

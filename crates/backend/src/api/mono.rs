@@ -1,7 +1,7 @@
-use std::ffi::CStr;
-use std::os::raw::c_char;
 use onyx_core::mono::{MonoDissector, RuntimeType};
 use onyx_core::process::Process;
+use std::ffi::CStr;
+use std::os::raw::c_char;
 
 static mut GLOBAL_DISSECTOR: Option<MonoDissector> = None;
 
@@ -209,7 +209,12 @@ pub unsafe extern "C" fn onyx_mono_read_field_value(
     out_val: *mut c_char,
     max_len: u32,
 ) -> i32 {
-    if process.is_null() || class_name.is_null() || field_name.is_null() || out_val.is_null() || max_len == 0 {
+    if process.is_null()
+        || class_name.is_null()
+        || field_name.is_null()
+        || out_val.is_null()
+        || max_len == 0
+    {
         return 0;
     }
 
@@ -227,7 +232,8 @@ pub unsafe extern "C" fn onyx_mono_read_field_value(
             if cls.name.to_lowercase() == c_str || cls.full_name.to_lowercase() == c_str {
                 for field in &cls.fields {
                     if field.name.to_lowercase() == f_str {
-                        let val_str = MonoDissector::read_field_value(proc, instance_address, field);
+                        let val_str =
+                            MonoDissector::read_field_value(proc, instance_address, field);
                         let bytes = val_str.as_bytes();
                         let copy_len = bytes.len().min((max_len - 1) as usize);
                         std::ptr::copy_nonoverlapping(bytes.as_ptr(), out_val as *mut u8, copy_len);

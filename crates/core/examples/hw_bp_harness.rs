@@ -1,12 +1,12 @@
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use onyx_core::debugger::{
-    read_thread_debug_registers, BreakpointSize, BreakpointType, HardwareBreakpointMonitor,
-    HwBpError, VehDebugger,
+    BreakpointSize, BreakpointType, HardwareBreakpointMonitor, HwBpError, VehDebugger,
+    read_thread_debug_registers,
 };
 use onyx_core::process::Process;
 
@@ -52,7 +52,11 @@ impl Target {
     }
 
     fn send(&mut self, command: &str) -> Result<(), String> {
-        let stdin = self.child.stdin.as_mut().ok_or("stdin do alvo indisponivel")?;
+        let stdin = self
+            .child
+            .stdin
+            .as_mut()
+            .ok_or("stdin do alvo indisponivel")?;
         stdin
             .write_all(format!("{command}\n").as_bytes())
             .map_err(|error| error.to_string())?;
@@ -150,7 +154,9 @@ fn run() -> Result<(), String> {
         BreakpointType::Write,
         BreakpointSize::Byte8,
     ) {
-        Err(HwBpError::NoFreeSlot) => println!("2/6 quinto breakpoint recusado com NoFreeSlot (-2)"),
+        Err(HwBpError::NoFreeSlot) => {
+            println!("2/6 quinto breakpoint recusado com NoFreeSlot (-2)")
+        }
         other => return Err(format!("esperava NoFreeSlot, obteve {other:?}")),
     }
 

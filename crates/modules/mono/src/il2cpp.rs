@@ -60,7 +60,13 @@ pub fn parse_global_metadata_header(bytes: &[u8]) -> Option<Il2CppMetadataHeader
         return None;
     }
 
-    let u32_at = |off: usize| -> Option<u32> { bytes.get(off..off + 4)?.try_into().ok().map(u32::from_le_bytes) };
+    let u32_at = |off: usize| -> Option<u32> {
+        bytes
+            .get(off..off + 4)?
+            .try_into()
+            .ok()
+            .map(u32::from_le_bytes)
+    };
 
     Some(Il2CppMetadataHeader {
         sanity,
@@ -88,7 +94,9 @@ pub fn parse_global_metadata_header(bytes: &[u8]) -> Option<Il2CppMetadataHeader
 /// terminadas em NUL).
 pub fn enumerate_strings(bytes: &[u8], header: &Il2CppMetadataHeader) -> Vec<String> {
     let start = header.string_offset as usize;
-    let end = start.saturating_add(header.string_size as usize).min(bytes.len());
+    let end = start
+        .saturating_add(header.string_size as usize)
+        .min(bytes.len());
     if start >= end {
         return Vec::new();
     }
@@ -162,7 +170,11 @@ mod tests {
         let strings = enumerate_strings(&bytes, &header);
         assert_eq!(
             strings,
-            vec!["Il2CppObject".to_string(), "GameManager".to_string(), "AddCoins".to_string()]
+            vec![
+                "Il2CppObject".to_string(),
+                "GameManager".to_string(),
+                "AddCoins".to_string()
+            ]
         );
     }
 

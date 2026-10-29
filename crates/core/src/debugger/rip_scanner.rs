@@ -1,5 +1,5 @@
-use crate::process::Process;
 use crate::debugger::disasm::Disassembler;
+use crate::process::Process;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RipRelativeMatch {
@@ -13,7 +13,6 @@ pub struct RipRelativeMatch {
 pub struct RipRelativeScanner;
 
 impl RipRelativeScanner {
-
     pub fn scan_buffer(
         code: &[u8],
         base_address: usize,
@@ -23,7 +22,6 @@ impl RipRelativeScanner {
         let mut offset = 0;
 
         while offset < code.len() {
-
             if offset + 1 < code.len() && code[offset] == 0 && code[offset + 1] == 0 {
                 let current_addr = base_address + offset;
                 let align_skip = 8 - (current_addr % 8);
@@ -96,7 +94,8 @@ impl RipRelativeScanner {
         module_name: &str,
         target_filter: Option<usize>,
     ) -> Result<Vec<RipRelativeMatch>, String> {
-        let m = proc.find_module(module_name)
+        let m = proc
+            .find_module(module_name)
             .ok_or_else(|| format!("Module '{}' not found", module_name))?;
 
         Self::scan_range(proc, m.base, m.base + m.size, target_filter)
@@ -109,7 +108,6 @@ mod tests {
 
     #[test]
     fn test_scan_buffer_rip_relative() {
-
         let mut code = vec![0x48, 0x8B, 0x05, 0x0A, 0x00, 0x00, 0x00];
 
         code.extend(vec![0x90, 0x90, 0x90]);

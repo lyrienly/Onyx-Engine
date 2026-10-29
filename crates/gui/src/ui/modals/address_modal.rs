@@ -1,6 +1,6 @@
-use eframe::egui::{self, Color32, RichText};
 use crate::app::OnyxEngineApp;
 use crate::state::GuiTableEntry;
+use eframe::egui::{self, Color32, RichText};
 
 pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
     if !app.show_add_addr_modal {
@@ -22,21 +22,39 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
             }
 
             egui::CentralPanel::default()
-                .frame(egui::Frame::none().fill(Color32::from_rgb(26, 29, 36)).inner_margin(egui::Margin::same(8.0)))
+                .frame(
+                    egui::Frame::none()
+                        .fill(Color32::from_rgb(26, 29, 36))
+                        .inner_margin(egui::Margin::same(8.0)),
+                )
                 .show(ctx, |ui| {
-                    ui.checkbox(&mut app.manual_is_pointer, RichText::new("Pointer").strong());
+                    ui.checkbox(
+                        &mut app.manual_is_pointer,
+                        RichText::new("Pointer").strong(),
+                    );
 
                     if !app.manual_is_pointer {
                         ui.label("Address (Hex):");
-                        ui.add(egui::TextEdit::singleline(&mut app.manual_addr_text).desired_width((ui.available_width() - 20.0).max(180.0)).font(egui::TextStyle::Monospace));
+                        ui.add(
+                            egui::TextEdit::singleline(&mut app.manual_addr_text)
+                                .desired_width((ui.available_width() - 20.0).max(180.0))
+                                .font(egui::TextStyle::Monospace),
+                        );
                     } else {
                         ui.group(|ui| {
                             ui.label(RichText::new("Base Pointer:").strong());
                             ui.horizontal(|ui| {
                                 ui.label("Module:");
-                                ui.add(egui::TextEdit::singleline(&mut app.manual_module_text).desired_width(120.0));
+                                ui.add(
+                                    egui::TextEdit::singleline(&mut app.manual_module_text)
+                                        .desired_width(120.0),
+                                );
                                 ui.label("Offset:");
-                                ui.add(egui::TextEdit::singleline(&mut app.manual_base_offset_text).desired_width(80.0).font(egui::TextStyle::Monospace));
+                                ui.add(
+                                    egui::TextEdit::singleline(&mut app.manual_base_offset_text)
+                                        .desired_width(80.0)
+                                        .font(egui::TextStyle::Monospace),
+                                );
                             });
 
                             ui.separator();
@@ -45,7 +63,11 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                             for (i, off_str) in app.manual_offsets.iter_mut().enumerate() {
                                 ui.horizontal(|ui| {
                                     ui.label(format!("Offset {}:", i));
-                                    ui.add(egui::TextEdit::singleline(off_str).desired_width(80.0).font(egui::TextStyle::Monospace));
+                                    ui.add(
+                                        egui::TextEdit::singleline(off_str)
+                                            .desired_width(80.0)
+                                            .font(egui::TextStyle::Monospace),
+                                    );
                                     if ui.button("[x]").clicked() {
                                         remove_idx = Some(i);
                                     }
@@ -61,7 +83,10 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                     }
 
                     ui.label("Description:");
-                    ui.add(egui::TextEdit::singleline(&mut app.manual_desc_text).desired_width((ui.available_width() - 20.0).max(180.0)));
+                    ui.add(
+                        egui::TextEdit::singleline(&mut app.manual_desc_text)
+                            .desired_width((ui.available_width() - 20.0).max(180.0)),
+                    );
 
                     ui.label("Type:");
                     let val_types = [
@@ -88,13 +113,18 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
 
                     ui.add_space(8.0);
                     ui.horizontal(|ui| {
-                        if ui.button(RichText::new("Add").strong().color(Color32::GREEN)).clicked() {
+                        if ui
+                            .button(RichText::new("Add").strong().color(Color32::GREEN))
+                            .clicked()
+                        {
                             let val_type = app.parse_manual_val_type();
 
                             if !app.manual_is_pointer {
                                 let addr = OnyxEngineApp::parse_hex_addr(&app.manual_addr_text, 0);
                                 let cur_val = if let Some(proc) = &app.attached_proc {
-                                    proc.read::<i32>(addr).map(|v| v.to_string()).unwrap_or("???".to_string())
+                                    proc.read::<i32>(addr)
+                                        .map(|v| v.to_string())
+                                        .unwrap_or("???".to_string())
                                 } else {
                                     "???".to_string()
                                 };
@@ -111,8 +141,10 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                                     target_val: cur_val,
                                 });
                             } else {
-                                let base_offset = OnyxEngineApp::parse_hex_addr(&app.manual_base_offset_text, 0);
-                                let offsets: Vec<usize> = app.manual_offsets
+                                let base_offset =
+                                    OnyxEngineApp::parse_hex_addr(&app.manual_base_offset_text, 0);
+                                let offsets: Vec<usize> = app
+                                    .manual_offsets
                                     .iter()
                                     .map(|s| OnyxEngineApp::parse_hex_addr(s, 0))
                                     .collect();

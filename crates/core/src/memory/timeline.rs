@@ -181,15 +181,16 @@ impl MemoryTimeline {
 
         for frame in 1..self.frames.len() {
             if let Some(current) = self.read_byte(address, frame)
-                && current != previous {
-                    events.push(ChangeEvent {
-                        frame,
-                        timestamp: self.frames[frame].timestamp,
-                        old: previous,
-                        new: current,
-                    });
-                    previous = current;
-                }
+                && current != previous
+            {
+                events.push(ChangeEvent {
+                    frame,
+                    timestamp: self.frames[frame].timestamp,
+                    old: previous,
+                    new: current,
+                });
+                previous = current;
+            }
         }
 
         events
@@ -215,12 +216,13 @@ impl MemoryTimeline {
         let mut merged: Vec<(usize, usize)> = Vec::new();
         for (start, end) in ranges {
             if let Some(last) = merged.last_mut()
-                && start <= last.1 {
-                    if end > last.1 {
-                        last.1 = end;
-                    }
-                    continue;
+                && start <= last.1
+            {
+                if end > last.1 {
+                    last.1 = end;
                 }
+                continue;
+            }
             merged.push((start, end));
         }
         merged
@@ -297,8 +299,24 @@ mod tests {
 
         let events = tl.changes_for_byte(0x4001);
         assert_eq!(events.len(), 2);
-        assert_eq!(events[0], ChangeEvent { frame: 1, timestamp: 200, old: 0x00, new: 0xAA });
-        assert_eq!(events[1], ChangeEvent { frame: 3, timestamp: 300, old: 0xAA, new: 0xBB });
+        assert_eq!(
+            events[0],
+            ChangeEvent {
+                frame: 1,
+                timestamp: 200,
+                old: 0x00,
+                new: 0xAA
+            }
+        );
+        assert_eq!(
+            events[1],
+            ChangeEvent {
+                frame: 3,
+                timestamp: 300,
+                old: 0xAA,
+                new: 0xBB
+            }
+        );
         assert!(tl.changes_for_byte(0x4002).is_empty());
     }
 

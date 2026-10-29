@@ -1,8 +1,8 @@
+use crate::app::OnyxEngineApp;
+use crate::state::GuiTableEntry;
 use eframe::egui::{self, Color32, RichText, Stroke, Vec2};
 use onyx_core::mono::MonoDissector;
 use onyx_core::scanner::ValType;
-use crate::app::OnyxEngineApp;
-use crate::state::GuiTableEntry;
 
 pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
     if !app.show_mono_modal {

@@ -27,7 +27,9 @@ impl core::fmt::Display for ResolveError {
         match self {
             ResolveError::WindowClass => write!(f, "falha ao registrar window class"),
             ResolveError::Window => write!(f, "falha ao criar janela cobaia"),
-            ResolveError::Device(hr) => write!(f, "D3D11CreateDeviceAndSwapChain falhou: {:#x}", hr),
+            ResolveError::Device(hr) => {
+                write!(f, "D3D11CreateDeviceAndSwapChain falhou: {:#x}", hr)
+            }
             ResolveError::NullVtable => write!(f, "vtable da swapchain invalida"),
         }
     }

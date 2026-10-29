@@ -58,7 +58,10 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<str>,
 {
-    let names: Vec<String> = modules.into_iter().map(|s| s.as_ref().to_string()).collect();
+    let names: Vec<String> = modules
+        .into_iter()
+        .map(|s| s.as_ref().to_string())
+        .collect();
 
     let has_mono = names
         .iter()
@@ -112,13 +115,12 @@ pub fn module_names_of_pid(pid: u32) -> Result<Vec<String>, String> {
     use std::os::windows::ffi::OsStringExt;
     use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE};
     use windows_sys::Win32::System::Diagnostics::ToolHelp::{
-        CreateToolhelp32Snapshot, Module32FirstW, Module32NextW, MODULEENTRY32W,
-        TH32CS_SNAPMODULE, TH32CS_SNAPMODULE32,
+        CreateToolhelp32Snapshot, Module32FirstW, Module32NextW, MODULEENTRY32W, TH32CS_SNAPMODULE,
+        TH32CS_SNAPMODULE32,
     };
 
     unsafe {
-        let snap: HANDLE =
-            CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid);
+        let snap: HANDLE = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid);
         if snap == INVALID_HANDLE_VALUE {
             return Err(format!("CreateToolhelp32Snapshot failed for pid {}", pid));
         }
@@ -190,7 +192,10 @@ mod tests {
         let modules = vec!["GameAssembly.dll", "UnityPlayer.dll", "kernel32.dll"];
         let r = detect_from_module_names(modules);
         match r {
-            MonoRuntime::Il2Cpp { module, unity_player } => {
+            MonoRuntime::Il2Cpp {
+                module,
+                unity_player,
+            } => {
                 assert!(module.eq_ignore_ascii_case("GameAssembly.dll"));
                 assert_eq!(
                     unity_player.as_deref().map(|s| s.to_ascii_lowercase()),

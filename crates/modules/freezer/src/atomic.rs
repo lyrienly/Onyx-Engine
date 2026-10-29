@@ -52,7 +52,6 @@ pub type FreezeId = u64;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FreezeMode {
-
     Normal,
 
     Increment(i64),
@@ -120,8 +119,7 @@ impl AtomicFreezer {
 
     pub fn set_interval(&self, interval: Duration) {
         let us = interval.as_micros() as u64;
-        self.interval_us
-            .store(us.max(1_000), Ordering::SeqCst);
+        self.interval_us.store(us.max(1_000), Ordering::SeqCst);
     }
 
     pub fn freeze(&self, address: usize, value: Vec<u8>, mode: FreezeMode) -> FreezeId {

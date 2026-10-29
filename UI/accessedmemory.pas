@@ -144,7 +144,7 @@ var
   plist: PPListDescriptor;
   found: boolean;
   search: TPListDescriptor;
-  n: TAVLTreeNode;
+  n: TAvgLvlTreeNode;
 begin
   {$ifdef windows}
   if watchinfo=nil then

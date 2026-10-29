@@ -2,15 +2,16 @@ use onyx_disasm::{build_cfg, cfg_to_dot, disassemble, FlowType};
 
 #[test]
 fn decodes_known_mov_sequence() {
-
     let code: &[u8] = &[
-        0x48, 0x89, 0x5C, 0x24, 0x08,
-        0x48, 0x89, 0x74, 0x24, 0x10,
-        0x57,
-        0xC3,
+        0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x74, 0x24, 0x10, 0x57, 0xC3,
     ];
     let insns = disassemble(code, 0x1000);
-    assert_eq!(insns.len(), 4, "expected 4 instructions, got {}", insns.len());
+    assert_eq!(
+        insns.len(),
+        4,
+        "expected 4 instructions, got {}",
+        insns.len()
+    );
     assert_eq!(insns[0].address, 0x1000);
     assert_eq!(insns[0].mnemonic, "mov");
     assert!(insns[0].operands.contains("rsp"));
@@ -23,14 +24,7 @@ fn decodes_known_mov_sequence() {
 
 #[test]
 fn cfg_splits_on_conditional_jump() {
-
-    let code: &[u8] = &[
-        0x83, 0xF8, 0x00,
-        0x74, 0x02,
-        0x90,
-        0x90,
-        0xC3,
-    ];
+    let code: &[u8] = &[0x83, 0xF8, 0x00, 0x74, 0x02, 0x90, 0x90, 0xC3];
     let insns = disassemble(code, 0x1000);
     assert!(!insns.is_empty());
     let graph = build_cfg(&insns);
@@ -70,11 +64,16 @@ fn e2e_disassembles_ntdll_function_and_dumps_cfg() {
     let base = func_addr as u64;
 
     let mut raw = vec![0u8; 512];
-    unsafe { std::ptr::copy_nonoverlapping(func_addr, raw.as_mut_ptr(), raw.len()); }
+    unsafe {
+        std::ptr::copy_nonoverlapping(func_addr, raw.as_mut_ptr(), raw.len());
+    }
 
     let insns = disassemble(&raw, base);
     assert!(!insns.is_empty(), "no instructions decoded from ntdll");
-    assert_eq!(insns[0].address, base, "first instruction must start at base");
+    assert_eq!(
+        insns[0].address, base,
+        "first instruction must start at base"
+    );
 
     let graph = build_cfg(&insns);
     assert!(!graph.blocks.is_empty(), "cfg must have >= 1 block");
@@ -95,7 +94,12 @@ fn e2e_disassembles_ntdll_function_and_dumps_cfg() {
         let log_path = scratch.join("e2e_feat_issue_14.log");
         if let Ok(mut f) = std::fs::File::create(&log_path) {
             let _ = writeln!(f, "NtQueryInformationProcess @ 0x{:X}", base);
-            let _ = writeln!(f, "decoded {} instructions, {} blocks", insns.len(), graph.blocks.len());
+            let _ = writeln!(
+                f,
+                "decoded {} instructions, {} blocks",
+                insns.len(),
+                graph.blocks.len()
+            );
             for insn in &insns {
                 let _ = writeln!(f, "{}", onyx_disasm::format_instruction(insn));
             }

@@ -1,8 +1,8 @@
 use crate::process::Process;
 
 pub const REGISTER_NAMES: [&str; 16] = [
-    "RAX", "RBX", "RCX", "RDX", "RSI", "RDI", "RBP", "RSP",
-    "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15",
+    "RAX", "RBX", "RCX", "RDX", "RSI", "RDI", "RBP", "RSP", "R8", "R9", "R10", "R11", "R12", "R13",
+    "R14", "R15",
 ];
 
 #[repr(C)]
@@ -77,7 +77,6 @@ pub struct StructureDifference {
 pub struct CommonalityAnalyzer;
 
 impl CommonalityAnalyzer {
-
     pub fn analyze_registers(
         group1: &[RegisterSnapshot],
         group2: &[RegisterSnapshot],
@@ -85,8 +84,14 @@ impl CommonalityAnalyzer {
         let mut results = Vec::new();
 
         for (idx, &name) in REGISTER_NAMES.iter().enumerate() {
-            let g1_vals: Vec<u64> = group1.iter().filter_map(|s| s.get_reg_by_index(idx)).collect();
-            let g2_vals: Vec<u64> = group2.iter().filter_map(|s| s.get_reg_by_index(idx)).collect();
+            let g1_vals: Vec<u64> = group1
+                .iter()
+                .filter_map(|s| s.get_reg_by_index(idx))
+                .collect();
+            let g2_vals: Vec<u64> = group2
+                .iter()
+                .filter_map(|s| s.get_reg_by_index(idx))
+                .collect();
 
             let g1_constant = !g1_vals.is_empty() && g1_vals.iter().all(|&v| v == g1_vals[0]);
             let g2_constant = !g2_vals.is_empty() && g2_vals.iter().all(|&v| v == g2_vals[0]);
@@ -98,7 +103,6 @@ impl CommonalityAnalyzer {
                 if g1_constant && g2_constant {
                     g1_sample != g2_sample
                 } else {
-
                     !g1_vals.iter().any(|v1| g2_vals.contains(v1))
                 }
             } else {
@@ -155,7 +159,12 @@ impl CommonalityAnalyzer {
             let mut g1_vals = Vec::new();
             for buf in &g1_data {
                 if offset + 4 <= buf.len() {
-                    let val = u32::from_le_bytes([buf[offset], buf[offset + 1], buf[offset + 2], buf[offset + 3]]) as u64;
+                    let val = u32::from_le_bytes([
+                        buf[offset],
+                        buf[offset + 1],
+                        buf[offset + 2],
+                        buf[offset + 3],
+                    ]) as u64;
                     g1_vals.push(val);
                 }
             }
@@ -163,7 +172,12 @@ impl CommonalityAnalyzer {
             let mut g2_vals = Vec::new();
             for buf in &g2_data {
                 if offset + 4 <= buf.len() {
-                    let val = u32::from_le_bytes([buf[offset], buf[offset + 1], buf[offset + 2], buf[offset + 3]]) as u64;
+                    let val = u32::from_le_bytes([
+                        buf[offset],
+                        buf[offset + 1],
+                        buf[offset + 2],
+                        buf[offset + 3],
+                    ]) as u64;
                     g2_vals.push(val);
                 }
             }
@@ -206,13 +220,30 @@ mod tests {
 
     #[test]
     fn test_analyze_registers() {
-        let snap_p1 = RegisterSnapshot { rax: 0x100, rsi: 0x7FFE0000, ..Default::default() };
-        let snap_p2 = RegisterSnapshot { rax: 0x100, rsi: 0x7FFE0000, ..Default::default() };
+        let snap_p1 = RegisterSnapshot {
+            rax: 0x100,
+            rsi: 0x7FFE0000,
+            ..Default::default()
+        };
+        let snap_p2 = RegisterSnapshot {
+            rax: 0x100,
+            rsi: 0x7FFE0000,
+            ..Default::default()
+        };
 
-        let snap_e1 = RegisterSnapshot { rax: 0x200, rsi: 0x7FFE5000, ..Default::default() };
-        let snap_e2 = RegisterSnapshot { rax: 0x200, rsi: 0x7FFE6000, ..Default::default() };
+        let snap_e1 = RegisterSnapshot {
+            rax: 0x200,
+            rsi: 0x7FFE5000,
+            ..Default::default()
+        };
+        let snap_e2 = RegisterSnapshot {
+            rax: 0x200,
+            rsi: 0x7FFE6000,
+            ..Default::default()
+        };
 
-        let comps = CommonalityAnalyzer::analyze_registers(&[snap_p1, snap_p2], &[snap_e1, snap_e2]);
+        let comps =
+            CommonalityAnalyzer::analyze_registers(&[snap_p1, snap_p2], &[snap_e1, snap_e2]);
 
         let rax_comp = comps.iter().find(|c| c.reg_name == "RAX").unwrap();
         assert!(rax_comp.g1_constant);

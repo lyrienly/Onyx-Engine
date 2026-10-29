@@ -18,7 +18,6 @@ pub enum AccessType {
 }
 
 impl AccessType {
-
     pub fn from_exception_info(code: ULONG_PTR) -> AccessType {
         match code {
             0 => AccessType::Read,
@@ -62,7 +61,11 @@ pub fn page_base(addr: u64) -> u64 {
     addr & !(PAGE_SIZE as u64 - 1)
 }
 
-pub fn match_bp(bps: &HashMap<BpId, PageGuardBreakpoint>, fault_address: u64, observed: AccessType) -> Option<BpId> {
+pub fn match_bp(
+    bps: &HashMap<BpId, PageGuardBreakpoint>,
+    fault_address: u64,
+    observed: AccessType,
+) -> Option<BpId> {
     for bp in bps.values() {
         let start = bp.address;
         let end = bp.address.saturating_add(bp.size as u64);
@@ -126,15 +129,8 @@ unsafe impl Send for PageGuardManager {}
 unsafe impl Sync for PageGuardManager {}
 
 impl PageGuardManager {
-
     pub fn attach(pid: u32) -> Result<Self, PageGuardError> {
-        let h_process = unsafe {
-            OpenProcess(
-                PROCESS_ALL_ACCESS,
-                FALSE,
-                pid,
-            )
-        };
+        let h_process = unsafe { OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid) };
         if h_process.is_null() {
             return Err(PageGuardError::OpenProcessFailed);
         }
@@ -199,7 +195,12 @@ impl PageGuardManager {
         inner.callback = Some(Box::new(callback));
     }
 
-    pub fn set(&self, address: u64, size: usize, access: AccessType) -> Result<BpId, PageGuardError> {
+    pub fn set(
+        &self,
+        address: u64,
+        size: usize,
+        access: AccessType,
+    ) -> Result<BpId, PageGuardError> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let page = page_base(address);
 
@@ -222,7 +223,11 @@ impl PageGuardManager {
             address,
             size,
             access,
-            original_protect: if old_protect == 0 { PAGE_READWRITE } else { old_protect & !PAGE_GUARD },
+            original_protect: if old_protect == 0 {
+                PAGE_READWRITE
+            } else {
+                old_protect & !PAGE_GUARD
+            },
         };
         self.inner.lock().unwrap().bps.insert(id, bp);
         Ok(id)
@@ -293,7 +298,10 @@ fn run_event_loop(h_process: HANDLE, inner: Arc<Mutex<Inner>>, stop: Arc<AtomicB
     let mut event: DEBUG_EVENT = unsafe { zeroed() };
     let trace = std::env::var("ONYX_PAGE_GUARD_TRACE").is_ok();
     if trace {
-        eprintln!("[pg] worker iniciado (h_process=0x{:X})", h_process as usize);
+        eprintln!(
+            "[pg] worker iniciado (h_process=0x{:X})",
+            h_process as usize
+        );
     }
 
     while !stop.load(Ordering::Relaxed) {
@@ -316,7 +324,8 @@ fn run_event_loop(h_process: HANDLE, inner: Arc<Mutex<Inner>>, stop: Arc<AtomicB
                 let code = ex.ExceptionRecord.ExceptionCode;
 
                 if code == EXCEPTION_GUARD_PAGE {
-                    let access = AccessType::from_exception_info(ex.ExceptionRecord.ExceptionInformation[0]);
+                    let access =
+                        AccessType::from_exception_info(ex.ExceptionRecord.ExceptionInformation[0]);
                     let fault_addr = ex.ExceptionRecord.ExceptionInformation[1] as u64;
                     let tid = event.dwThreadId;
                     if trace {
@@ -388,7 +397,6 @@ fn run_event_loop(h_process: HANDLE, inner: Arc<Mutex<Inner>>, stop: Arc<AtomicB
 
                     continue_status = DBG_CONTINUE;
                 } else if code == EXCEPTION_BREAKPOINT {
-
                     continue_status = DBG_CONTINUE;
                 } else {
                     continue_status = DBG_EXCEPTION_NOT_HANDLED;
@@ -453,7 +461,6 @@ mod tests {
 
     #[test]
     fn match_bp_filtra_falso_positivo_na_mesma_pagina() {
-
         let mut bps = HashMap::new();
         bps.insert(1, mk_bp(1, 0x4000_1000, 4, AccessType::Write));
         bps.insert(2, mk_bp(2, 0x4000_1800, 8, AccessType::Write));

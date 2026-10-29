@@ -4,7 +4,6 @@ use std::sync::{OnceLock, RwLock};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum VehDisposition {
-
     Search,
 
     Continue,
@@ -74,7 +73,6 @@ unsafe impl Send for VehRegistration {}
 unsafe impl Sync for VehRegistration {}
 
 impl VehRegistration {
-
     pub fn install() -> Option<Self> {
         let handle = unsafe { AddVectoredExceptionHandler(1, dispatcher) };
         if handle.is_null() {
@@ -143,11 +141,9 @@ pub(crate) unsafe extern "system" fn dispatcher(ex: *mut EXCEPTION_POINTERS) -> 
             if h.matches(rec, &ctx_snapshot) {
                 let d = h.handle(rec, ctx);
                 if d == VehDisposition::Continue {
-
                     ctx.EFlags &= !EFLAGS_RF;
 
-                    ctx.ContextFlags |= CONTEXT_CONTROL | CONTEXT_INTEGER
-                        | CONTEXT_DEBUG_REGISTERS;
+                    ctx.ContextFlags |= CONTEXT_CONTROL | CONTEXT_INTEGER | CONTEXT_DEBUG_REGISTERS;
                 }
                 return d.as_ntstatus();
             }

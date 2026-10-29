@@ -29,7 +29,11 @@ impl fmt::Display for ParseError {
             ParseError::Incomplete => write!(f, "pacote incompleto"),
             ParseError::MissingStart => write!(f, "sem delimitador $"),
             ParseError::BadChecksum { expected, actual } => {
-                write!(f, "checksum invalido esperado={:02x} atual={:02x}", expected, actual)
+                write!(
+                    f,
+                    "checksum invalido esperado={:02x} atual={:02x}",
+                    expected, actual
+                )
             }
             ParseError::BadHex => write!(f, "hex invalido no checksum"),
         }
@@ -135,7 +139,6 @@ mod tests {
 
     #[test]
     fn checksum_sanity() {
-
         assert_eq!(checksum(b"OK"), 0x9a);
     }
 

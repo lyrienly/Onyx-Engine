@@ -32,10 +32,22 @@ pub struct OnyxGdbRegisters {
 impl From<&Registers> for OnyxGdbRegisters {
     fn from(r: &Registers) -> Self {
         Self {
-            rax: r.rax, rbx: r.rbx, rcx: r.rcx, rdx: r.rdx,
-            rsi: r.rsi, rdi: r.rdi, rbp: r.rbp, rsp: r.rsp,
-            r8: r.r8, r9: r.r9, r10: r.r10, r11: r.r11,
-            r12: r.r12, r13: r.r13, r14: r.r14, r15: r.r15,
+            rax: r.rax,
+            rbx: r.rbx,
+            rcx: r.rcx,
+            rdx: r.rdx,
+            rsi: r.rsi,
+            rdi: r.rdi,
+            rbp: r.rbp,
+            rsp: r.rsp,
+            r8: r.r8,
+            r9: r.r9,
+            r10: r.r10,
+            r11: r.r11,
+            r12: r.r12,
+            r13: r.r13,
+            r14: r.r14,
+            r15: r.r15,
             rip: r.rip,
         }
     }
@@ -44,10 +56,22 @@ impl From<&Registers> for OnyxGdbRegisters {
 impl From<&OnyxGdbRegisters> for Registers {
     fn from(r: &OnyxGdbRegisters) -> Self {
         Self {
-            rax: r.rax, rbx: r.rbx, rcx: r.rcx, rdx: r.rdx,
-            rsi: r.rsi, rdi: r.rdi, rbp: r.rbp, rsp: r.rsp,
-            r8: r.r8, r9: r.r9, r10: r.r10, r11: r.r11,
-            r12: r.r12, r13: r.r13, r14: r.r14, r15: r.r15,
+            rax: r.rax,
+            rbx: r.rbx,
+            rcx: r.rcx,
+            rdx: r.rdx,
+            rsi: r.rsi,
+            rdi: r.rdi,
+            rbp: r.rbp,
+            rsp: r.rsp,
+            r8: r.r8,
+            r9: r.r9,
+            r10: r.r10,
+            r11: r.r11,
+            r12: r.r12,
+            r13: r.r13,
+            r14: r.r14,
+            r15: r.r15,
             rip: r.rip,
         }
     }
@@ -55,16 +79,26 @@ impl From<&OnyxGdbRegisters> for Registers {
 
 #[repr(C)]
 pub struct OnyxGdbTargetVTable {
-    pub read_registers: Option<unsafe extern "C" fn(user: *mut c_void, out: *mut OnyxGdbRegisters) -> i32>,
-    pub write_registers: Option<unsafe extern "C" fn(user: *mut c_void, regs: *const OnyxGdbRegisters) -> i32>,
-    pub read_memory: Option<unsafe extern "C" fn(user: *mut c_void, addr: u64, out_buf: *mut u8, len: usize) -> i32>,
-    pub write_memory: Option<unsafe extern "C" fn(user: *mut c_void, addr: u64, buf: *const u8, len: usize) -> i32>,
+    pub read_registers:
+        Option<unsafe extern "C" fn(user: *mut c_void, out: *mut OnyxGdbRegisters) -> i32>,
+    pub write_registers:
+        Option<unsafe extern "C" fn(user: *mut c_void, regs: *const OnyxGdbRegisters) -> i32>,
+    pub read_memory: Option<
+        unsafe extern "C" fn(user: *mut c_void, addr: u64, out_buf: *mut u8, len: usize) -> i32,
+    >,
+    pub write_memory: Option<
+        unsafe extern "C" fn(user: *mut c_void, addr: u64, buf: *const u8, len: usize) -> i32,
+    >,
     pub cont: Option<unsafe extern "C" fn(user: *mut c_void, out_reason: *mut u32) -> i32>,
     pub step: Option<unsafe extern "C" fn(user: *mut c_void, out_reason: *mut u32) -> i32>,
-    pub add_sw_breakpoint: Option<unsafe extern "C" fn(user: *mut c_void, addr: u64, kind: u32) -> i32>,
-    pub remove_sw_breakpoint: Option<unsafe extern "C" fn(user: *mut c_void, addr: u64, kind: u32) -> i32>,
-    pub add_hw_breakpoint: Option<unsafe extern "C" fn(user: *mut c_void, addr: u64, kind: u32) -> i32>,
-    pub remove_hw_breakpoint: Option<unsafe extern "C" fn(user: *mut c_void, addr: u64, kind: u32) -> i32>,
+    pub add_sw_breakpoint:
+        Option<unsafe extern "C" fn(user: *mut c_void, addr: u64, kind: u32) -> i32>,
+    pub remove_sw_breakpoint:
+        Option<unsafe extern "C" fn(user: *mut c_void, addr: u64, kind: u32) -> i32>,
+    pub add_hw_breakpoint:
+        Option<unsafe extern "C" fn(user: *mut c_void, addr: u64, kind: u32) -> i32>,
+    pub remove_hw_breakpoint:
+        Option<unsafe extern "C" fn(user: *mut c_void, addr: u64, kind: u32) -> i32>,
 }
 
 struct CTarget {
@@ -84,43 +118,84 @@ fn reason_from_u32(v: u32) -> StopReason {
 
 impl GdbTarget for CTarget {
     fn read_registers(&self) -> io::Result<Registers> {
-        let f = self.vt.read_registers.ok_or_else(|| io::Error::new(io::ErrorKind::Other, "unimpl"))?;
+        let f = self
+            .vt
+            .read_registers
+            .ok_or_else(|| io::Error::other("unimpl"))?;
         let mut out = OnyxGdbRegisters {
-            rax: 0, rbx: 0, rcx: 0, rdx: 0, rsi: 0, rdi: 0, rbp: 0, rsp: 0,
-            r8: 0, r9: 0, r10: 0, r11: 0, r12: 0, r13: 0, r14: 0, r15: 0, rip: 0,
+            rax: 0,
+            rbx: 0,
+            rcx: 0,
+            rdx: 0,
+            rsi: 0,
+            rdi: 0,
+            rbp: 0,
+            rsp: 0,
+            r8: 0,
+            r9: 0,
+            r10: 0,
+            r11: 0,
+            r12: 0,
+            r13: 0,
+            r14: 0,
+            r15: 0,
+            rip: 0,
         };
         let rc = unsafe { f(self.user, &mut out) };
         if rc != 0 {
-            return Err(io::Error::new(io::ErrorKind::Other, "read_regs"));
+            return Err(io::Error::other("read_regs"));
         }
         Ok(Registers::from(&out))
     }
 
     fn write_registers(&mut self, regs: &Registers) -> io::Result<()> {
-        let f = self.vt.write_registers.ok_or_else(|| io::Error::new(io::ErrorKind::Other, "unimpl"))?;
+        let f = self
+            .vt
+            .write_registers
+            .ok_or_else(|| io::Error::other("unimpl"))?;
         let c = OnyxGdbRegisters::from(regs);
         let rc = unsafe { f(self.user, &c) };
-        if rc != 0 { Err(io::Error::new(io::ErrorKind::Other, "write_regs")) } else { Ok(()) }
+        if rc != 0 {
+            Err(io::Error::other("write_regs"))
+        } else {
+            Ok(())
+        }
     }
 
     fn read_memory(&self, addr: u64, len: usize) -> io::Result<Vec<u8>> {
-        let f = self.vt.read_memory.ok_or_else(|| io::Error::new(io::ErrorKind::Other, "unimpl"))?;
+        let f = self
+            .vt
+            .read_memory
+            .ok_or_else(|| io::Error::other("unimpl"))?;
         let mut buf = vec![0u8; len];
         let rc = unsafe { f(self.user, addr, buf.as_mut_ptr(), len) };
-        if rc != 0 { Err(io::Error::new(io::ErrorKind::Other, "read_mem")) } else { Ok(buf) }
+        if rc != 0 {
+            Err(io::Error::other("read_mem"))
+        } else {
+            Ok(buf)
+        }
     }
 
     fn write_memory(&mut self, addr: u64, data: &[u8]) -> io::Result<()> {
-        let f = self.vt.write_memory.ok_or_else(|| io::Error::new(io::ErrorKind::Other, "unimpl"))?;
+        let f = self
+            .vt
+            .write_memory
+            .ok_or_else(|| io::Error::other("unimpl"))?;
         let rc = unsafe { f(self.user, addr, data.as_ptr(), data.len()) };
-        if rc != 0 { Err(io::Error::new(io::ErrorKind::Other, "write_mem")) } else { Ok(()) }
+        if rc != 0 {
+            Err(io::Error::other("write_mem"))
+        } else {
+            Ok(())
+        }
     }
 
     fn cont(&mut self) -> io::Result<StopReason> {
         if let Some(f) = self.vt.cont {
             let mut r: u32 = 1;
             let rc = unsafe { f(self.user, &mut r) };
-            if rc != 0 { return Err(io::Error::new(io::ErrorKind::Other, "cont")); }
+            if rc != 0 {
+                return Err(io::Error::other("cont"));
+            }
             return Ok(reason_from_u32(r));
         }
         Ok(StopReason::Trap)
@@ -130,7 +205,9 @@ impl GdbTarget for CTarget {
         if let Some(f) = self.vt.step {
             let mut r: u32 = 1;
             let rc = unsafe { f(self.user, &mut r) };
-            if rc != 0 { return Err(io::Error::new(io::ErrorKind::Other, "step")); }
+            if rc != 0 {
+                return Err(io::Error::other("step"));
+            }
             return Ok(reason_from_u32(r));
         }
         Ok(StopReason::Trap)
@@ -139,28 +216,36 @@ impl GdbTarget for CTarget {
     fn add_sw_breakpoint(&mut self, addr: u64, kind: u32) -> io::Result<()> {
         if let Some(f) = self.vt.add_sw_breakpoint {
             let rc = unsafe { f(self.user, addr, kind) };
-            if rc != 0 { return Err(io::Error::new(io::ErrorKind::Other, "add_sw")); }
+            if rc != 0 {
+                return Err(io::Error::other("add_sw"));
+            }
         }
         Ok(())
     }
     fn remove_sw_breakpoint(&mut self, addr: u64, kind: u32) -> io::Result<()> {
         if let Some(f) = self.vt.remove_sw_breakpoint {
             let rc = unsafe { f(self.user, addr, kind) };
-            if rc != 0 { return Err(io::Error::new(io::ErrorKind::Other, "rm_sw")); }
+            if rc != 0 {
+                return Err(io::Error::other("rm_sw"));
+            }
         }
         Ok(())
     }
     fn add_hw_breakpoint(&mut self, addr: u64, kind: u32) -> io::Result<()> {
         if let Some(f) = self.vt.add_hw_breakpoint {
             let rc = unsafe { f(self.user, addr, kind) };
-            if rc != 0 { return Err(io::Error::new(io::ErrorKind::Other, "add_hw")); }
+            if rc != 0 {
+                return Err(io::Error::other("add_hw"));
+            }
         }
         Ok(())
     }
     fn remove_hw_breakpoint(&mut self, addr: u64, kind: u32) -> io::Result<()> {
         if let Some(f) = self.vt.remove_hw_breakpoint {
             let rc = unsafe { f(self.user, addr, kind) };
-            if rc != 0 { return Err(io::Error::new(io::ErrorKind::Other, "rm_hw")); }
+            if rc != 0 {
+                return Err(io::Error::other("rm_hw"));
+            }
         }
         Ok(())
     }

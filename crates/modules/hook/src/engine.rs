@@ -57,6 +57,5 @@ impl HookEngine {
 }
 
 fn hook_target_addr(hook: &Hook) -> usize {
-
     hook.original() as usize
 }

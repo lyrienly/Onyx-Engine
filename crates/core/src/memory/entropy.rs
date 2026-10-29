@@ -132,7 +132,11 @@ mod tests {
             }
         }
         let e = EntropyScanner::shannon_entropy(&buf);
-        assert!((e - 8.0).abs() < 1e-9, "uniform 256-symbol buffer must be 8.0, got {}", e);
+        assert!(
+            (e - 8.0).abs() < 1e-9,
+            "uniform 256-symbol buffer must be 8.0, got {}",
+            e
+        );
     }
 
     #[test]
@@ -152,9 +156,21 @@ mod tests {
     #[test]
     fn test_classify_thresholds() {
         let nonzero = vec![1u8; 64];
-        assert_eq!(EntropyScanner::classify_entropy(1.0, &nonzero), EntropyClass::Plain);
-        assert_eq!(EntropyScanner::classify_entropy(5.0, &nonzero), EntropyClass::Code);
-        assert_eq!(EntropyScanner::classify_entropy(7.0, &nonzero), EntropyClass::Compressed);
-        assert_eq!(EntropyScanner::classify_entropy(7.9, &nonzero), EntropyClass::Encrypted);
+        assert_eq!(
+            EntropyScanner::classify_entropy(1.0, &nonzero),
+            EntropyClass::Plain
+        );
+        assert_eq!(
+            EntropyScanner::classify_entropy(5.0, &nonzero),
+            EntropyClass::Code
+        );
+        assert_eq!(
+            EntropyScanner::classify_entropy(7.0, &nonzero),
+            EntropyClass::Compressed
+        );
+        assert_eq!(
+            EntropyScanner::classify_entropy(7.9, &nonzero),
+            EntropyClass::Encrypted
+        );
     }
 }

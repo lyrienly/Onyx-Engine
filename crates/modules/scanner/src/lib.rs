@@ -2,10 +2,10 @@ pub mod pattern;
 pub mod smart;
 pub mod value_scan;
 
-use std::ffi::CStr;
-use std::os::raw::c_char;
 use onyx_core::process::Process;
 use onyx_core::scanner::{ScanCondition, ScanValue, Scanner, ValType};
+use std::ffi::CStr;
+use std::os::raw::c_char;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -52,18 +52,28 @@ fn parse_c_str(ptr: *const c_char) -> String {
 fn resolve_condition(s: &Scanner, scan_type: i32, v1: &str, v2: &str) -> Option<ScanCondition> {
     match scan_type {
         0 => Some(ScanCondition::UnknownInitial),
-        1 => ScanValue::parse(s.val_type, v1).ok().map(ScanCondition::Exact),
+        1 => ScanValue::parse(s.val_type, v1)
+            .ok()
+            .map(ScanCondition::Exact),
         2 => {
             let p1 = ScanValue::parse(s.val_type, v1).ok()?;
             let p2 = ScanValue::parse(s.val_type, v2).ok()?;
             Some(ScanCondition::Between(p1, p2))
         }
-        3 => ScanValue::parse(s.val_type, v1).ok().map(ScanCondition::BiggerThan),
-        4 => ScanValue::parse(s.val_type, v1).ok().map(ScanCondition::SmallerThan),
+        3 => ScanValue::parse(s.val_type, v1)
+            .ok()
+            .map(ScanCondition::BiggerThan),
+        4 => ScanValue::parse(s.val_type, v1)
+            .ok()
+            .map(ScanCondition::SmallerThan),
         5 => Some(ScanCondition::Increased),
-        6 => ScanValue::parse(s.val_type, v1).ok().map(ScanCondition::IncreasedBy),
+        6 => ScanValue::parse(s.val_type, v1)
+            .ok()
+            .map(ScanCondition::IncreasedBy),
         7 => Some(ScanCondition::Decreased),
-        8 => ScanValue::parse(s.val_type, v1).ok().map(ScanCondition::DecreasedBy),
+        8 => ScanValue::parse(s.val_type, v1)
+            .ok()
+            .map(ScanCondition::DecreasedBy),
         9 => Some(ScanCondition::Changed),
         10 => Some(ScanCondition::Unchanged),
         _ => None,
@@ -174,7 +184,11 @@ pub unsafe extern "C" fn onyx_scanner_undo(scanner: *mut Scanner) -> i32 {
         return 0;
     }
     let s = &mut *scanner;
-    if s.undo_scan() { 1 } else { 0 }
+    if s.undo_scan() {
+        1
+    } else {
+        0
+    }
 }
 
 #[no_mangle]
@@ -253,7 +267,9 @@ pub unsafe extern "C" fn onyx_scanner_save_results_file(
     }
 
     if s.val_type == ValType::Group {
-        let offset_count = s.candidates.first()
+        let offset_count = s
+            .candidates
+            .first()
             .map(|c| c.group_offsets.len() as u32)
             .unwrap_or(0);
 

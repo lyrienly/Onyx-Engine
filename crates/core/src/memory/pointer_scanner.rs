@@ -1,8 +1,8 @@
+use crate::process::{ModuleEntry, Process};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::mem::size_of;
-use crate::process::{ModuleEntry, Process};
 
 #[derive(Debug, Clone)]
 pub struct PointerNode {
@@ -55,7 +55,6 @@ impl Default for PointerScanConfig {
 }
 
 pub struct PointerScanner {
-
     pub pointer_map: HashMap<usize, Vec<PointerNode>>,
     pub total_pointers: usize,
 }
@@ -86,7 +85,11 @@ impl PointerScanner {
     ) -> Result<usize, String> {
         let regions = proc.regions(true)?;
         let ptr_size = size_of::<usize>();
-        let align = if config.alignment == 0 { ptr_size } else { config.alignment };
+        let align = if config.alignment == 0 {
+            ptr_size
+        } else {
+            config.alignment
+        };
         self.clear();
 
         const PAGE_SHIFT: usize = 12;
@@ -96,7 +99,6 @@ impl PointerScanner {
         let mut processed_bytes: usize = 0;
 
         for region in &regions {
-
             if region.base + region.size < config.min_address || region.base > config.max_address {
                 processed_bytes += region.size;
                 continue;
@@ -108,35 +110,43 @@ impl PointerScanner {
                 let cur_addr = region.base + offset;
 
                 if let Ok(read) = proc.read_raw(cur_addr, &mut buf[..cur_size])
-                    && read >= ptr_size {
-                        let max_i = read - ptr_size;
-                        let mut i = 0;
-                        while i <= max_i {
-                            let ptr_val = if ptr_size == 8 {
-                                u64::from_ne_bytes([
-                                    buf[i], buf[i + 1], buf[i + 2], buf[i + 3],
-                                    buf[i + 4], buf[i + 5], buf[i + 6], buf[i + 7],
-                                ]) as usize
-                            } else {
-                                u32::from_ne_bytes([buf[i], buf[i + 1], buf[i + 2], buf[i + 3]]) as usize
-                            };
+                    && read >= ptr_size
+                {
+                    let max_i = read - ptr_size;
+                    let mut i = 0;
+                    while i <= max_i {
+                        let ptr_val = if ptr_size == 8 {
+                            u64::from_ne_bytes([
+                                buf[i],
+                                buf[i + 1],
+                                buf[i + 2],
+                                buf[i + 3],
+                                buf[i + 4],
+                                buf[i + 5],
+                                buf[i + 6],
+                                buf[i + 7],
+                            ]) as usize
+                        } else {
+                            u32::from_ne_bytes([buf[i], buf[i + 1], buf[i + 2], buf[i + 3]])
+                                as usize
+                        };
 
-                            if ptr_val >= config.min_address && ptr_val <= config.max_address {
-                                let from_addr = cur_addr + i;
-                                let bucket = ptr_val >> PAGE_SHIFT;
+                        if ptr_val >= config.min_address && ptr_val <= config.max_address {
+                            let from_addr = cur_addr + i;
+                            let bucket = ptr_val >> PAGE_SHIFT;
 
-                                self.pointer_map
-                                    .entry(bucket)
-                                    .or_default()
-                                    .push(PointerNode {
-                                        from_address: from_addr,
-                                        to_address: ptr_val,
-                                    });
-                                self.total_pointers += 1;
-                            }
-                            i += align;
+                            self.pointer_map
+                                .entry(bucket)
+                                .or_default()
+                                .push(PointerNode {
+                                    from_address: from_addr,
+                                    to_address: ptr_val,
+                                });
+                            self.total_pointers += 1;
                         }
+                        i += align;
                     }
+                }
 
                 offset += cur_size;
                 processed_bytes += cur_size;
@@ -224,8 +234,9 @@ impl PointerScanner {
         for page in start_page..=end_page {
             if let Some(nodes) = self.pointer_map.get(&page) {
                 for node in nodes {
-                    if node.to_address <= current_target && current_target - node.to_address <= max_offset {
-
+                    if node.to_address <= current_target
+                        && current_target - node.to_address <= max_offset
+                    {
                         if visited.contains(&node.from_address) {
                             continue;
                         }
@@ -234,7 +245,9 @@ impl PointerScanner {
                         offsets.push(offset);
                         visited.insert(node.from_address);
 
-                        if let Some(m) = modules.iter().find(|m| node.from_address >= m.base && node.from_address < m.base + m.size) {
+                        if let Some(m) = modules.iter().find(|m| {
+                            node.from_address >= m.base && node.from_address < m.base + m.size
+                        }) {
                             let base_offset = node.from_address - m.base;
                             let mut path_offsets = offsets.clone();
                             path_offsets.reverse();
@@ -277,7 +290,8 @@ impl PointerScanner {
     }
 
     pub fn evaluate_path(proc: &Process, path: &PointerPath) -> Result<usize, String> {
-        let m = proc.find_module(&path.module_name)
+        let m = proc
+            .find_module(&path.module_name)
             .ok_or_else(|| format!("Module '{}' not found", path.module_name))?;
         let mut cur_addr = m.base + path.base_offset;
 
@@ -312,11 +326,12 @@ impl PointerScanner {
 
         for (idx, p) in paths.iter().enumerate() {
             if let Ok(resolved) = Self::evaluate_path(proc, p)
-                && resolved == new_target_addr {
-                    let mut updated = p.clone();
-                    updated.final_address = resolved;
-                    valid_paths.push(updated);
-                }
+                && resolved == new_target_addr
+            {
+                let mut updated = p.clone();
+                updated.final_address = resolved;
+                valid_paths.push(updated);
+            }
 
             if idx % 100 == 0 && total > 0 {
                 let pct = (idx as f32 / total as f32) * 100.0;
@@ -348,12 +363,14 @@ impl PointerScanner {
         for (idx, p) in paths.iter().enumerate() {
             if let Ok(resolved) = Self::evaluate_path(proc, p)
                 && resolved != 0
-                    && let Ok(n) = proc.read_raw(resolved, &mut read_buf)
-                        && n == val_len && read_buf == expected_bytes {
-                            let mut updated = p.clone();
-                            updated.final_address = resolved;
-                            valid_paths.push(updated);
-                        }
+                && let Ok(n) = proc.read_raw(resolved, &mut read_buf)
+                && n == val_len
+                && read_buf == expected_bytes
+            {
+                let mut updated = p.clone();
+                updated.final_address = resolved;
+                valid_paths.push(updated);
+            }
 
             if idx % 100 == 0 && total > 0 {
                 let pct = (idx as f32 / total as f32) * 100.0;
@@ -374,23 +391,35 @@ impl PointerScanner {
         writer.write_all(b"ONYXPTR1").map_err(|e| e.to_string())?;
 
         let count = paths.len() as u32;
-        writer.write_all(&count.to_le_bytes()).map_err(|e| e.to_string())?;
+        writer
+            .write_all(&count.to_le_bytes())
+            .map_err(|e| e.to_string())?;
 
         for p in paths {
             let mod_bytes = p.module_name.as_bytes();
             let mod_len = mod_bytes.len().min(255) as u8;
             writer.write_all(&[mod_len]).map_err(|e| e.to_string())?;
-            writer.write_all(&mod_bytes[..mod_len as usize]).map_err(|e| e.to_string())?;
+            writer
+                .write_all(&mod_bytes[..mod_len as usize])
+                .map_err(|e| e.to_string())?;
 
-            writer.write_all(&(p.base_offset as u64).to_le_bytes()).map_err(|e| e.to_string())?;
+            writer
+                .write_all(&(p.base_offset as u64).to_le_bytes())
+                .map_err(|e| e.to_string())?;
 
             let off_count = p.offsets.len().min(16) as u16;
-            writer.write_all(&off_count.to_le_bytes()).map_err(|e| e.to_string())?;
+            writer
+                .write_all(&off_count.to_le_bytes())
+                .map_err(|e| e.to_string())?;
             for &off in &p.offsets[..off_count as usize] {
-                writer.write_all(&(off as u64).to_le_bytes()).map_err(|e| e.to_string())?;
+                writer
+                    .write_all(&(off as u64).to_le_bytes())
+                    .map_err(|e| e.to_string())?;
             }
 
-            writer.write_all(&(p.final_address as u64).to_le_bytes()).map_err(|e| e.to_string())?;
+            writer
+                .write_all(&(p.final_address as u64).to_le_bytes())
+                .map_err(|e| e.to_string())?;
         }
 
         writer.flush().map_err(|e| e.to_string())?;
@@ -408,26 +437,36 @@ impl PointerScanner {
         }
 
         let mut count_buf = [0u8; 4];
-        reader.read_exact(&mut count_buf).map_err(|e| e.to_string())?;
+        reader
+            .read_exact(&mut count_buf)
+            .map_err(|e| e.to_string())?;
         let count = u32::from_le_bytes(count_buf) as usize;
 
         let mut paths = Vec::with_capacity(count.min(100_000));
 
         for _ in 0..count {
             let mut mod_len_buf = [0u8; 1];
-            reader.read_exact(&mut mod_len_buf).map_err(|e| e.to_string())?;
+            reader
+                .read_exact(&mut mod_len_buf)
+                .map_err(|e| e.to_string())?;
             let mod_len = mod_len_buf[0] as usize;
 
             let mut mod_bytes = vec![0u8; mod_len];
-            reader.read_exact(&mut mod_bytes).map_err(|e| e.to_string())?;
+            reader
+                .read_exact(&mut mod_bytes)
+                .map_err(|e| e.to_string())?;
             let module_name = String::from_utf8_lossy(&mod_bytes).to_string();
 
             let mut base_off_buf = [0u8; 8];
-            reader.read_exact(&mut base_off_buf).map_err(|e| e.to_string())?;
+            reader
+                .read_exact(&mut base_off_buf)
+                .map_err(|e| e.to_string())?;
             let base_offset = u64::from_le_bytes(base_off_buf) as usize;
 
             let mut off_count_buf = [0u8; 2];
-            reader.read_exact(&mut off_count_buf).map_err(|e| e.to_string())?;
+            reader
+                .read_exact(&mut off_count_buf)
+                .map_err(|e| e.to_string())?;
             let off_count = u16::from_le_bytes(off_count_buf) as usize;
 
             let mut offsets = Vec::with_capacity(off_count);
@@ -438,7 +477,9 @@ impl PointerScanner {
             }
 
             let mut final_addr_buf = [0u8; 8];
-            reader.read_exact(&mut final_addr_buf).map_err(|e| e.to_string())?;
+            reader
+                .read_exact(&mut final_addr_buf)
+                .map_err(|e| e.to_string())?;
             let final_address = u64::from_le_bytes(final_addr_buf) as usize;
 
             paths.push(PointerPath {
@@ -459,22 +500,36 @@ impl PointerScanner {
         writer.write_all(b"ONYXMAP1").map_err(|e| e.to_string())?;
 
         let mod_count = modules.len() as u32;
-        writer.write_all(&mod_count.to_le_bytes()).map_err(|e| e.to_string())?;
+        writer
+            .write_all(&mod_count.to_le_bytes())
+            .map_err(|e| e.to_string())?;
         for m in modules {
             let name_bytes = m.name.as_bytes();
             let name_len = name_bytes.len().min(255) as u8;
             writer.write_all(&[name_len]).map_err(|e| e.to_string())?;
-            writer.write_all(&name_bytes[..name_len as usize]).map_err(|e| e.to_string())?;
-            writer.write_all(&(m.base as u64).to_le_bytes()).map_err(|e| e.to_string())?;
-            writer.write_all(&(m.size as u64).to_le_bytes()).map_err(|e| e.to_string())?;
+            writer
+                .write_all(&name_bytes[..name_len as usize])
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_all(&(m.base as u64).to_le_bytes())
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_all(&(m.size as u64).to_le_bytes())
+                .map_err(|e| e.to_string())?;
         }
 
         let ptr_count = self.total_pointers as u64;
-        writer.write_all(&ptr_count.to_le_bytes()).map_err(|e| e.to_string())?;
+        writer
+            .write_all(&ptr_count.to_le_bytes())
+            .map_err(|e| e.to_string())?;
         for nodes in self.pointer_map.values() {
             for node in nodes {
-                writer.write_all(&(node.from_address as u64).to_le_bytes()).map_err(|e| e.to_string())?;
-                writer.write_all(&(node.to_address as u64).to_le_bytes()).map_err(|e| e.to_string())?;
+                writer
+                    .write_all(&(node.from_address as u64).to_le_bytes())
+                    .map_err(|e| e.to_string())?;
+                writer
+                    .write_all(&(node.to_address as u64).to_le_bytes())
+                    .map_err(|e| e.to_string())?;
             }
         }
 
@@ -493,7 +548,9 @@ impl PointerScanner {
         }
 
         let mut mod_count_buf = [0u8; 4];
-        reader.read_exact(&mut mod_count_buf).map_err(|e| e.to_string())?;
+        reader
+            .read_exact(&mut mod_count_buf)
+            .map_err(|e| e.to_string())?;
         let mod_count = u32::from_le_bytes(mod_count_buf) as usize;
         let mut modules = Vec::with_capacity(mod_count);
 
@@ -501,15 +558,21 @@ impl PointerScanner {
             let mut len_buf = [0u8; 1];
             reader.read_exact(&mut len_buf).map_err(|e| e.to_string())?;
             let mut name_buf = vec![0u8; len_buf[0] as usize];
-            reader.read_exact(&mut name_buf).map_err(|e| e.to_string())?;
+            reader
+                .read_exact(&mut name_buf)
+                .map_err(|e| e.to_string())?;
             let name = String::from_utf8_lossy(&name_buf).to_string();
 
             let mut base_buf = [0u8; 8];
-            reader.read_exact(&mut base_buf).map_err(|e| e.to_string())?;
+            reader
+                .read_exact(&mut base_buf)
+                .map_err(|e| e.to_string())?;
             let base = u64::from_le_bytes(base_buf) as usize;
 
             let mut size_buf = [0u8; 8];
-            reader.read_exact(&mut size_buf).map_err(|e| e.to_string())?;
+            reader
+                .read_exact(&mut size_buf)
+                .map_err(|e| e.to_string())?;
             let size = u64::from_le_bytes(size_buf) as usize;
 
             modules.push(ModuleEntry {
@@ -521,7 +584,9 @@ impl PointerScanner {
         }
 
         let mut ptr_count_buf = [0u8; 8];
-        reader.read_exact(&mut ptr_count_buf).map_err(|e| e.to_string())?;
+        reader
+            .read_exact(&mut ptr_count_buf)
+            .map_err(|e| e.to_string())?;
         let ptr_count = u64::from_le_bytes(ptr_count_buf) as usize;
 
         let mut scanner = PointerScanner::new();
@@ -529,7 +594,9 @@ impl PointerScanner {
 
         for _ in 0..ptr_count {
             let mut from_buf = [0u8; 8];
-            reader.read_exact(&mut from_buf).map_err(|e| e.to_string())?;
+            reader
+                .read_exact(&mut from_buf)
+                .map_err(|e| e.to_string())?;
             let from_address = u64::from_le_bytes(from_buf) as usize;
 
             let mut to_buf = [0u8; 8];
@@ -579,12 +646,17 @@ impl PointerScanner {
         Ok(results)
     }
 
-    pub fn evaluate_path_in_map(&self, modules: &[ModuleEntry], path: &PointerPath) -> Option<usize> {
-        let m = modules.iter().find(|m| m.name.eq_ignore_ascii_case(&path.module_name))?;
+    pub fn evaluate_path_in_map(
+        &self,
+        modules: &[ModuleEntry],
+        path: &PointerPath,
+    ) -> Option<usize> {
+        let m = modules
+            .iter()
+            .find(|m| m.name.eq_ignore_ascii_case(&path.module_name))?;
         let mut cur_addr = m.base + path.base_offset;
 
         for &off in &path.offsets {
-
             let mut found_dest = None;
             for nodes in self.pointer_map.values() {
                 if let Some(node) = nodes.iter().find(|n| n.from_address == cur_addr) {
@@ -606,12 +678,22 @@ impl PointerScanner {
     pub fn intersect_paths(paths_a: &[PointerPath], paths_b: &[PointerPath]) -> Vec<PointerPath> {
         let mut b_set: HashSet<(String, usize, Vec<usize>)> = HashSet::new();
         for p in paths_b {
-            b_set.insert((p.module_name.to_lowercase(), p.base_offset, p.offsets.clone()));
+            b_set.insert((
+                p.module_name.to_lowercase(),
+                p.base_offset,
+                p.offsets.clone(),
+            ));
         }
 
         paths_a
             .iter()
-            .filter(|p| b_set.contains(&(p.module_name.to_lowercase(), p.base_offset, p.offsets.clone())))
+            .filter(|p| {
+                b_set.contains(&(
+                    p.module_name.to_lowercase(),
+                    p.base_offset,
+                    p.offsets.clone(),
+                ))
+            })
             .cloned()
             .collect()
     }
@@ -675,16 +757,24 @@ mod tests {
 
         const PAGE_SHIFT: usize = 12;
 
-        scanner.pointer_map.entry(0x200000 >> PAGE_SHIFT).or_default().push(PointerNode {
-            from_address: 0x140001000,
-            to_address: 0x200000,
-        });
+        scanner
+            .pointer_map
+            .entry(0x200000 >> PAGE_SHIFT)
+            .or_default()
+            .push(PointerNode {
+                from_address: 0x140001000,
+                to_address: 0x200000,
+            });
         scanner.total_pointers += 1;
 
-        scanner.pointer_map.entry(0x300000 >> PAGE_SHIFT).or_default().push(PointerNode {
-            from_address: 0x200020,
-            to_address: 0x300000,
-        });
+        scanner
+            .pointer_map
+            .entry(0x300000 >> PAGE_SHIFT)
+            .or_default()
+            .push(PointerNode {
+                from_address: 0x200020,
+                to_address: 0x300000,
+            });
         scanner.total_pointers += 1;
 
         let file_path = std::env::temp_dir().join("test_map.ptrmap");
@@ -692,7 +782,8 @@ mod tests {
 
         assert!(scanner.save_map_to_file(file_str, &modules).is_ok());
 
-        let (loaded_scanner, loaded_mods) = PointerScanner::load_map_from_file(file_str).expect("load ptrmap");
+        let (loaded_scanner, loaded_mods) =
+            PointerScanner::load_map_from_file(file_str).expect("load ptrmap");
         assert_eq!(loaded_mods.len(), 1);
         assert_eq!(loaded_mods[0].name, "testapp.exe");
         assert_eq!(loaded_scanner.total_pointers, 2);
@@ -700,7 +791,9 @@ mod tests {
         let mut config = PointerScanConfig::default();
         config.max_depth = 3;
         config.max_offset = 0x100;
-        let paths = loaded_scanner.scan_paths_offline(&loaded_mods, 0x300040, &config, &mut |_, _| true).unwrap();
+        let paths = loaded_scanner
+            .scan_paths_offline(&loaded_mods, 0x300040, &config, &mut |_, _| true)
+            .unwrap();
 
         assert_eq!(paths.len(), 1);
         assert_eq!(paths[0].module_name, "testapp.exe");

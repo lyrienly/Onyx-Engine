@@ -722,7 +722,7 @@ var
   d:PCESymbolInfo;
   i: integer;
 
-  //e: TAVLTreeNodeEnumerator;
+  //e: TAvgLvlTreeNodeEnumerator;
 begin
   cs.Beginwrite;
   try
@@ -844,7 +844,7 @@ end;
 procedure TSymbolListHandler.SaveToXML(e: TDOMElement);
 var
   e2: TDOMElement;
-  enum: TAVLTreeNodeEnumerator;
+  enum: TAvgLvlTreeNodeEnumerator;
   si: PCESymbolInfo;
   i: integer;
 begin
@@ -885,10 +885,10 @@ function TSymbolListHandler.SyncSymbols(otherlist: TSymbolListHandler; dontdelet
 var
   i,j: integer;
   found: boolean;
-  e: TAVLTreeNodeEnumerator;
+  e: TAvgLvlTreeNodeEnumerator;
   si,si2: PCESymbolInfo;
   sicopy: PCESymbolInfo;
-  n: TAVLTreeNode;
+  n: TAvgLvlTreeNode;
 begin
   result:=false;
 

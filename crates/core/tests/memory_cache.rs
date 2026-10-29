@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use onyx_core::memory::cache::{MemoryCache, MIN_CHUNK_SIZE};
+use onyx_core::memory::cache::{MIN_CHUNK_SIZE, MemoryCache};
 use onyx_core::process::Process;
 use onyx_core::win32::{
     CloseHandle, HANDLE, LPVOID, MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_READWRITE,
@@ -71,7 +71,10 @@ struct ProcessInformation {
 }
 
 fn to_wide(s: &str) -> Vec<u16> {
-    OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
+    OsStr::new(s)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect()
 }
 
 struct CobaiaGuard {
@@ -139,7 +142,10 @@ fn spawn_cobaia(region_size: usize) -> CobaiaGuard {
             &mut written,
         )
     };
-    assert!(wr != 0 && written == region_size, "WriteProcessMemory failed");
+    assert!(
+        wr != 0 && written == region_size,
+        "WriteProcessMemory failed"
+    );
 
     CobaiaGuard {
         pid: pi.dwProcessId,
@@ -153,9 +159,7 @@ fn spawn_cobaia(region_size: usize) -> CobaiaGuard {
 #[test]
 fn concurrent_readers_same_region() {
     let cache = Arc::new(MemoryCache::new(16, MIN_CHUNK_SIZE));
-    let backing: Arc<Vec<u8>> = Arc::new(
-        (0..(64 * 1024usize)).map(|i| (i & 0xff) as u8).collect(),
-    );
+    let backing: Arc<Vec<u8>> = Arc::new((0..(64 * 1024usize)).map(|i| (i & 0xff) as u8).collect());
     let load_count = Arc::new(AtomicUsize::new(0));
 
     let mut handles = Vec::new();
@@ -253,7 +257,9 @@ fn e2e_cmd_cobaia_benchmark_10k() {
     let t0 = Instant::now();
     for i in 0..iters {
         let a = base + ((i * step) % (REGION - read_size)) as u64;
-        let _ = cache.read_process(&proc, a, read_size).expect("read cached");
+        let _ = cache
+            .read_process(&proc, a, read_size)
+            .expect("read cached");
     }
     let dt_cached = t0.elapsed();
 

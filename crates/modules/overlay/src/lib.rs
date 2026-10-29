@@ -9,9 +9,9 @@
 #![allow(clippy::missing_safety_doc)]
 
 pub mod dx;
+pub mod engine;
 pub mod present_hook;
 pub mod renderer;
-pub mod engine;
 
 pub use dx::PRESENT_VTABLE_INDEX;
 pub use engine::{OverlayEngine, OverlayError, OverlayFrame};

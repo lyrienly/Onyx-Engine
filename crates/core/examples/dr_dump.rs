@@ -2,7 +2,10 @@ use onyx_core::debugger::read_thread_debug_registers;
 use onyx_core::process::Process;
 
 fn main() {
-    let pid = match std::env::args().nth(1).and_then(|arg| arg.parse::<u32>().ok()) {
+    let pid = match std::env::args()
+        .nth(1)
+        .and_then(|arg| arg.parse::<u32>().ok())
+    {
         Some(pid) => pid,
         None => {
             eprintln!("uso: dr_dump.exe <pid>");

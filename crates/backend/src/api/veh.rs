@@ -1,12 +1,12 @@
-use std::ffi::CStr;
-use std::os::raw::c_char;
-use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex, MutexGuard};
+use crate::types::{OnyxVehHit, OnyxVehSlot};
 use onyx_core::debugger::{
     BreakpointSize, BreakpointType, HardwareBreakpointMonitor, HwBpError, VehDebugger,
 };
 use onyx_core::process::Process;
-use crate::types::{OnyxVehHit, OnyxVehSlot};
+use std::ffi::CStr;
+use std::os::raw::c_char;
+use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 static GLOBAL_VEH: Mutex<Option<VehDebugger>> = Mutex::new(None);
 
@@ -52,10 +52,7 @@ fn map_bp_size(val: i32) -> BreakpointSize {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn onyx_veh_inject(
-    process: *mut Process,
-    dll_path: *const c_char,
-) -> i32 {
+pub unsafe extern "C" fn onyx_veh_inject(process: *mut Process, dll_path: *const c_char) -> i32 {
     if process.is_null() {
         return 0;
     }

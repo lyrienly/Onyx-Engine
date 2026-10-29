@@ -16,14 +16,16 @@ use windows_sys::Win32::System::LibraryLoader::LoadLibraryW;
 use windows_sys::Win32::System::Threading::GetCurrentProcessId;
 
 fn to_wide(p: &Path) -> Vec<u16> {
-    OsStr::new(p).encode_wide().chain(std::iter::once(0)).collect()
+    OsStr::new(p)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect()
 }
 
 /// Fabrica uma copia do kernel32 com o nome fornecido num diretorio temporario
 /// unico. Retorna o path completo.
 fn fabricate_mock_dll(target_name: &str, suffix: &str) -> PathBuf {
-    let dir = std::env::temp_dir()
-        .join(format!("onyx_mono_e2e_{}_{}", std::process::id(), suffix));
+    let dir = std::env::temp_dir().join(format!("onyx_mono_e2e_{}_{}", std::process::id(), suffix));
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let dst = dir.join(target_name);
 
@@ -31,7 +33,9 @@ fn fabricate_mock_dll(target_name: &str, suffix: &str) -> PathBuf {
     // copia renomeada tem efeito colateral minimo durante o DLL_PROCESS_DETACH
     // comparado a copias de kernel32/user32.
     let system_root = std::env::var_os("SystemRoot").expect("SystemRoot env");
-    let src = PathBuf::from(system_root).join("System32").join("psapi.dll");
+    let src = PathBuf::from(system_root)
+        .join("System32")
+        .join("psapi.dll");
     std::fs::copy(&src, &dst).expect("copy psapi to mock name");
     dst
 }
@@ -43,7 +47,10 @@ fn detects_mono_classic_after_loading_mock_dll() {
     // Sanity: antes do load, nenhum runtime (ou qualquer coisa menos MonoClassic
     // via mono-2.0-bdwgc). Nao assertamos None aqui porque o host pode ja ter
     // UnityPlayer carregado em cenarios exoticos; so garantimos que nao e Mono.
-    assert!(!matches!(detect_mono_runtime(pid), MonoRuntime::MonoClassic { .. }));
+    assert!(!matches!(
+        detect_mono_runtime(pid),
+        MonoRuntime::MonoClassic { .. }
+    ));
 
     let mock = fabricate_mock_dll("mono-2.0-bdwgc.dll", "mono");
     let wide = to_wide(&mock);
@@ -69,7 +76,10 @@ fn detects_il2cpp_after_loading_mock_gameassembly() {
     let pid = unsafe { GetCurrentProcessId() };
 
     // Garante que o processo nao tem a DLL de teste antes do load.
-    assert!(!matches!(detect_mono_runtime(pid), MonoRuntime::Il2Cpp { .. }));
+    assert!(!matches!(
+        detect_mono_runtime(pid),
+        MonoRuntime::Il2Cpp { .. }
+    ));
 
     let mock = fabricate_mock_dll("GameAssembly.dll", "il2cpp");
     let wide = to_wide(&mock);

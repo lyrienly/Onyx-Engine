@@ -1,6 +1,6 @@
-use crate::process::Process;
 use crate::debugger::disasm::Disassembler;
 use crate::memory::scanner::AobByte;
+use crate::process::Process;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UniqueSignatureResult {
@@ -13,7 +13,6 @@ pub struct UniqueSignatureResult {
 pub struct SignatureMaker;
 
 impl SignatureMaker {
-
     pub fn mask_instruction(insn_bytes: &[u8], is_rip_relative: bool) -> (Vec<AobByte>, String) {
         let mut aob_bytes = Vec::new();
         let mut pattern_parts = Vec::new();
@@ -119,7 +118,9 @@ mod tests {
 
     #[test]
     fn test_count_matches_in_buffer() {
-        let haystack = vec![0x48, 0x89, 0x5C, 0x24, 0x08, 0x90, 0x48, 0x89, 0x5C, 0x24, 0x10];
+        let haystack = vec![
+            0x48, 0x89, 0x5C, 0x24, 0x08, 0x90, 0x48, 0x89, 0x5C, 0x24, 0x10,
+        ];
 
         let pattern = vec![
             AobByte::exact(0x48),

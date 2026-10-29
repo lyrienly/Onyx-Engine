@@ -4,11 +4,11 @@
 //! Escopo pragmatico: identificacao do runtime, versao do coreclr/clr,
 //! enumeracao dos modulos .NET (assemblies carregados no processo).
 
-pub mod runtime;
 pub mod collector;
+pub mod runtime;
 
-pub use runtime::{detect_runtime, enumerate_modules, ClrKind, ClrRuntime, ModuleInfo};
 pub use collector::{enumerate_assemblies, Assembly};
+pub use runtime::{detect_runtime, enumerate_modules, ClrKind, ClrRuntime, ModuleInfo};
 
 #[no_mangle]
 pub extern "C" fn onyx_dotnet_module_ping() -> i32 {

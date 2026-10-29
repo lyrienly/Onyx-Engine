@@ -4,10 +4,10 @@ use std::ptr::null_mut;
 use onyx_core::win32::{
     CloseHandle, CreateRemoteThread, GetModuleHandleA, GetProcAddress, OpenProcess,
     ReadProcessMemory, VirtualAllocEx, VirtualFreeEx, VirtualProtectEx, WaitForSingleObject,
-    WriteProcessMemory, DWORD, HANDLE, LPCVOID, LPVOID, PROCESS_ALL_ACCESS,
-    PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION, PROCESS_VM_OPERATION, PROCESS_VM_READ,
-    PROCESS_VM_WRITE, PAGE_EXECUTE, PAGE_EXECUTE_READ, PAGE_EXECUTE_READWRITE, PAGE_READONLY,
-    PAGE_READWRITE, MEM_COMMIT, MEM_RELEASE, MEM_RESERVE,
+    WriteProcessMemory, DWORD, HANDLE, LPCVOID, LPVOID, MEM_COMMIT, MEM_RELEASE, MEM_RESERVE,
+    PAGE_EXECUTE, PAGE_EXECUTE_READ, PAGE_EXECUTE_READWRITE, PAGE_READONLY, PAGE_READWRITE,
+    PROCESS_ALL_ACCESS, PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION, PROCESS_VM_OPERATION,
+    PROCESS_VM_READ, PROCESS_VM_WRITE,
 };
 
 use crate::imports::{parse_imports, ImportSymbol};
@@ -65,9 +65,8 @@ fn open_target(pid: u32) -> Result<HANDLE, String> {
 }
 
 fn alloc_remote(process: HANDLE, size: usize, protect: DWORD) -> Result<usize, String> {
-    let ptr = unsafe {
-        VirtualAllocEx(process, null_mut(), size, MEM_COMMIT | MEM_RESERVE, protect)
-    };
+    let ptr =
+        unsafe { VirtualAllocEx(process, null_mut(), size, MEM_COMMIT | MEM_RESERVE, protect) };
     if ptr.is_null() {
         Err("VirtualAllocEx failed".to_string())
     } else {
@@ -153,9 +152,18 @@ fn remote_call(
     };
     write_remote(process, request, bytes)?;
 
-    let start: unsafe extern "system" fn(LPVOID) -> DWORD =
-        unsafe { std::mem::transmute(stub) };
-    let thread = unsafe { CreateRemoteThread(process, null_mut(), 0, start, request as LPVOID, 0, null_mut()) };
+    let start: unsafe extern "system" fn(LPVOID) -> DWORD = unsafe { std::mem::transmute(stub) };
+    let thread = unsafe {
+        CreateRemoteThread(
+            process,
+            null_mut(),
+            0,
+            start,
+            request as LPVOID,
+            0,
+            null_mut(),
+        )
+    };
     if thread.is_null() {
         return Err("CreateRemoteThread failed".to_string());
     }
@@ -309,7 +317,10 @@ fn resolve_imports(
     let mut resolved = 0u32;
 
     for entry in &imports {
-        let module_base = match modules.iter().find(|(name, _)| name.eq_ignore_ascii_case(&entry.module)) {
+        let module_base = match modules
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case(&entry.module))
+        {
             Some((_, cached)) => *cached,
             None => {
                 let bytes = entry.module.as_bytes();
@@ -390,7 +401,10 @@ fn run_mapping(
         return Err("only PE32+ (x64) DLLs are supported".to_string());
     }
     if !pe.is_dll() {
-        return Err(format!("{} is not a DLL (IMAGE_FILE_DLL not set)", dll_path));
+        return Err(format!(
+            "{} is not a DLL (IMAGE_FILE_DLL not set)",
+            dll_path
+        ));
     }
 
     let mut image = pe.build_image()?;

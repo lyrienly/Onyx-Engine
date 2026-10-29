@@ -1,16 +1,18 @@
-use std::ffi::CStr;
-use std::os::raw::c_char;
+use crate::types::{
+    OnyxAobValidation, OnyxCodecaveEntry, OnyxRipRelativeMatch, OnyxScanCandidate,
+    OnyxSignatureResult,
+};
+use onyx_core::debugger::rip_scanner::RipRelativeScanner;
+use onyx_core::memory::aob_validator::AobValidator;
+use onyx_core::memory::codecave::{CaveByteType, CodecaveScanner};
+use onyx_core::memory::signature_maker::SignatureMaker;
 use onyx_core::process::Process;
 use onyx_core::scanner::{ScanCondition, ScanValue, Scanner, ValType};
-use onyx_core::memory::codecave::{CodecaveScanner, CaveByteType};
-use onyx_core::memory::signature_maker::SignatureMaker;
-use onyx_core::memory::aob_validator::AobValidator;
-use onyx_core::debugger::rip_scanner::RipRelativeScanner;
-use crate::types::{OnyxScanCandidate, OnyxCodecaveEntry, OnyxRipRelativeMatch, OnyxSignatureResult, OnyxAobValidation};
+use std::ffi::CStr;
+use std::os::raw::c_char;
 
 fn map_val_type(idx: i32) -> ValType {
     match idx {
-
         0 => ValType::I8,
         1 => ValType::I16,
         2 => ValType::I32,
@@ -35,10 +37,11 @@ fn parse_c_str(ptr: *const c_char) -> String {
 
 fn resolve_condition(s: &Scanner, scan_type: i32, v1: &str, v2: &str) -> Option<ScanCondition> {
     match scan_type {
-
         0 => Some(ScanCondition::UnknownInitial),
 
-        1 => ScanValue::parse(s.val_type, v1).ok().map(ScanCondition::Exact),
+        1 => ScanValue::parse(s.val_type, v1)
+            .ok()
+            .map(ScanCondition::Exact),
 
         2 => {
             let p1 = ScanValue::parse(s.val_type, v1).ok()?;
@@ -46,17 +49,25 @@ fn resolve_condition(s: &Scanner, scan_type: i32, v1: &str, v2: &str) -> Option<
             Some(ScanCondition::Between(p1, p2))
         }
 
-        3 => ScanValue::parse(s.val_type, v1).ok().map(ScanCondition::BiggerThan),
+        3 => ScanValue::parse(s.val_type, v1)
+            .ok()
+            .map(ScanCondition::BiggerThan),
 
-        4 => ScanValue::parse(s.val_type, v1).ok().map(ScanCondition::SmallerThan),
+        4 => ScanValue::parse(s.val_type, v1)
+            .ok()
+            .map(ScanCondition::SmallerThan),
 
         5 => Some(ScanCondition::Increased),
 
-        6 => ScanValue::parse(s.val_type, v1).ok().map(ScanCondition::IncreasedBy),
+        6 => ScanValue::parse(s.val_type, v1)
+            .ok()
+            .map(ScanCondition::IncreasedBy),
 
         7 => Some(ScanCondition::Decreased),
 
-        8 => ScanValue::parse(s.val_type, v1).ok().map(ScanCondition::DecreasedBy),
+        8 => ScanValue::parse(s.val_type, v1)
+            .ok()
+            .map(ScanCondition::DecreasedBy),
 
         9 => Some(ScanCondition::Changed),
 
@@ -118,7 +129,11 @@ pub unsafe extern "C" fn onyx_scanner_first_scan(
     s.fast_scan = fast_scan != 0;
     s.alignment = if alignment == 0 { 4 } else { alignment };
     s.start_addr = start_addr;
-    s.stop_addr = if stop_addr == 0 { 0x7FFFFFFFFFFFFFFF } else { stop_addr };
+    s.stop_addr = if stop_addr == 0 {
+        0x7FFFFFFFFFFFFFFF
+    } else {
+        stop_addr
+    };
     s.writable_only = writable_only != 0;
     s.executable = executable != 0;
     s.copy_on_write = copy_on_write != 0;
@@ -171,7 +186,11 @@ pub unsafe extern "C" fn onyx_scanner_undo(scanner: *mut Scanner) -> i32 {
         return 0;
     }
     let s = &mut *scanner;
-    if s.undo_scan() { 1 } else { 0 }
+    if s.undo_scan() {
+        1
+    } else {
+        0
+    }
 }
 
 #[no_mangle]
@@ -251,8 +270,9 @@ pub unsafe extern "C" fn onyx_scanner_save_results_file(
     }
 
     if s.val_type == ValType::Group {
-
-        let offset_count = s.candidates.first()
+        let offset_count = s
+            .candidates
+            .first()
             .map(|c| c.group_offsets.len() as u32)
             .unwrap_or(0);
 
@@ -324,7 +344,8 @@ pub unsafe extern "C" fn onyx_scan_codecaves(
         _ => CaveByteType::AnyPadding,
     };
 
-    match CodecaveScanner::scan_process(&*handle, start, stop, min_size, cave_type, exec_only != 0) {
+    match CodecaveScanner::scan_process(&*handle, start, stop, min_size, cave_type, exec_only != 0)
+    {
         Ok(caves) => {
             if !out_count.is_null() {
                 *out_count = caves.len() as u32;
@@ -406,7 +427,13 @@ pub unsafe extern "C" fn onyx_generate_aob_signature(
         return -1;
     }
 
-    match SignatureMaker::generate_signature(&*handle, target_address, scan_start, scan_stop, max_len) {
+    match SignatureMaker::generate_signature(
+        &*handle,
+        target_address,
+        scan_start,
+        scan_stop,
+        max_len,
+    ) {
         Ok(sig) => {
             let mut res = OnyxSignatureResult {
                 pattern: [0u8; 256],

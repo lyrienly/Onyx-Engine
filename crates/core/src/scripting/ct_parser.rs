@@ -1,16 +1,16 @@
-use std::fs::File;
-use std::io::{Read, Write};
 use crate::scanner::ValType;
 use crate::table::{CheatTable, TableEntry};
+use std::fs::File;
+use std::io::{Read, Write};
 
 pub struct CtParser;
 
 impl CtParser {
-
     pub fn load_ct_file(path: &str) -> Result<CheatTable, String> {
         let mut file = File::open(path).map_err(|e| format!("Failed to open {}: {}", path, e))?;
         let mut content = String::new();
-        file.read_to_string(&mut content).map_err(|e| format!("Failed to read {}: {}", path, e))?;
+        file.read_to_string(&mut content)
+            .map_err(|e| format!("Failed to read {}: {}", path, e))?;
 
         Self::parse_ct_xml(&content)
     }
@@ -41,8 +41,7 @@ impl CtParser {
                 .unwrap_or_else(|| "4 Bytes".to_string());
             let val_type = parse_ct_variable_type(&type_str);
 
-            let address_str = extract_tag_content(entry_block, "Address")
-                .unwrap_or_default();
+            let address_str = extract_tag_content(entry_block, "Address").unwrap_or_default();
 
             let mut offsets = Vec::new();
             if let Some(offsets_block) = extract_block(entry_block, "Offsets") {
@@ -79,7 +78,8 @@ impl CtParser {
     }
 
     pub fn save_ct_file(table: &CheatTable, path: &str) -> Result<(), String> {
-        let mut file = File::create(path).map_err(|e| format!("Failed to create {}: {}", path, e))?;
+        let mut file =
+            File::create(path).map_err(|e| format!("Failed to create {}: {}", path, e))?;
 
         writeln!(file, "<?xml version=\"1.0\" encoding=\"utf-8\"?>").map_err(|e| e.to_string())?;
         writeln!(file, "<CheatTable CheatEngineTableVersion=\"45\">").map_err(|e| e.to_string())?;
@@ -88,8 +88,18 @@ impl CtParser {
         for entry in &table.entries {
             writeln!(file, "    <CheatEntry>").map_err(|e| e.to_string())?;
             writeln!(file, "      <ID>{}</ID>", entry.id).map_err(|e| e.to_string())?;
-            writeln!(file, "      <Description>\"{}\"</Description>", entry.description).map_err(|e| e.to_string())?;
-            writeln!(file, "      <VariableType>{}</VariableType>", format_ct_variable_type(entry.val_type)).map_err(|e| e.to_string())?;
+            writeln!(
+                file,
+                "      <Description>\"{}\"</Description>",
+                entry.description
+            )
+            .map_err(|e| e.to_string())?;
+            writeln!(
+                file,
+                "      <VariableType>{}</VariableType>",
+                format_ct_variable_type(entry.val_type)
+            )
+            .map_err(|e| e.to_string())?;
 
             let addr_str = match &entry.module_name {
                 Some(mod_name) => format!("\"{}\"+{:X}", mod_name, entry.base_offset),
@@ -100,7 +110,8 @@ impl CtParser {
             if !entry.offsets.is_empty() {
                 writeln!(file, "      <Offsets>").map_err(|e| e.to_string())?;
                 for &off in &entry.offsets {
-                    writeln!(file, "        <Offset>{:X}</Offset>", off).map_err(|e| e.to_string())?;
+                    writeln!(file, "        <Offset>{:X}</Offset>", off)
+                        .map_err(|e| e.to_string())?;
                 }
                 writeln!(file, "      </Offsets>").map_err(|e| e.to_string())?;
             }
@@ -167,7 +178,9 @@ fn parse_offset_str(s: &str) -> Option<usize> {
     if t.starts_with("0x") || t.starts_with("0X") {
         usize::from_str_radix(&t[2..], 16).ok()
     } else {
-        usize::from_str_radix(t, 16).or_else(|_| t.parse::<usize>()).ok()
+        usize::from_str_radix(t, 16)
+            .or_else(|_| t.parse::<usize>())
+            .ok()
     }
 }
 

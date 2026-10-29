@@ -65,9 +65,7 @@ pub fn start_listener() {
             if unsafe { ConnectNamedPipe(h, null_mut()) } != 0 {
                 let mut buf = [0u8; 4];
                 let mut read: DWORD = 0;
-                if unsafe {
-                    ReadFile(h, buf.as_mut_ptr() as LPVOID, 4, &mut read, null_mut())
-                } != 0
+                if unsafe { ReadFile(h, buf.as_mut_ptr() as LPVOID, 4, &mut read, null_mut()) } != 0
                     && read == 4
                 {
                     let speed = f32::from_le_bytes(buf) as f64;

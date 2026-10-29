@@ -17,9 +17,7 @@
 use std::sync::Mutex;
 
 #[cfg(windows)]
-use windows_sys::Win32::System::Performance::{
-    QueryPerformanceCounter, QueryPerformanceFrequency,
-};
+use windows_sys::Win32::System::Performance::{QueryPerformanceCounter, QueryPerformanceFrequency};
 
 #[derive(Debug, Clone)]
 pub struct VirtualClock {
@@ -84,7 +82,9 @@ pub fn raw_qpc_now() -> i64 {
 }
 
 #[cfg(not(windows))]
-pub fn raw_qpc_freq() -> i64 { 10_000_000 }
+pub fn raw_qpc_freq() -> i64 {
+    10_000_000
+}
 
 #[cfg(not(windows))]
 pub fn raw_qpc_now() -> i64 {

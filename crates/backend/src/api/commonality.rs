@@ -1,6 +1,6 @@
-use onyx_core::process::Process;
+use crate::types::{OnyxRegisterComparison, OnyxRegisterSnapshot, OnyxStructureDifference};
 use onyx_core::debugger::commonality::{CommonalityAnalyzer, RegisterSnapshot};
-use crate::types::{OnyxRegisterSnapshot, OnyxRegisterComparison, OnyxStructureDifference};
+use onyx_core::process::Process;
 
 #[no_mangle]
 pub unsafe extern "C" fn onyx_commonality_analyze_registers(
@@ -19,21 +19,53 @@ pub unsafe extern "C" fn onyx_commonality_analyze_registers(
     let g1_slice = std::slice::from_raw_parts(g1, g1_count as usize);
     let g2_slice = std::slice::from_raw_parts(g2, g2_count as usize);
 
-    let g1_snaps: Vec<RegisterSnapshot> = g1_slice.iter().map(|s| RegisterSnapshot {
-        rax: s.rax, rbx: s.rbx, rcx: s.rcx, rdx: s.rdx,
-        rsi: s.rsi, rdi: s.rdi, rbp: s.rbp, rsp: s.rsp,
-        r8: s.r8, r9: s.r9, r10: s.r10, r11: s.r11,
-        r12: s.r12, r13: s.r13, r14: s.r14, r15: s.r15,
-        rip: s.rip, rflags: s.rflags,
-    }).collect();
+    let g1_snaps: Vec<RegisterSnapshot> = g1_slice
+        .iter()
+        .map(|s| RegisterSnapshot {
+            rax: s.rax,
+            rbx: s.rbx,
+            rcx: s.rcx,
+            rdx: s.rdx,
+            rsi: s.rsi,
+            rdi: s.rdi,
+            rbp: s.rbp,
+            rsp: s.rsp,
+            r8: s.r8,
+            r9: s.r9,
+            r10: s.r10,
+            r11: s.r11,
+            r12: s.r12,
+            r13: s.r13,
+            r14: s.r14,
+            r15: s.r15,
+            rip: s.rip,
+            rflags: s.rflags,
+        })
+        .collect();
 
-    let g2_snaps: Vec<RegisterSnapshot> = g2_slice.iter().map(|s| RegisterSnapshot {
-        rax: s.rax, rbx: s.rbx, rcx: s.rcx, rdx: s.rdx,
-        rsi: s.rsi, rdi: s.rdi, rbp: s.rbp, rsp: s.rsp,
-        r8: s.r8, r9: s.r9, r10: s.r10, r11: s.r11,
-        r12: s.r12, r13: s.r13, r14: s.r14, r15: s.r15,
-        rip: s.rip, rflags: s.rflags,
-    }).collect();
+    let g2_snaps: Vec<RegisterSnapshot> = g2_slice
+        .iter()
+        .map(|s| RegisterSnapshot {
+            rax: s.rax,
+            rbx: s.rbx,
+            rcx: s.rcx,
+            rdx: s.rdx,
+            rsi: s.rsi,
+            rdi: s.rdi,
+            rbp: s.rbp,
+            rsp: s.rsp,
+            r8: s.r8,
+            r9: s.r9,
+            r10: s.r10,
+            r11: s.r11,
+            r12: s.r12,
+            r13: s.r13,
+            r14: s.r14,
+            r15: s.r15,
+            rip: s.rip,
+            rflags: s.rflags,
+        })
+        .collect();
 
     let comps = CommonalityAnalyzer::analyze_registers(&g1_snaps, &g2_snaps);
 
@@ -74,7 +106,12 @@ pub unsafe extern "C" fn onyx_commonality_analyze_structures(
     max_diffs: u32,
     out_count: *mut u32,
 ) -> i32 {
-    if handle.is_null() || g1_ptrs.is_null() || g2_ptrs.is_null() || out_diffs.is_null() || max_diffs == 0 {
+    if handle.is_null()
+        || g1_ptrs.is_null()
+        || g2_ptrs.is_null()
+        || out_diffs.is_null()
+        || max_diffs == 0
+    {
         return -1;
     }
 

@@ -1,9 +1,9 @@
+use crate::process::Process;
 use crate::process::pe_info::{
     IMAGE_DOS_SIGNATURE, IMAGE_FILE_MACHINE_AMD64, IMAGE_NT_SIGNATURE, IMAGE_SCN_MEM_EXECUTE,
     IMAGE_SCN_MEM_READ, IMAGE_SCN_MEM_WRITE,
 };
 use crate::process::win32::*;
-use crate::process::Process;
 use std::ffi::CString;
 use std::ptr::null_mut;
 
@@ -24,7 +24,6 @@ pub const DLL_PROCESS_ATTACH: u32 = 1;
 
 #[derive(Debug, Clone)]
 pub struct ManualMapOptions {
-
     pub wipe_headers: bool,
 
     pub erase_discardable_sections: bool,
@@ -53,7 +52,6 @@ impl Default for ManualMapOptions {
 
 #[derive(Debug, Clone)]
 pub struct ManualMapResult {
-
     pub base_address: usize,
 
     pub entry_point: usize,
@@ -89,7 +87,6 @@ pub struct ParsedPe {
 }
 
 impl ParsedPe {
-
     pub fn parse(bytes: &[u8]) -> Result<Self, String> {
         if bytes.len() < 0x200 {
             return Err("Buffer muito pequeno para conter um executável PE válido".to_string());
@@ -100,7 +97,8 @@ impl ParsedPe {
             return Err("Assinatura DOS inválida (esperado 'MZ')".to_string());
         }
 
-        let e_lfanew = u32::from_le_bytes([bytes[0x3C], bytes[0x3D], bytes[0x3E], bytes[0x3F]]) as usize;
+        let e_lfanew =
+            u32::from_le_bytes([bytes[0x3C], bytes[0x3D], bytes[0x3E], bytes[0x3F]]) as usize;
         if e_lfanew + 0x108 > bytes.len() {
             return Err("Offset e_lfanew aponta para fora dos limites do buffer".to_string());
         }
@@ -116,7 +114,8 @@ impl ParsedPe {
         }
 
         let file_header_offset = e_lfanew + 4;
-        let machine = u16::from_le_bytes([bytes[file_header_offset], bytes[file_header_offset + 1]]);
+        let machine =
+            u16::from_le_bytes([bytes[file_header_offset], bytes[file_header_offset + 1]]);
         if machine != IMAGE_FILE_MACHINE_AMD64 {
             return Err(format!(
                 "Arquitetura incompatível: esperado AMD64 (0x{:04X}), encontrado 0x{:04X}",
@@ -124,11 +123,17 @@ impl ParsedPe {
             ));
         }
 
-        let num_sections = u16::from_le_bytes([bytes[file_header_offset + 2], bytes[file_header_offset + 3]]) as usize;
-        let size_of_opt_header = u16::from_le_bytes([bytes[file_header_offset + 16], bytes[file_header_offset + 17]]) as usize;
+        let num_sections =
+            u16::from_le_bytes([bytes[file_header_offset + 2], bytes[file_header_offset + 3]])
+                as usize;
+        let size_of_opt_header = u16::from_le_bytes([
+            bytes[file_header_offset + 16],
+            bytes[file_header_offset + 17],
+        ]) as usize;
 
         let opt_header_offset = file_header_offset + 20;
-        let opt_magic = u16::from_le_bytes([bytes[opt_header_offset], bytes[opt_header_offset + 1]]);
+        let opt_magic =
+            u16::from_le_bytes([bytes[opt_header_offset], bytes[opt_header_offset + 1]]);
         if opt_magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC {
             return Err(format!(
                 "Magic do OptionalHeader inválido (esperado PE32+ 0x020B, encontrado 0x{:04X})",
@@ -142,7 +147,11 @@ impl ParsedPe {
             bytes[opt_header_offset + 18],
             bytes[opt_header_offset + 19],
         ]);
-        let image_base = u64::from_le_bytes(bytes[opt_header_offset + 24..opt_header_offset + 32].try_into().unwrap());
+        let image_base = u64::from_le_bytes(
+            bytes[opt_header_offset + 24..opt_header_offset + 32]
+                .try_into()
+                .unwrap(),
+        );
         let size_of_image = u32::from_le_bytes([
             bytes[opt_header_offset + 56],
             bytes[opt_header_offset + 57],
@@ -169,8 +178,14 @@ impl ParsedPe {
                 return (0, 0);
             }
             let pos = data_dir_offset + (idx * 8);
-            let rva = u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]]);
-            let sz = u32::from_le_bytes([bytes[pos + 4], bytes[pos + 5], bytes[pos + 6], bytes[pos + 7]]);
+            let rva =
+                u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]]);
+            let sz = u32::from_le_bytes([
+                bytes[pos + 4],
+                bytes[pos + 5],
+                bytes[pos + 6],
+                bytes[pos + 7],
+            ]);
             (rva, sz)
         };
 
@@ -193,11 +208,36 @@ impl ParsedPe {
                 .trim_matches(char::from(0))
                 .to_string();
 
-            let virtual_size = u32::from_le_bytes([bytes[sec_pos + 8], bytes[sec_pos + 9], bytes[sec_pos + 10], bytes[sec_pos + 11]]);
-            let virtual_address = u32::from_le_bytes([bytes[sec_pos + 12], bytes[sec_pos + 13], bytes[sec_pos + 14], bytes[sec_pos + 15]]);
-            let raw_data_size = u32::from_le_bytes([bytes[sec_pos + 16], bytes[sec_pos + 17], bytes[sec_pos + 18], bytes[sec_pos + 19]]);
-            let raw_data_ptr = u32::from_le_bytes([bytes[sec_pos + 20], bytes[sec_pos + 21], bytes[sec_pos + 22], bytes[sec_pos + 23]]);
-            let characteristics = u32::from_le_bytes([bytes[sec_pos + 36], bytes[sec_pos + 37], bytes[sec_pos + 38], bytes[sec_pos + 39]]);
+            let virtual_size = u32::from_le_bytes([
+                bytes[sec_pos + 8],
+                bytes[sec_pos + 9],
+                bytes[sec_pos + 10],
+                bytes[sec_pos + 11],
+            ]);
+            let virtual_address = u32::from_le_bytes([
+                bytes[sec_pos + 12],
+                bytes[sec_pos + 13],
+                bytes[sec_pos + 14],
+                bytes[sec_pos + 15],
+            ]);
+            let raw_data_size = u32::from_le_bytes([
+                bytes[sec_pos + 16],
+                bytes[sec_pos + 17],
+                bytes[sec_pos + 18],
+                bytes[sec_pos + 19],
+            ]);
+            let raw_data_ptr = u32::from_le_bytes([
+                bytes[sec_pos + 20],
+                bytes[sec_pos + 21],
+                bytes[sec_pos + 22],
+                bytes[sec_pos + 23],
+            ]);
+            let characteristics = u32::from_le_bytes([
+                bytes[sec_pos + 36],
+                bytes[sec_pos + 37],
+                bytes[sec_pos + 38],
+                bytes[sec_pos + 39],
+            ]);
 
             sections.push(PeSectionData {
                 name,
@@ -226,7 +266,6 @@ impl ParsedPe {
 pub struct ManualMapper;
 
 impl ManualMapper {
-
     pub fn inject(
         proc: &Process,
         pe_bytes: &[u8],
@@ -256,7 +295,8 @@ impl ManualMapper {
             let copy_len = (sec.raw_data_size as usize).min(sec.virtual_size as usize);
 
             if copy_len > 0 && (sec.raw_data_ptr as usize + copy_len) <= pe_bytes.len() {
-                let slice = &pe_bytes[sec.raw_data_ptr as usize..sec.raw_data_ptr as usize + copy_len];
+                let slice =
+                    &pe_bytes[sec.raw_data_ptr as usize..sec.raw_data_ptr as usize + copy_len];
                 proc.write_raw(sec_dest, slice)?;
             }
             sections_mapped += 1;
@@ -326,7 +366,8 @@ impl ManualMapper {
 
         while offset + 8 <= max_len {
             let page_rva = proc.read::<u32>(remote_base + reloc_rva as usize + offset)? as usize;
-            let block_size = proc.read::<u32>(remote_base + reloc_rva as usize + offset + 4)? as usize;
+            let block_size =
+                proc.read::<u32>(remote_base + reloc_rva as usize + offset + 4)? as usize;
 
             if block_size == 0 || block_size < 8 || offset + block_size > max_len {
                 break;
@@ -353,12 +394,8 @@ impl ManualMapper {
                         let patched_val = original_val.wrapping_add(delta as u32);
                         proc.write::<u32>(target_addr, &patched_val)?;
                     }
-                    IMAGE_REL_BASED_ABSOLUTE => {
-
-                    }
-                    _ => {
-
-                    }
+                    IMAGE_REL_BASED_ABSOLUTE => {}
+                    _ => {}
                 }
             }
 
@@ -368,15 +405,10 @@ impl ManualMapper {
         Ok(())
     }
 
-    fn resolve_imports(
-        proc: &Process,
-        remote_base: usize,
-        import_rva: u32,
-    ) -> Result<(), String> {
+    fn resolve_imports(proc: &Process, remote_base: usize, import_rva: u32) -> Result<(), String> {
         let mut desc_offset = remote_base + import_rva as usize;
 
         loop {
-
             let original_first_thunk = proc.read::<u32>(desc_offset)?;
             let _time_date_stamp = proc.read::<u32>(desc_offset + 4)?;
             let _forwarder_chain = proc.read::<u32>(desc_offset + 8)?;
@@ -398,25 +430,21 @@ impl ManualMapper {
                 let target_mod = proc.find_module(&mod_name);
                 let mod_base = match target_mod {
                     Some(m) => m.base,
-                    None => {
-
-                        Self::load_remote_library(proc, &mod_name)?
-                    }
+                    None => Self::load_remote_library(proc, &mod_name)?,
                 };
 
                 let mut thunk_idx = 0usize;
                 loop {
-                    let thunk_val = proc.read::<u64>(remote_base + thunk_rva as usize + (thunk_idx * 8))?;
+                    let thunk_val =
+                        proc.read::<u64>(remote_base + thunk_rva as usize + (thunk_idx * 8))?;
                     if thunk_val == 0 {
                         break;
                     }
 
                     let proc_address = if (thunk_val & 0x8000_0000_0000_0000) != 0 {
-
                         let ordinal = (thunk_val & 0xFFFF) as u16;
                         Self::resolve_export_by_ordinal(proc, mod_base, ordinal)?
                     } else {
-
                         let name_addr = remote_base + (thunk_val as usize) + 2;
                         let func_name = proc.read_string(name_addr, 256, false)?;
                         Self::resolve_export_by_name(proc, mod_base, &func_name)?
@@ -435,14 +463,21 @@ impl ManualMapper {
         Ok(())
     }
 
-    fn resolve_export_by_name(proc: &Process, mod_base: usize, func_name: &str) -> Result<usize, String> {
+    fn resolve_export_by_name(
+        proc: &Process,
+        mod_base: usize,
+        func_name: &str,
+    ) -> Result<usize, String> {
         let e_lfanew = proc.read::<i32>(mod_base + 0x3C)? as usize;
         let opt_header = mod_base + e_lfanew + 24;
         let export_rva = proc.read::<u32>(opt_header + 112)? as usize;
         let export_size = proc.read::<u32>(opt_header + 116)? as usize;
 
         if export_rva == 0 || export_size == 0 {
-            return Err(format!("Módulo em 0x{:X} não possui tabela de exportação", mod_base));
+            return Err(format!(
+                "Módulo em 0x{:X} não possui tabela de exportação",
+                mod_base
+            ));
         }
 
         let export_dir = mod_base + export_rva;
@@ -459,7 +494,10 @@ impl ManualMapper {
             if current_name == func_name {
                 let ordinal = proc.read::<u16>(addr_ordinals + (i * 2))? as usize;
                 if ordinal >= num_functions {
-                    return Err(format!("Ordinal fora dos limites para função '{}'", func_name));
+                    return Err(format!(
+                        "Ordinal fora dos limites para função '{}'",
+                        func_name
+                    ));
                 }
 
                 let func_rva = proc.read::<u32>(addr_functions + (ordinal * 4))? as usize;
@@ -483,10 +521,17 @@ impl ManualMapper {
             }
         }
 
-        Err(format!("Símbolo '{}' não encontrado nas exportações do módulo 0x{:X}", func_name, mod_base))
+        Err(format!(
+            "Símbolo '{}' não encontrado nas exportações do módulo 0x{:X}",
+            func_name, mod_base
+        ))
     }
 
-    fn resolve_export_by_ordinal(proc: &Process, mod_base: usize, ordinal: u16) -> Result<usize, String> {
+    fn resolve_export_by_ordinal(
+        proc: &Process,
+        mod_base: usize,
+        ordinal: u16,
+    ) -> Result<usize, String> {
         let e_lfanew = proc.read::<i32>(mod_base + 0x3C)? as usize;
         let opt_header = mod_base + e_lfanew + 24;
         let export_rva = proc.read::<u32>(opt_header + 112)? as usize;
@@ -517,14 +562,14 @@ impl ManualMapper {
         let target_dll = format!("{}.dll", parts[0]);
         let func_name = parts[1];
 
-        let target_mod = proc.find_module(&target_dll)
+        let target_mod = proc
+            .find_module(&target_dll)
             .ok_or_else(|| format!("Módulo redirecionado '{}' não carregado", target_dll))?;
 
         Self::resolve_export_by_name(proc, target_mod.base, func_name)
     }
 
     fn load_remote_library(proc: &Process, dll_name: &str) -> Result<usize, String> {
-
         if let Some(m) = proc.find_module(dll_name) {
             return Ok(m.base);
         }
@@ -533,12 +578,12 @@ impl ManualMapper {
         let bytes_len = wide_name.len() * 2;
         let remote_str = proc.alloc(bytes_len, PAGE_READWRITE)?;
 
-        let raw_bytes: &[u8] = unsafe {
-            std::slice::from_raw_parts(wide_name.as_ptr() as *const u8, bytes_len)
-        };
+        let raw_bytes: &[u8] =
+            unsafe { std::slice::from_raw_parts(wide_name.as_ptr() as *const u8, bytes_len) };
         proc.write_raw(remote_str, raw_bytes)?;
 
-        let kernel32 = proc.find_module("kernel32.dll")
+        let kernel32 = proc
+            .find_module("kernel32.dll")
             .ok_or_else(|| "kernel32.dll não encontrado no processo alvo".to_string())?;
 
         let load_lib_addr = Self::resolve_export_by_name(proc, kernel32.base, "LoadLibraryW")?;
@@ -548,7 +593,9 @@ impl ManualMapper {
                 proc.handle,
                 null_mut(),
                 0,
-                std::mem::transmute::<usize, unsafe extern "system" fn(LPVOID) -> DWORD>(load_lib_addr),
+                std::mem::transmute::<usize, unsafe extern "system" fn(LPVOID) -> DWORD>(
+                    load_lib_addr,
+                ),
                 remote_str as LPVOID,
                 0,
                 null_mut(),
@@ -612,7 +659,6 @@ impl ManualMapper {
         target_fn: usize,
         timeout_ms: u32,
     ) -> Result<(), String> {
-
         let mut shellcode = Vec::with_capacity(48);
 
         shellcode.extend_from_slice(&[0x48, 0x83, 0xEC, 0x28]);
@@ -735,7 +781,6 @@ mod tests {
 
     #[test]
     fn test_parse_valid_system_dll() {
-
         let path = "C:\\Windows\\System32\\ntdll.dll";
         if let Ok(bytes) = std::fs::read(path) {
             let pe = ParsedPe::parse(&bytes).expect("Falha ao analisar ntdll.dll");
@@ -748,9 +793,10 @@ mod tests {
 
     #[test]
     fn test_apply_relocations_delta() {
-
         let proc = Process::attach_current().expect("Falha ao anexar ao processo atual");
-        let test_mem = proc.alloc(0x1000, PAGE_READWRITE).expect("Falha ao alocar memória de teste");
+        let test_mem = proc
+            .alloc(0x1000, PAGE_READWRITE)
+            .expect("Falha ao alocar memória de teste");
 
         let reloc_rva = 0x200u32;
         let block_addr = test_mem + reloc_rva as usize;

@@ -1,6 +1,6 @@
-use std::collections::{HashMap, HashSet};
-use crate::process::Process;
 use crate::debugger::disasm::Disassembler;
+use crate::process::Process;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BranchKind {
@@ -28,7 +28,6 @@ pub struct DissectCodeResult {
 pub struct DissectCodeEngine;
 
 impl DissectCodeEngine {
-
     pub fn dissect_buffer(code: &[u8], base_address: usize) -> DissectCodeResult {
         let mut result = DissectCodeResult::default();
         let mut function_starts = HashSet::new();
@@ -38,7 +37,6 @@ impl DissectCodeEngine {
         let mut last_was_ret = true;
 
         while offset < code.len() {
-
             if code[offset] == 0xCC || code[offset] == 0x90 {
                 last_was_ret = true;
                 offset += 1;
@@ -91,15 +89,15 @@ impl DissectCodeEngine {
                 }
                 last_was_ret = true;
             } else if m.starts_with('j')
-
-                && let Some(target) = insn.target_addr {
-                    result.branches.push(DissectBranch {
-                        from_address: insn_addr,
-                        to_address: target,
-                        kind: BranchKind::ConditionalJump,
-                    });
-                    xrefs.entry(target).or_default().push(insn_addr);
-                }
+                && let Some(target) = insn.target_addr
+            {
+                result.branches.push(DissectBranch {
+                    from_address: insn_addr,
+                    to_address: target,
+                    kind: BranchKind::ConditionalJump,
+                });
+                xrefs.entry(target).or_default().push(insn_addr);
+            }
 
             offset += len;
         }
@@ -140,7 +138,11 @@ impl DissectCodeEngine {
                 let partial = Self::dissect_buffer(&data, region_start);
                 final_result.branches.extend(partial.branches);
                 for (callee, callers) in partial.xrefs {
-                    final_result.xrefs.entry(callee).or_default().extend(callers);
+                    final_result
+                        .xrefs
+                        .entry(callee)
+                        .or_default()
+                        .extend(callers);
                 }
                 all_starts.extend(partial.function_starts);
             }
@@ -160,7 +162,6 @@ mod tests {
 
     #[test]
     fn test_dissect_buffer_call_and_ret() {
-
         let mut code = vec![0xE8, 0x10, 0x00, 0x00, 0x00, 0xC3, 0xCC, 0xCC];
         while code.len() < 0x15 {
             code.push(0xCC);
@@ -176,7 +177,11 @@ mod tests {
         let callers = result.xrefs.get(&0x1015).expect("XRef should exist");
         assert!(callers.contains(&0x1000));
 
-        let calls: Vec<_> = result.branches.iter().filter(|b| b.kind == BranchKind::Call).collect();
+        let calls: Vec<_> = result
+            .branches
+            .iter()
+            .filter(|b| b.kind == BranchKind::Call)
+            .collect();
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].from_address, 0x1000);
         assert_eq!(calls[0].to_address, 0x1015);

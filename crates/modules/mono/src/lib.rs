@@ -11,12 +11,14 @@
 //!   versoes 24-29 cobrem Unity 2018-2023).
 //! - API `enumerate_assemblies` / `enumerate_classes` com stub para IL2CPP.
 
-pub mod runtime;
 pub mod api;
-pub mod il2cpp;
 pub mod collector;
+pub mod il2cpp;
+pub mod runtime;
 
-pub use runtime::{MonoRuntime, detect_from_module_names, module_names_of_pid, detect_mono_runtime};
-pub use api::{MonoApi, MONO_ESSENTIAL_EXPORTS, IL2CPP_ESSENTIAL_EXPORTS};
-pub use il2cpp::{Il2CppMetadataHeader, parse_global_metadata_header, GLOBAL_METADATA_MAGIC};
-pub use collector::{MonoAssembly, MonoClass, enumerate_assemblies, enumerate_classes};
+pub use api::{MonoApi, IL2CPP_ESSENTIAL_EXPORTS, MONO_ESSENTIAL_EXPORTS};
+pub use collector::{enumerate_assemblies, enumerate_classes, MonoAssembly, MonoClass};
+pub use il2cpp::{parse_global_metadata_header, Il2CppMetadataHeader, GLOBAL_METADATA_MAGIC};
+pub use runtime::{
+    detect_from_module_names, detect_mono_runtime, module_names_of_pid, MonoRuntime,
+};
