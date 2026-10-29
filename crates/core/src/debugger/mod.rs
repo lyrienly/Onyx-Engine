@@ -9,8 +9,10 @@ pub mod dissect_code;
 pub mod string_referencer;
 pub mod relocator;
 pub mod rop_finder;
+pub mod page_guard;
 
 pub use debugger::*;
+pub use page_guard::{AccessType, BpHit, BpId, PageGuardBreakpoint, PageGuardError, PageGuardManager};
 pub use disasm::*;
 pub use veh::*;
 pub use hook::*;
