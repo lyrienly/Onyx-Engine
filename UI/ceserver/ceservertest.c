@@ -517,7 +517,7 @@ void *CESERVERTEST(int pid )
 
   pthread_t pth;
 
-  char *output;
+  unsigned char *output;
   debug_log("CESERVERTEST: running (v2)\n");
 
   i=GetModuleSize("/home/eric/x/ld-linux-x86-64.so.2",0x00027000, 123);
