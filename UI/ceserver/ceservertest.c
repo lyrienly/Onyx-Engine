@@ -14,6 +14,7 @@
 
 #include "ceserver.h"
 #include "api.h"
+#include "symbols.h"
 
 int pHandle;
 
@@ -436,7 +437,7 @@ void *CESERVERTEST_DEBUGGERTHREAD(void *arg)
       {
         debug_log("going to set breakpoint\n");
 
-        i=cenet_setBreakpoint(fd, pHandle, -1, 0x00ce0000, 3, 4,0);
+        i=cenet_setBreakpoint(fd, pHandle, -1, (void*)0x00ce0000, 3, 4,0);
 
         debug_log("cenet_setBreakpoint returned %d\n",i);
       }
