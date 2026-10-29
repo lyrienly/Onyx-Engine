@@ -39,7 +39,7 @@ impl std::error::Error for ResolveError {}
 /// `vtable[PRESENT_VTABLE_INDEX]` de uma swapchain descartavel.
 pub fn resolve_present_slot() -> Result<*const u8, ResolveError> {
     unsafe {
-        let class_name = b"OnyxOverlayProbe\0".as_ptr();
+        let class_name = c"OnyxOverlayProbe".as_ptr() as *const u8;
         let wc = WNDCLASSEXA {
             cbSize: core::mem::size_of::<WNDCLASSEXA>() as u32,
             style: 0,
@@ -60,7 +60,7 @@ pub fn resolve_present_slot() -> Result<*const u8, ResolveError> {
         let hwnd = CreateWindowExA(
             0,
             class_name,
-            b"OnyxOverlayProbe\0".as_ptr(),
+            c"OnyxOverlayProbe".as_ptr() as *const u8,
             WS_OVERLAPPEDWINDOW,
             0,
             0,
