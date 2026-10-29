@@ -1,4 +1,3 @@
-
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::process::Process;
@@ -106,7 +105,12 @@ impl ReferenceGraph {
         address >= self.base && address < self.base.wrapping_add(self.len)
     }
 
-    pub fn find_path(&self, roots: &[usize], target: usize, max_depth: usize) -> Option<Vec<usize>> {
+    pub fn find_path(
+        &self,
+        roots: &[usize],
+        target: usize,
+        max_depth: usize,
+    ) -> Option<Vec<usize>> {
         if roots.is_empty() || max_depth == 0 || !self.contains(target) {
             return None;
         }
@@ -184,7 +188,9 @@ mod tests {
     #[test]
     fn test_find_path() {
         let graph = ReferenceGraph::build(&chain_buffer(), BASE, 8, 8);
-        let path = graph.find_path(&[BASE + 0x10], BASE + 0x40, 4).expect("path");
+        let path = graph
+            .find_path(&[BASE + 0x10], BASE + 0x40, 4)
+            .expect("path");
         assert_eq!(path, vec![BASE + 0x10, BASE + 0x20, BASE + 0x40]);
     }
 
@@ -206,9 +212,9 @@ mod tests {
     fn test_cycle_does_not_hang() {
         let mut buffer = vec![0u8; 0x40];
         write_ptr(&mut buffer, 0x00, BASE + 0x08);
-        write_ptr(&mut buffer, 0x08, BASE + 0x00);
+        write_ptr(&mut buffer, 0x08, BASE);
         let graph = ReferenceGraph::build(&buffer, BASE, 8, 8);
-        assert!(graph.find_path(&[BASE + 0x30], BASE + 0x00, 8).is_none());
+        assert!(graph.find_path(&[BASE + 0x30], BASE, 8).is_none());
         assert_eq!(graph.referrers(BASE), &[BASE + 0x08]);
     }
 
@@ -220,7 +226,9 @@ mod tests {
         let graph = ReferenceGraph::build(&buffer, BASE, 4, 4);
         assert_eq!(graph.pointer_size(), 4);
         assert_eq!(graph.referrers(BASE + 0x10), &[BASE + 0x04]);
-        let path = graph.find_path(&[BASE + 0x04], BASE + 0x20, 4).expect("path");
+        let path = graph
+            .find_path(&[BASE + 0x04], BASE + 0x20, 4)
+            .expect("path");
         assert_eq!(path, vec![BASE + 0x04, BASE + 0x10, BASE + 0x20]);
     }
 
