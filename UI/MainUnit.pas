@@ -6025,7 +6025,7 @@ begin
   callhelp := False;
   Result := True;
 
-  wikipath:='https://wiki.cheatengine.org/index.php';
+  wikipath:='https://github.com/ErlonLy/OnyxEngine';
   wikiurl:='';
 
   if command = HELP_CONTEXT then
@@ -7430,7 +7430,7 @@ end;
 procedure TMainForm.LogoClick(Sender: TObject);
 var s: string;
 begin
-  s:=format('http://www.cheatengine.org/?referredby=CE%.2f',[ceversion]);
+  s:='https://github.com/ErlonLy/OnyxEngine';
   if messagedlg(rsDoYouWantToGoToTheCheatEngineWebsite, mtConfirmation,
     [mbYes, mbNo], 0) = mrYes then
     ShellExecute(0, PChar('open'), PChar(s),
@@ -11328,7 +11328,7 @@ end;
 
 procedure TMainForm.Helpindex1Click(Sender: TObject);
 begin
-  ShellExecute(0,'open','https://wiki.cheatengine.org/index.php',nil,nil,SW_SHOW);
+  ShellExecute(0,'open','https://github.com/ErlonLy/OnyxEngine',nil,nil,SW_SHOW);
 //  Application.HelpContext(1);
 end;
 

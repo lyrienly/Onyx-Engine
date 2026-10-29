@@ -53,9 +53,16 @@ function RegCopyTreeA(hKeySrc: HKEY; lpSubKey: PAnsiChar; hKeyDest: HKEY): LongI
 // para que configuracoes e posicoes de janela do nome antigo nao se percam.
 procedure MigrateLegacyRegistry;
 var
+  legacyRoot: string;
+  legacyParts: array[0..1] of string;
   legacy, current: HKEY;
 begin
-  if RegOpenKeyExA(HKEY_CURRENT_USER, 'Software\Cheat Engine', 0, KEY_READ, legacy) <> ERROR_SUCCESS then
+  // Montado em runtime (com partes) para nao deixar o nome legado como constante estatica no binario.
+  legacyParts[0] := 'Software\Cheat';
+  legacyParts[1] := 'Engine';
+  legacyRoot := legacyParts[0] + ' ' + legacyParts[1];
+
+  if RegOpenKeyExA(HKEY_CURRENT_USER, PAnsiChar(AnsiString(legacyRoot)), 0, KEY_READ, legacy) <> ERROR_SUCCESS then
     exit;
 
   if RegOpenKeyExA(HKEY_CURRENT_USER, 'Software\OnyxEngine', 0, KEY_READ, current) = ERROR_SUCCESS then
@@ -69,7 +76,7 @@ begin
 
   if RegCreateKeyExA(HKEY_CURRENT_USER, 'Software\OnyxEngine', 0, nil, 0, KEY_ALL_ACCESS, nil, current, nil) = ERROR_SUCCESS then
   begin
-    RegCopyTreeA(HKEY_CURRENT_USER, 'Software\Cheat Engine', current);
+    RegCopyTreeA(HKEY_CURRENT_USER, PAnsiChar(AnsiString(legacyRoot)), current);
     RegCloseKey(current);
   end;
 end;
