@@ -13,6 +13,7 @@ members = [
     "crates/modules/hook",
     "crates/modules/mono",
     "crates/modules/mono_hook",
+    "crates/modules/overlay",
     "crates/dlls/allochook",
     "crates/dlls/d3dhook",
     "crates/dlls/luaclient",
