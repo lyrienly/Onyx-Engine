@@ -1,4 +1,11 @@
 #![allow(non_snake_case, non_camel_case_types, dead_code, unsafe_op_in_unsafe_fn, static_mut_refs)]
+#![allow(
+    clippy::missing_safety_doc,
+    clippy::not_unsafe_ptr_arg_deref,
+    clippy::upper_case_acronyms,
+    clippy::too_many_arguments,
+    clippy::manual_c_str_literals
+)]
 
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU64, Ordering};
