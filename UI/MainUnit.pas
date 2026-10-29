@@ -4179,7 +4179,7 @@ end;
 
 procedure TMainForm.miMCPAboutClick(Sender: TObject);
 begin
-  MessageDlg('Ponte MCP do OnyxEngine'#13#10'===================================='#13#10'Protocolo da Ponte: miscusi-peek MCP Bridge v12.0.0'#13#10'Named Pipe: \\.\pipe\CE_MCP_Bridge_v99'#13#10'Motor do Driver: OwMemDriver (Ring-0 CR3 Fisico)'#13#10'Localizacao: Menu Principal ao lado do D3D'#13#10'===================================='#13#10'Suporte completo a 175 ferramentas nativas de inspecao e memoria do Cheat Engine.', mtInformation, [mbOK], 0);
+  MessageDlg('Ponte MCP do OnyxEngine'#13#10'===================================='#13#10'Protocolo da Ponte: miscusi-peek MCP Bridge v12.0.0'#13#10'Named Pipe: \\.\pipe\CE_MCP_Bridge_v99'#13#10'Motor do Driver: OwMemDriver (Ring-0 CR3 Fisico)'#13#10'Localizacao: Menu Principal ao lado do D3D'#13#10'===================================='#13#10'Suporte completo a 175 ferramentas nativas de inspecao e memoria do OnyxEngine.', mtInformation, [mbOK], 0);
 end;
 
 procedure TMainForm.miChangeDisplayTypeClick(Sender: TObject);

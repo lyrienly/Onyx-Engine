@@ -559,7 +559,7 @@ begin
 end;
 
 function lua_ToCEUserData(L: PLua_state; i: integer): pointer;
-//Cheat Engine implements two types of userdata. the legacy LightUserData used in 6.2- and the Heavy UserData in 6.3+
+//OnyxEngine implements two types of userdata. the legacy LightUserData used in 6.2- and the Heavy UserData in 6.3+
 //Heavy UserData is a pointer with a pointer to the real object, while lightuserdata is just a pointer to the object
 begin
   result:=lua_touserdata(L,i);
