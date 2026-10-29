@@ -1697,6 +1697,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "onyx_dll_mapper"
+version = "1.0.0"
+dependencies = [
+ "onyx_core",
+]
+
+[[package]]
 name = "onyx_dotnet"
 version = "0.1.0"
 dependencies = [

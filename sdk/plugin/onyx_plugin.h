@@ -69,6 +69,35 @@ ONYX_PLUGIN_EXPORT int32_t ONYX_PLUGIN_CALL OnyxPlugin_ValidateAOB(
     OnyxAobMatchResult* out_result
 );
 
+
+#define ONYX_MAP_ERASE_HEADERS     0x1
+#define ONYX_MAP_PROTECT_SECTIONS  0x2
+#define ONYX_MAP_CALL_TLS          0x4
+
+typedef struct OnyxMapOptions {
+    uint32_t struct_size;
+    uint32_t flags;
+    uint64_t preferred_base;
+} OnyxMapOptions;
+
+typedef struct OnyxMapResult {
+    uint64_t image_base;
+    uint64_t entry_point;
+    int32_t  dll_main_result;
+    uint32_t flags_applied;
+    uint32_t relocations;
+    uint32_t imports;
+    char     error[256];
+} OnyxMapResult;
+
+ONYX_PLUGIN_EXPORT int32_t ONYX_PLUGIN_CALL OnyxPlugin_MapDll(
+    const char* dll_path,
+    const OnyxMapOptions* options,
+    OnyxMapResult* out_result
+);
+
+ONYX_PLUGIN_EXPORT int32_t ONYX_PLUGIN_CALL OnyxPlugin_IsMapped(uint64_t image_base);
+
 ONYX_PLUGIN_EXPORT int32_t ONYX_PLUGIN_CALL OnyxPlugin_GenerateAOB(
     uint32_t pid,
     uint64_t target_address,

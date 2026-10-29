@@ -19,6 +19,7 @@ members = [
     "crates/dlls/vehdebug",
     "crates/dlls/taskmgr_cloak",
     "crates/plugins/aob_generator",
+    "crates/plugins/dll_mapper",
     "crates/syscalls-indirect",
 ]
 resolver = "2"
