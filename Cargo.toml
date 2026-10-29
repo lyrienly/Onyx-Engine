@@ -10,6 +10,7 @@ members = [
     "crates/modules/gdb_server",
     "crates/modules/freezer",
     "crates/modules/hook",
+    "crates/modules/mono",
     "crates/dlls/allochook",
     "crates/dlls/d3dhook",
     "crates/dlls/luaclient",

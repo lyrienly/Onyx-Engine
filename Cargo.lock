@@ -1717,6 +1717,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "onyx_mono"
+version = "0.1.0"
+dependencies = [
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "onyx_pointer"
 version = "0.1.0"
 dependencies = [
