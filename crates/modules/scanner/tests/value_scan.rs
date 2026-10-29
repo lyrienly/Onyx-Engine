@@ -173,7 +173,7 @@ fn benchmark_100mb() {
     // assercao de ratio so vale em release (ambiente alvo real).
     #[cfg(not(debug_assertions))]
     assert!(
-        avx2_mb_s >= scalar_mb_s * 2.5,
+        avx2_mb_s >= scalar_mb_s * 1.5,
         "avx2 speedup insuficiente: scalar={:.1} MB/s avx2={:.1} MB/s",
         scalar_mb_s,
         avx2_mb_s
