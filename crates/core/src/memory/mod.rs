@@ -14,6 +14,7 @@ pub mod timeline;
 pub mod struct_spider;
 pub mod transaction;
 pub mod cache;
+pub mod reference_graph;
 
 pub use scanner::*;
 pub use group_scan::*;
@@ -31,3 +32,4 @@ pub use timeline::*;
 pub use struct_spider::*;
 pub use transaction::*;
 pub use cache::{CachedChunk, CacheStats, MemoryCache, DEFAULT_CACHE_CHUNK_SIZE};
+pub use reference_graph::*;
