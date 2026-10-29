@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "porthelp.h"
+#include "api.h"
 
 typedef struct
 {
