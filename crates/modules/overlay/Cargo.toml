@@ -1,0 +1,24 @@
+[package]
+name = "onyx_overlay"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "onyx_overlay"
+crate-type = ["rlib"]
+
+[dependencies]
+onyx_hook = { path = "../hook" }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.52", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Memory",
+    "Win32_System_Threading",
+] }
+
+[dev-dependencies]
+png = "0.17"
