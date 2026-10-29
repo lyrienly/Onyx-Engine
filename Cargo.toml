@@ -9,6 +9,7 @@ members = [
     "crates/modules/disasm",
     "crates/modules/gdb_server",
     "crates/modules/freezer",
+    "crates/modules/dotnet",
     "crates/modules/hook",
     "crates/dlls/allochook",
     "crates/dlls/d3dhook",
