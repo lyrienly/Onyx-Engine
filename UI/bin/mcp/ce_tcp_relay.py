@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 r"""TCP-to-named-pipe relay for the Cheat Engine MCP bridge.
 
-Run this script on Windows while ``ce_mcp_bridge.lua`` is loaded in Cheat
-Engine. It accepts the same length-prefixed JSON-RPC frames used by
-``mcp_cheatengine.py`` and forwards them to ``\\.\pipe\CE_MCP_Bridge_v99``.
+Run this script on Windows while ``ce_mcp_bridge.lua`` is loaded in
+OnyxEngine. It accepts the same length-prefixed JSON-RPC frames used by
+``mcp_onyxengine.py`` and forwards them to the pipe named in
+``mcp/mcp_pipe.txt`` (or ``ONYX_MCP_PIPE``).
 
 Use this when the MCP server cannot open the Windows named pipe directly, such
 as from WSL, a container, or another host.
@@ -21,13 +22,14 @@ Issue #5 — resilience additions:
   * Pipe access is serialized by a per-connection ``threading.Lock`` so the
     heartbeat sender and the client-forwarder cannot interleave frames.
   * Framing stays 4-byte little-endian length prefix + body — unchanged, so
-    ``test_mcp.py`` and ``mcp_cheatengine.py`` keep working byte-for-byte.
+    ``test_mcp.py`` and ``mcp_onyxengine.py`` keep working byte-for-byte.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import socket
 import socketserver
 import struct
@@ -44,7 +46,23 @@ except ImportError as exc:  # pragma: no cover - Windows-only helper
     raise SystemExit(1) from exc
 
 
-PIPE_NAME = r"\\.\pipe\CE_MCP_Bridge_v99"
+def _resolve_pipe_name() -> str:
+    """Nome do pipe compartilhado com ce_mcp_bridge.lua (mcp/mcp_pipe.txt) ou ONYX_MCP_PIPE."""
+    env = os.environ.get("ONYX_MCP_PIPE", "").strip()
+    if env:
+        return env if env.startswith("\\\\.\\pipe\\") else "\\\\.\\pipe\\" + env
+    try:
+        here = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(here, "mcp_pipe.txt"), "r", encoding="utf-8") as fh:
+            name = fh.read().strip()
+        if name:
+            return "\\\\.\\pipe\\" + name
+    except OSError:
+        pass
+    return "\\\\.\\pipe\\Onyx_MCP_Bridge_v1"
+
+
+PIPE_NAME = _resolve_pipe_name()
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 9876
 MAX_FRAME_SIZE_BYTES = 32 * 1024 * 1024

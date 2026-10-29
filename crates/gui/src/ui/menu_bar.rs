@@ -190,8 +190,8 @@ pub fn render_top_menu(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                 });
 
                 ui.menu_button(RichText::new("Help").size(12.0), |ui| {
-                    if ui.button("About Cheat Engine 7.7").clicked() {
-                        app.status_msg = "Cheat Engine 7.7 (Rust Edition) - High performance native memory suite.".to_string();
+                    if ui.button("About OnyxEngine").clicked() {
+                        app.status_msg = "OnyxEngine (Rust Edition) - High performance native memory suite.".to_string();
                         ui.close_menu();
                     }
                 });
@@ -324,7 +324,7 @@ pub fn render_header_bar(app: &mut OnyxEngineApp, ui: &mut egui::Ui) {
                                 .stroke(Stroke::new(1.0_f32, Color32::from_rgb(48, 54, 66)))
                                 .min_size(Vec2::new(28.0, 28.0))
                                 .rounding(Rounding::same(2.0)),
-                        ).on_hover_text("Cheat Engine Settings (Ctrl+,)").clicked() {
+                        ).on_hover_text("OnyxEngine Settings (Ctrl+,)").clicked() {
                             app.show_settings_modal = true;
                         }
                     }

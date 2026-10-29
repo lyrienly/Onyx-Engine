@@ -12,7 +12,7 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
     ctx.show_viewport_immediate(
         egui::ViewportId::from_hash_of("ce_settings_viewport"),
         egui::ViewportBuilder::default()
-            .with_title("Cheat Engine settings")
+            .with_title("OnyxEngine settings")
             .with_inner_size([780.0, 540.0])
             .with_min_inner_size([600.0, 400.0])
             .with_resizable(true),
@@ -178,7 +178,7 @@ fn render_general_settings(app: &mut OnyxEngineApp, ui: &mut egui::Ui) {
         let mut center_popups = true;
         let mut show_undo = true;
         ui.checkbox(&mut show_proc_list_on_start, "Show process list on start");
-        ui.checkbox(&mut center_popups, "Center popup windows on Cheat Engine");
+        ui.checkbox(&mut center_popups, "Center popup windows on OnyxEngine");
         ui.checkbox(&mut show_undo, "Show undo button");
         ui.horizontal(|ui| {
             ui.label("Address list max string length:");
@@ -210,7 +210,7 @@ fn render_scan_settings(app: &mut OnyxEngineApp, ui: &mut egui::Ui) {
         ui.checkbox(&mut app.copy_on_write, "Scan copy-on-write memory");
     });
 
-    render_group_box(ui, "Cheat Engine 7.7 Enhancements", |ui| {
+    render_group_box(ui, "OnyxEngine Enhancements", |ui| {
         let mut no_globalalloc_save = true;
         let mut low_mem_leak_fix = true;
         let mut binary_aob_notation = true;
@@ -273,7 +273,7 @@ fn render_hotkeys_tab(app: &mut OnyxEngineApp, ui: &mut egui::Ui) {
         ui.label("Ctrl+P: Pointer Scanner");
         ui.label("Ctrl+A: Auto Assembler");
         ui.label("Ctrl+L: Lua Engine Console");
-        ui.label("Ctrl+,: Cheat Engine Settings");
+        ui.label("Ctrl+,: OnyxEngine Settings");
     });
 
     render_group_box(ui, "Ghost Mode (CE 7.7)", |ui| {

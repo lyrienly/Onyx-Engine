@@ -161,7 +161,9 @@ end
 
 miAndroid=createMenuItem(MainForm.Menu)
 miAndroid.Caption='Android'
-MainForm.Menu.Items.insert(MainForm.miHelp.MenuIndex, miAndroid)
+local insertAt = MainForm.miHelp and MainForm.miHelp.MenuIndex or -1
+if insertAt < 0 then insertAt = MainForm.Menu.Items.Count end
+MainForm.Menu.Items.insert(insertAt, miAndroid)
 
 miPatchAPK=createMenuItem(miAndroid)
 miPatchAPK.Caption='Patch APK to debuggable'

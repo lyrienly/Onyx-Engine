@@ -657,7 +657,7 @@ begin
 
   if (CurrentOnyxScanner = nil) or (CurrentOnyxProcessHandle = nil) then Exit;
 
-  // Prepare UNDO files for Cheat Engine compatibility
+  // Prepare UNDO files for OnyxEngine compatibility
   DeleteFile(folder + 'ADDRESSES.UNDO');
   RenameFile(folder + 'ADDRESSES.TMP', folder + 'ADDRESSES.UNDO');
   DeleteFile(folder + 'MEMORY.UNDO');
@@ -770,7 +770,7 @@ begin
     h := OriginalOpenProcess(dwDesiredAccess, bInheritHandle, dwProcessId);
 
   // If usermode OpenProcess was stripped or blocked by ObRegisterCallbacks,
-  // return a synthetic valid handle so the Cheat Engine UI never errors out,
+  // return a synthetic valid handle so the OnyxEngine UI never errors out,
   // since memory operations are already intercepted and handled via Ring-0 CR3 in Rust!
   if (h = 0) or (h = INVALID_HANDLE_VALUE) then
   begin

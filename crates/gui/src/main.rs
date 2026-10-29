@@ -11,7 +11,7 @@ use eframe::egui::{self, Color32, Rounding, Stroke, Vec2};
 fn main() -> eframe::Result<()> {
     let native_options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
-            .with_title("Cheat Engine 7.7")
+            .with_title("OnyxEngine")
             .with_resizable(true)
             .with_inner_size([1260.0, 880.0])
             .with_min_inner_size([820.0, 560.0]),
