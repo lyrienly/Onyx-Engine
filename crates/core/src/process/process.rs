@@ -17,7 +17,7 @@ impl ProcessAccessMode {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::NtApi => "NT Native API",
-            Self::KernelDbk => "Kernel OwMemDriver",
+            Self::KernelDbk => "Kernel OnyxDriver",
             Self::Win32 => "Win32 API",
         }
     }
@@ -25,7 +25,7 @@ impl ProcessAccessMode {
     pub fn badge(&self) -> &'static str {
         match self {
             Self::NtApi => "[NT API]",
-            Self::KernelDbk => "[OwMemDriver]",
+            Self::KernelDbk => "[OnyxDriver]",
             Self::Win32 => "[WIN32]",
         }
     }
@@ -1131,7 +1131,7 @@ mod tests {
     #[test]
     fn test_process_access_mode_badges() {
         assert_eq!(ProcessAccessMode::NtApi.badge(), "[NT API]");
-        assert_eq!(ProcessAccessMode::KernelDbk.badge(), "[OwMemDriver]");
+        assert_eq!(ProcessAccessMode::KernelDbk.badge(), "[OnyxDriver]");
         assert_eq!(ProcessAccessMode::Win32.badge(), "[WIN32]");
     }
 

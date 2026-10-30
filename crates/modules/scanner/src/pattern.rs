@@ -1,3 +1,4 @@
+use onyx_core::process::{Process, ProcessAccessMode};
 use std::sync::OnceLock;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -323,6 +324,78 @@ pub fn find_all_with(haystack: &[u8], pattern: &Pattern) -> Vec<usize> {
         }
     }
     find_all_scalar(haystack, &pattern.bytes, &pattern.mask)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ScanEngineStrategy {
+    #[default]
+    Auto,
+    UserModeAvx2,
+    KernelPhysical,
+}
+
+pub fn scan_pattern_process(
+    proc: &Process,
+    pattern: &Pattern,
+    start_addr: usize,
+    size: usize,
+    strategy: ScanEngineStrategy,
+) -> Result<Vec<usize>, String> {
+    if pattern.is_empty() {
+        return Err("Empty pattern".to_string());
+    }
+
+    if (strategy == ScanEngineStrategy::KernelPhysical || strategy == ScanEngineStrategy::Auto)
+        && proc.access_mode == ProcessAccessMode::KernelDbk
+        && pattern.len() <= 64
+    {
+        if let Some(ref dbk) = proc.dbk {
+            let mask_bytes: Vec<u8> = pattern
+                .mask
+                .iter()
+                .map(|&m| if m { 0xFF } else { 0x00 })
+                .collect();
+            if let Ok(matches) = dbk.pattern_scan_cr3(
+                proc.pid,
+                start_addr as u64,
+                size as u64,
+                &pattern.bytes,
+                &mask_bytes,
+            ) {
+                if !matches.is_empty() {
+                    return Ok(matches.into_iter().map(|m| m as usize).collect());
+                }
+            }
+        }
+    }
+
+    let chunk_size = 512 * 1024;
+    let mut buf = vec![0u8; chunk_size];
+    let mut results = Vec::new();
+    let mut offset = 0;
+    let n = pattern.len();
+
+    while offset < size {
+        let cur_size = (size - offset).min(chunk_size);
+        let cur_addr = start_addr + offset;
+
+        if let Ok(bytes_read) = proc.read_raw(cur_addr, &mut buf[..cur_size]) {
+            if bytes_read >= n {
+                let matches = find_all_with(&buf[..bytes_read], pattern);
+                for m in matches {
+                    results.push(cur_addr + m);
+                }
+            }
+        }
+
+        if offset + cur_size < size {
+            offset += cur_size.saturating_sub(n.saturating_sub(1));
+        } else {
+            break;
+        }
+    }
+
+    Ok(results)
 }
 
 #[cfg(test)]

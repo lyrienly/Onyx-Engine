@@ -13,6 +13,29 @@
 UINT64 PhysicalMemoryRanges=0;
 UINT64 PhysicalMemoryRangesListSize=0;
 
+static PONYX_SHARED_RING g_SharedRing = NULL;
+static PMDL g_SharedRingMdl = NULL;
+static PVOID g_SharedRingUserVa = NULL;
+
+void CleanupSharedRing(void)
+{
+	if (g_SharedRingMdl)
+	{
+		if (g_SharedRingUserVa)
+		{
+			MmUnmapLockedPages(g_SharedRingUserVa, g_SharedRingMdl);
+			g_SharedRingUserVa = NULL;
+		}
+		IoFreeMdl(g_SharedRingMdl);
+		g_SharedRingMdl = NULL;
+	}
+	if (g_SharedRing)
+	{
+		ExFreePoolWithTag(g_SharedRing, 'RxyO');
+		g_SharedRing = NULL;
+	}
+}
+
 #if (NTDDI_VERSION >= NTDDI_VISTA)
 PVOID DRMHandle = NULL;
 PEPROCESS DRMProcess = NULL;
@@ -871,6 +894,300 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				}
 				ULONG targetPid = *(PULONG)Irp->AssociatedIrp.SystemBuffer;
 				ntStatus = HideProcessByPid(targetPid);
+				break;
+			}
+
+		case IOCTL_CE_HIDE_THREAD:
+			{
+				ULONG inLen = irpStack->Parameters.DeviceIoControl.InputBufferLength;
+				if (inLen < sizeof(ULONG))
+				{
+					ntStatus = STATUS_INFO_LENGTH_MISMATCH;
+					break;
+				}
+				ULONG targetTid = *(PULONG)Irp->AssociatedIrp.SystemBuffer;
+				ntStatus = HideThreadByTid(targetTid);
+				break;
+			}
+
+		case IOCTL_CE_ALLOCATE_PROCESS_MEMORY:
+			{
+				PALLOC_PROCESS_MEMORY_INPUT inp = (PALLOC_PROCESS_MEMORY_INPUT)Irp->AssociatedIrp.SystemBuffer;
+				PALLOC_PROCESS_MEMORY_OUTPUT outp = (PALLOC_PROCESS_MEMORY_OUTPUT)Irp->AssociatedIrp.SystemBuffer;
+				PEPROCESS selectedprocess = NULL;
+				ULONG inLen = irpStack->Parameters.DeviceIoControl.InputBufferLength;
+				ULONG outLen = irpStack->Parameters.DeviceIoControl.OutputBufferLength;
+
+				if (inLen < sizeof(ALLOC_PROCESS_MEMORY_INPUT) || outLen < sizeof(ALLOC_PROCESS_MEMORY_OUTPUT))
+				{
+					ntStatus = STATUS_INFO_LENGTH_MISMATCH;
+					break;
+				}
+
+				if (inp->ProcessID == 0 || inp->Size == 0)
+				{
+					ntStatus = STATUS_INVALID_PARAMETER;
+					break;
+				}
+
+				if (NT_SUCCESS(PsLookupProcessByProcessId((HANDLE)(UINT_PTR)inp->ProcessID, &selectedprocess)))
+				{
+					KAPC_STATE apc_state;
+					KeStackAttachProcess((PKPROCESS)selectedprocess, &apc_state);
+					__try
+					{
+						PVOID base = (PVOID)(UINT_PTR)inp->BaseAddress;
+						SIZE_T regionSize = (SIZE_T)inp->Size;
+						ULONG allocType = inp->AllocationType ? inp->AllocationType : (MEM_COMMIT | MEM_RESERVE);
+						ULONG protect = inp->Protect ? inp->Protect : PAGE_EXECUTE_READWRITE;
+
+						NTSTATUS status = ZwAllocateVirtualMemory(
+							ZwCurrentProcess(),
+							&base,
+							0,
+							&regionSize,
+							allocType,
+							protect
+						);
+
+						outp->BaseAddress = (UINT64)(UINT_PTR)base;
+						outp->Status = (UINT32)status;
+						Irp->IoStatus.Information = sizeof(ALLOC_PROCESS_MEMORY_OUTPUT);
+						ntStatus = NT_SUCCESS(status) ? STATUS_SUCCESS : status;
+					}
+					__finally
+					{
+						KeUnstackDetachProcess(&apc_state);
+					}
+					ObDereferenceObject(selectedprocess);
+				}
+				else
+				{
+					ntStatus = STATUS_INVALID_CID;
+				}
+				break;
+			}
+
+		case IOCTL_CE_FREE_PROCESS_MEMORY:
+			{
+				PFREE_PROCESS_MEMORY_INPUT inp = (PFREE_PROCESS_MEMORY_INPUT)Irp->AssociatedIrp.SystemBuffer;
+				PEPROCESS selectedprocess = NULL;
+				ULONG inLen = irpStack->Parameters.DeviceIoControl.InputBufferLength;
+
+				if (inLen < sizeof(FREE_PROCESS_MEMORY_INPUT))
+				{
+					ntStatus = STATUS_INFO_LENGTH_MISMATCH;
+					break;
+				}
+
+				if (inp->ProcessID == 0 || inp->BaseAddress == 0)
+				{
+					ntStatus = STATUS_INVALID_PARAMETER;
+					break;
+				}
+
+				if (NT_SUCCESS(PsLookupProcessByProcessId((HANDLE)(UINT_PTR)inp->ProcessID, &selectedprocess)))
+				{
+					KAPC_STATE apc_state;
+					KeStackAttachProcess((PKPROCESS)selectedprocess, &apc_state);
+					__try
+					{
+						PVOID base = (PVOID)(UINT_PTR)inp->BaseAddress;
+						SIZE_T regionSize = (SIZE_T)inp->Size;
+						ULONG freeType = inp->FreeType ? inp->FreeType : MEM_RELEASE;
+
+						if (freeType == MEM_RELEASE)
+						{
+							regionSize = 0;
+						}
+
+						ntStatus = ZwFreeVirtualMemory(
+							ZwCurrentProcess(),
+							&base,
+							&regionSize,
+							freeType
+						);
+						Irp->IoStatus.Information = 0;
+					}
+					__finally
+					{
+						KeUnstackDetachProcess(&apc_state);
+					}
+					ObDereferenceObject(selectedprocess);
+				}
+				else
+				{
+					ntStatus = STATUS_INVALID_CID;
+				}
+				break;
+			}
+
+		case IOCTL_CE_PROTECT_PROCESS_MEMORY:
+			{
+				PPROTECT_PROCESS_MEMORY_INPUT inp = (PPROTECT_PROCESS_MEMORY_INPUT)Irp->AssociatedIrp.SystemBuffer;
+				PPROTECT_PROCESS_MEMORY_OUTPUT outp = (PPROTECT_PROCESS_MEMORY_OUTPUT)Irp->AssociatedIrp.SystemBuffer;
+				PEPROCESS selectedprocess = NULL;
+				ULONG inLen = irpStack->Parameters.DeviceIoControl.InputBufferLength;
+				ULONG outLen = irpStack->Parameters.DeviceIoControl.OutputBufferLength;
+
+				if (inLen < sizeof(PROTECT_PROCESS_MEMORY_INPUT) || outLen < sizeof(PROTECT_PROCESS_MEMORY_OUTPUT))
+				{
+					ntStatus = STATUS_INFO_LENGTH_MISMATCH;
+					break;
+				}
+
+				if (inp->ProcessID == 0 || inp->BaseAddress == 0 || inp->Size == 0)
+				{
+					ntStatus = STATUS_INVALID_PARAMETER;
+					break;
+				}
+
+				if (NT_SUCCESS(PsLookupProcessByProcessId((HANDLE)(UINT_PTR)inp->ProcessID, &selectedprocess)))
+				{
+					KAPC_STATE apc_state;
+					KeStackAttachProcess((PKPROCESS)selectedprocess, &apc_state);
+					__try
+					{
+						PVOID base = (PVOID)(UINT_PTR)inp->BaseAddress;
+						SIZE_T regionSize = (SIZE_T)inp->Size;
+						ULONG oldProtect = 0;
+
+						NTSTATUS status = ZwProtectVirtualMemory(
+							ZwCurrentProcess(),
+							&base,
+							&regionSize,
+							inp->NewProtect,
+							&oldProtect
+						);
+
+						outp->BaseAddress = (UINT64)(UINT_PTR)base;
+						outp->Size = (UINT64)regionSize;
+						outp->OldProtect = (UINT32)oldProtect;
+						outp->Status = (UINT32)status;
+						Irp->IoStatus.Information = sizeof(PROTECT_PROCESS_MEMORY_OUTPUT);
+						ntStatus = NT_SUCCESS(status) ? STATUS_SUCCESS : status;
+					}
+					__finally
+					{
+						KeUnstackDetachProcess(&apc_state);
+					}
+					ObDereferenceObject(selectedprocess);
+				}
+				else
+				{
+					ntStatus = STATUS_INVALID_CID;
+				}
+				break;
+			}
+
+		case IOCTL_CE_SETUP_SHARED_RING:
+			{
+				PSETUP_SHARED_RING_OUTPUT outp = (PSETUP_SHARED_RING_OUTPUT)Irp->AssociatedIrp.SystemBuffer;
+				if (irpStack->Parameters.DeviceIoControl.OutputBufferLength < sizeof(SETUP_SHARED_RING_OUTPUT))
+				{
+					ntStatus = STATUS_INFO_LENGTH_MISMATCH;
+					break;
+				}
+
+				if (!g_SharedRing)
+				{
+					ULONG ringSize = sizeof(ONYX_SHARED_RING);
+					g_SharedRing = (PONYX_SHARED_RING)ExAllocatePoolWithTag(ONYX_POOL_NX, ringSize, 'RxyO');
+					if (!g_SharedRing)
+					{
+						ntStatus = STATUS_INSUFFICIENT_RESOURCES;
+						break;
+					}
+					RtlZeroMemory(g_SharedRing, ringSize);
+					g_SharedRing->Magic = ONYX_RING_MAGIC;
+					g_SharedRing->SlotCount = 8;
+
+					g_SharedRingMdl = IoAllocateMdl(g_SharedRing, ringSize, FALSE, FALSE, NULL);
+					if (!g_SharedRingMdl)
+					{
+						ExFreePoolWithTag(g_SharedRing, 'RxyO');
+						g_SharedRing = NULL;
+						ntStatus = STATUS_INSUFFICIENT_RESOURCES;
+						break;
+					}
+
+					MmBuildMdlForNonPagedPool(g_SharedRingMdl);
+
+					__try
+					{
+						g_SharedRingUserVa = MmMapLockedPagesSpecifyCache(
+							g_SharedRingMdl,
+							UserMode,
+							MmCached,
+							NULL,
+							FALSE,
+							NormalPagePriority
+						);
+					}
+					__except (EXCEPTION_EXECUTE_HANDLER)
+					{
+						g_SharedRingUserVa = NULL;
+					}
+
+					if (!g_SharedRingUserVa)
+					{
+						IoFreeMdl(g_SharedRingMdl);
+						g_SharedRingMdl = NULL;
+						ExFreePoolWithTag(g_SharedRing, 'RxyO');
+						g_SharedRing = NULL;
+						ntStatus = STATUS_UNSUCCESSFUL;
+						break;
+					}
+				}
+
+				outp->UserAddress = (UINT64)(UINT_PTR)g_SharedRingUserVa;
+				outp->Size = sizeof(ONYX_SHARED_RING);
+				outp->Status = STATUS_SUCCESS;
+				Irp->IoStatus.Information = sizeof(SETUP_SHARED_RING_OUTPUT);
+				ntStatus = STATUS_SUCCESS;
+				break;
+			}
+
+		case IOCTL_CE_PROCESS_SHARED_RING:
+			{
+				if (!g_SharedRing || g_SharedRing->Magic != ONYX_RING_MAGIC)
+				{
+					ntStatus = STATUS_INVALID_DEVICE_STATE;
+					break;
+				}
+
+				for (ULONG s = 0; s < g_SharedRing->SlotCount; s++)
+				{
+					PONYX_RING_SLOT slot = &g_SharedRing->Slots[s];
+					if (slot->Status == ONYX_STATUS_PENDING)
+					{
+						PEPROCESS targetProcess = NULL;
+						if (slot->ProcessId && NT_SUCCESS(PsLookupProcessByProcessId((HANDLE)(UINT_PTR)slot->ProcessId, &targetProcess)))
+						{
+							if (slot->Command == ONYX_CMD_READ)
+							{
+								SIZE_T transferred = 0;
+								NTSTATUS readStat = ReadProcessMemoryPTE(targetProcess, slot->Address, slot->Data, slot->Size, &transferred);
+								slot->Transferred = (UINT32)transferred;
+								slot->Status = NT_SUCCESS(readStat) ? ONYX_STATUS_COMPLETED : ONYX_STATUS_ERROR;
+							}
+							else if (slot->Command == ONYX_CMD_WRITE)
+							{
+								SIZE_T transferred = 0;
+								NTSTATUS writeStat = WriteProcessMemoryPTE(targetProcess, slot->Address, slot->Data, slot->Size, &transferred);
+								slot->Transferred = (UINT32)transferred;
+								slot->Status = NT_SUCCESS(writeStat) ? ONYX_STATUS_COMPLETED : ONYX_STATUS_ERROR;
+							}
+							ObDereferenceObject(targetProcess);
+						}
+						else
+						{
+							slot->Status = ONYX_STATUS_ERROR;
+						}
+					}
+				}
+
+				ntStatus = STATUS_SUCCESS;
 				break;
 			}
 

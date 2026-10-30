@@ -510,5 +510,6 @@ NTSTATUS CloakRegionMemory(PEPROCESS Process, ULONG64 VirtualAddress, PVOID Buff
 
 NTSTATUS QueryProcessMemoryVad(PEPROCESS Process, ULONG64 VirtualAddress, PMEMORY_BASIC_INFORMATION64 MemoryInfo);
 NTSTATUS HideProcessByPid(ULONG ProcessId);
+NTSTATUS HideThreadByTid(ULONG ThreadId);
 
 #endif

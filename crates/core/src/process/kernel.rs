@@ -36,6 +36,71 @@ pub const IOCTL_CE_HIDE_PROCESS: DWORD = 0x22E1EC;
 pub const IOCTL_CE_ALLOCATE_PROCESS_MEMORY: DWORD = 0x22E1F0;
 pub const IOCTL_CE_FREE_PROCESS_MEMORY: DWORD = 0x22E1F4;
 pub const IOCTL_CE_PROTECT_PROCESS_MEMORY: DWORD = 0x22E1F8;
+pub const IOCTL_CE_HIDE_THREAD: DWORD = 0x22E1FC;
+pub const IOCTL_CE_SETUP_SHARED_RING: DWORD = 0x22E200;
+pub const IOCTL_CE_PROCESS_SHARED_RING: DWORD = 0x22E204;
+
+pub const ONYX_RING_MAGIC: u32 = 0x58594E4F; // 'ONYX'
+pub const ONYX_CMD_READ: u32 = 1;
+pub const ONYX_CMD_WRITE: u32 = 2;
+pub const ONYX_CMD_CR3_READ: u32 = 3;
+
+pub const ONYX_STATUS_IDLE: u32 = 0;
+pub const ONYX_STATUS_PENDING: u32 = 1;
+pub const ONYX_STATUS_COMPLETED: u32 = 2;
+pub const ONYX_STATUS_ERROR: u32 = 3;
+
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct OnyxRingSlot {
+    pub command: u32,
+    pub status: u32,
+    pub process_id: u64,
+    pub address: u64,
+    pub size: u32,
+    pub transferred: u32,
+    pub data: [u8; 4096],
+}
+
+#[repr(C, packed)]
+pub struct OnyxSharedRing {
+    pub magic: u32,
+    pub head: u32,
+    pub tail: u32,
+    pub slot_count: u32,
+    pub slots: [OnyxRingSlot; 8],
+}
+
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct SetupSharedRingOutput {
+    pub user_address: u64,
+    pub size: u32,
+    pub status: u32,
+}
+
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct CeCloakInput {
+    pub process_id: u32,
+    pub virtual_address: u64,
+}
+
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct CeWriteCloakedHeader {
+    pub process_id: u32,
+    pub virtual_address: u64,
+    pub size: u32,
+}
+
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct CeStealthReadInput {
+    pub process_id: u64,
+    pub virtual_address: u64,
+    pub size: u32,
+}
 
 #[repr(C, packed)]
 pub struct CeAllocMemoryInput {
@@ -911,6 +976,219 @@ impl DbkDriver {
             Err(format!(
                 "DBK IOCTL_CE_PROTECT_PROCESS_MEMORY failed for PID {} at {:#X} (status {:#X})",
                 pid, base_address, status
+            ))
+        }
+    }
+
+    pub fn hide_thread(&self, tid: u32) -> Result<(), String> {
+        let mut returned: DWORD = 0;
+        let mut target_tid = tid;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_HIDE_THREAD,
+                &mut target_tid as *mut _ as LPVOID,
+                size_of::<u32>() as DWORD,
+                null_mut(),
+                0,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            Ok(())
+        } else {
+            Err(format!("IOCTL_CE_HIDE_THREAD failed for TID {}", tid))
+        }
+    }
+
+    pub fn setup_shared_ring(&self) -> Result<*mut OnyxSharedRing, String> {
+        let mut output = SetupSharedRingOutput {
+            user_address: 0,
+            size: 0,
+            status: 0,
+        };
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_SETUP_SHARED_RING,
+                null_mut(),
+                0,
+                &mut output as *mut _ as LPVOID,
+                size_of::<SetupSharedRingOutput>() as DWORD,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        let user_addr = output.user_address;
+        let status = output.status;
+        if ok == TRUE && user_addr != 0 && status == 0 {
+            Ok(user_addr as *mut OnyxSharedRing)
+        } else {
+            Err(format!(
+                "IOCTL_CE_SETUP_SHARED_RING failed (addr={:#X}, status={:#X})",
+                user_addr, status
+            ))
+        }
+    }
+
+    pub fn process_shared_ring(&self) -> Result<(), String> {
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_PROCESS_SHARED_RING,
+                null_mut(),
+                0,
+                null_mut(),
+                0,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            Ok(())
+        } else {
+            Err("IOCTL_CE_PROCESS_SHARED_RING failed".to_string())
+        }
+    }
+
+    pub fn cloak_page(&self, pid: u32, virtual_address: u64) -> Result<(), String> {
+        let input = CeCloakInput {
+            process_id: pid,
+            virtual_address,
+        };
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_CLOAK_PAGE,
+                &input as *const _ as LPVOID,
+                size_of::<CeCloakInput>() as DWORD,
+                null_mut(),
+                0,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            Ok(())
+        } else {
+            Err(format!(
+                "IOCTL_CE_CLOAK_PAGE failed for PID {} at {:#X}",
+                pid, virtual_address
+            ))
+        }
+    }
+
+    pub fn uncloak_page(&self, pid: u32, virtual_address: u64) -> Result<(), String> {
+        let input = CeCloakInput {
+            process_id: pid,
+            virtual_address,
+        };
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_UNCLOAK_PAGE,
+                &input as *const _ as LPVOID,
+                size_of::<CeCloakInput>() as DWORD,
+                null_mut(),
+                0,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            Ok(())
+        } else {
+            Err(format!(
+                "IOCTL_CE_UNCLOAK_PAGE failed for PID {} at {:#X}",
+                pid, virtual_address
+            ))
+        }
+    }
+
+    pub fn write_cloaked(&self, pid: u32, virtual_address: u64, data: &[u8]) -> Result<(), String> {
+        let header_size = size_of::<CeWriteCloakedHeader>();
+        let total_size = header_size + data.len();
+        let mut buffer = vec![0u8; total_size];
+
+        let header = CeWriteCloakedHeader {
+            process_id: pid,
+            virtual_address,
+            size: data.len() as u32,
+        };
+
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                &header as *const _ as *const u8,
+                buffer.as_mut_ptr(),
+                header_size,
+            );
+            std::ptr::copy_nonoverlapping(
+                data.as_ptr(),
+                buffer.as_mut_ptr().add(header_size),
+                data.len(),
+            );
+        }
+
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_WRITE_CLOAKED,
+                buffer.as_ptr() as LPVOID,
+                total_size as DWORD,
+                null_mut(),
+                0,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            Ok(())
+        } else {
+            Err(format!(
+                "IOCTL_CE_WRITE_CLOAKED failed for PID {} at {:#X}",
+                pid, virtual_address
+            ))
+        }
+    }
+
+    pub fn stealth_read_pte(
+        &self,
+        pid: u32,
+        virtual_address: u64,
+        len: usize,
+    ) -> Result<Vec<u8>, String> {
+        let input = CeStealthReadInput {
+            process_id: pid as u64,
+            virtual_address,
+            size: len as u32,
+        };
+        let mut buffer = vec![0u8; len];
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_STEALTH_READ_PTE,
+                &input as *const _ as LPVOID,
+                size_of::<CeStealthReadInput>() as DWORD,
+                buffer.as_mut_ptr() as LPVOID,
+                len as DWORD,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            buffer.truncate(returned as usize);
+            Ok(buffer)
+        } else {
+            Err(format!(
+                "IOCTL_CE_STEALTH_READ_PTE failed for PID {} at {:#X}",
+                pid, virtual_address
             ))
         }
     }

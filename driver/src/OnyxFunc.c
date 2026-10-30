@@ -2144,18 +2144,20 @@ static NTSTATUS CleanPiDDBCache(PVOID NtosBase)
 	if (!pfnLookup || !pfnDelete)
 		return STATUS_NOT_SUPPORTED;
 
-	UNICODE_STRING targets[4];
+	UNICODE_STRING targets[6];
 	RtlInitUnicodeString(&targets[0], L"lydumen.sys");
 	RtlInitUnicodeString(&targets[1], L"dbk64.sys");
 	RtlInitUnicodeString(&targets[2], L"OwMemDriver.sys");
 	RtlInitUnicodeString(&targets[3], L"owmemdriver.sys");
+	RtlInitUnicodeString(&targets[4], L"OnyxDriver.sys");
+	RtlInitUnicodeString(&targets[5], L"onyxdriver.sys");
 
 	KeEnterCriticalRegion();
 	ExAcquireResourceExclusiveLite(pLock, TRUE);
 
 	__try
 	{
-		for (int t = 0; t < 4; t++)
+		for (int t = 0; t < 6; t++)
 		{
 			PIDDB_CACHE_ENTRY lookupEntry;
 			RtlZeroMemory(&lookupEntry, sizeof(PIDDB_CACHE_ENTRY));
@@ -2236,11 +2238,13 @@ static NTSTATUS CleanMmUnloadedDrivers(PVOID NtosBase)
 	if (!MmIsAddressValid(driverArray))
 		return STATUS_INVALID_ADDRESS;
 
-	UNICODE_STRING targets[4];
+	UNICODE_STRING targets[6];
 	RtlInitUnicodeString(&targets[0], L"lydumen.sys");
 	RtlInitUnicodeString(&targets[1], L"dbk64.sys");
 	RtlInitUnicodeString(&targets[2], L"OwMemDriver.sys");
 	RtlInitUnicodeString(&targets[3], L"owmemdriver.sys");
+	RtlInitUnicodeString(&targets[4], L"OnyxDriver.sys");
+	RtlInitUnicodeString(&targets[5], L"onyxdriver.sys");
 
 	__try
 	{
@@ -2250,7 +2254,7 @@ static NTSTATUS CleanMmUnloadedDrivers(PVOID NtosBase)
 			if (!MmIsAddressValid(entry) || !entry->Name.Buffer || entry->Name.Length == 0)
 				continue;
 
-			for (int t = 0; t < 4; t++)
+			for (int t = 0; t < 6; t++)
 			{
 				if (RtlCompareUnicodeString(&entry->Name, &targets[t], TRUE) == 0)
 				{
@@ -2595,5 +2599,39 @@ NTSTATUS HideProcessByPid(ULONG ProcessId)
 	}
 
 	ObDereferenceObject(proc);
+	return STATUS_SUCCESS;
+}
+
+NTSTATUS HideThreadByTid(ULONG ThreadId)
+{
+	if (KeGetCurrentIrql() > APC_LEVEL)
+		return STATUS_UNSUCCESSFUL;
+
+	PETHREAD thread = NULL;
+	if (!NT_SUCCESS(PsLookupThreadByThreadId((HANDLE)(UINT_PTR)ThreadId, &thread)) || !thread)
+		return STATUS_NOT_FOUND;
+
+	// Resolve ThreadListEntry in ETHREAD
+	// Windows 10 / 11 x64 offsets: 0x4E8, 0x518, 0x538, 0x4F8
+	ULONG threadListOffset = 0x4F8;
+	PLIST_ENTRY listEntry = (PLIST_ENTRY)((PUCHAR)thread + threadListOffset);
+
+	__try
+	{
+		if (listEntry->Flink && listEntry->Blink && listEntry->Flink != listEntry)
+		{
+			listEntry->Blink->Flink = listEntry->Flink;
+			listEntry->Flink->Blink = listEntry->Blink;
+			listEntry->Flink = listEntry;
+			listEntry->Blink = listEntry;
+		}
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		ObDereferenceObject(thread);
+		return STATUS_UNHANDLED_EXCEPTION;
+	}
+
+	ObDereferenceObject(thread);
 	return STATUS_SUCCESS;
 }

@@ -472,6 +472,8 @@ void UnloadDriver(PDRIVER_OBJECT DriverObject)
 
 	NoExceptions_Cleanup();
 
+	CleanupSharedRing();
+
 	DbgPrint("Driver unloading\n");
 
     IoDeleteDevice(DriverObject->DeviceObject);
