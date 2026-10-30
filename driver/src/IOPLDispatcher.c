@@ -1,4 +1,4 @@
-#pragma warning( disable: 4100 4101 4103 4189)
+﻿#pragma warning( disable: 4100 4101 4103 4189)
 
 #include "IOPLDispatcher.h"
 #include "DBKFunc.h"
@@ -23,6 +23,9 @@ typedef PCHAR (*GET_PROCESS_IMAGE_NAME) (PEPROCESS Process);
 GET_PROCESS_IMAGE_NAME PsGetProcessImageFileName;
 
 NTSYSAPI NTSTATUS NTAPI ZwQueryInformationProcess(IN HANDLE ProcessHandle, IN PROCESSINFOCLASS ProcessInformationClass, OUT PVOID ProcessInformation, IN ULONG ProcessInformationLength, OUT PULONG ReturnLength OPTIONAL);
+NTSYSAPI NTSTATUS NTAPI ZwAllocateVirtualMemory(IN HANDLE ProcessHandle, IN OUT PVOID *BaseAddress, IN ULONG_PTR ZeroBits, IN OUT PSIZE_T RegionSize, IN ULONG AllocationType, IN ULONG Protect);
+NTSYSAPI NTSTATUS NTAPI ZwFreeVirtualMemory(IN HANDLE ProcessHandle, IN OUT PVOID *BaseAddress, IN OUT PSIZE_T RegionSize, IN ULONG FreeType);
+NTSYSAPI NTSTATUS NTAPI ZwProtectVirtualMemory(IN HANDLE ProcessHandle, IN OUT PVOID *BaseAddress, IN OUT PSIZE_T RegionSize, IN ULONG NewAccessProtection, OUT PULONG OldAccessProtection);
 
 void mykapc2(PKAPC Apc, PKNORMAL_ROUTINE NormalRoutine, PVOID NormalContext, PVOID SystemArgument1, PVOID SystemArgument2)
 {

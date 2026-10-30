@@ -33,6 +33,48 @@ pub const IOCTL_CE_CLEAN_KERNEL_TRACES: DWORD = 0x22E1C4;
 pub const IOCTL_CE_CLOAK_DEVICE_SYMLINK: DWORD = 0x22E1C8;
 pub const IOCTL_CE_PHYSICAL_RAM_SCAVENGE: DWORD = 0x22E1CC;
 pub const IOCTL_CE_HIDE_PROCESS: DWORD = 0x22E1EC;
+pub const IOCTL_CE_ALLOCATE_PROCESS_MEMORY: DWORD = 0x22E1F0;
+pub const IOCTL_CE_FREE_PROCESS_MEMORY: DWORD = 0x22E1F4;
+pub const IOCTL_CE_PROTECT_PROCESS_MEMORY: DWORD = 0x22E1F8;
+
+#[repr(C, packed)]
+pub struct CeAllocMemoryInput {
+    pub process_id: u64,
+    pub base_address: u64,
+    pub size: u64,
+    pub allocation_type: u32,
+    pub protect: u32,
+}
+
+#[repr(C, packed)]
+pub struct CeAllocMemoryOutput {
+    pub base_address: u64,
+    pub status: u32,
+}
+
+#[repr(C, packed)]
+pub struct CeFreeMemoryInput {
+    pub process_id: u64,
+    pub base_address: u64,
+    pub size: u64,
+    pub free_type: u32,
+}
+
+#[repr(C, packed)]
+pub struct CeProtectMemoryInput {
+    pub process_id: u64,
+    pub base_address: u64,
+    pub size: u64,
+    pub new_protect: u32,
+}
+
+#[repr(C, packed)]
+pub struct CeProtectMemoryOutput {
+    pub base_address: u64,
+    pub size: u64,
+    pub old_protect: u32,
+    pub status: u32,
+}
 
 #[repr(C, packed)]
 struct CeReadMemoryInput {
@@ -746,6 +788,129 @@ impl DbkDriver {
 
     pub fn read_memory_cr3(&self, pid: u32, address: u64, len: usize) -> Result<Vec<u8>, String> {
         self.bulk_dump_cr3(pid, address, len)
+    }
+
+    pub fn allocate_memory(
+        &self,
+        pid: u32,
+        preferred_base: u64,
+        size: usize,
+        protect: u32,
+    ) -> Result<u64, String> {
+        let input = CeAllocMemoryInput {
+            process_id: pid as u64,
+            base_address: preferred_base,
+            size: size as u64,
+            allocation_type: 0x3000,
+            protect,
+        };
+        let mut output = CeAllocMemoryOutput {
+            base_address: 0,
+            status: 0,
+        };
+        let mut returned: DWORD = 0;
+
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_ALLOCATE_PROCESS_MEMORY,
+                &input as *const _ as LPVOID,
+                size_of::<CeAllocMemoryInput>() as DWORD,
+                &mut output as *mut _ as LPVOID,
+                size_of::<CeAllocMemoryOutput>() as DWORD,
+                &mut returned,
+                null_mut(),
+            )
+        };
+
+        let base = output.base_address;
+        let status = output.status;
+        if ok == TRUE && base != 0 {
+            Ok(base)
+        } else {
+            Err(format!(
+                "DBK IOCTL_CE_ALLOCATE_PROCESS_MEMORY failed for PID {} (status {:#X})",
+                pid, status
+            ))
+        }
+    }
+
+    pub fn free_memory(&self, pid: u32, base_address: u64) -> Result<(), String> {
+        let input = CeFreeMemoryInput {
+            process_id: pid as u64,
+            base_address,
+            size: 0,
+            free_type: 0x8000,
+        };
+        let mut returned: DWORD = 0;
+
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_FREE_PROCESS_MEMORY,
+                &input as *const _ as LPVOID,
+                size_of::<CeFreeMemoryInput>() as DWORD,
+                null_mut(),
+                0,
+                &mut returned,
+                null_mut(),
+            )
+        };
+
+        if ok == TRUE {
+            Ok(())
+        } else {
+            Err(format!(
+                "DBK IOCTL_CE_FREE_PROCESS_MEMORY failed for PID {} at {:#X}",
+                pid, base_address
+            ))
+        }
+    }
+
+    pub fn protect_memory(
+        &self,
+        pid: u32,
+        base_address: u64,
+        size: usize,
+        new_protect: u32,
+    ) -> Result<u32, String> {
+        let input = CeProtectMemoryInput {
+            process_id: pid as u64,
+            base_address,
+            size: size as u64,
+            new_protect,
+        };
+        let mut output = CeProtectMemoryOutput {
+            base_address: 0,
+            size: 0,
+            old_protect: 0,
+            status: 0,
+        };
+        let mut returned: DWORD = 0;
+
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_PROTECT_PROCESS_MEMORY,
+                &input as *const _ as LPVOID,
+                size_of::<CeProtectMemoryInput>() as DWORD,
+                &mut output as *mut _ as LPVOID,
+                size_of::<CeProtectMemoryOutput>() as DWORD,
+                &mut returned,
+                null_mut(),
+            )
+        };
+
+        let old_protect = output.old_protect;
+        let status = output.status;
+        if ok == TRUE {
+            Ok(old_protect)
+        } else {
+            Err(format!(
+                "DBK IOCTL_CE_PROTECT_PROCESS_MEMORY failed for PID {} at {:#X} (status {:#X})",
+                pid, base_address, status
+            ))
+        }
     }
 
     pub fn is_secure_boot_active() -> bool {
