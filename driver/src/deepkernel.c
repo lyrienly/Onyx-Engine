@@ -1,7 +1,7 @@
 #pragma warning( disable: 4100 4103)
 
 #include "deepkernel.h"
-#include "DBKFunc.h"
+#include "OnyxFunc.h"
 #include <windef.h>
 
 #include "vmxhelper.h"

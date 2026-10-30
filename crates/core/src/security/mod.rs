@@ -7,6 +7,7 @@ pub mod hook_detection;
 pub mod pe_remap;
 pub mod sk_crypt;
 pub mod taskmgr_cloak;
+pub mod window_shield;
 
 pub use analysis_hunter::AnalysisHunter;
 pub use anomaly_scanner::{AnomalyKind, MemoryAnomalyScanner, RegionAnomaly};
@@ -20,6 +21,7 @@ pub use hook_detection::{
 pub use pe_remap::{PeRemap, SectionBounds};
 pub use sk_crypt::SkCrypt;
 pub use taskmgr_cloak::{TaskmgrCloakManager, filter_system_process_information};
+pub use window_shield::WindowShield;
 
 pub fn activate_process_shield() -> Result<(), String> {
     AntiAttach::enable()?;
@@ -27,6 +29,7 @@ pub fn activate_process_shield() -> Result<(), String> {
     let _ = AntiDump::distort_peb_size_of_image(0x100000);
     TaskmgrCloakManager::start_watcher();
     AnalysisHunter::start_monitor();
+    WindowShield::protect_current_process(None);
     Ok(())
 }
 

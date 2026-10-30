@@ -6,7 +6,7 @@
 #include <windef.h>
 
 #include "interruptHook.h"
-#include "dbkfunc.h"
+#include "OnyxFunc.h"
 
 typedef struct
 {

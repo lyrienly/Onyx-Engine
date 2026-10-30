@@ -3,7 +3,7 @@
 #include <ntddk.h>
 #include <windef.h>
 #include "vmxhelper.h"
-#include "DBKFunc.h"
+#include "OnyxFunc.h"
 
 #ifdef AMD64
 extern UINT_PTR dovmcall_intel(void *vmcallinfo, unsigned int level1pass);
@@ -660,7 +660,7 @@ unsigned int vmx_add_memory(UINT64 *list, int count)
 		UINT64 PhysicalPages[0];
 	} AddMemoryInfoCall, *PAddMemoryInfoCall;
 #pragma pack()
-	PAddMemoryInfoCall vmcallinfo = (PAddMemoryInfoCall)ExAllocatePoolWithTag(DBK_POOL_NX, sizeof(AddMemoryInfoCall) + count * sizeof(UINT64), 'mxmV');
+	PAddMemoryInfoCall vmcallinfo = (PAddMemoryInfoCall)ExAllocatePoolWithTag(ONYX_POOL_NX, sizeof(AddMemoryInfoCall) + count * sizeof(UINT64), 'mxmV');
 	if (!vmcallinfo)
 		return FALSE;
 

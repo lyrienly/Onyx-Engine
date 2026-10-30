@@ -1,8 +1,8 @@
 ﻿#pragma warning( disable: 4100 4101 4103 4189)
 
 #include "IOPLDispatcher.h"
-#include "DBKFunc.h"
-#include "DBKDrvr.h"
+#include "OnyxFunc.h"
+#include "OnyxDrvr.h"
 
 #include "memscan.h"
 
@@ -60,7 +60,7 @@ void mykapc(PKAPC Apc, PKNORMAL_ROUTINE NormalRoutine, PVOID NormalContext, PVOI
 	PKAPC      kApc;
 	LARGE_INTEGER Timeout;
 
-	kApc = (PKAPC)ExAllocatePoolWithTag(DBK_POOL_NX, sizeof(KAPC), 'cpAk');
+	kApc = (PKAPC)ExAllocatePoolWithTag(ONYX_POOL_NX, sizeof(KAPC), 'cpAk');
 	if (!kApc)
 	{
 		ExFreePool(Apc);
@@ -105,7 +105,7 @@ void CreateRemoteAPC(ULONG threadid,PVOID addresstoexecute)
 	PKTHREAD   kThread;
 	PKAPC      kApc;
 
-	kApc = (PKAPC)ExAllocatePoolWithTag(DBK_POOL_NX, sizeof(KAPC), 'cpAk');
+	kApc = (PKAPC)ExAllocatePoolWithTag(ONYX_POOL_NX, sizeof(KAPC), 'cpAk');
 	if (!kApc)
 		return;
 
@@ -1310,7 +1310,7 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 					break;
 				}
 
-				PWCHAR safeBuf = (PWCHAR)ExAllocatePoolWithTag(DBK_POOL_NX, inLen + sizeof(WCHAR), 'kOLS');
+				PWCHAR safeBuf = (PWCHAR)ExAllocatePoolWithTag(ONYX_POOL_NX, inLen + sizeof(WCHAR), 'kOLS');
 				if (!safeBuf)
 				{
 					ntStatus = STATUS_INSUFFICIENT_RESOURCES;
@@ -1612,7 +1612,7 @@ static PVOID g_TraceStoreBuffer = NULL;
 					if (!g_TraceStoreBuffer)
 					{
 
-						g_TraceStoreBuffer = ExAllocatePoolWithTag(DBK_POOL_NX, 64 * 1024, 'rtSU');
+						g_TraceStoreBuffer = ExAllocatePoolWithTag(ONYX_POOL_NX, 64 * 1024, 'rtSU');
 					}
 
 					if (!g_TraceStoreBuffer)

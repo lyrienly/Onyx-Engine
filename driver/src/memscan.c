@@ -7,7 +7,7 @@
 #include "kfiles.h"
 #endif
 #include "memscan.h"
-#include "DBKFunc.h"
+#include "OnyxFunc.h"
 
 #include "vmxhelper.h"
 #include "vmxoffload.h"

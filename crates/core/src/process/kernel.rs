@@ -156,6 +156,8 @@ struct VadEnumOutputHeader {
     count: u32,
 }
 
+pub type OnyxDriver = DbkDriver;
+
 pub struct DbkDriver {
     pub device_handle: HANDLE,
     pub device_name: String,

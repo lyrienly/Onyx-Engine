@@ -2,7 +2,7 @@
 #include <ntifs.h>
 #include <windef.h>
 
-#include "DBKFunc.h"
+#include "OnyxFunc.h"
 #include "interruptHook.h"
 
 #include "debugger.h"
@@ -173,14 +173,14 @@ void debugger_initialize(void)
 	KeInitializeEvent(&debugger_event_WaitForDebugEvent, SynchronizationEvent, FALSE);
 
 	StackCount = getCpuCount() * 4;
-	Stacks = (PSavedStack*)ExAllocatePoolWithTag(DBK_POOL_NX, StackCount * sizeof(PSavedStack), 'kbtS');
+	Stacks = (PSavedStack*)ExAllocatePoolWithTag(ONYX_POOL_NX, StackCount * sizeof(PSavedStack), 'kbtS');
 	if (!Stacks)
 		return;
 
 	int i;
 	for (i = 0; i < StackCount; i++)
 	{
-		Stacks[i] = (PSavedStack)ExAllocatePoolWithTag(DBK_POOL_NX, sizeof(SavedStack), 'kbtS');
+		Stacks[i] = (PSavedStack)ExAllocatePoolWithTag(ONYX_POOL_NX, sizeof(SavedStack), 'kbtS');
 		if (Stacks[i])
 			RtlZeroMemory(Stacks[i], sizeof(SavedStack));
 	}
@@ -218,7 +218,7 @@ void debugger_growstack()
 		int newStackCount = StackCount * 2;
 		int i;
 		PSavedStack *newStacks;
-		newStacks = (PSavedStack*)ExAllocatePoolWithTag(DBK_POOL_NX, newStackCount * sizeof(PSavedStack), 'kbtS');
+		newStacks = (PSavedStack*)ExAllocatePoolWithTag(ONYX_POOL_NX, newStackCount * sizeof(PSavedStack), 'kbtS');
 
 		if (newStacks)
 		{
@@ -227,7 +227,7 @@ void debugger_growstack()
 
 			for (i = StackCount; i < newStackCount; i++)
 			{
-				newStacks[i] = (PSavedStack)ExAllocatePoolWithTag(DBK_POOL_NX, sizeof(SavedStack), 'kbtS');
+				newStacks[i] = (PSavedStack)ExAllocatePoolWithTag(ONYX_POOL_NX, sizeof(SavedStack), 'kbtS');
 				if (newStacks[i])
 					RtlZeroMemory(newStacks[i], sizeof(SavedStack));
 				else

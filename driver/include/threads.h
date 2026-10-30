@@ -3,7 +3,7 @@
 
 #include <ntifs.h>
 #include <windef.h>
-#include "DBKFunc.h"
+#include "OnyxFunc.h"
 
 void Ignore(PKAPC Apc, PKNORMAL_ROUTINE NormalRoutine, PVOID NormalContext, PVOID SystemArgument1, PVOID SystemArgument2);
 void SuspendThreadAPCRoutine(PVOID arg1, PVOID arg2, PVOID arg3);

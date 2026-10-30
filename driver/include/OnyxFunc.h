@@ -1,5 +1,5 @@
-#ifndef DBKFUNC_H
-#define DBKFUNC_H
+#ifndef ONYXFUNC_H
+#define ONYXFUNC_H
 
 #pragma warning( disable: 4214 )
 
@@ -13,8 +13,8 @@
 #define NonPagedPoolNx 512
 #endif
 
-#ifndef DBK_POOL_NX
-#define DBK_POOL_NX NonPagedPoolNx
+#ifndef ONYX_POOL_NX
+#define ONYX_POOL_NX NonPagedPoolNx
 #endif
 
 /*
@@ -25,7 +25,7 @@
 #ifdef NonPagedPool
 #undef NonPagedPool
 #endif
-#define NonPagedPool DBK_POOL_NX
+#define NonPagedPool ONYX_POOL_NX
 
 #pragma pack(1)
 #ifndef _TAG_INT_VECTOR_DEFINED_

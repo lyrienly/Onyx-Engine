@@ -3,7 +3,7 @@
 #include "ntifs.h"
 #include <windef.h>
 
-#include "DBKFunc.h"
+#include "OnyxFunc.h"
 #include "vmxhelper.h"
 
 #include "interruptHook.h"

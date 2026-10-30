@@ -7,7 +7,7 @@
 #include <windef.h>
 
 #include "Ntstrsafe.h"
-#include "DBKFunc.h"
+#include "OnyxFunc.h"
 
 #include "ultimap2\apic.h"
 #include "ultimap2.h"
@@ -181,7 +181,7 @@ NTSTATUS ultimap2_waitForData(ULONG timeout, PULTIMAP2DATAEVENT data)
 
 		int cpunr;
 
-		waitblock = (PKWAIT_BLOCK)ExAllocatePoolWithTag(DBK_POOL_NX, Ultimap2CpuCount * sizeof(KWAIT_BLOCK), '2ltU');
+		waitblock = (PKWAIT_BLOCK)ExAllocatePoolWithTag(ONYX_POOL_NX, Ultimap2CpuCount * sizeof(KWAIT_BLOCK), '2ltU');
 		if (!waitblock)
 			return STATUS_INSUFFICIENT_RESOURCES;
 		wait.QuadPart = -10000LL * timeout;
@@ -891,7 +891,7 @@ RTL_GENERIC_COMPARE_RESULTS NTAPI ToPACompare(__in struct _RTL_GENERIC_TABLE *Ta
 
 PVOID NTAPI ToPAAlloc(__in struct _RTL_GENERIC_TABLE *Table, __in CLONG ByteSize)
 {
-	return ExAllocatePoolWithTag(DBK_POOL_NX, ByteSize, '2ltU');
+	return ExAllocatePoolWithTag(ONYX_POOL_NX, ByteSize, '2ltU');
 }
 
 VOID NTAPI ToPADealloc(__in struct _RTL_GENERIC_TABLE *Table, __in __drv_freesMem(Mem) __post_invalid PVOID Buffer)
@@ -1036,7 +1036,7 @@ void* setupToPA(PToPA_ENTRY *Header, PVOID *OutputBuffer, PMDL *BufferMDL, PRTL_
 			return NULL;
 		}
 
-		r = ExAllocatePoolWithTag(DBK_POOL_NX, 4096, '2ltU');
+		r = ExAllocatePoolWithTag(ONYX_POOL_NX, 4096, '2ltU');
 		if (r == NULL)
 		{
 			MmFreeContiguousMemory(*OutputBuffer);
@@ -1051,14 +1051,14 @@ void* setupToPA(PToPA_ENTRY *Header, PVOID *OutputBuffer, PMDL *BufferMDL, PRTL_
 
 		BlockSize = 4096;
 
-		*OutputBuffer = ExAllocatePoolWithTag(DBK_POOL_NX, _BufferSize, '2ltU');
+		*OutputBuffer = ExAllocatePoolWithTag(ONYX_POOL_NX, _BufferSize, '2ltU');
 		if (*OutputBuffer == NULL)
 		{
 			DbgPrint("setupToPA: Failure allocating output buffer");
 			return NULL;
 		}
 
-		r = ExAllocatePoolWithTag(DBK_POOL_NX, getToPAHeaderSize(_BufferSize), '2ltU');
+		r = ExAllocatePoolWithTag(ONYX_POOL_NX, getToPAHeaderSize(_BufferSize), '2ltU');
 		if (r == NULL)
 		{
 			ExFreePool(*OutputBuffer);
@@ -1070,7 +1070,7 @@ void* setupToPA(PToPA_ENTRY *Header, PVOID *OutputBuffer, PMDL *BufferMDL, PRTL_
 
 	*Header = r;
 
-	*gt = (PRTL_GENERIC_TABLE)ExAllocatePoolWithTag(DBK_POOL_NX, sizeof(RTL_GENERIC_TABLE), '2ltU');
+	*gt = (PRTL_GENERIC_TABLE)ExAllocatePoolWithTag(ONYX_POOL_NX, sizeof(RTL_GENERIC_TABLE), '2ltU');
 
 	if (*gt == NULL)
 	{
@@ -1245,7 +1245,7 @@ void SetupUltimap2(UINT32 PID, UINT32 BufferSize, WCHAR *Path, int rangeCount, P
 			Ultimap2Ranges = NULL;
 		}
 
-		Ultimap2Ranges = (PURANGE)ExAllocatePoolWithTag(DBK_POOL_NX, rangeCount * sizeof(URANGE), '2ltU');
+		Ultimap2Ranges = (PURANGE)ExAllocatePoolWithTag(ONYX_POOL_NX, rangeCount * sizeof(URANGE), '2ltU');
 
 		for (i = 0; i < rangeCount; i++)
 			Ultimap2Ranges[i] = Ranges[i];
@@ -1319,8 +1319,8 @@ void SetupUltimap2(UINT32 PID, UINT32 BufferSize, WCHAR *Path, int rangeCount, P
 
 	Ultimap2CpuCount = KeQueryMaximumProcessorCount();
 
-	PInfo = (PProcessorInfo*)ExAllocatePoolWithTag(DBK_POOL_NX, Ultimap2CpuCount * sizeof(PProcessorInfo), '2ltU');
-	Ultimap2_DataReady = (PVOID*)ExAllocatePoolWithTag(DBK_POOL_NX, Ultimap2CpuCount * sizeof(PVOID), '2ltU');
+	PInfo = (PProcessorInfo*)ExAllocatePoolWithTag(ONYX_POOL_NX, Ultimap2CpuCount * sizeof(PProcessorInfo), '2ltU');
+	Ultimap2_DataReady = (PVOID*)ExAllocatePoolWithTag(ONYX_POOL_NX, Ultimap2CpuCount * sizeof(PVOID), '2ltU');
 
 	if (PInfo == NULL)
 	{
@@ -1336,7 +1336,7 @@ void SetupUltimap2(UINT32 PID, UINT32 BufferSize, WCHAR *Path, int rangeCount, P
 
 	for (i = 0; i < Ultimap2CpuCount; i++)
 	{
-		PInfo[i] = (PProcessorInfo)ExAllocatePoolWithTag(DBK_POOL_NX, sizeof(ProcessorInfo), '2ltU');
+		PInfo[i] = (PProcessorInfo)ExAllocatePoolWithTag(ONYX_POOL_NX, sizeof(ProcessorInfo), '2ltU');
 		RtlZeroMemory(PInfo[i], sizeof(ProcessorInfo));
 
 		KeInitializeEvent(&PInfo[i]->InitiateSave, SynchronizationEvent, FALSE);

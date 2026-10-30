@@ -1,11 +1,11 @@
 #pragma warning( disable: 4100 4101 4103 4189)
 
-#include "DBKFunc.h"
+#include "OnyxFunc.h"
 #include <ntifs.h>
 #include <windef.h>
 #include <wdmsec.h>
 #pragma comment(lib, "wdmsec.lib")
-#include "DBKDrvr.h"
+#include "OnyxDrvr.h"
 
 static const GUID GUID_DEVCLASS_ONYX = { 0xb70b86a8, 0x580a, 0x4f67, { 0xb9, 0xb8, 0x1e, 0x2e, 0x7a, 0x98, 0x56, 0x11 } };
 
