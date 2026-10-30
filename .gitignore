@@ -46,3 +46,6 @@ extras/
 ACE/
 ACE.rar
 lydumen/
+
+obj/
+bin/

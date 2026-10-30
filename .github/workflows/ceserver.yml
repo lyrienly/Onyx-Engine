@@ -3,8 +3,14 @@ name: CEServer
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - 'UI/ceserver/**'
+      - '.github/workflows/ceserver.yml'
   pull_request:
     branches: [ "main" ]
+    paths:
+      - 'UI/ceserver/**'
+      - '.github/workflows/ceserver.yml' 
 
 jobs:
   linux:

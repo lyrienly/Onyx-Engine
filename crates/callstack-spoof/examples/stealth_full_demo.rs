@@ -40,7 +40,12 @@ fn log_frames<W: Write>(w: &mut W, label: &str, frames: &[*mut c_void], count: u
     for i in 0..n {
         let addr = frames[i];
         let base = unsafe { module_base_of(addr) };
-        writeln!(w, "  frame[{:>2}] = {:p}  (module base = {:p})", i, addr, base).unwrap();
+        writeln!(
+            w,
+            "  frame[{:>2}] = {:p}  (module base = {:p})",
+            i, addr, base
+        )
+        .unwrap();
     }
 }
 
@@ -48,7 +53,13 @@ fn format_bytes(bytes: &[u8]) -> String {
     let hex: Vec<String> = bytes.iter().map(|b| format!("{:02X}", b)).collect();
     let printable: String = bytes
         .iter()
-        .map(|&b| if (0x20..=0x7E).contains(&b) { b as char } else { '.' })
+        .map(|&b| {
+            if (0x20..=0x7E).contains(&b) {
+                b as char
+            } else {
+                '.'
+            }
+        })
         .collect();
     format!("{} | {}", hex.join(" "), printable)
 }

@@ -13,9 +13,7 @@
 use core::ffi::c_void;
 use core::ptr;
 
-use windows_sys::Win32::System::Diagnostics::Debug::{
-    FlushInstructionCache, IMAGE_NT_HEADERS64,
-};
+use windows_sys::Win32::System::Diagnostics::Debug::{FlushInstructionCache, IMAGE_NT_HEADERS64};
 use windows_sys::Win32::System::Memory::{
     VirtualProtect, VirtualQuery, MEMORY_BASIC_INFORMATION, PAGE_READWRITE,
 };
@@ -59,10 +57,7 @@ pub enum StripError {
 /// O caller deve garantir que `[base, base+size)` eh mapeado e que o
 /// processo pode sobrescrever esses bytes (o resto do codigo do modulo
 /// nao deve depender dos headers em runtime).
-pub unsafe fn strip_module_headers(
-    base: *mut u8,
-    size: usize,
-) -> Result<StripReport, StripError> {
+pub unsafe fn strip_module_headers(base: *mut u8, size: usize) -> Result<StripReport, StripError> {
     if base.is_null() || size < core::mem::size_of::<IMAGE_DOS_HEADER>() {
         return Err(StripError::InvalidPointer);
     }
@@ -94,7 +89,13 @@ pub unsafe fn strip_module_headers(
 
     // VirtualProtect -> RW, zera, restaura.
     let mut old_prot: u32 = 0;
-    if VirtualProtect(base as *const c_void, clear_len, PAGE_READWRITE, &mut old_prot) == 0 {
+    if VirtualProtect(
+        base as *const c_void,
+        clear_len,
+        PAGE_READWRITE,
+        &mut old_prot,
+    ) == 0
+    {
         return Err(StripError::VirtualProtectFailed);
     }
 
@@ -213,16 +214,15 @@ mod tests {
             // Marca um padrao DEPOIS da area de header, pra provar que nao foi tocado.
             let sentinel_off = 0x1000;
             let sentinel: &[u8] = b"ONYX_SENTINEL_MARK";
-            core::ptr::copy_nonoverlapping(sentinel.as_ptr(), base.add(sentinel_off), sentinel.len());
+            core::ptr::copy_nonoverlapping(
+                sentinel.as_ptr(),
+                base.add(sentinel_off),
+                sentinel.len(),
+            );
 
             // Troca a protecao pra READONLY, pra forcar o VirtualProtect do strip.
             let mut old: u32 = 0;
-            let ok = VirtualProtect(
-                base as *const c_void,
-                region_size,
-                PAGE_READONLY,
-                &mut old,
-            );
+            let ok = VirtualProtect(base as *const c_void, region_size, PAGE_READONLY, &mut old);
             assert_ne!(ok, 0, "VirtualProtect pre-strip falhou");
 
             // Executa o strip
@@ -232,7 +232,10 @@ mod tests {
             assert_eq!(rep.dos_signature_after, 0, "DOS signature nao foi zerada");
             assert_eq!(rep.nt_signature_before, IMAGE_NT_SIGNATURE);
             assert_eq!(rep.nt_signature_after, 0, "NT signature nao foi zerada");
-            assert_eq!(rep.cleared_bytes, 0x400, "deve ter zerado SizeOfHeaders=0x400");
+            assert_eq!(
+                rep.cleared_bytes, 0x400,
+                "deve ter zerado SizeOfHeaders=0x400"
+            );
             assert_eq!(rep.previous_protect & 0xFF, PAGE_READONLY & 0xFF);
 
             // Verifica que os primeiros 0x400 bytes estao TODOS zerados.

@@ -19,13 +19,7 @@ fn hex_dump(bytes: &[u8]) -> String {
 
 fn main() {
     let name = c"shcore.dll";
-    let h = unsafe {
-        LoadLibraryExA(
-            name.as_ptr() as *const u8,
-            0,
-            DONT_RESOLVE_DLL_REFERENCES,
-        )
-    };
+    let h = unsafe { LoadLibraryExA(name.as_ptr() as *const u8, 0, DONT_RESOLVE_DLL_REFERENCES) };
     if h == 0 {
         eprintln!("LoadLibraryExA falhou");
         std::process::exit(1);
@@ -41,8 +35,7 @@ fn main() {
         println!("ANTES  : {}", hex_dump(&before[..32]));
         println!("         {}", hex_dump(&before[32..]));
 
-        let rep: StripReport =
-            strip_module_headers(base, image_size).expect("strip falhou");
+        let rep: StripReport = strip_module_headers(base, image_size).expect("strip falhou");
         println!(
             "report : cleared={} previous_protect=0x{:X} dos_before=0x{:04X} dos_after=0x{:04X} nt_before=0x{:08X} nt_after=0x{:08X}",
             rep.cleared_bytes,
