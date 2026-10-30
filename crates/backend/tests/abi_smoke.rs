@@ -5,7 +5,7 @@ use std::ptr;
 use onyx_backend::{
     onyx_aa_analyze, onyx_aa_parse, onyx_abi_free_string, onyx_hook_engine_free,
     onyx_hook_engine_install, onyx_hook_engine_len, onyx_hook_engine_new,
-    onyx_hook_engine_remove_by_name, onyx_manual_map_dll,
+    onyx_hook_engine_remove_by_name, onyx_manual_map_available, onyx_manual_map_dll,
 };
 
 fn cstr(s: &str) -> CString {
@@ -120,10 +120,11 @@ fn hook_engine_install_and_remove_on_live_fn() {
 }
 
 #[test]
-fn manual_map_stub_returns_not_implemented() {
+fn manual_map_available_and_rejects_invalid_pid() {
+    assert_eq!(onyx_manual_map_available(), 1);
     let path = cstr("fake.dll");
     let rc = onyx_manual_map_dll(0, path.as_ptr());
-    assert_eq!(rc, -99);
+    assert_eq!(rc, -1);
 }
 
 #[test]
