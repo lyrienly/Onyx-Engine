@@ -62,6 +62,7 @@ NTSTATUS ZwCreateThread(
 #endif
 
 UNICODE_STRING  uszDeviceString;
+UNICODE_STRING  uszDriverString;
 PVOID BufDeviceString=NULL;
 
 void hideme(PDRIVER_OBJECT DriverObject)
@@ -121,7 +122,6 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 
 	NTSTATUS        ntStatus;
 	PVOID           BufDriverString = NULL, BufProcessEventString = NULL, BufThreadEventString = NULL;
-	UNICODE_STRING  uszDriverString;
 
 	UNICODE_STRING  uszProcessEventString;
 	UNICODE_STRING	uszThreadEventString;
@@ -206,29 +206,29 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 				BufProcessEventString = NULL;
 				BufThreadEventString = NULL;
 
-				RtlInitUnicodeString(&uszDriverString, L"\\Device\\OwMemDriver");
-				RtlInitUnicodeString(&uszDeviceString, L"\\DosDevices\\OwMemDriver");
-				RtlInitUnicodeString(&uszProcessEventString, L"\\BaseNamedObjects\\OwMemDriver_PE");
-				RtlInitUnicodeString(&uszThreadEventString, L"\\BaseNamedObjects\\OwMemDriver_TE");
+				RtlInitUnicodeString(&uszDriverString, L"\\Device\\OnyxDriver");
+				RtlInitUnicodeString(&uszDeviceString, L"\\DosDevices\\OnyxDriver");
+				RtlInitUnicodeString(&uszProcessEventString, L"\\BaseNamedObjects\\OnyxDriver_PE");
+				RtlInitUnicodeString(&uszThreadEventString, L"\\BaseNamedObjects\\OnyxDriver_TE");
 				ntStatus = STATUS_SUCCESS;
 			}
 
 		}
 		else
 		{
-			RtlInitUnicodeString(&uszDriverString, L"\\Device\\OwMemDriver");
-			RtlInitUnicodeString(&uszDeviceString, L"\\DosDevices\\OwMemDriver");
-			RtlInitUnicodeString(&uszProcessEventString, L"\\BaseNamedObjects\\OwMemDriver_PE");
-			RtlInitUnicodeString(&uszThreadEventString, L"\\BaseNamedObjects\\OwMemDriver_TE");
+			RtlInitUnicodeString(&uszDriverString, L"\\Device\\OnyxDriver");
+			RtlInitUnicodeString(&uszDeviceString, L"\\DosDevices\\OnyxDriver");
+			RtlInitUnicodeString(&uszProcessEventString, L"\\BaseNamedObjects\\OnyxDriver_PE");
+			RtlInitUnicodeString(&uszThreadEventString, L"\\BaseNamedObjects\\OnyxDriver_TE");
 			ntStatus = STATUS_SUCCESS;
 		}
 	}
 	else
 	{
-		RtlInitUnicodeString(&uszDriverString, L"\\Device\\OwMemDriver");
-		RtlInitUnicodeString(&uszDeviceString, L"\\DosDevices\\OwMemDriver");
-		RtlInitUnicodeString(&uszProcessEventString, L"\\BaseNamedObjects\\OwMemDriver_PE");
-		RtlInitUnicodeString(&uszThreadEventString, L"\\BaseNamedObjects\\OwMemDriver_TE");
+		RtlInitUnicodeString(&uszDriverString, L"\\Device\\OnyxDriver");
+		RtlInitUnicodeString(&uszDeviceString, L"\\DosDevices\\OnyxDriver");
+		RtlInitUnicodeString(&uszProcessEventString, L"\\BaseNamedObjects\\OnyxDriver_PE");
+		RtlInitUnicodeString(&uszThreadEventString, L"\\BaseNamedObjects\\OnyxDriver_TE");
 		loadedbydbvm = FALSE;
 	}
 

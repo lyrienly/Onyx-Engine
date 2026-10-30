@@ -1,6 +1,6 @@
 ;
-; OwMemDriver.inf
-; OnyxEngine Kernel Memory Driver v2.0
+; OnyxDriver.inf
+; OnyxEngine Kernel Driver
 ; Architecture: Windows 10 & Windows 11 (x64)
 ;
 
@@ -9,8 +9,9 @@ Signature   = "$WINDOWS NT$"
 Class       = System
 ClassGuid   = {4d36e97d-e325-11ce-bfc1-08002be10318}
 Provider    = %ProviderName%
-DriverVer   = 10/27/2026,2.0.0.0
-CatalogFile = OwMemDriver.cat
+DriverVer   = 10/30/2026,2.0.0.0
+CatalogFile = OnyxDriver.cat
+PnpLockdown = 1
 
 [DestinationDirs]
 DefaultDestDir = 12
@@ -19,29 +20,29 @@ DefaultDestDir = 12
 1 = %DiskName%,,,""
 
 [SourceDisksFiles]
-OwMemDriver.sys = 1,,
+OnyxDriver.sys = 1,,
 
 [DefaultInstall.NTamd64]
-CopyFiles = OwMemDriver.CopyFiles
+CopyFiles = OnyxDriver.CopyFiles
 
-[OwMemDriver.CopyFiles]
-OwMemDriver.sys
+[OnyxDriver.CopyFiles]
+OnyxDriver.sys
 
 [DefaultInstall.NTamd64.Services]
-AddService = %ServiceName%,%SPSVCINST_ASSOCSERVICE%,OwMemDriver.Service
+AddService = %ServiceName%,%SPSVCINST_ASSOCSERVICE%,OnyxDriver.Service
 
-[OwMemDriver.Service]
+[OnyxDriver.Service]
 DisplayName    = %ServiceDisplayName%
 Description    = %ServiceDescription%
 ServiceType    = 1                  ; SERVICE_KERNEL_DRIVER
 StartType      = 3                  ; SERVICE_DEMAND_START
 ErrorControl   = 1                  ; SERVICE_ERROR_NORMAL
-ServiceBinary  = %12%\OwMemDriver.sys
+ServiceBinary  = %12%\OnyxDriver.sys
 
 [Strings]
 SPSVCINST_ASSOCSERVICE = 0x00000002
 ProviderName           = "OnyxEngine Project"
-DiskName               = "OwMemDriver Installation Disk"
-ServiceName            = "OwMemDriver"
-ServiceDisplayName     = "OwMemDriver v2.0 Kernel Access Service"
-ServiceDescription     = "High-Performance Zero-Attach Physical CR3 Kernel Driver for OnyxEngine"
+DiskName               = "OnyxDriver Installation Disk"
+ServiceName            = "OnyxDriver"
+ServiceDisplayName     = "OnyxDriver Ring-0 Kernel Access Service"
+ServiceDescription     = "High-Performance Zero-Attach Physical CR3 & EPT Kernel Driver for OnyxEngine"

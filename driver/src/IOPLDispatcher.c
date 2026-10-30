@@ -1167,16 +1167,16 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 							if (slot->Command == ONYX_CMD_READ)
 							{
 								SIZE_T transferred = 0;
-								NTSTATUS readStat = ReadProcessMemoryPTE(targetProcess, slot->Address, slot->Data, slot->Size, &transferred);
+								BOOLEAN ok = StealthReadProcessMemoryPTE(targetProcess, slot->Address, slot->Data, (SIZE_T)slot->Size, &transferred);
 								slot->Transferred = (UINT32)transferred;
-								slot->Status = NT_SUCCESS(readStat) ? ONYX_STATUS_COMPLETED : ONYX_STATUS_ERROR;
+								slot->Status = ok ? ONYX_STATUS_COMPLETED : ONYX_STATUS_ERROR;
 							}
 							else if (slot->Command == ONYX_CMD_WRITE)
 							{
 								SIZE_T transferred = 0;
-								NTSTATUS writeStat = WriteProcessMemoryPTE(targetProcess, slot->Address, slot->Data, slot->Size, &transferred);
+								BOOLEAN ok = WriteProcessMemoryPhysicalCR3(targetProcess, slot->Address, slot->Data, (SIZE_T)slot->Size, &transferred);
 								slot->Transferred = (UINT32)transferred;
-								slot->Status = NT_SUCCESS(writeStat) ? ONYX_STATUS_COMPLETED : ONYX_STATUS_ERROR;
+								slot->Status = ok ? ONYX_STATUS_COMPLETED : ONYX_STATUS_ERROR;
 							}
 							ObDereferenceObject(targetProcess);
 						}

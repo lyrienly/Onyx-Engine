@@ -312,4 +312,14 @@ int vmx_causedCurrentDebugBreak();
 
 void vmx_init_dovmcall(int isIntel);
 
+unsigned int vmx_cloak_activate(QWORD physicalPage);
+unsigned int vmx_cloak_deactivate(QWORD physicalPage);
+unsigned int vmx_cloak_readOriginal(QWORD physicalPage, void *destination);
+unsigned int vmx_cloak_writeOriginal(QWORD physicalPage, void *source);
+
+unsigned int vmx_watch_pagewrites(UINT64 PhysicalAddress, int Size, int Options, int MaxEntryCount);
+unsigned int vmx_watch_pageaccess(UINT64 PhysicalAddress, int Size, int Options, int MaxEntryCount);
+unsigned int vmx_watch_retreivelog(int ID, PPageEventListDescriptor result, int *resultsize);
+unsigned int vmx_watch_delete(int ID);
+
 #endif

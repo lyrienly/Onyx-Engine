@@ -1,7 +1,7 @@
 ﻿#ifndef IOPLDISPACTCHER_H
 #define IOPLDISPACTCHER_H
 
-#include "DBKfunc.h"
+#include "OnyxFunc.h"
 
 #define IOCTL_UNKNOWN_BASE					FILE_DEVICE_UNKNOWN
 
