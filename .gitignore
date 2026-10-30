@@ -41,3 +41,8 @@ UI/VEHDebug/backup/
 bin/
 /extras/
 extras/
+
+# Confidential reverse-engineering references & targets (NEVER commit)
+ACE/
+ACE.rar
+lydumen/
