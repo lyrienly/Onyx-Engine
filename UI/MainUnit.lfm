@@ -2747,6 +2747,10 @@ object MainForm: TMainForm
         ShortCut = 24641
         OnClick = miAobValidatorClick
       end
+      object miManualMapper: TMenuItem
+        Caption = 'Manual Map DLL Injector'
+        OnClick = miManualMapperClick
+      end
       object N99PluginSep: TMenuItem
         Caption = '-'
       end

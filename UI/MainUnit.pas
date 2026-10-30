@@ -595,6 +595,7 @@ type
     Helpindex1: TMenuItem;
     Plugins2: TMenuItem;
     miAobValidator: TMenuItem;
+    miManualMapper: TMenuItem;
     N99PluginSep: TMenuItem;
     miPluginManager: TMenuItem;
     miReloadPlugins: TMenuItem;
@@ -635,6 +636,7 @@ type
     procedure miAutoAssembleErrorMessageClick(Sender: TObject);
     procedure miHelpClick(Sender: TObject);
     procedure miAobValidatorClick(Sender: TObject);
+    procedure miManualMapperClick(Sender: TObject);
     procedure miPluginManagerClick(Sender: TObject);
     procedure miReloadPluginsClick(Sender: TObject);
     procedure miLuaDocumentationClick(Sender: TObject);
@@ -1150,7 +1152,7 @@ resourcestring
 implementation
 
 
-uses frmAobValidatorUnit, OnyxBackend, OnyxInstance, cefuncproc, MainUnit2, ProcessWindowUnit, MemoryBrowserFormUnit, TypePopup, HotKeys,
+uses frmAobValidatorUnit, frmManualMapperUnit, OnyxBackend, OnyxInstance, cefuncproc, MainUnit2, ProcessWindowUnit, MemoryBrowserFormUnit, TypePopup, HotKeys,
   aboutunit, formhotkeyunit, formDifferentBitSizeUnit,
   CommentsUnit, formsettingsunit, formAddressChangeUnit, Changeoffsetunit,
   FoundCodeUnit, AdvancedOptionsUnit, frmProcessWatcherUnit,
@@ -3990,6 +3992,14 @@ begin
   miEnableLCLDebug.visible:=miEnableLCLDebug.checked or (ssCtrl in GetKeyShiftState);
 end;
 
+procedure TMainForm.miManualMapperClick(Sender: TObject);
+begin
+  if frmManualMapper = nil then
+    frmManualMapper := TfrmManualMapper.Create(Self);
+  frmManualMapper.Show;
+  frmManualMapper.BringToFront;
+end;
+
 procedure TMainForm.miAobValidatorClick(Sender: TObject);
 begin
   if frmAobValidator = nil then
@@ -4009,6 +4019,7 @@ end;
 procedure TMainForm.miReloadPluginsClick(Sender: TObject);
 begin
   OnyxUnloadAOBPlugin;
+  OnyxUnloadDllMapperPlugin;
   ShowMessage('Plugins descarregados com sucesso. O próximo acesso recarregará a DLL atualizada.');
 end;
 

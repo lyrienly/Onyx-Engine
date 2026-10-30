@@ -151,7 +151,8 @@ pub unsafe extern "system" fn OnyxPlugin_Shutdown() {
 }
 
 #[no_mangle]
-pub unsafe extern "system" fn OnyxPlugin_MapDll(
+pub unsafe extern "system" fn OnyxPlugin_MapDllPid(
+    target_pid: u32,
     dll_path: *const c_char,
     options: *const OnyxMapOptions,
     out_result: *mut OnyxMapResult,
@@ -179,7 +180,11 @@ pub unsafe extern "system" fn OnyxPlugin_MapDll(
         (*options).flags
     };
 
-    let pid = target_pid();
+    let pid = if target_pid != 0 {
+        target_pid
+    } else {
+        self::target_pid()
+    };
     if pid == 0 {
         write_c_string(&mut (*out_result).error, "no target process attached");
         return ONYX_PLUGIN_ERR_NOT_FOUND;
@@ -205,6 +210,15 @@ pub unsafe extern "system" fn OnyxPlugin_MapDll(
             ONYX_PLUGIN_ERR_EXECUTION
         }
     }
+}
+
+#[no_mangle]
+pub unsafe extern "system" fn OnyxPlugin_MapDll(
+    dll_path: *const c_char,
+    options: *const OnyxMapOptions,
+    out_result: *mut OnyxMapResult,
+) -> i32 {
+    OnyxPlugin_MapDllPid(0, dll_path, options, out_result)
 }
 
 #[no_mangle]

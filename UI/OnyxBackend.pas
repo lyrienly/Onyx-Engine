@@ -1,4 +1,4 @@
-﻿unit OnyxBackend;
+unit OnyxBackend;
 
 {$MODE Delphi}
 
@@ -208,6 +208,37 @@ type
     disasm_preview: array[0..511] of AnsiChar;
   end;
   POnyxAobMatchResult = ^TOnyxAobMatchResult;
+
+const
+  ONYX_MAP_ERASE_HEADERS    = 1;
+  ONYX_MAP_PROTECT_SECTIONS = 2;
+  ONYX_MAP_CALL_TLS         = 4;
+  ONYX_MAP_THREAD_HIJACK    = 8;
+  ONYX_MAP_USE_DRIVER       = 16;
+  ONYX_MAP_WIPE_STUB        = 32;
+  ONYX_MAP_MODULE_STOMP     = 64;
+  ONYX_MAP_RESOLVE_PEB      = 128;
+  ONYX_MAP_REGISTER_SEH     = 256;
+  ONYX_MAP_INIT_COOKIE      = 512;
+
+type
+  TOnyxMapOptions = packed record
+    struct_size: DWORD;
+    flags: DWORD;
+    preferred_base: UInt64;
+  end;
+  POnyxMapOptions = ^TOnyxMapOptions;
+
+  TOnyxMapResult = packed record
+    image_base: UInt64;
+    entry_point: UInt64;
+    dll_main_result: integer;
+    flags_applied: DWORD;
+    relocations: DWORD;
+    imports: DWORD;
+    error: array[0..255] of AnsiChar;
+  end;
+  POnyxMapResult = ^TOnyxMapResult;
 
 const
   ONYX_PTR_PHASE_IDLE = 0;
@@ -435,6 +466,9 @@ procedure RegisterOnyxLua(L: Pointer);
 function OnyxValidateAOBPlugin(pid: DWORD; pattern: PAnsiChar; module_filter: PAnsiChar; out_result: POnyxAobMatchResult): integer;
 function OnyxGenerateAOBPlugin(pid: DWORD; target_address: UInt64; max_len: DWORD; out_pattern: PAnsiChar; buf_size: DWORD): integer;
 procedure OnyxUnloadAOBPlugin;
+function OnyxMapDllPlugin(pid: DWORD; dll_path: PAnsiChar; options: POnyxMapOptions; out_result: POnyxMapResult): integer;
+
+procedure OnyxUnloadDllMapperPlugin;
 
 implementation
 
@@ -1606,6 +1640,120 @@ begin
   end;
   fnAobValidate := nil;
   fnAobGenerate := nil;
+end;
+
+type
+  TOnyxPluginHostGetPidFn = function: DWORD; stdcall;
+  TOnyxPluginHostGetHandleFn = function: THandle; stdcall;
+  TOnyxPluginHostAPI = packed record
+    struct_size: DWORD;
+    get_target_pid: TOnyxPluginHostGetPidFn;
+    get_target_handle: TOnyxPluginHostGetHandleFn;
+    read_memory: Pointer;
+    write_memory: Pointer;
+    resolve_symbol: Pointer;
+    log_message: Pointer;
+  end;
+  POnyxPluginHostAPI = ^TOnyxPluginHostAPI;
+
+  TOnyxPluginInitFn = function(host_api: POnyxPluginHostAPI): integer; stdcall;
+  TOnyxPluginMapDllPidFn = function(pid: DWORD; dll_path: PAnsiChar; options: POnyxMapOptions; out_result: POnyxMapResult): integer; stdcall;
+  TOnyxPluginMapDllNamedFn = function(target_name: PAnsiChar; dll_path: PAnsiChar; options: POnyxMapOptions; out_result: POnyxMapResult): integer; stdcall;
+
+var
+  hDllMapperPlugin: THandle = 0;
+  fnDllMapperInit: TOnyxPluginInitFn = nil;
+  fnDllMapDllPid: TOnyxPluginMapDllPidFn = nil;
+  fnDllMapDllNamed: TOnyxPluginMapDllNamedFn = nil;
+  dllMapperHostAPI: TOnyxPluginHostAPI;
+
+function HostPluginGetPid: DWORD; stdcall;
+begin
+  Result := processid;
+end;
+
+function HostPluginGetHandle: THandle; stdcall;
+begin
+  Result := processhandle;
+end;
+
+function EnsureDllMapperPlugin: Boolean;
+var
+  candidates: array[0..4] of string;
+  i: integer;
+  baseDir: string;
+begin
+  if (hDllMapperPlugin <> 0) and Assigned(fnDllMapDllPid) then
+    Exit(True);
+
+  baseDir := ExtractFilePath(ParamStr(0));
+  candidates[0] := baseDir + 'plugins\onyx_dll_mapper.dll';
+  candidates[1] := baseDir + 'bin\plugins\onyx_dll_mapper.dll';
+  candidates[2] := 'plugins\onyx_dll_mapper.dll';
+  candidates[3] := 'bin\plugins\onyx_dll_mapper.dll';
+  candidates[4] := 'onyx_dll_mapper.dll';
+
+  for i := 0 to 4 do
+  begin
+    if FileExists(candidates[i]) then
+    begin
+      hDllMapperPlugin := LoadLibraryA(PAnsiChar(AnsiString(candidates[i])));
+      if hDllMapperPlugin <> 0 then Break;
+    end;
+  end;
+
+  if hDllMapperPlugin = 0 then
+    hDllMapperPlugin := LoadLibraryA('onyx_dll_mapper.dll');
+
+  if hDllMapperPlugin <> 0 then
+  begin
+    fnDllMapperInit := TOnyxPluginInitFn(GetProcAddress(hDllMapperPlugin, 'OnyxPlugin_Init'));
+    fnDllMapDllPid := TOnyxPluginMapDllPidFn(GetProcAddress(hDllMapperPlugin, 'OnyxPlugin_MapDllPid'));
+    fnDllMapDllNamed := TOnyxPluginMapDllNamedFn(GetProcAddress(hDllMapperPlugin, 'OnyxPlugin_MapDllNamed'));
+
+    if Assigned(fnDllMapperInit) then
+    begin
+      FillChar(dllMapperHostAPI, SizeOf(dllMapperHostAPI), 0);
+      dllMapperHostAPI.struct_size := SizeOf(dllMapperHostAPI);
+      dllMapperHostAPI.get_target_pid := @HostPluginGetPid;
+      dllMapperHostAPI.get_target_handle := @HostPluginGetHandle;
+      fnDllMapperInit(@dllMapperHostAPI);
+    end;
+
+    Result := Assigned(fnDllMapDllPid);
+  end
+  else
+    Result := False;
+end;
+
+function OnyxMapDllPlugin(pid: DWORD; dll_path: PAnsiChar; options: POnyxMapOptions; out_result: POnyxMapResult): integer;
+begin
+  if not EnsureDllMapperPlugin then Exit(-2);
+  if Assigned(fnDllMapDllPid) then
+    Result := fnDllMapDllPid(pid, dll_path, options, out_result)
+  else
+    Result := -5;
+end;
+
+function OnyxMapDllNamedPlugin(target_name: PAnsiChar; dll_path: PAnsiChar; options: POnyxMapOptions; out_result: POnyxMapResult): integer;
+begin
+  if not EnsureDllMapperPlugin then Exit(-2);
+  if Assigned(fnDllMapDllNamed) then
+    Result := fnDllMapDllNamed(target_name, dll_path, options, out_result)
+  else
+    Result := -5;
+end;
+
+procedure OnyxUnloadDllMapperPlugin;
+begin
+  if hDllMapperPlugin <> 0 then
+  begin
+    FreeLibrary(hDllMapperPlugin);
+    hDllMapperPlugin := 0;
+  end;
+  fnDllMapperInit := nil;
+  fnDllMapDllPid := nil;
+  fnDllMapDllNamed := nil;
 end;
 
 initialization

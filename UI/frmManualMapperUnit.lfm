@@ -1,0 +1,425 @@
+object frmManualMapper: TfrmManualMapper
+  Left = 680
+  Height = 650
+  Top = 160
+  Width = 660
+  BorderIcons = [biSystemMenu, biMinimize]
+  BorderStyle = bsSingle
+  Caption = 'Onyx DLL Manual Mapper'
+  ClientHeight = 650
+  ClientWidth = 660
+  Color = 2105376
+  OnCreate = FormCreate
+  OnShow = FormShow
+  Position = poScreenCenter
+  LCLVersion = '2.2.2.0'
+  object pnlHeader: TPanel
+    Left = 0
+    Height = 52
+    Top = 0
+    Width = 660
+    Align = alTop
+    BevelOuter = bvNone
+    ClientHeight = 52
+    ClientWidth = 660
+    Color = 2631720
+    ParentColor = False
+    TabOrder = 0
+    object lblTitle: TLabel
+      Left = 14
+      Height = 20
+      Top = 8
+      Width = 220
+      Caption = 'Onyx DLL Manual Mapper'
+      Font.Color = 58998
+      Font.Height = -15
+      Font.Style = [fsBold]
+      ParentColor = False
+      ParentFont = False
+    end
+    object lblSubtitle: TLabel
+      Left = 14
+      Height = 15
+      Top = 29
+      Width = 475
+      Caption = 'Injeção direta em memória: evasão VAD, module stomping, PEB EAT e thread hijacking'
+      Font.Color = 10526880
+      ParentColor = False
+      ParentFont = False
+    end
+  end
+  object gbTarget: TGroupBox
+    Left = 12
+    Height = 58
+    Top = 58
+    Width = 636
+    Caption = ' Processo Alvo '
+    ClientHeight = 38
+    ClientWidth = 632
+    Font.Color = 15592941
+    ParentFont = False
+    TabOrder = 1
+    object lblTarget: TLabel
+      Left = 10
+      Height = 15
+      Top = 10
+      Width = 52
+      Caption = 'Processo:'
+      ParentColor = False
+    end
+    object edtTarget: TEdit
+      Left = 68
+      Height = 23
+      Top = 6
+      Width = 430
+      Color = 1973790
+      Font.Color = 58998
+      Font.Style = [fsBold]
+      ParentFont = False
+      ReadOnly = True
+      TabOrder = 0
+    end
+    object btnRefreshTarget: TButton
+      Left = 506
+      Height = 25
+      Top = 5
+      Width = 116
+      Caption = 'Atualizar Alvo'
+      OnClick = btnRefreshTargetClick
+      TabOrder = 1
+    end
+  end
+  object gbDll: TGroupBox
+    Left = 12
+    Height = 58
+    Top = 120
+    Width = 636
+    Caption = ' Arquivo DLL '
+    ClientHeight = 38
+    ClientWidth = 632
+    Font.Color = 15592941
+    ParentFont = False
+    TabOrder = 2
+    object lblDll: TLabel
+      Left = 10
+      Height = 15
+      Top = 10
+      Width = 49
+      Caption = 'DLL Path:'
+      ParentColor = False
+    end
+    object edtDllPath: TEdit
+      Left = 68
+      Height = 23
+      Top = 6
+      Width = 430
+      Color = 1973790
+      Font.Color = 15592941
+      ParentFont = False
+      TabOrder = 0
+    end
+    object btnBrowse: TButton
+      Left = 506
+      Height = 25
+      Top = 5
+      Width = 116
+      Caption = 'Buscar DLL...'
+      OnClick = btnBrowseClick
+      TabOrder = 1
+    end
+  end
+  object gbOptions: TGroupBox
+    Left = 12
+    Height = 110
+    Top = 182
+    Width = 636
+    Caption = ' Opções de Evasão e Mapeamento '
+    ClientHeight = 90
+    ClientWidth = 632
+    Font.Color = 15592941
+    ParentFont = False
+    TabOrder = 3
+    object cbEraseHeaders: TCheckBox
+      Left = 12
+      Height = 19
+      Top = 4
+      Width = 150
+      Caption = 'Wipe PE Headers'
+      Checked = True
+      State = cbChecked
+      TabOrder = 0
+    end
+    object cbProtectSections: TCheckBox
+      Left = 12
+      Height = 19
+      Top = 24
+      Width = 150
+      Caption = 'Proteger Seções'
+      Checked = True
+      State = cbChecked
+      TabOrder = 1
+    end
+    object cbCallTls: TCheckBox
+      Left = 12
+      Height = 19
+      Top = 44
+      Width = 150
+      Caption = 'Executar Callbacks TLS'
+      Checked = True
+      State = cbChecked
+      TabOrder = 2
+    end
+    object cbWipeStub: TCheckBox
+      Left = 12
+      Height = 19
+      Top = 64
+      Width = 150
+      Caption = 'Wipe Execution Stub'
+      Checked = True
+      State = cbChecked
+      TabOrder = 3
+    end
+    object cbResolvePeb: TCheckBox
+      Left = 200
+      Height = 19
+      Top = 4
+      Width = 190
+      Caption = 'Resolver Imports via PEB EAT'
+      Checked = True
+      State = cbChecked
+      TabOrder = 4
+    end
+    object cbRegisterSeh: TCheckBox
+      Left = 200
+      Height = 19
+      Top = 24
+      Width = 190
+      Caption = 'Registrar SEH Tables (x64)'
+      Checked = True
+      State = cbChecked
+      TabOrder = 5
+    end
+    object cbInitCookie: TCheckBox
+      Left = 200
+      Height = 19
+      Top = 44
+      Width = 190
+      Caption = 'Init Security Cookie'
+      Checked = True
+      State = cbChecked
+      TabOrder = 6
+    end
+    object cbThreadHijack: TCheckBox
+      Left = 420
+      Height = 19
+      Top = 4
+      Width = 180
+      Caption = 'Thread Hijacking'
+      TabOrder = 7
+    end
+    object cbUseDriver: TCheckBox
+      Left = 420
+      Height = 19
+      Top = 24
+      Width = 180
+      Caption = 'Driver Kernel (DBK)'
+      TabOrder = 8
+    end
+    object cbModuleStomp: TCheckBox
+      Left = 420
+      Height = 19
+      Top = 44
+      Width = 180
+      Caption = 'Module Stomping (VAD)'
+      TabOrder = 9
+    end
+  end
+  object gbResults: TGroupBox
+    Left = 12
+    Height = 250
+    Top = 296
+    Width = 636
+    Caption = ' Status && Relatório de Mapeamento '
+    ClientHeight = 230
+    ClientWidth = 632
+    Font.Color = 15592941
+    ParentFont = False
+    TabOrder = 4
+    object pnlStatusBadge: TPanel
+      Left = 10
+      Height = 26
+      Top = 4
+      Width = 612
+      BevelOuter = bvNone
+      BorderStyle = bsNone
+      ClientHeight = 26
+      ClientWidth = 612
+      Color = 2631720
+      ParentColor = False
+      TabOrder = 0
+      object lblStatus: TLabel
+        Left = 0
+        Height = 26
+        Top = 0
+        Width = 612
+        Align = alClient
+        Alignment = taCenter
+        Caption = 'Aguardando configuração de injeção...'
+        Font.Color = 11184810
+        Font.Style = [fsBold]
+        Layout = tlCenter
+        ParentColor = False
+        ParentFont = False
+      end
+    end
+    object lblImageBase: TLabel
+      Left = 10
+      Height = 15
+      Top = 36
+      Width = 65
+      Caption = 'Image Base:'
+      ParentColor = False
+    end
+    object edtImageBase: TEdit
+      Left = 10
+      Height = 23
+      Top = 52
+      Width = 190
+      Color = 1973790
+      Font.Color = 58998
+      Font.Name = 'Courier New'
+      Font.Style = [fsBold]
+      ParentFont = False
+      ReadOnly = True
+      TabOrder = 1
+    end
+    object lblEntryPoint: TLabel
+      Left = 210
+      Height = 15
+      Top = 36
+      Width = 61
+      Caption = 'EntryPoint:'
+      ParentColor = False
+    end
+    object edtEntryPoint: TEdit
+      Left = 210
+      Height = 23
+      Top = 52
+      Width = 190
+      Color = 1973790
+      Font.Color = 15592941
+      Font.Name = 'Courier New'
+      ParentFont = False
+      ReadOnly = True
+      TabOrder = 2
+    end
+    object lblDllMainResult: TLabel
+      Left = 410
+      Height = 15
+      Top = 36
+      Width = 47
+      Caption = 'DllMain:'
+      ParentColor = False
+    end
+    object edtDllMainResult: TEdit
+      Left = 410
+      Height = 23
+      Top = 52
+      Width = 212
+      Color = 1973790
+      Font.Color = 15592941
+      ParentFont = False
+      ReadOnly = True
+      TabOrder = 3
+    end
+    object lblStats: TLabel
+      Left = 10
+      Height = 15
+      Top = 80
+      Width = 116
+      Caption = 'Relocações / Imports:'
+      ParentColor = False
+    end
+    object edtStats: TEdit
+      Left = 10
+      Height = 23
+      Top = 96
+      Width = 612
+      Color = 1973790
+      Font.Color = 15592941
+      ParentFont = False
+      ReadOnly = True
+      TabOrder = 4
+    end
+    object lblLog: TLabel
+      Left = 10
+      Height = 15
+      Top = 124
+      Width = 79
+      Caption = 'Log de Eventos:'
+      ParentColor = False
+    end
+    object mmoLog: TMemo
+      Left = 10
+      Height = 72
+      Top = 142
+      Width = 612
+      Color = 1973790
+      Font.Color = 13816530
+      Font.Name = 'Courier New'
+      ParentFont = False
+      ReadOnly = True
+      ScrollBars = ssAutoBoth
+      TabOrder = 5
+    end
+  end
+  object pnlBottom: TPanel
+    Left = 0
+    Height = 44
+    Top = 606
+    Width = 660
+    Align = alBottom
+    BevelOuter = bvNone
+    ClientHeight = 44
+    ClientWidth = 660
+    Color = 2631720
+    ParentColor = False
+    TabOrder = 5
+    object btnInject: TButton
+      Left = 12
+      Height = 28
+      Top = 8
+      Width = 190
+      Caption = 'Mapear / Injetar DLL'
+      Font.Style = [fsBold]
+      OnClick = btnInjectClick
+      ParentFont = False
+      TabOrder = 0
+    end
+    object btnOpenMemView: TButton
+      Left = 212
+      Height = 28
+      Top = 8
+      Width = 190
+      Caption = 'Ver no Memory Browser'
+      OnClick = btnOpenMemViewClick
+      TabOrder = 1
+    end
+    object btnClose: TButton
+      Left = 538
+      Height = 28
+      Top = 8
+      Width = 110
+      Caption = 'Fechar'
+      OnClick = btnCloseClick
+      TabOrder = 2
+    end
+  end
+  object OpenDialog1: TOpenDialog
+    DefaultExt = '.dll'
+    Filter = 'Dynamic Link Libraries (*.dll)|*.dll|All Files (*.*)|*.*'
+    Title = 'Selecione a DLL para Mapeamento Manual'
+    Left = 560
+    Top = 16
+  end
+end
