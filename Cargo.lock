@@ -243,6 +243,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "callstack-spoof"
+version = "0.1.0"
+dependencies = [
+ "pe-strip",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "cc"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1835,6 +1843,13 @@ dependencies = [
  "fallible-iterator",
  "scroll",
  "uuid",
+]
+
+[[package]]
+name = "pe-strip"
+version = "0.1.0"
+dependencies = [
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

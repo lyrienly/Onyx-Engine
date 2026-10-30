@@ -23,6 +23,8 @@ members = [
     "crates/plugins/aob_generator",
     "crates/plugins/dll_mapper",
     "crates/syscalls-indirect",
+    "crates/pe-strip",
+    "crates/callstack-spoof",
 ]
 resolver = "2"
 
