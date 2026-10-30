@@ -221,17 +221,17 @@ struct VadEnumOutputHeader {
     count: u32,
 }
 
-pub type OnyxDriver = DbkDriver;
-
-pub struct DbkDriver {
+pub struct OnyxDriver {
     pub device_handle: HANDLE,
     pub device_name: String,
 }
 
-unsafe impl Send for DbkDriver {}
-unsafe impl Sync for DbkDriver {}
+pub type DbkDriver = OnyxDriver;
 
-impl DbkDriver {
+unsafe impl Send for OnyxDriver {}
+unsafe impl Sync for OnyxDriver {}
+
+impl OnyxDriver {
     pub fn connect_device(device_path: &str) -> Result<Self, String> {
         let wide_name: Vec<u16> = device_path
             .encode_utf16()
@@ -250,7 +250,7 @@ impl DbkDriver {
         };
 
         if handle != INVALID_HANDLE_VALUE && !handle.is_null() {
-            let driver = DbkDriver {
+            let driver = OnyxDriver {
                 device_handle: handle,
                 device_name: device_path.to_string(),
             };
@@ -264,17 +264,7 @@ impl DbkDriver {
     }
 
     pub fn connect() -> Result<Self, String> {
-        let names = [
-            "\\\\.\\OwMemDriver",
-            "\\\\.\\lydumen",
-            "\\\\.\\DBK64",
-            "\\\\.\\DBK32",
-            "\\\\.\\CEDRIVER77",
-            "\\\\.\\CEDRIVER76",
-            "\\\\.\\CEDRIVER75",
-            "\\\\.\\CEDRIVER74",
-            "\\\\.\\CEDRIVER73",
-        ];
+        let names = ["\\\\.\\OnyxDriver"];
 
         for name in &names {
             if let Ok(driver) = Self::connect_device(name) {
@@ -283,7 +273,7 @@ impl DbkDriver {
         }
 
         Err(
-            "Failed to connect to kernel driver (OwMemDriver/lydumen/DBK64). Is driver loaded?"
+            "Failed to connect to OnyxDriver (\\\\.\\OnyxDriver). Is OnyxDriver.sys loaded?"
                 .to_string(),
         )
     }
@@ -726,7 +716,10 @@ impl DbkDriver {
         if ok == TRUE && output.handle != 0 {
             Ok(output.handle as HANDLE)
         } else {
-            Err(format!("DBK IOCTL_CE_OPENPROCESS failed for PID {}", pid))
+            Err(format!(
+                "OnyxDriver IOCTL_CE_OPENPROCESS failed for PID {}",
+                pid
+            ))
         }
     }
 
@@ -763,7 +756,7 @@ impl DbkDriver {
                 offset += returned as usize;
             } else {
                 return Err(format!(
-                    "DBK IOCTL_CE_READMEMORY failed at 0x{:X}",
+                    "OnyxDriver IOCTL_CE_READMEMORY failed at 0x{:X}",
                     address + offset
                 ));
             }
@@ -819,7 +812,7 @@ impl DbkDriver {
                 offset += chunk_len as usize;
             } else {
                 return Err(format!(
-                    "DBK IOCTL_CE_WRITEMEMORY failed at 0x{:X}",
+                    "OnyxDriver IOCTL_CE_WRITEMEMORY failed at 0x{:X}",
                     address + offset
                 ));
             }
@@ -849,7 +842,7 @@ impl DbkDriver {
         if ok == TRUE {
             Ok(cr3)
         } else {
-            Err(format!("DBK IOCTL_CE_GETCR3 failed for PID {}", pid))
+            Err(format!("OnyxDriver IOCTL_CE_GETCR3 failed for PID {}", pid))
         }
     }
 
@@ -896,7 +889,7 @@ impl DbkDriver {
             Ok(base)
         } else {
             Err(format!(
-                "DBK IOCTL_CE_ALLOCATE_PROCESS_MEMORY failed for PID {} (status {:#X})",
+                "OnyxDriver IOCTL_CE_ALLOCATE_PROCESS_MEMORY failed for PID {} (status {:#X})",
                 pid, status
             ))
         }
@@ -928,7 +921,7 @@ impl DbkDriver {
             Ok(())
         } else {
             Err(format!(
-                "DBK IOCTL_CE_FREE_PROCESS_MEMORY failed for PID {} at {:#X}",
+                "OnyxDriver IOCTL_CE_FREE_PROCESS_MEMORY failed for PID {} at {:#X}",
                 pid, base_address
             ))
         }
@@ -974,7 +967,7 @@ impl DbkDriver {
             Ok(old_protect)
         } else {
             Err(format!(
-                "DBK IOCTL_CE_PROTECT_PROCESS_MEMORY failed for PID {} at {:#X} (status {:#X})",
+                "OnyxDriver IOCTL_CE_PROTECT_PROCESS_MEMORY failed for PID {} at {:#X} (status {:#X})",
                 pid, base_address, status
             ))
         }
@@ -1383,7 +1376,7 @@ pub struct KernelSecurityProfile {
     pub cr3_interception_risk: bool,
 }
 
-impl Drop for DbkDriver {
+impl Drop for OnyxDriver {
     fn drop(&mut self) {
         if !self.device_handle.is_null() && self.device_handle != INVALID_HANDLE_VALUE {
             unsafe {

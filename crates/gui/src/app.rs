@@ -1,7 +1,7 @@
 use eframe::egui::{self, Color32, RichText, Rounding, Stroke, Vec2};
 use onyx_core::disasm::Disassembler;
 use onyx_core::freeze::Freezer;
-use onyx_core::kernel::DbkDriver;
+use onyx_core::kernel::OnyxDriver;
 use onyx_core::lua_api::CeLuaEngine;
 use onyx_core::mono::{MonoDissector, RuntimeType};
 use onyx_core::pointer_scanner::{PointerPath, PointerScanner};
@@ -61,7 +61,7 @@ pub struct OnyxEngineApp {
     pub settings_tab: usize,
 
     pub access_mode: ProcessAccessMode,
-    pub dbk_driver: Option<Arc<DbkDriver>>,
+    pub dbk_driver: Option<Arc<OnyxDriver>>,
     pub dbk_status_msg: String,
     pub freeze_interval_ms: u64,
 
@@ -174,7 +174,7 @@ impl OnyxEngineApp {
             settings_tab: 0,
 
             access_mode: ProcessAccessMode::NtApi,
-            dbk_driver: DbkDriver::connect().ok().map(Arc::new),
+            dbk_driver: OnyxDriver::connect().ok().map(Arc::new),
             dbk_status_msg: String::new(),
             freeze_interval_ms: 50,
             ghost_mode: false,
@@ -259,7 +259,7 @@ dealloc(newmem)
     }
 
     pub fn try_connect_dbk(&mut self) {
-        match DbkDriver::connect() {
+        match OnyxDriver::connect() {
             Ok(driver) => {
                 let arc = Arc::new(driver);
                 self.dbk_status_msg = format!("Connected to driver: {}", arc.device_name);
@@ -267,7 +267,7 @@ dealloc(newmem)
                 if let Some(ref mut proc) = self.attached_proc {
                     proc.set_dbk(Some(arc));
                 }
-                self.status_msg = "OwMemDriver (Stealth Ring-0) connected.".to_string();
+                self.status_msg = "OnyxDriver (Stealth Ring-0) connected.".to_string();
             }
             Err(e) => {
                 self.dbk_status_msg = format!("Driver connection failed: {}", e);
