@@ -388,6 +388,7 @@ pub struct DEBUG_EVENT {
 unsafe extern "system" {
 
     pub fn OpenProcess(dwDesiredAccess: DWORD, bInheritHandle: BOOL, dwProcessId: DWORD) -> HANDLE;
+    pub fn GetProcessId(Process: HANDLE) -> DWORD;
     pub fn CloseHandle(hObject: HANDLE) -> BOOL;
     pub fn GetCurrentProcess() -> HANDLE;
     pub fn ReadProcessMemory(

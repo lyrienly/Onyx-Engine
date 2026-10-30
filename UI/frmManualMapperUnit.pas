@@ -80,7 +80,7 @@ implementation
 {$R *.lfm}
 
 uses
-  MemoryBrowserFormUnit, processlist;
+  MemoryBrowserFormUnit, processlist, ProcessWindowUnit, NewKernelHandler;
 
 procedure TfrmManualMapper.FormCreate(Sender: TObject);
 begin
@@ -193,13 +193,45 @@ begin
 end;
 
 procedure TfrmManualMapper.btnRefreshTargetClick(Sender: TObject);
+var
+  resu: TModalResult;
+  selectedText: string;
+  i: integer;
 begin
-  PopulateProcessList;
-  UpdateDriverStatus;
+  if ProcessWindow = nil then
+    ProcessWindow := TProcessWindow.Create(Application);
+
+  resu := ProcessWindow.ShowModal;
+  if (resu = mrOk) or (ProcessWindow.ModalResult = mrOk) then
+  begin
+    PopulateProcessList;
+
+    if (ProcessWindow.ProcessList.ItemIndex >= 0) and
+       (ProcessWindow.ProcessList.Items.Count > ProcessWindow.ProcessList.ItemIndex) then
+    begin
+      selectedText := ProcessWindow.ProcessList.Items[ProcessWindow.ProcessList.ItemIndex];
+      for i := 0 to cbTarget.Items.Count - 1 do
+      begin
+        if (cbTarget.Items[i] = selectedText) or
+           ((processid <> 0) and (Pos(IntToHex(processid, 8), cbTarget.Items[i]) = 1)) then
+        begin
+          cbTarget.ItemIndex := i;
+          Break;
+        end;
+      end;
+    end;
+
+    UpdateDriverStatus;
+  end;
 end;
 
 procedure TfrmManualMapper.cbTargetChange(Sender: TObject);
+var
+  newPid: DWORD;
 begin
+  newPid := GetSelectedPid;
+  if newPid <> 0 then
+    processid := newPid;
   UpdateDriverStatus;
 end;
 

@@ -3,14 +3,15 @@ use std::ptr::null_mut;
 
 use onyx_core::win32::{
     CloseHandle, CreateRemoteThread, CreateToolhelp32Snapshot, GetModuleHandleA, GetProcAddress,
-    GetThreadContext, Module32FirstW, Module32NextW, OpenProcess, OpenThread, ReadProcessMemory,
-    ResumeThread, SetThreadContext, SuspendThread, Thread32First, Thread32Next, VirtualAllocEx,
-    VirtualFreeEx, VirtualProtectEx, WaitForSingleObject, WriteProcessMemory, CONTEXT, CONTEXT_ALL,
-    DWORD, HANDLE, INVALID_HANDLE_VALUE, LPCVOID, LPVOID, MEM_COMMIT, MEM_RELEASE, MEM_RESERVE,
-    MODULEENTRY32W, PAGE_EXECUTE, PAGE_EXECUTE_READ, PAGE_EXECUTE_READWRITE, PAGE_READONLY,
-    PAGE_READWRITE, PROCESS_ALL_ACCESS, PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION,
-    PROCESS_VM_OPERATION, PROCESS_VM_READ, PROCESS_VM_WRITE, TH32CS_SNAPMODULE,
-    TH32CS_SNAPMODULE32, TH32CS_SNAPTHREAD, THREADENTRY32, THREAD_ALL_ACCESS,
+    GetProcessId, GetThreadContext, Module32FirstW, Module32NextW, OpenProcess, OpenThread,
+    ReadProcessMemory, ResumeThread, SetThreadContext, SuspendThread, Thread32First, Thread32Next,
+    VirtualAllocEx, VirtualFreeEx, VirtualProtectEx, WaitForSingleObject, WriteProcessMemory,
+    CONTEXT, CONTEXT_ALL, DWORD, HANDLE, INVALID_HANDLE_VALUE, LPCVOID, LPVOID, MEM_COMMIT,
+    MEM_RELEASE, MEM_RESERVE, MODULEENTRY32W, PAGE_EXECUTE, PAGE_EXECUTE_READ,
+    PAGE_EXECUTE_READWRITE, PAGE_READONLY, PAGE_READWRITE, PROCESS_ALL_ACCESS,
+    PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION, PROCESS_VM_OPERATION, PROCESS_VM_READ,
+    PROCESS_VM_WRITE, TH32CS_SNAPMODULE, TH32CS_SNAPMODULE32, TH32CS_SNAPTHREAD, THREADENTRY32,
+    THREAD_ALL_ACCESS,
 };
 
 use crate::imports::{parse_imports, ImportSymbol};
@@ -143,11 +144,24 @@ fn write_remote(process: HANDLE, address: usize, bytes: &[u8]) -> Result<(), Str
             &mut written,
         )
     };
-    if ok == 0 || written != bytes.len() {
-        Err(format!("WriteProcessMemory failed at 0x{:X}", address))
-    } else {
-        Ok(())
+    if ok != 0 && written == bytes.len() {
+        return Ok(());
     }
+
+    // Kernel Driver fallback: if usermode WriteProcessMemory fails (e.g. anti-cheat hook or stripped handle),
+    // route write directly through ring-0 kernel memory engine via CR3!
+    let pid = unsafe { GetProcessId(process) };
+    if pid != 0 {
+        if let Ok(driver) = onyx_core::process::kernel::DbkDriver::connect() {
+            if let Ok(k_written) = driver.write_memory(pid, address, bytes) {
+                if k_written == bytes.len() {
+                    return Ok(());
+                }
+            }
+        }
+    }
+
+    Err(format!("WriteProcessMemory failed at 0x{:X}", address))
 }
 
 fn read_remote(process: HANDLE, address: usize, buffer: &mut [u8]) -> Result<(), String> {
@@ -161,11 +175,24 @@ fn read_remote(process: HANDLE, address: usize, buffer: &mut [u8]) -> Result<(),
             &mut read,
         )
     };
-    if ok == 0 || read != buffer.len() {
-        Err(format!("ReadProcessMemory failed at 0x{:X}", address))
-    } else {
-        Ok(())
+    if ok != 0 && read == buffer.len() {
+        return Ok(());
     }
+
+    // Kernel Driver fallback: if usermode ReadProcessMemory fails, route read directly via CR3!
+    let pid = unsafe { GetProcessId(process) };
+    if pid != 0 {
+        if let Ok(driver) = onyx_core::process::kernel::DbkDriver::connect() {
+            if let Ok(k_bytes) = driver.read_memory(pid, address, buffer.len()) {
+                if k_bytes.len() == buffer.len() {
+                    buffer.copy_from_slice(&k_bytes);
+                    return Ok(());
+                }
+            }
+        }
+    }
+
+    Err(format!("ReadProcessMemory failed at 0x{:X}", address))
 }
 
 fn local_proc(module: &str, name: &str) -> Result<u64, String> {

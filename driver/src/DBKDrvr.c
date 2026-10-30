@@ -3,7 +3,11 @@
 #include "DBKFunc.h"
 #include <ntifs.h>
 #include <windef.h>
+#include <wdmsec.h>
+#pragma comment(lib, "wdmsec.lib")
 #include "DBKDrvr.h"
+
+static const GUID GUID_DEVCLASS_ONYX = { 0xb70b86a8, 0x580a, 0x4f67, { 0xb9, 0xb8, 0x1e, 0x2e, 0x7a, 0x98, 0x56, 0x11 } };
 
 #include "deepkernel.h"
 #include "memscan.h"
@@ -235,13 +239,28 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 
 #ifndef CETC
 
-		ntStatus = IoCreateDevice(DriverObject,
+		// ACE Evasion: Create device with strict SDDL (SYSTEM + Administrator full access only)
+		// Prevents unprivileged AC scanners and sandboxed probes from opening device
+		ntStatus = IoCreateDeviceSecure(DriverObject,
 			0,
 			&uszDriverString,
 			FILE_DEVICE_UNKNOWN,
-			0,
+			FILE_DEVICE_SECURE_OPEN,
 			FALSE,
+			&SDDL_DEVOBJ_SYS_ALL_ADM_ALL,
+			&GUID_DEVCLASS_ONYX,
 			&pDeviceObject);
+
+		if (!NT_SUCCESS(ntStatus))
+		{
+			ntStatus = IoCreateDevice(DriverObject,
+				0,
+				&uszDriverString,
+				FILE_DEVICE_UNKNOWN,
+				FILE_DEVICE_SECURE_OPEN,
+				FALSE,
+				&pDeviceObject);
+		}
 
 		if (ntStatus != STATUS_SUCCESS)
 		{

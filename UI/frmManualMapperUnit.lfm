@@ -89,7 +89,7 @@ object frmManualMapper: TfrmManualMapper
       Height = 25
       Top = 5
       Width = 116
-      Caption = 'Recarregar Lista'
+      Caption = 'Process List'
       OnClick = btnRefreshTargetClick
       TabOrder = 1
     end

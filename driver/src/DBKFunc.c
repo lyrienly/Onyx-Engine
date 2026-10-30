@@ -2287,6 +2287,7 @@ NTSTATUS CleanKernelTraces(VOID)
 	return STATUS_UNSUCCESSFUL;
 }
 
+extern UNICODE_STRING uszDriverString;
 extern UNICODE_STRING uszDeviceString;
 static WCHAR g_CloakedSymlinkBuffer[128] = { 0 };
 
@@ -2318,7 +2319,14 @@ NTSTATUS CloakDeviceSymlink(PCWSTR NewSymlinkName)
 		RtlInitUnicodeString(&uNewLink, fullDosDevicesPath);
 
 		UNICODE_STRING uTargetDevice;
-		RtlInitUnicodeString(&uTargetDevice, L"\\Device\\lydumen");
+		if (uszDriverString.Buffer && uszDriverString.Length > 0)
+		{
+			uTargetDevice = uszDriverString;
+		}
+		else
+		{
+			RtlInitUnicodeString(&uTargetDevice, L"\\Device\\OwMemDriver");
+		}
 
 		NTSTATUS status = IoCreateSymbolicLink(&uNewLink, &uTargetDevice);
 		if (!NT_SUCCESS(status))
