@@ -1,16 +1,7 @@
 name: Lazbuild
 
 on:
-  push:
-    branches: [ "main" ]
-    paths:
-      - 'UI/**'
-      - '.github/workflows/lazbuild.yml'
-  pull_request:
-    branches: [ "main" ]
-    paths:
-      - 'UI/**'
-      - '.github/workflows/lazbuild.yml'
+  workflow_dispatch:
 
 jobs:
   lazbuild:
