@@ -25,6 +25,10 @@ pub const ONYX_MAP_CALL_TLS: u32 = 4;
 pub const ONYX_MAP_THREAD_HIJACK: u32 = 8;
 pub const ONYX_MAP_USE_DRIVER: u32 = 16;
 pub const ONYX_MAP_WIPE_STUB: u32 = 32;
+pub const ONYX_MAP_MODULE_STOMP: u32 = 64;
+pub const ONYX_MAP_RESOLVE_PEB: u32 = 128;
+pub const ONYX_MAP_REGISTER_SEH: u32 = 256;
+pub const ONYX_MAP_INIT_COOKIE: u32 = 512;
 
 #[repr(C)]
 pub struct OnyxPluginInfo {
@@ -69,10 +73,10 @@ pub struct OnyxMapResult {
 }
 
 static PLUGIN_NAME: &[u8] = b"Onyx DLL Manual Mapper\0";
-static PLUGIN_VERSION: &[u8] = b"1.1.0\0";
+static PLUGIN_VERSION: &[u8] = b"1.2.0\0";
 static PLUGIN_AUTHOR: &[u8] = b"OnyxEngine Team\0";
 static PLUGIN_DESC: &[u8] =
-    b"Manual (mapped) DLL injection with thread hijacking, driver elevation, and PE wiping\0";
+    b"Manual (mapped) DLL injection with module stomping, VAD evasion, PEB EAT resolving, and thread hijacking\0";
 
 static HOST: AtomicUsize = AtomicUsize::new(0);
 static MAPPED: Mutex<Vec<u64>> = Mutex::new(Vec::new());
@@ -101,6 +105,22 @@ fn target_pid() -> u32 {
     match unsafe { (*host).get_target_pid } {
         Some(get_pid) => unsafe { get_pid() },
         None => 0,
+    }
+}
+
+fn parse_map_options(flags: u32) -> mapper::MapOptions {
+    mapper::MapOptions {
+        erase_headers: flags & ONYX_MAP_ERASE_HEADERS != 0,
+        protect_sections: flags & ONYX_MAP_PROTECT_SECTIONS != 0,
+        call_tls: flags & ONYX_MAP_CALL_TLS != 0,
+        thread_hijack: flags & ONYX_MAP_THREAD_HIJACK != 0,
+        use_driver: flags & ONYX_MAP_USE_DRIVER != 0,
+        wipe_stub: flags & ONYX_MAP_WIPE_STUB != 0,
+        module_stomp: flags & ONYX_MAP_MODULE_STOMP != 0,
+        resolve_peb: flags & ONYX_MAP_RESOLVE_PEB != 0,
+        register_seh: flags & ONYX_MAP_REGISTER_SEH != 0,
+        init_cookie: flags & ONYX_MAP_INIT_COOKIE != 0,
+        target_stomp_module: None,
     }
 }
 
@@ -150,7 +170,11 @@ pub unsafe extern "system" fn OnyxPlugin_MapDll(
     };
 
     let flags = if options.is_null() {
-        ONYX_MAP_PROTECT_SECTIONS | ONYX_MAP_CALL_TLS
+        ONYX_MAP_PROTECT_SECTIONS
+            | ONYX_MAP_CALL_TLS
+            | ONYX_MAP_RESOLVE_PEB
+            | ONYX_MAP_REGISTER_SEH
+            | ONYX_MAP_INIT_COOKIE
     } else {
         (*options).flags
     };
@@ -161,14 +185,7 @@ pub unsafe extern "system" fn OnyxPlugin_MapDll(
         return ONYX_PLUGIN_ERR_NOT_FOUND;
     }
 
-    let map_options = mapper::MapOptions {
-        erase_headers: flags & ONYX_MAP_ERASE_HEADERS != 0,
-        protect_sections: flags & ONYX_MAP_PROTECT_SECTIONS != 0,
-        call_tls: flags & ONYX_MAP_CALL_TLS != 0,
-        thread_hijack: flags & ONYX_MAP_THREAD_HIJACK != 0,
-        use_driver: flags & ONYX_MAP_USE_DRIVER != 0,
-        wipe_stub: flags & ONYX_MAP_WIPE_STUB != 0,
-    };
+    let map_options = parse_map_options(flags);
 
     match mapper::map_dll(pid, path, &map_options) {
         Ok(outcome) => {
@@ -219,19 +236,16 @@ pub unsafe extern "system" fn OnyxPlugin_MapDllNamed(
     };
 
     let flags = if options.is_null() {
-        ONYX_MAP_PROTECT_SECTIONS | ONYX_MAP_CALL_TLS
+        ONYX_MAP_PROTECT_SECTIONS
+            | ONYX_MAP_CALL_TLS
+            | ONYX_MAP_RESOLVE_PEB
+            | ONYX_MAP_REGISTER_SEH
+            | ONYX_MAP_INIT_COOKIE
     } else {
         (*options).flags
     };
 
-    let map_options = mapper::MapOptions {
-        erase_headers: flags & ONYX_MAP_ERASE_HEADERS != 0,
-        protect_sections: flags & ONYX_MAP_PROTECT_SECTIONS != 0,
-        call_tls: flags & ONYX_MAP_CALL_TLS != 0,
-        thread_hijack: flags & ONYX_MAP_THREAD_HIJACK != 0,
-        use_driver: flags & ONYX_MAP_USE_DRIVER != 0,
-        wipe_stub: flags & ONYX_MAP_WIPE_STUB != 0,
-    };
+    let map_options = parse_map_options(flags);
 
     match mapper::map_dll_by_name(name, path, &map_options) {
         Ok(outcome) => {

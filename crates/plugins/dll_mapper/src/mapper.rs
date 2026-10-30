@@ -3,13 +3,14 @@ use std::ptr::null_mut;
 
 use onyx_core::win32::{
     CloseHandle, CreateRemoteThread, CreateToolhelp32Snapshot, GetModuleHandleA, GetProcAddress,
-    GetThreadContext, OpenProcess, OpenThread, ReadProcessMemory, ResumeThread, SetThreadContext,
-    SuspendThread, Thread32First, Thread32Next, VirtualAllocEx, VirtualFreeEx, VirtualProtectEx,
-    WaitForSingleObject, WriteProcessMemory, CONTEXT, CONTEXT_ALL, DWORD, HANDLE,
-    INVALID_HANDLE_VALUE, LPCVOID, LPVOID, MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_EXECUTE,
-    PAGE_EXECUTE_READ, PAGE_EXECUTE_READWRITE, PAGE_READONLY, PAGE_READWRITE, PROCESS_ALL_ACCESS,
-    PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION, PROCESS_VM_OPERATION, PROCESS_VM_READ,
-    PROCESS_VM_WRITE, TH32CS_SNAPTHREAD, THREADENTRY32, THREAD_ALL_ACCESS,
+    GetThreadContext, Module32FirstW, Module32NextW, OpenProcess, OpenThread, ReadProcessMemory,
+    ResumeThread, SetThreadContext, SuspendThread, Thread32First, Thread32Next, VirtualAllocEx,
+    VirtualFreeEx, VirtualProtectEx, WaitForSingleObject, WriteProcessMemory, CONTEXT, CONTEXT_ALL,
+    DWORD, HANDLE, INVALID_HANDLE_VALUE, LPCVOID, LPVOID, MEM_COMMIT, MEM_RELEASE, MEM_RESERVE,
+    MODULEENTRY32W, PAGE_EXECUTE, PAGE_EXECUTE_READ, PAGE_EXECUTE_READWRITE, PAGE_READONLY,
+    PAGE_READWRITE, PROCESS_ALL_ACCESS, PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION,
+    PROCESS_VM_OPERATION, PROCESS_VM_READ, PROCESS_VM_WRITE, TH32CS_SNAPMODULE,
+    TH32CS_SNAPMODULE32, TH32CS_SNAPTHREAD, THREADENTRY32, THREAD_ALL_ACCESS,
 };
 
 use crate::imports::{parse_imports, ImportSymbol};
@@ -21,7 +22,7 @@ const INFINITE: DWORD = 0xFFFF_FFFF;
 const SCRATCH_SIZE: usize = 0x1000;
 const NAME_BUFFER_SIZE: usize = 0x200;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct MapOptions {
     pub erase_headers: bool,
     pub protect_sections: bool,
@@ -29,6 +30,11 @@ pub struct MapOptions {
     pub thread_hijack: bool,
     pub use_driver: bool,
     pub wipe_stub: bool,
+    pub module_stomp: bool,
+    pub resolve_peb: bool,
+    pub register_seh: bool,
+    pub init_cookie: bool,
+    pub target_stomp_module: Option<String>,
 }
 
 impl Default for MapOptions {
@@ -40,6 +46,11 @@ impl Default for MapOptions {
             thread_hijack: false,
             use_driver: false,
             wipe_stub: false,
+            module_stomp: false,
+            resolve_peb: true,
+            register_seh: true,
+            init_cookie: true,
+            target_stomp_module: None,
         }
     }
 }
@@ -172,6 +183,168 @@ fn local_proc(module: &str, name: &str) -> Result<u64, String> {
         Err(format!("GetProcAddress failed for {}", name))
     } else {
         Ok(proc as usize as u64)
+    }
+}
+
+fn get_remote_modules(pid: u32) -> Vec<(String, usize, usize)> {
+    let snap = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid) };
+    if snap.is_null() || snap == INVALID_HANDLE_VALUE {
+        return Vec::new();
+    }
+
+    let mut entry: MODULEENTRY32W = unsafe { std::mem::zeroed() };
+    entry.dwSize = size_of::<MODULEENTRY32W>() as DWORD;
+
+    let mut list = Vec::new();
+    let mut ok = unsafe { Module32FirstW(snap, &mut entry) };
+    while ok != 0 {
+        let end = entry.szModule.iter().position(|&c| c == 0).unwrap_or(256);
+        let name = String::from_utf16_lossy(&entry.szModule[..end]);
+        list.push((name, entry.modBaseAddr as usize, entry.modBaseSize as usize));
+        ok = unsafe { Module32NextW(snap, &mut entry) };
+    }
+
+    unsafe {
+        CloseHandle(snap);
+    }
+
+    list
+}
+
+fn resolve_export_from_remote_module(
+    process: HANDLE,
+    mod_base: usize,
+    target_symbol: &ImportSymbol,
+) -> Result<u64, String> {
+    let mut dos_header = [0u8; 0x40];
+    read_remote(process, mod_base, &mut dos_header)?;
+    if dos_header[0] != b'M' || dos_header[1] != b'Z' {
+        return Err("Invalid MZ signature in remote module".to_string());
+    }
+
+    let pe_off = u32::from_le_bytes([
+        dos_header[0x3C],
+        dos_header[0x3D],
+        dos_header[0x3E],
+        dos_header[0x3F],
+    ]) as usize;
+
+    let mut nt_signature = [0u8; 4];
+    read_remote(process, mod_base + pe_off, &mut nt_signature)?;
+    if &nt_signature != b"PE\0\0" {
+        return Err("Invalid PE signature in remote module".to_string());
+    }
+
+    let opt_hdr_off = mod_base + pe_off + 24;
+    let mut export_dir_entry = [0u8; 8];
+    read_remote(process, opt_hdr_off + 112, &mut export_dir_entry)?;
+
+    let export_rva = u32::from_le_bytes([
+        export_dir_entry[0],
+        export_dir_entry[1],
+        export_dir_entry[2],
+        export_dir_entry[3],
+    ]) as usize;
+    let export_size = u32::from_le_bytes([
+        export_dir_entry[4],
+        export_dir_entry[5],
+        export_dir_entry[6],
+        export_dir_entry[7],
+    ]) as usize;
+
+    if export_rva == 0 || export_size == 0 {
+        return Err("Remote module has no exports".to_string());
+    }
+
+    let mut export_dir = [0u8; 40];
+    read_remote(process, mod_base + export_rva, &mut export_dir)?;
+
+    let base_ordinal = u32::from_le_bytes([
+        export_dir[16],
+        export_dir[17],
+        export_dir[18],
+        export_dir[19],
+    ]);
+    let num_functions = u32::from_le_bytes([
+        export_dir[20],
+        export_dir[21],
+        export_dir[22],
+        export_dir[23],
+    ]);
+    let num_names = u32::from_le_bytes([
+        export_dir[24],
+        export_dir[25],
+        export_dir[26],
+        export_dir[27],
+    ]);
+    let funcs_rva = u32::from_le_bytes([
+        export_dir[28],
+        export_dir[29],
+        export_dir[30],
+        export_dir[31],
+    ]) as usize;
+    let names_rva = u32::from_le_bytes([
+        export_dir[32],
+        export_dir[33],
+        export_dir[34],
+        export_dir[35],
+    ]) as usize;
+    let ords_rva = u32::from_le_bytes([
+        export_dir[36],
+        export_dir[37],
+        export_dir[38],
+        export_dir[39],
+    ]) as usize;
+
+    match target_symbol {
+        ImportSymbol::Ordinal(ord) => {
+            let index = ord.wrapping_sub(base_ordinal as u16) as usize;
+            if index >= num_functions as usize {
+                return Err(format!("Ordinal {} out of range", ord));
+            }
+            let mut func_rva_bytes = [0u8; 4];
+            read_remote(
+                process,
+                mod_base + funcs_rva + index * 4,
+                &mut func_rva_bytes,
+            )?;
+            let func_rva = u32::from_le_bytes(func_rva_bytes) as u64;
+            Ok(mod_base as u64 + func_rva)
+        }
+        ImportSymbol::Name(name) => {
+            let mut name_buf = vec![0u8; name.len() + 1];
+            for i in 0..num_names as usize {
+                let mut name_rva_bytes = [0u8; 4];
+                read_remote(process, mod_base + names_rva + i * 4, &mut name_rva_bytes)?;
+                let name_rva = u32::from_le_bytes(name_rva_bytes) as usize;
+
+                if read_remote(process, mod_base + name_rva, &mut name_buf).is_ok()
+                    && &name_buf[..name.len()] == name.as_bytes()
+                    && name_buf[name.len()] == 0
+                {
+                    let mut ord_bytes = [0u8; 2];
+                    read_remote(process, mod_base + ords_rva + i * 2, &mut ord_bytes)?;
+                    let ord_idx = u16::from_le_bytes(ord_bytes) as usize;
+
+                    let mut func_rva_bytes = [0u8; 4];
+                    read_remote(
+                        process,
+                        mod_base + funcs_rva + ord_idx * 4,
+                        &mut func_rva_bytes,
+                    )?;
+                    let func_rva = u32::from_le_bytes(func_rva_bytes) as u64;
+
+                    if (func_rva as usize) >= export_rva
+                        && (func_rva as usize) < export_rva + export_size
+                    {
+                        return Err(format!("Forwarded export for {} not handled", name));
+                    }
+
+                    return Ok(mod_base as u64 + func_rva);
+                }
+            }
+            Err(format!("Symbol {} not found in remote module", name))
+        }
     }
 }
 
@@ -495,6 +668,76 @@ fn call_tls_callbacks(
     Ok(())
 }
 
+fn register_exception_table(
+    process: HANDLE,
+    pid: u32,
+    base: usize,
+    pe: &PeImage,
+    stub: usize,
+    request: usize,
+    thread_hijack: bool,
+) -> Result<(), String> {
+    if pe.exception_rva == 0 || pe.exception_size == 0 {
+        return Ok(());
+    }
+
+    let fn_table = base + pe.exception_rva as usize;
+    let entry_count = (pe.exception_size / 12) as u64;
+    if entry_count == 0 {
+        return Ok(());
+    }
+
+    let rtl_add_fn = match local_proc("ntdll.dll", "RtlAddFunctionTable") {
+        Ok(addr) => addr,
+        Err(_) => return Ok(()),
+    };
+
+    let _ = remote_call(
+        process,
+        pid,
+        stub,
+        request,
+        rtl_add_fn,
+        [fn_table as u64, entry_count, base as u64, 0],
+        thread_hijack,
+    );
+
+    Ok(())
+}
+
+fn init_security_cookie(process: HANDLE, base: usize, pe: &PeImage) -> Result<(), String> {
+    if pe.load_config_rva == 0 || pe.load_config_size < 0x40 {
+        return Ok(());
+    }
+
+    let load_config_va = base + pe.load_config_rva as usize;
+    let cookie_ptr_offset = load_config_va + 0x38;
+
+    let mut cookie_va_bytes = [0u8; 8];
+    if read_remote(process, cookie_ptr_offset, &mut cookie_va_bytes).is_err() {
+        return Ok(());
+    }
+    let cookie_va = u64::from_le_bytes(cookie_va_bytes) as usize;
+    if cookie_va == 0 {
+        return Ok(());
+    }
+
+    let tick = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    let pid = unsafe { onyx_core::win32::GetCurrentProcessId() };
+    let cookie_val = 0x2B99_2DDF_A232_u64 ^ (tick << 16) ^ (pid as u64);
+    let cookie_final = if cookie_val == 0x2B99_2DDF_A232_u64 {
+        cookie_val + 1
+    } else {
+        cookie_val
+    };
+
+    let _ = write_remote(process, cookie_va, &cookie_final.to_le_bytes());
+    Ok(())
+}
+
 fn resolve_imports(
     process: HANDLE,
     pid: u32,
@@ -507,12 +750,43 @@ fn resolve_imports(
     load_library: u64,
     get_proc: u64,
     thread_hijack: bool,
+    resolve_peb: bool,
 ) -> Result<u32, String> {
     let imports = parse_imports(image, pe.import_rva, pe.import_size)?;
     let mut modules: Vec<(String, u64)> = Vec::new();
     let mut resolved = 0u32;
 
+    let remote_modules = if resolve_peb {
+        get_remote_modules(pid)
+    } else {
+        Vec::new()
+    };
+
     for entry in &imports {
+        let mut resolved_via_eat = false;
+        if resolve_peb {
+            if let Some((_, mod_base, _)) = remote_modules
+                .iter()
+                .find(|(name, _, _)| name.eq_ignore_ascii_case(&entry.module))
+            {
+                if let Ok(symbol_addr) =
+                    resolve_export_from_remote_module(process, *mod_base, &entry.symbol)
+                {
+                    write_remote(
+                        process,
+                        base + entry.iat_rva as usize,
+                        &symbol_addr.to_le_bytes(),
+                    )?;
+                    resolved += 1;
+                    resolved_via_eat = true;
+                }
+            }
+        }
+
+        if resolved_via_eat {
+            continue;
+        }
+
         let module_base = match modules
             .iter()
             .find(|(name, _)| name.eq_ignore_ascii_case(&entry.module))
@@ -588,6 +862,34 @@ fn resolve_imports(
     Ok(resolved)
 }
 
+fn find_stomping_candidate(pid: u32, min_size: usize, preferred: Option<&str>) -> Option<usize> {
+    let modules = get_remote_modules(pid);
+    if let Some(pref) = preferred {
+        if let Some((_, base, _size)) = modules
+            .iter()
+            .find(|(name, _, size)| name.eq_ignore_ascii_case(pref) && *size >= min_size)
+        {
+            return Some(*base);
+        }
+    }
+
+    for (name, base, size) in modules.iter().skip(1) {
+        if *size >= min_size {
+            let lower = name.to_lowercase();
+            if lower.contains("chakra")
+                || lower.contains("vulkan")
+                || lower.contains("msvcp")
+                || lower.contains("d3dcompiler")
+                || lower.contains("xinput")
+            {
+                return Some(*base);
+            }
+        }
+    }
+
+    None
+}
+
 fn run_mapping(
     process: HANDLE,
     pid: u32,
@@ -611,15 +913,38 @@ fn run_mapping(
     let mut image = pe.build_image()?;
     let image_size = image.len();
 
-    let mut base = unsafe {
-        VirtualAllocEx(
-            process,
-            pe.image_base as LPVOID,
-            image_size,
-            MEM_COMMIT | MEM_RESERVE,
-            PAGE_EXECUTE_READWRITE,
-        )
-    } as usize;
+    let mut base = 0usize;
+    if options.module_stomp {
+        if let Some(stomp_base) =
+            find_stomping_candidate(pid, image_size, options.target_stomp_module.as_deref())
+        {
+            let mut old_protect = 0u32;
+            let ok = unsafe {
+                VirtualProtectEx(
+                    process,
+                    stomp_base as LPVOID,
+                    image_size,
+                    PAGE_EXECUTE_READWRITE,
+                    &mut old_protect,
+                )
+            };
+            if ok != 0 {
+                base = stomp_base;
+            }
+        }
+    }
+
+    if base == 0 {
+        base = unsafe {
+            VirtualAllocEx(
+                process,
+                pe.image_base as LPVOID,
+                image_size,
+                MEM_COMMIT | MEM_RESERVE,
+                PAGE_EXECUTE_READWRITE,
+            )
+        } as usize;
+    }
 
     if base == 0 {
         base = alloc_remote(process, image_size, PAGE_EXECUTE_READWRITE)?;
@@ -643,10 +968,15 @@ fn run_mapping(
         load_library,
         get_proc,
         options.thread_hijack,
+        options.resolve_peb,
     )?;
 
     if options.protect_sections {
         apply_section_protections(process, base, &pe)?;
+    }
+
+    if options.init_cookie {
+        let _ = init_security_cookie(process, base, &pe);
     }
 
     if options.call_tls {
@@ -660,6 +990,18 @@ fn run_mapping(
             request,
             options.thread_hijack,
         )?;
+    }
+
+    if options.register_seh {
+        let _ = register_exception_table(
+            process,
+            pid,
+            base,
+            &pe,
+            stub,
+            request,
+            options.thread_hijack,
+        );
     }
 
     let entry_point = if pe.entry_point_rva != 0 {
@@ -682,7 +1024,7 @@ fn run_mapping(
         1
     };
 
-    if options.erase_headers {
+    if options.erase_headers && !options.module_stomp {
         erase_headers(process, base, pe.size_of_headers)?;
     }
 
@@ -756,6 +1098,10 @@ mod tests {
         assert!(!options.thread_hijack);
         assert!(!options.use_driver);
         assert!(!options.wipe_stub);
+        assert!(!options.module_stomp);
+        assert!(options.resolve_peb);
+        assert!(options.register_seh);
+        assert!(options.init_cookie);
     }
 
     #[test]

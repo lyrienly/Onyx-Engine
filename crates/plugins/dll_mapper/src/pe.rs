@@ -35,8 +35,12 @@ pub struct PeImage {
     pub reloc_size: u32,
     pub import_rva: u32,
     pub import_size: u32,
+    pub exception_rva: u32,
+    pub exception_size: u32,
     pub tls_rva: u32,
     pub tls_size: u32,
+    pub load_config_rva: u32,
+    pub load_config_size: u32,
     pub sections: Vec<SectionHeader>,
 }
 
@@ -124,8 +128,10 @@ impl PeImage {
         };
 
         let (import_rva, import_size) = dir(1);
+        let (exception_rva, exception_size) = dir(3);
         let (reloc_rva, reloc_size) = dir(5);
         let (tls_rva, tls_size) = dir(9);
+        let (load_config_rva, load_config_size) = dir(10);
 
         let sections_offset = opt + size_of_optional;
         let mut sections = Vec::with_capacity(num_sections);
@@ -170,8 +176,12 @@ impl PeImage {
             reloc_size,
             import_rva,
             import_size,
+            exception_rva,
+            exception_size,
             tls_rva,
             tls_size,
+            load_config_rva,
+            load_config_size,
             sections,
         })
     }
