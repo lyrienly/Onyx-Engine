@@ -17,6 +17,16 @@
 #define DBK_POOL_NX NonPagedPoolNx
 #endif
 
+/*
+ * Conformidade com HVCI (Integridade de Memoria) e VBS (Windows 11):
+ * Forca qualquer chamada residual de NonPagedPool a resolver para NonPagedPoolNx (512).
+ * Impede violacoes da politica W^X e bloqueio por lista de drivers vulneraveis.
+ */
+#ifdef NonPagedPool
+#undef NonPagedPool
+#endif
+#define NonPagedPool DBK_POOL_NX
+
 #pragma pack(1)
 typedef struct tagINT_VECTOR
 {

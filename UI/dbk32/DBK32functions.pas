@@ -402,6 +402,7 @@ procedure allocateMemoryForDBVM(pagecount: QWORD);
 function GetGDT(limit: pword):ptruint; stdcall;
 
 function isDriverLoaded(SigningIsTheCause: PBOOL): BOOL; stdcall;
+function isVBSActive: boolean;
 
 procedure DBK32Initialize;
 
@@ -916,7 +917,13 @@ begin
         result:=deviceiocontrol(hdevice,cc,@x,4,@_cr3,8,y,nil);
 
        // outputdebugstring(pchar('GetCR3: return '+inttohex(_cr3,16)));
-        if result then CR3:=_cr3 else cr3:=$11223344;
+        if result then
+        begin
+          CR3:=_cr3;
+          if isVBSActive then
+            outputdebugstring('GetCR3: Aviso - VBS ativo; traducoes fisicas de CR3 estao sujeitas ao isolamento do SLAT/hipervisor');
+        end
+        else cr3:=$11223344;
       end;
 
     finally
@@ -970,7 +977,13 @@ begin
       end;
       //readProcessMemory(processhandle,  GetPEProcess(pid);
     end;
-    if result then CR3:=_cr3 else cr3:=0;
+    if result then
+    begin
+      CR3:=_cr3;
+      if isVBSActive then
+        outputdebugstring('GetCR3FromPID: Aviso - VBS ativo; traducoes fisicas de CR3 estao sujeitas ao isolamento do SLAT/hipervisor');
+    end
+    else cr3:=0;
   end;
 
 
@@ -3150,6 +3163,32 @@ var sav: pchar;
     driverdat: textfile;
 
 
+function isVBSActive: boolean;
+var
+  vbsReg: TRegistry;
+begin
+  result := false;
+  vbsReg := TRegistry.Create;
+  try
+    vbsReg.RootKey := HKEY_LOCAL_MACHINE;
+    if vbsReg.OpenKeyReadOnly('\SYSTEM\CurrentControlSet\Control\DeviceGuard') then
+    begin
+      if vbsReg.ValueExists('EnableVirtualizationBasedSecurity') then
+        result := vbsReg.ReadInteger('EnableVirtualizationBasedSecurity') = 1;
+      vbsReg.CloseKey;
+    end;
+    if not result and vbsReg.OpenKeyReadOnly('\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity') then
+    begin
+      if vbsReg.ValueExists('Enabled') then
+        result := vbsReg.ReadInteger('Enabled') = 1;
+      vbsReg.CloseKey;
+    end;
+  except
+    result := false;
+  end;
+  vbsReg.Free;
+end;
+
 //    servicestatus: _service_status;
 procedure DBK32Initialize;
 var le: integer;
@@ -3395,6 +3434,10 @@ begin
             le:=getlasterror;
             if le=577 then
             begin
+              if isVBSActive then
+                outputdebugstring('DBK32Initialize: Erro 577 - VBS/HVCI ativo, bloqueando carregamento de driver com assinatura de teste')
+              else
+                outputdebugstring('DBK32Initialize: Erro 577 - Falha na verificacao da assinatura digital do driver');
               if dbvm_version=0 then
                 messagebox(0,PChar(rsPleaseRebootAndPressF8DuringBoot),PChar(rsDbk32Error),MB_ICONERROR or mb_ok);
               failedduetodriversigning:=true;

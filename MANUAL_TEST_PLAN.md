@@ -68,12 +68,12 @@ Este documento detalha o roteiro prático e passo a passo para você testar manu
 
 ---
 
-## 2. Plugin DLL Mapper (Issue #89)
+## 2. Plugin DLL Mapper (Issue #89 & Anarchy Enhancements)
 
-*Objetivo*: Validar a interface de plugin para injeção por Manual Mapping.
+*Objetivo*: Validar a interface de plugin para injeção por Manual Mapping, auto-descoberta por nome de processo, evasão por Thread Hijacking, elevação de handle via Kernel Driver e limpeza do stub.
 
 ### Passo a Passo
-1. Execute a suíte de testes do plugin:
+1. Execute a suíte de testes do plugin (18 testes):
    ```powershell
    cd C:\Users\Administrator\Desktop\OnyxEngine
    cargo test -p onyx_dll_mapper -- --nocapture
@@ -81,16 +81,21 @@ Este documento detalha o roteiro prático e passo a passo para você testar manu
 2. Inicie um processo de teste (ex: `notepad.exe`):
    ```powershell
    $p = Start-Process notepad.exe -PassThru
-   $pid_notepad = $p.Id
    ```
-3. Execute o mapper chamando a DLL compilada de exemplo:
-   ```powershell
-   cargo run -p onyx_dll_mapper -- --pid $pid_notepad --dll target\debug\allochook.dll
-   ```
+3. Teste a injeção via C-ABI chamando `OnyxPlugin_MapDllNamed`:
+   - Alvo por nome direto (`notepad.exe` ou `notepad`).
+   - Flags ativas:
+     - `ONYX_MAP_PROTECT_SECTIONS (2)`: converte RWX para RX / RO / RW por seção.
+     - `ONYX_MAP_CALL_TLS (4)`: executa TLS callbacks antes do DllMain.
+     - `ONYX_MAP_THREAD_HIJACK (8)`: sequestra thread existente sem criar novas threads (`CreateRemoteThread`).
+     - `ONYX_MAP_USE_DRIVER (16)`: elevação para `PROCESS_ALL_ACCESS` via DBK driver caso permissões usermode sejam insuficientes.
+     - `ONYX_MAP_WIPE_STUB (32)`: sobrescreve com zeros e desaloca a memória do bootstrap stub.
+     - `ONYX_MAP_ERASE_HEADERS (1)`: apaga os cabeçalhos MZ / PE.
 ### Critérios de Sucesso
-- `17 passed; 0 failed`.
-- `OpenProcess`, alocação de seções (`PAGE_EXECUTE_READWRITE` convertida para `PAGE_EXECUTE_READ` ou `PAGE_READONLY`), resolução de IAT de `kernel32.dll` e execução de stub remoto retornam código `0`.
-- Feche o processo: `Stop-Process -Id $pid_notepad`.
+- `18 passed; 0 failed`.
+- Descoberta automática de PID pelo nome executável `Process::find_by_name`.
+- Mapeamento executado com sucesso e `DllMain` retornando `1`.
+- Feche o processo de teste ao concluir: `Stop-Process -Name notepad`.
 
 ---
 
@@ -588,6 +593,63 @@ Este documento detalha o roteiro prático e passo a passo para você testar manu
 ### Critérios de Sucesso
 - `cargo test -p onyx_core --lib memory::reference_graph` passa 100% (10 testes cobrindo ciclos, caminhos múltiplos, 32-bit e 64-bit).
 - Resolução rápida de cadeias de ponteiros sem loop infinito em grafos cíclicos.
+
+---
+
+## 28. AllocHook x64 (Trampolins 16-byte, VAD Stealth) (Issue #9)
+
+### O que foi feito
+- Trampolins x64 seguros de 16 bytes na NTDLL (`NtAllocateVirtualMemory` e `NtFreeVirtualMemory`) com padding NOP, eliminando crash `0xC0000005` e sincronizando cache via `FlushInstructionCache`.
+- Captura de `caller_ip` via `RtlCaptureStackBackTrace(2, 1, ...)` sem unwinding pesado.
+- Mascaramento furtivo VAD com tag `STEALTH_FLAG_MASKED_RWX` (`0x8000_0000`) para alocações RWX com toggles `CeSetStealthMasking` e `CeIsStealthMaskingEnabled`.
+- Ring buffer circular atômico lock-free de 4.096 posições com gravação O(1) e enumeração inicial de heaps via `perform_initial_heap_walk` (`HeapWalk`).
+- Interface Pascal (`UI/frmHeapsUnit.pas`) com suporte total a árvores Radix de 16 níveis (`targetLevel := 15`) para processos de 64 bits.
+
+### Passo a Passo
+1. Execute os testes unitários do allochook:
+   ```powershell
+   cargo test -p allochook_dll
+   ```
+2. Abra a interface do OnyxEngine (`onyxengine.exe`) e anexe a um processo 64-bit (ex: Unity / Unreal).
+3. Abra **Memory Viewer -> Tools -> Heaplist / Allocations**.
+4. Verifique a listagem em tempo real de blocos alocados com endereços de 16 dígitos hexadecimais (64-bit) sem crash e com duplo clique navegando corretamente na memória.
+
+### Critérios de Sucesso
+- `cargo test -p allochook_dll` passa 100% dos testes.
+- Alocações virtuais e de heap são interceptadas sem crash `0xC0000005`.
+- A Radix Tree navega corretamente os nós de 64 bits no Memory Viewer.
+
+---
+
+## 29. Compatibilidade com HVCI, VBS e Isolamento de Kernel (Issue #24)
+
+### O que foi feito
+- **Eliminacao Total de Pools Executaveis**: Todas as ocorrencias residuais de `NonPagedPool` no driver C (`driver/src/*.c`) foram substituidas por `DBK_POOL_NX` (`NonPagedPoolNx = 512`) com tags de rastreamento dedicadas (`'kcpD'`, `'kbtS'`, `'cpAk'`, `'xpEN'`, `'mtlU'`, `'2ltU'`, `'mxmV'`, `'xmvO'`), eliminando violacoes de W^X no Windows 11.
+- **Protecao Contra Falhas de Integridade**: Operacoes de modificacao de registradores de controle (`CR0`) foram encapsuladas com tratamento estruturado de excecoes (SEH) para evitar BugChecks decorrentes de traps de SLAT/EPT do hipervisor.
+- **Deteccao de Ambiente em Rust**: Adicionadas rotinas de alta performance em `crates/core/src/process/kernel.rs` (`is_vbs_active`, `is_hvci_active`, `is_cr3_interception_risk`, `evaluate_security_profile`) consultando diretamente o registro `DeviceGuard` com fallback via CIM.
+- **Alerta de Interceptacao de CR3**: Mensagens de diagnostico orientativas implementadas tanto no backend Rust quanto na interface Pascal (`UI/dbk32/DBK32functions.pas`), alertando sobre a isolacao de paginas do Secure Kernel (VTL 1) quando o VBS estiver ativo.
+- **Preservacao de Compilacao com `/INTEGRITYCHECK`**: Documentada e padronizada a diretiva `/INTEGRITYCHECK` no `driver/README.md` e INF.
+
+### Passo a Passo
+1. Execute os testes unitarios de seguranca de kernel no Rust:
+   ```powershell
+   cargo test -p onyx_core --test kernel_security -- --nocapture
+   ```
+2. Valide o estado de integridade do host via PowerShell:
+   ```powershell
+   Get-CimInstance -ClassName Win32_DeviceGuard -Namespace root\Microsoft\Windows\DeviceGuard | Select-Object VirtualizationBasedSecurityStatus, SecurityServicesRunning
+   ```
+3. Confirme a ausencia de alocacoes executaveis `NonPagedPool` no codigo-fonte do driver:
+   ```powershell
+   Select-String -Path "driver\src\*.c", "driver\include\*.h" -Pattern "NonPagedPool\b"
+   ```
+
+### Criterios de Sucesso
+- `cargo test -p onyx_core --test kernel_security` passa 100% dos testes.
+- Zero ocorrencias de alocacao `NonPagedPool` no driver C.
+- Driver opera sem violar as diretrizes de Integridade de Memoria (HVCI) do Windows 11.
+
+---
 
 ## Roteiro Rápido para Teste Geral do Workspace
 
