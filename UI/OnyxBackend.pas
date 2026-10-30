@@ -220,6 +220,7 @@ const
   ONYX_MAP_RESOLVE_PEB      = 128;
   ONYX_MAP_REGISTER_SEH     = 256;
   ONYX_MAP_INIT_COOKIE      = 512;
+  ONYX_MAP_AUTO             = DWORD($80000000);
 
 type
   TOnyxMapOptions = packed record

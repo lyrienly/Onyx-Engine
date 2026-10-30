@@ -1,12 +1,12 @@
 object frmManualMapper: TfrmManualMapper
   Left = 680
-  Height = 650
+  Height = 600
   Top = 160
   Width = 660
   BorderIcons = [biSystemMenu, biMinimize]
   BorderStyle = bsSingle
   Caption = 'Onyx DLL Manual Mapper'
-  ClientHeight = 650
+  ClientHeight = 600
   ClientWidth = 660
   Color = 2105376
   OnCreate = FormCreate
@@ -41,8 +41,8 @@ object frmManualMapper: TfrmManualMapper
       Left = 14
       Height = 15
       Top = 29
-      Width = 475
-      Caption = 'Injeção direta em memória: evasão VAD, module stomping, PEB EAT e thread hijacking'
+      Width = 520
+      Caption = 'Mapeamento direto em memória: auto-detecção de Driver DBK, evasão VAD, PEB EAT e SEH'
       Font.Color = 10526880
       ParentColor = False
       ParentFont = False
@@ -67,16 +67,21 @@ object frmManualMapper: TfrmManualMapper
       Caption = 'Processo:'
       ParentColor = False
     end
-    object edtTarget: TEdit
+    object cbTarget: TComboBox
       Left = 68
       Height = 23
       Top = 6
       Width = 430
+      AutoComplete = True
+      AutoDropDown = True
       Color = 1973790
       Font.Color = 58998
+      Font.Name = 'Courier New'
       Font.Style = [fsBold]
+      ItemHeight = 15
+      OnChange = cbTargetChange
       ParentFont = False
-      ReadOnly = True
+      Style = csDropDownList
       TabOrder = 0
     end
     object btnRefreshTarget: TButton
@@ -84,7 +89,7 @@ object frmManualMapper: TfrmManualMapper
       Height = 25
       Top = 5
       Width = 116
-      Caption = 'Atualizar Alvo'
+      Caption = 'Recarregar Lista'
       OnClick = btnRefreshTargetClick
       TabOrder = 1
     end
@@ -128,61 +133,112 @@ object frmManualMapper: TfrmManualMapper
       TabOrder = 1
     end
   end
-  object gbOptions: TGroupBox
+  object gbMode: TGroupBox
     Left = 12
-    Height = 110
+    Height = 64
     Top = 182
     Width = 636
-    Caption = ' Opções de Evasão e Mapeamento '
-    ClientHeight = 90
+    Caption = ' Configuração & Modo de Evasão '
+    ClientHeight = 44
     ClientWidth = 632
     Font.Color = 15592941
     ParentFont = False
     TabOrder = 3
-    object cbEraseHeaders: TCheckBox
-      Left = 12
+    object cbAutoStealth: TCheckBox
+      Left = 10
       Height = 19
-      Top = 4
-      Width = 150
+      Top = 2
+      Width = 270
+      Caption = 'Modo Totalmente Automático (Recomendado)'
+      Checked = True
+      Font.Style = [fsBold]
+      OnChange = cbAutoStealthChange
+      ParentFont = False
+      State = cbChecked
+      TabOrder = 0
+    end
+    object pnlDriverStatus: TPanel
+      Left = 10
+      Height = 20
+      Top = 22
+      Width = 612
+      BevelOuter = bvNone
+      BorderStyle = bsNone
+      ClientHeight = 20
+      ClientWidth = 612
+      Color = 2631720
+      ParentColor = False
+      TabOrder = 1
+      object lblDriverStatus: TLabel
+        Left = 6
+        Height = 20
+        Top = 0
+        Width = 600
+        Align = alClient
+        Caption = 'Detectando status do kernel driver...'
+        Font.Color = 58998
+        Layout = tlCenter
+        ParentColor = False
+        ParentFont = False
+      end
+    end
+  end
+  object pnlManualOptions: TPanel
+    Left = 12
+    Height = 86
+    Top = 248
+    Width = 636
+    BevelOuter = bvNone
+    ClientHeight = 86
+    ClientWidth = 636
+    Color = 2105376
+    ParentColor = False
+    TabOrder = 4
+    Visible = False
+    object cbEraseHeaders: TCheckBox
+      Left = 10
+      Height = 19
+      Top = 2
+      Width = 140
       Caption = 'Wipe PE Headers'
       Checked = True
       State = cbChecked
       TabOrder = 0
     end
     object cbProtectSections: TCheckBox
-      Left = 12
+      Left = 10
       Height = 19
-      Top = 24
-      Width = 150
+      Top = 20
+      Width = 140
       Caption = 'Proteger Seções'
       Checked = True
       State = cbChecked
       TabOrder = 1
     end
     object cbCallTls: TCheckBox
-      Left = 12
+      Left = 10
       Height = 19
-      Top = 44
-      Width = 150
+      Top = 38
+      Width = 140
       Caption = 'Executar Callbacks TLS'
       Checked = True
       State = cbChecked
       TabOrder = 2
     end
     object cbWipeStub: TCheckBox
-      Left = 12
+      Left = 10
       Height = 19
-      Top = 64
-      Width = 150
+      Top = 56
+      Width = 140
       Caption = 'Wipe Execution Stub'
       Checked = True
       State = cbChecked
       TabOrder = 3
     end
     object cbResolvePeb: TCheckBox
-      Left = 200
+      Left = 190
       Height = 19
-      Top = 4
+      Top = 2
       Width = 190
       Caption = 'Resolver Imports via PEB EAT'
       Checked = True
@@ -190,9 +246,9 @@ object frmManualMapper: TfrmManualMapper
       TabOrder = 4
     end
     object cbRegisterSeh: TCheckBox
-      Left = 200
+      Left = 190
       Height = 19
-      Top = 24
+      Top = 20
       Width = 190
       Caption = 'Registrar SEH Tables (x64)'
       Checked = True
@@ -200,9 +256,9 @@ object frmManualMapper: TfrmManualMapper
       TabOrder = 5
     end
     object cbInitCookie: TCheckBox
-      Left = 200
+      Left = 190
       Height = 19
-      Top = 44
+      Top = 38
       Width = 190
       Caption = 'Init Security Cookie'
       Checked = True
@@ -210,25 +266,25 @@ object frmManualMapper: TfrmManualMapper
       TabOrder = 6
     end
     object cbThreadHijack: TCheckBox
-      Left = 420
+      Left = 410
       Height = 19
-      Top = 4
+      Top = 2
       Width = 180
       Caption = 'Thread Hijacking'
       TabOrder = 7
     end
     object cbUseDriver: TCheckBox
-      Left = 420
+      Left = 410
       Height = 19
-      Top = 24
+      Top = 20
       Width = 180
       Caption = 'Driver Kernel (DBK)'
       TabOrder = 8
     end
     object cbModuleStomp: TCheckBox
-      Left = 420
+      Left = 410
       Height = 19
-      Top = 44
+      Top = 38
       Width = 180
       Caption = 'Module Stomping (VAD)'
       TabOrder = 9
@@ -237,14 +293,14 @@ object frmManualMapper: TfrmManualMapper
   object gbResults: TGroupBox
     Left = 12
     Height = 250
-    Top = 296
+    Top = 252
     Width = 636
     Caption = ' Status && Relatório de Mapeamento '
     ClientHeight = 230
     ClientWidth = 632
     Font.Color = 15592941
     ParentFont = False
-    TabOrder = 4
+    TabOrder = 5
     object pnlStatusBadge: TPanel
       Left = 10
       Height = 26
@@ -376,7 +432,7 @@ object frmManualMapper: TfrmManualMapper
   object pnlBottom: TPanel
     Left = 0
     Height = 44
-    Top = 606
+    Top = 556
     Width = 660
     Align = alBottom
     BevelOuter = bvNone
@@ -384,7 +440,7 @@ object frmManualMapper: TfrmManualMapper
     ClientWidth = 660
     Color = 2631720
     ParentColor = False
-    TabOrder = 5
+    TabOrder = 6
     object btnInject: TButton
       Left = 12
       Height = 28

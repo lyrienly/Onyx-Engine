@@ -75,7 +75,7 @@ pub fn resolve_pid(target: &str) -> Result<u32, String> {
 }
 
 fn open_target(pid: u32, use_driver: bool) -> Result<HANDLE, String> {
-    if use_driver {
+    if use_driver || onyx_core::process::kernel::DbkDriver::connect().is_ok() {
         if let Ok(driver) = onyx_core::process::kernel::DbkDriver::connect() {
             if let Ok(h) = driver.open_process(pid) {
                 return Ok(h);

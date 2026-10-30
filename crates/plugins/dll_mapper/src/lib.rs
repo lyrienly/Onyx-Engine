@@ -29,6 +29,7 @@ pub const ONYX_MAP_MODULE_STOMP: u32 = 64;
 pub const ONYX_MAP_RESOLVE_PEB: u32 = 128;
 pub const ONYX_MAP_REGISTER_SEH: u32 = 256;
 pub const ONYX_MAP_INIT_COOKIE: u32 = 512;
+pub const ONYX_MAP_AUTO: u32 = 0x8000_0000;
 
 #[repr(C)]
 pub struct OnyxPluginInfo {
@@ -109,6 +110,21 @@ fn target_pid() -> u32 {
 }
 
 fn parse_map_options(flags: u32) -> mapper::MapOptions {
+    if flags == 0 || (flags & ONYX_MAP_AUTO != 0) {
+        return mapper::MapOptions {
+            erase_headers: true,
+            protect_sections: true,
+            call_tls: true,
+            thread_hijack: true,
+            use_driver: true,
+            wipe_stub: true,
+            module_stomp: flags & ONYX_MAP_MODULE_STOMP != 0,
+            resolve_peb: true,
+            register_seh: true,
+            init_cookie: true,
+            target_stomp_module: None,
+        };
+    }
     mapper::MapOptions {
         erase_headers: flags & ONYX_MAP_ERASE_HEADERS != 0,
         protect_sections: flags & ONYX_MAP_PROTECT_SECTIONS != 0,
