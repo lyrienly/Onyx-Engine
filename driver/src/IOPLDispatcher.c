@@ -563,74 +563,121 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 					UINT64 startaddress;
 					UINT64 bytestoread;
 				} *pinp;
-				pinp=Irp->AssociatedIrp.SystemBuffer;
 
-				DbgPrint("IOCTL_CE_READPHYSICALMEMORY:pinp->startaddress=%x, pinp->bytestoread=%d", pinp->startaddress, pinp->bytestoread);
+				ULONG inLen = (irpStack) ? irpStack->Parameters.DeviceIoControl.InputBufferLength : 0;
+				ULONG outLen = (irpStack) ? irpStack->Parameters.DeviceIoControl.OutputBufferLength : 0;
 
-				ntStatus = ReadPhysicalMemory((PVOID)(UINT_PTR)pinp->startaddress, (UINT_PTR)pinp->bytestoread, pinp);
+				if (!Irp->AssociatedIrp.SystemBuffer || inLen < sizeof(struct input) || outLen < sizeof(struct input))
+				{
+					ntStatus = STATUS_INFO_LENGTH_MISMATCH;
+					break;
+				}
+
+				pinp = (struct input*)Irp->AssociatedIrp.SystemBuffer;
+
+				__try
+				{
+					if (pinp->bytestoread > outLen)
+					{
+						ntStatus = STATUS_BUFFER_TOO_SMALL;
+						break;
+					}
+
+					ntStatus = ReadPhysicalMemory((PVOID)(UINT_PTR)pinp->startaddress, (UINT_PTR)pinp->bytestoread, pinp);
+				}
+				__except (EXCEPTION_EXECUTE_HANDLER)
+				{
+					ntStatus = STATUS_UNSUCCESSFUL;
+				}
 				break;
-
 			}
 
 		case IOCTL_CE_WRITEPHYSICALMEMORY:
 			{
-				HANDLE			physmem;
+				ULONG inLen = (irpStack) ? irpStack->Parameters.DeviceIoControl.InputBufferLength : 0;
+				struct input
+				{
+					UINT64 startaddress;
+					UINT64 bytestoread;
+				} *pinp;
+
+				if (!Irp->AssociatedIrp.SystemBuffer || inLen < sizeof(struct input))
+				{
+					ntStatus = STATUS_INFO_LENGTH_MISMATCH;
+					break;
+				}
+
+				pinp = (struct input*)Irp->AssociatedIrp.SystemBuffer;
+				if (inLen < (sizeof(struct input) + pinp->bytestoread))
+				{
+					ntStatus = STATUS_BUFFER_TOO_SMALL;
+					break;
+				}
+
+				HANDLE			physmem = NULL;
 				UNICODE_STRING	physmemString;
 				OBJECT_ATTRIBUTES attributes;
 				WCHAR			physmemName[] = L"\\device\\physicalmemory";
-				UCHAR*			memoryview;
+				UCHAR*			memoryview = NULL;
 
-				RtlInitUnicodeString( &physmemString, physmemName );
+				RtlInitUnicodeString(&physmemString, physmemName);
+				InitializeObjectAttributes(&attributes, &physmemString, OBJ_CASE_INSENSITIVE, NULL, NULL);
 
-            	InitializeObjectAttributes( &attributes, &physmemString, OBJ_CASE_INSENSITIVE, NULL, NULL );
-			    ntStatus=ZwOpenSection( &physmem, SECTION_ALL_ACCESS, &attributes );
-				if (ntStatus==STATUS_SUCCESS)
+				__try
 				{
-
-					struct input
+					ntStatus = ZwOpenSection(&physmem, SECTION_ALL_ACCESS, &attributes);
+					if (NT_SUCCESS(ntStatus))
 					{
-						UINT64 startaddress;
-						UINT64 bytestoread;
-					} *pinp;
+						UCHAR* pinp2 = (UCHAR*)pinp;
+						SIZE_T length = 0x2000;
+						PHYSICAL_ADDRESS viewBase;
+						viewBase.QuadPart = (ULONGLONG)(pinp->startaddress);
+						UINT_PTR toread = (UINT_PTR)pinp->bytestoread;
 
-					UCHAR* pinp2;
-
-					SIZE_T length;
-					PHYSICAL_ADDRESS	viewBase;
-					UINT_PTR offset;
-					UINT_PTR toread;
-
-					pinp=Irp->AssociatedIrp.SystemBuffer;
-					pinp2=(UCHAR *)pinp;
-					viewBase.QuadPart = (ULONGLONG)(pinp->startaddress);
-
-					length=0x2000;
-					toread=(UINT_PTR)pinp->bytestoread;
-
-					memoryview=NULL;
-					ntStatus=ZwMapViewOfSection(
-						physmem,
-						NtCurrentProcess(),
-						&memoryview,
-						0L,
-						length,
-						&viewBase,
-						&length,
-						ViewShare,
-						0,
-						PAGE_READWRITE);
-
-					if (ntStatus==STATUS_SUCCESS)
-					{
-                        offset=(UINT_PTR)(pinp->startaddress)-(UINT_PTR)viewBase.QuadPart;
-						RtlCopyMemory(&memoryview[offset],&pinp2[16],toread);
-
-						ZwUnmapViewOfSection(
+						ntStatus = ZwMapViewOfSection(
+							physmem,
 							NtCurrentProcess(),
-							memoryview);
-					}
+							&memoryview,
+							0L,
+							length,
+							&viewBase,
+							&length,
+							ViewShare,
+							0,
+							PAGE_READWRITE);
 
-					ZwClose(physmem);
+						if (NT_SUCCESS(ntStatus) && memoryview)
+						{
+							__try
+							{
+								UINT_PTR offset = (UINT_PTR)(pinp->startaddress) - (UINT_PTR)viewBase.QuadPart;
+								if (offset + toread <= length)
+								{
+									RtlCopyMemory(&memoryview[offset], &pinp2[sizeof(struct input)], toread);
+								}
+								else
+								{
+									ntStatus = STATUS_BUFFER_OVERFLOW;
+								}
+							}
+							__finally
+							{
+								ZwUnmapViewOfSection(NtCurrentProcess(), memoryview);
+								memoryview = NULL;
+							}
+						}
+
+						ZwClose(physmem);
+						physmem = NULL;
+					}
+				}
+				__except (EXCEPTION_EXECUTE_HANDLER)
+				{
+					if (memoryview)
+						ZwUnmapViewOfSection(NtCurrentProcess(), memoryview);
+					if (physmem)
+						ZwClose(physmem);
+					ntStatus = STATUS_UNSUCCESSFUL;
 				}
 
 				break;
@@ -864,21 +911,43 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				} *pinp = (struct in_trans*)Irp->AssociatedIrp.SystemBuffer;
 #pragma pack()
 
+				ULONG inLen = (irpStack) ? irpStack->Parameters.DeviceIoControl.InputBufferLength : 0;
+				ULONG outLen = (irpStack) ? irpStack->Parameters.DeviceIoControl.OutputBufferLength : 0;
+
+				if (!pinp || inLen < sizeof(struct in_trans) || outLen < sizeof(UINT64))
+				{
+					ntStatus = STATUS_INFO_LENGTH_MISMATCH;
+					break;
+				}
+
 				PEPROCESS selectedprocess = NULL;
 				ULONG64 physAddr = 0;
 
-				if (NT_SUCCESS(PsLookupProcessByProcessId((HANDLE)(UINT_PTR)pinp->ProcessId, &selectedprocess)))
+				__try
 				{
-					physAddr = TranslateVirtualToPhysicalCR3(selectedprocess, pinp->VirtualAddress);
-					ObDereferenceObject(selectedprocess);
-					ntStatus = (physAddr != 0) ? STATUS_SUCCESS : STATUS_NOT_FOUND;
-				}
-				else
-				{
-					ntStatus = STATUS_NOT_FOUND;
-				}
+					if (NT_SUCCESS(PsLookupProcessByProcessId((HANDLE)(UINT_PTR)pinp->ProcessId, &selectedprocess)))
+					{
+						__try
+						{
+							physAddr = TranslateVirtualToPhysicalCR3(selectedprocess, pinp->VirtualAddress);
+							ntStatus = (physAddr != 0) ? STATUS_SUCCESS : STATUS_NOT_FOUND;
+						}
+						__finally
+						{
+							ObDereferenceObject(selectedprocess);
+						}
+					}
+					else
+					{
+						ntStatus = STATUS_NOT_FOUND;
+					}
 
-				*(PUINT64)Irp->AssociatedIrp.SystemBuffer = (UINT64)physAddr;
+					*(PUINT64)Irp->AssociatedIrp.SystemBuffer = (UINT64)physAddr;
+				}
+				__except (EXCEPTION_EXECUTE_HANDLER)
+				{
+					ntStatus = STATUS_UNSUCCESSFUL;
+				}
 				break;
 			}
 

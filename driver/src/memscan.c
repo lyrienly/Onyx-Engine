@@ -623,6 +623,12 @@ UINT_PTR getPageTableBase()
 typedef void PRESENTPAGECALLBACK(UINT_PTR StartAddress, UINT_PTR EndAddress, struct PTEStruct *pageEntry);
 BOOL walkPagingLayout(PEPROCESS PEProcess, UINT_PTR MaxAddress, PRESENTPAGECALLBACK OnPresentPage)
 {
+	if (!PEProcess || MaxAddress == 0 || OnPresentPage == NULL)
+		return FALSE;
+
+	if (KeGetCurrentIrql() > APC_LEVEL)
+		return FALSE;
+
 #ifdef AMD64
 	UINT_PTR pagebase = getPageTableBase();
 #else
@@ -630,9 +636,6 @@ BOOL walkPagingLayout(PEPROCESS PEProcess, UINT_PTR MaxAddress, PRESENTPAGECALLB
 #endif
 
 	if (pagebase == 0)
-		return FALSE;
-
-	if (OnPresentPage == NULL)
 		return FALSE;
 
 	__try

@@ -32,3 +32,22 @@ fn test_vbs_and_hvci_status_queries() {
     );
     assert_eq!(risk, vbs);
 }
+
+#[test]
+fn test_canonical_virtual_address_validation() {
+    // Valid canonical user-mode addresses
+    assert!(DbkDriver::is_canonical_va(0x0000_0000_0040_0000));
+    assert!(DbkDriver::is_canonical_va(0x0000_7FFF_FFFF_FFFF));
+    assert!(DbkDriver::is_canonical_va(0x0));
+
+    // Valid canonical kernel-mode addresses
+    assert!(DbkDriver::is_canonical_va(0xFFFF_8000_0000_0000));
+    assert!(DbkDriver::is_canonical_va(0xFFFF_F800_0000_0000));
+    assert!(DbkDriver::is_canonical_va(0xFFFF_FFFF_FFFF_FFFF));
+
+    // Non-canonical "hole" addresses (must be rejected)
+    assert!(!DbkDriver::is_canonical_va(0x0000_8000_0000_0000));
+    assert!(!DbkDriver::is_canonical_va(0x0001_0000_0000_0000));
+    assert!(!DbkDriver::is_canonical_va(0xFFFF_7FFF_FFFF_FFFF));
+    assert!(!DbkDriver::is_canonical_va(0xDEAD_BEEF_CAFE_BABE));
+}

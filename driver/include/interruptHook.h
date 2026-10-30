@@ -10,6 +10,8 @@ typedef enum {si_gs=-12, si_fs=-11, si_es=-10, si_ds=-9, si_edi=-8, si_esi=-7, s
 #endif
 
 #pragma pack(1)
+#ifndef _TAG_INT_VECTOR_DEFINED_
+#define _TAG_INT_VECTOR_DEFINED_
 typedef struct tagINT_VECTOR
 {
 	WORD	wLowOffset;
@@ -32,6 +34,7 @@ typedef struct tagIDT
 	PINT_VECTOR vector;
 } IDT, *PIDT;
 #pragma pack()
+#endif
 
 #ifdef AMD64
 typedef

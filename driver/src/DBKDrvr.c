@@ -419,8 +419,10 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 	}
 #endif
 
-	HideDriverFromLoadedModuleList(DriverObject);
-	CleanKernelTraces();
+	// Note: HideDriverFromLoadedModuleList and CleanKernelTraces are called on-demand via IOCTL (Issue #29)
+	// Calling them inside DriverEntry causes a deadlock in SCM during driver load
+	// HideDriverFromLoadedModuleList(DriverObject);
+	// CleanKernelTraces();
 
     return STATUS_SUCCESS;
 }

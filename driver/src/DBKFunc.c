@@ -628,6 +628,38 @@ static __inline BOOLEAN IsCanonicalVirtualAddress(ULONG64 va)
 	return (highBits == 0 || highBits == 0x1FFFF);
 }
 
+typedef PVOID (*PFN_MmMapIoSpaceEx)(PHYSICAL_ADDRESS PhysicalAddress, SIZE_T NumberOfBytes, ULONG Protect);
+
+static PVOID SafeMapPhysicalMemory(PHYSICAL_ADDRESS PhysicalAddress, SIZE_T Size, ULONG Protect)
+{
+	static PFN_MmMapIoSpaceEx pfnMmMapIoSpaceEx = NULL;
+	static BOOLEAN resolved = FALSE;
+
+	if (KeGetCurrentIrql() > APC_LEVEL)
+		return NULL;
+
+	if (!resolved)
+	{
+		UNICODE_STRING uRoutine;
+		RtlInitUnicodeString(&uRoutine, L"MmMapIoSpaceEx");
+		pfnMmMapIoSpaceEx = (PFN_MmMapIoSpaceEx)MmGetSystemRoutineAddress(&uRoutine);
+		resolved = TRUE;
+	}
+
+	if (pfnMmMapIoSpaceEx != NULL)
+	{
+		return pfnMmMapIoSpaceEx(PhysicalAddress, Size, Protect);
+	}
+	else
+	{
+		MEMORY_CACHING_TYPE cacheType = (Protect == PAGE_READWRITE) ? MmCached : MmNonCached;
+		PVOID mapped = MmMapIoSpace(PhysicalAddress, Size, cacheType);
+		if (!mapped && cacheType == MmCached)
+			mapped = MmMapIoSpace(PhysicalAddress, Size, MmNonCached);
+		return mapped;
+	}
+}
+
 static BOOLEAN WritePhysicalChunk(ULONG64 PhysAddr, PVOID Buffer, SIZE_T Size);
 static BOOLEAN ReadPhysicalChunk(ULONG64 PhysAddr, PVOID Buffer, SIZE_T Size)
 {
@@ -643,12 +675,50 @@ static BOOLEAN ReadPhysicalChunk(ULONG64 PhysAddr, PVOID Buffer, SIZE_T Size)
 		copyAddr.PhysicalAddress.QuadPart = (LONGLONG)PhysAddr;
 		SIZE_T transferred = 0;
 		NTSTATUS status = MmCopyMemory(Buffer, copyAddr, Size, MM_COPY_MEMORY_PHYSICAL, &transferred);
-		return NT_SUCCESS(status) && (transferred == Size);
+		if (NT_SUCCESS(status) && (transferred == Size))
+			return TRUE;
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
 	{
-		return FALSE;
 	}
+
+	if (KeGetCurrentIrql() <= APC_LEVEL)
+	{
+		PVOID mapped = NULL;
+		BOOLEAN success = FALSE;
+		__try
+		{
+			PHYSICAL_ADDRESS pa;
+			pa.QuadPart = (LONGLONG)PhysAddr;
+
+			mapped = SafeMapPhysicalMemory(pa, Size, PAGE_READONLY);
+			if (mapped != NULL)
+			{
+				__try
+				{
+					RtlCopyMemory(Buffer, mapped, Size);
+					success = TRUE;
+				}
+				__finally
+				{
+					MmUnmapIoSpace(mapped, Size);
+					mapped = NULL;
+				}
+			}
+		}
+		__except (EXCEPTION_EXECUTE_HANDLER)
+		{
+			if (mapped != NULL)
+			{
+				MmUnmapIoSpace(mapped, Size);
+				mapped = NULL;
+			}
+			success = FALSE;
+		}
+		return success;
+	}
+
+	return FALSE;
 }
 
 ULONG64 TranslateVirtualToPhysicalWithCr3(ULONG64 cr3, ULONG64 VirtualAddress)
@@ -657,63 +727,70 @@ ULONG64 TranslateVirtualToPhysicalWithCr3(ULONG64 cr3, ULONG64 VirtualAddress)
 		return 0;
 
 	ULONG64 pml4_base = cr3 & 0x000FFFFFFFFFF000ULL;
+	if (!pml4_base || !IsPhysicalAddressSafe(pml4_base, sizeof(ULONG64)))
+		return 0;
+
 	ULONG64 pml4_idx  = (VirtualAddress >> 39) & 0x1FF;
 	ULONG64 pdpt_idx  = (VirtualAddress >> 30) & 0x1FF;
 	ULONG64 pd_idx    = (VirtualAddress >> 21) & 0x1FF;
 	ULONG64 pt_idx    = (VirtualAddress >> 12) & 0x1FF;
 	ULONG64 offset    = VirtualAddress & 0xFFF;
 
-	ULONG64 pml4e = 0;
-	if (!ReadPhysicalChunk(pml4_base + (pml4_idx * 8), &pml4e, sizeof(pml4e)) || !(pml4e & 1))
-		return 0;
-
-	ULONG64 pdpt_base = pml4e & 0x000FFFFFFFFFF000ULL;
-	ULONG64 pdpte = 0;
-	if (!ReadPhysicalChunk(pdpt_base + (pdpt_idx * 8), &pdpte, sizeof(pdpte)) || !(pdpte & 1))
-		return 0;
-
-	if (pdpte & 0x80)
+	__try
 	{
-		ULONG64 phys1gb = (pdpte & 0x000FFFFFC0000000ULL) | (VirtualAddress & 0x3FFFFFFFULL);
-		return IsPhysicalAddressSafe(phys1gb, 1) ? phys1gb : 0;
-	}
+		// 1. PML4 Level Validation
+		ULONG64 pml4e = 0;
+		if (!ReadPhysicalChunk(pml4_base + (pml4_idx * 8), &pml4e, sizeof(pml4e)) || !(pml4e & 1))
+			return 0;
 
-	ULONG64 pd_base = pdpte & 0x000FFFFFFFFFF000ULL;
-	ULONG64 pde = 0;
-	if (!ReadPhysicalChunk(pd_base + (pd_idx * 8), &pde, sizeof(pde)) || !(pde & 1))
-		return 0;
+		// 2. PDPT Level Validation
+		ULONG64 pdpt_base = pml4e & 0x000FFFFFFFFFF000ULL;
+		if (!pdpt_base || !IsPhysicalAddressSafe(pdpt_base, sizeof(ULONG64)))
+			return 0;
 
-	if (pde & 0x80)
-	{
-		ULONG64 phys2mb = (pde & 0x000FFFFFFFE00000ULL) | (VirtualAddress & 0x1FFFFFULL);
-		return IsPhysicalAddressSafe(phys2mb, 1) ? phys2mb : 0;
-	}
+		ULONG64 pdpte = 0;
+		if (!ReadPhysicalChunk(pdpt_base + (pdpt_idx * 8), &pdpte, sizeof(pdpte)) || !(pdpte & 1))
+			return 0;
 
-	ULONG64 pt_base = pde & 0x000FFFFFFFFFF000ULL;
-	ULONG64 pte = 0;
-	if (!ReadPhysicalChunk(pt_base + (pt_idx * 8), &pte, sizeof(pte)))
-		return 0;
+		// 1GB Large Page (PS bit 7)
+		if (pdpte & 0x80)
+		{
+			ULONG64 phys1gb = (pdpte & 0x000FFFFFC0000000ULL) | (VirtualAddress & 0x3FFFFFFFULL);
+			return IsPhysicalAddressSafe(phys1gb, 1) ? phys1gb : 0;
+		}
 
-	if (pte & 1)
-	{
+		// 3. PD Level Validation
+		ULONG64 pd_base = pdpte & 0x000FFFFFFFFFF000ULL;
+		if (!pd_base || !IsPhysicalAddressSafe(pd_base, sizeof(ULONG64)))
+			return 0;
+
+		ULONG64 pde = 0;
+		if (!ReadPhysicalChunk(pd_base + (pd_idx * 8), &pde, sizeof(pde)) || !(pde & 1))
+			return 0;
+
+		// 2MB Large Page (PS bit 7)
+		if (pde & 0x80)
+		{
+			ULONG64 phys2mb = (pde & 0x000FFFFFFFE00000ULL) | (VirtualAddress & 0x1FFFFFULL);
+			return IsPhysicalAddressSafe(phys2mb, 1) ? phys2mb : 0;
+		}
+
+		// 4. PT Level Validation
+		ULONG64 pt_base = pde & 0x000FFFFFFFFFF000ULL;
+		if (!pt_base || !IsPhysicalAddressSafe(pt_base, sizeof(ULONG64)))
+			return 0;
+
+		ULONG64 pte = 0;
+		if (!ReadPhysicalChunk(pt_base + (pt_idx * 8), &pte, sizeof(pte)) || !(pte & 1))
+			return 0;
 
 		ULONG64 phys4kb = (pte & 0x000FFFFFFFFFF000ULL) | offset;
 		return IsPhysicalAddressSafe(phys4kb, 1) ? phys4kb : 0;
 	}
-	else
+	__except (EXCEPTION_EXECUTE_HANDLER)
 	{
-
-		if ((pte & (1ULL << 11)) && !(pte & (1ULL << 10)))
-		{
-			ULONG64 pfn = (pte >> 12) & 0x000000FFFFFFFFFFULL;
-			ULONG64 physTrans = (pfn << 12) | offset;
-			if (IsPhysicalAddressSafe(physTrans, 1))
-			{
-				return physTrans;
-			}
-		}
+		return 0;
 	}
-	return 0;
 }
 
 static ULONG g_DirectoryTableBaseOffset = 0;
@@ -1529,28 +1606,42 @@ static BOOLEAN WritePhysicalChunk(ULONG64 PhysAddr, PVOID Buffer, SIZE_T Size)
 	if (!Buffer || Size == 0)
 		return FALSE;
 
+	if (KeGetCurrentIrql() > APC_LEVEL)
+		return FALSE;
+
 	if (!IsPhysicalAddressSafe(PhysAddr, Size))
 		return FALSE;
 
 	BOOLEAN success = FALSE;
+	PVOID mapped = NULL;
+
 	__try
 	{
 		PHYSICAL_ADDRESS pa;
 		pa.QuadPart = (LONGLONG)PhysAddr;
 
-		PVOID mapped = MmMapIoSpace(pa, Size, MmCached);
-		if (!mapped)
-			mapped = MmMapIoSpace(pa, Size, MmNonCached);
-
-		if (mapped)
+		mapped = SafeMapPhysicalMemory(pa, Size, PAGE_READWRITE);
+		if (mapped != NULL)
 		{
-			RtlCopyMemory(mapped, Buffer, Size);
-			MmUnmapIoSpace(mapped, Size);
-			success = TRUE;
+			__try
+			{
+				RtlCopyMemory(mapped, Buffer, Size);
+				success = TRUE;
+			}
+			__finally
+			{
+				MmUnmapIoSpace(mapped, Size);
+				mapped = NULL;
+			}
 		}
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
 	{
+		if (mapped != NULL)
+		{
+			MmUnmapIoSpace(mapped, Size);
+			mapped = NULL;
+		}
 		success = FALSE;
 	}
 

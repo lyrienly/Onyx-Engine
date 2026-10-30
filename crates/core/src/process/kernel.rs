@@ -413,7 +413,20 @@ impl DbkDriver {
         }
     }
 
+    #[inline]
+    pub fn is_canonical_va(va: u64) -> bool {
+        let high = va >> 47;
+        high == 0 || high == 0x1FFFF
+    }
+
     pub fn translate_cr3(&self, pid: u32, virtual_address: u64) -> Result<u64, String> {
+        if !Self::is_canonical_va(virtual_address) {
+            return Err(format!(
+                "Non-canonical virtual address 0x{:X} rejected for CR3 translation",
+                virtual_address
+            ));
+        }
+
         let mut inp = CeTranslateCr3Input {
             process_id: pid,
             virtual_address,

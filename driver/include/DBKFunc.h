@@ -28,6 +28,8 @@
 #define NonPagedPool DBK_POOL_NX
 
 #pragma pack(1)
+#ifndef _TAG_INT_VECTOR_DEFINED_
+#define _TAG_INT_VECTOR_DEFINED_
 typedef struct tagINT_VECTOR
 {
 	WORD	wLowOffset;
@@ -49,6 +51,7 @@ typedef struct tagIDT
 	PINT_VECTOR vector;
 } IDT, *PIDT;
 #pragma pack()
+#endif
 
 void GetIDT(PIDT pIdt);
 
