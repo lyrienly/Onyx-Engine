@@ -805,13 +805,14 @@ void vmxoffload_override(CCHAR cpunr, PKDEFERRED_ROUTINE Dpc, PVOID DeferredCont
 	if (mdl)
 	{
 
-		PDBVMOffloadMemInfo mi = ExAllocatePool(NonPagedPool, sizeof(DBVMOffloadMemInfo));
+		PDBVMOffloadMemInfo mi = (PDBVMOffloadMemInfo)ExAllocatePoolWithTag(DBK_POOL_NX, sizeof(DBVMOffloadMemInfo), 'xmvO');
 		int i;
 		PFN_NUMBER *pfnlist;
 
 		DbgPrint("vmxoffload_override: mi=%p\n", mi);
 
-		mi->List = ExAllocatePool(NonPagedPool, sizeof(UINT64) * 16);
+		if (mi)
+			mi->List = (PUINT64)ExAllocatePoolWithTag(DBK_POOL_NX, sizeof(UINT64) * 16, 'xmvO');
 
 		DbgPrint("vmxoffload_override: mi->list=%p\n", mi->List);
 

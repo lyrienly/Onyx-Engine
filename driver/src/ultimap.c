@@ -83,7 +83,9 @@ NTSTATUS ultimap_waitForData(ULONG timeout, PULTIMAPDATAEVENT data)
 
 	if (DataBlock)
 	{
-		waitblock=ExAllocatePool(NonPagedPool, MaxDataBlocks*sizeof(KWAIT_BLOCK));
+		waitblock = (PKWAIT_BLOCK)ExAllocatePoolWithTag(DBK_POOL_NX, MaxDataBlocks * sizeof(KWAIT_BLOCK), 'mtlU');
+		if (!waitblock)
+			return STATUS_INSUFFICIENT_RESOURCES;
 
 		wait.QuadPart=-10000LL * timeout;
 
@@ -170,7 +172,7 @@ int perfmon_interrupt_centry(void)
 		DbgPrint("Entry cpunr=%d\n", cpunr());
 		DbgPrint("Entry threadid=%d\n", PsGetCurrentThreadId());
 
-		temp=ExAllocatePool(NonPagedPool, blocksize);
+		temp = ExAllocatePoolWithTag(DBK_POOL_NX, blocksize, 'mtlU');
 		if (temp)
 		{
 			RtlCopyMemory(temp, (PVOID *)(UINT_PTR)DS_AREA[cpunr()]->BTS_BufferBaseAddress, blocksize);
@@ -404,7 +406,7 @@ VOID ultimap_setup_dpc(IN struct _KDPC *Dpc, IN PVOID  DeferredContext, IN PVOID
 
 	if (params->DS_AREA_SIZE)
 	{
-		DS_AREA[cpunr()]=ExAllocatePool(NonPagedPool, params->DS_AREA_SIZE);
+		DS_AREA[cpunr()] = ExAllocatePoolWithTag(DBK_POOL_NX, params->DS_AREA_SIZE, 'mtlU');
 
 		if (DS_AREA[cpunr()] == NULL)
 		{
@@ -545,8 +547,8 @@ NTSTATUS ultimap(UINT64 cr3, UINT64 dbgctl_msr, int _DS_AREA_SIZE, BOOL savetofi
 	KeInitializeSemaphore(&DataBlockSemaphore, MaxDataBlocks, MaxDataBlocks);
 	ExInitializeFastMutex(&DataBlockMutex);
 
-	DataBlock=ExAllocatePool(NonPagedPool, sizeof(_DataBlock) * MaxDataBlocks);
-	DataReadyPointerList=ExAllocatePool(NonPagedPool, sizeof(PVOID) * MaxDataBlocks);
+	DataBlock = (_DataBlock*)ExAllocatePoolWithTag(DBK_POOL_NX, sizeof(_DataBlock) * MaxDataBlocks, 'mtlU');
+	DataReadyPointerList = (PVOID*)ExAllocatePoolWithTag(DBK_POOL_NX, sizeof(PVOID) * MaxDataBlocks, 'mtlU');
 
 	RtlZeroMemory(DataBlock, sizeof(_DataBlock) * MaxDataBlocks);
 	RtlZeroMemory(DataReadyPointerList, sizeof(PVOID) * MaxDataBlocks);

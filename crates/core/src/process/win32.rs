@@ -455,8 +455,21 @@ unsafe extern "system" {
     pub fn SetThreadContext(hThread: HANDLE, lpContext: *const CONTEXT) -> BOOL;
 }
 
+pub const HKEY_LOCAL_MACHINE: HANDLE = 0x80000002usize as HANDLE;
+pub const RRF_RT_REG_DWORD: DWORD = 0x00000010;
+
 #[link(name = "advapi32")]
 unsafe extern "system" {
+
+    pub fn RegGetValueW(
+        hkey: HANDLE,
+        lpSubKey: LPCWSTR,
+        lpValue: LPCWSTR,
+        dwFlags: DWORD,
+        pdwType: *mut DWORD,
+        pvData: LPVOID,
+        pcbData: *mut DWORD,
+    ) -> i32;
 
     pub fn OpenProcessToken(
         ProcessHandle: HANDLE,

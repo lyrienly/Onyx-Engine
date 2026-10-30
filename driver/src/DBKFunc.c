@@ -80,13 +80,15 @@ void forOneCpu(CCHAR cpunr, PKDEFERRED_ROUTINE dpcfunction, PVOID DeferredContex
 	if (preDPCCallback)
 		preDPCCallback(cpunr, dpcfunction, DeferredContext, &SystemArgument1, &SystemArgument2);
 
-	dpc = ExAllocatePool(NonPagedPool, sizeof(KDPC));
+	dpc = ExAllocatePoolWithTag(DBK_POOL_NX, sizeof(KDPC), 'kcpD');
+	if (!dpc)
+		return;
 	KeInitializeDpc(dpc, dpcfunction, DeferredContext);
 	KeSetTargetProcessorDpc(dpc, cpunr);
 	KeInsertQueueDpc(dpc, SystemArgument1, SystemArgument2);
 	KeFlushQueuedDpcs();
 
-	ExFreePool(dpc);
+	ExFreePoolWithTag(dpc, 'kcpD');
 }
 
 void forEachCpu(PKDEFERRED_ROUTINE dpcfunction,  PVOID DeferredContext, PVOID  SystemArgument1, PVOID  SystemArgument2, OPTIONAL PPREDPC_CALLBACK preDPCCallback)
@@ -108,7 +110,9 @@ void forEachCpu(PKDEFERRED_ROUTINE dpcfunction,  PVOID DeferredContext, PVOID  S
 		cpus=cpus / 2;
 	}
 
-	dpc=ExAllocatePool(NonPagedPool, sizeof(KDPC)*cpucount);
+	dpc = (PKDPC)ExAllocatePoolWithTag(DBK_POOL_NX, sizeof(KDPC) * cpucount, 'kcpD');
+	if (!dpc)
+		return;
 
 	cpus=KeQueryActiveProcessors();
 	cpunr=0;
@@ -132,7 +136,7 @@ void forEachCpu(PKDEFERRED_ROUTINE dpcfunction,  PVOID DeferredContext, PVOID  S
 		cpunr++;
 	}
 
-	ExFreePool(dpc);
+	ExFreePoolWithTag(dpc, 'kcpD');
 }
 
 void forEachCpuAsync(PKDEFERRED_ROUTINE dpcfunction, PVOID DeferredContext, PVOID  SystemArgument1, PVOID  SystemArgument2, OPTIONAL PPREDPC_CALLBACK preDPCCallback)
@@ -154,7 +158,9 @@ void forEachCpuAsync(PKDEFERRED_ROUTINE dpcfunction, PVOID DeferredContext, PVOI
 		cpus = cpus / 2;
 	}
 
-	dpc = ExAllocatePool(NonPagedPool, sizeof(KDPC)*cpucount);
+	dpc = (PKDPC)ExAllocatePoolWithTag(DBK_POOL_NX, sizeof(KDPC) * cpucount, 'kcpD');
+	if (!dpc)
+		return;
 
 	cpus = KeQueryActiveProcessors();
 	cpunr = 0;
@@ -179,7 +185,7 @@ void forEachCpuAsync(PKDEFERRED_ROUTINE dpcfunction, PVOID DeferredContext, PVOI
 
 	KeFlushQueuedDpcs();
 
-	ExFreePool(dpc);
+	ExFreePoolWithTag(dpc, 'kcpD');
 }
 
 void spinlock(volatile LONG *lockvar)
@@ -301,7 +307,14 @@ UINT64 readMSR(DWORD msr)
 
 void setCR0(UINT64 newcr0)
 {
-	__writecr0(newcr0);
+	__try
+	{
+		__writecr0(newcr0);
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		DbgPrint("setCR0: interceptado pelo hipervisor/HVCI, modificacao de CR0 ignorada para evitar BSOD\n");
+	}
 }
 
 UINT64 getCR0(void)

@@ -660,7 +660,9 @@ unsigned int vmx_add_memory(UINT64 *list, int count)
 		UINT64 PhysicalPages[0];
 	} AddMemoryInfoCall, *PAddMemoryInfoCall;
 #pragma pack()
-	PAddMemoryInfoCall vmcallinfo=ExAllocatePool(NonPagedPool, sizeof(AddMemoryInfoCall) + count * sizeof(UINT64));
+	PAddMemoryInfoCall vmcallinfo = (PAddMemoryInfoCall)ExAllocatePoolWithTag(DBK_POOL_NX, sizeof(AddMemoryInfoCall) + count * sizeof(UINT64), 'mxmV');
+	if (!vmcallinfo)
+		return FALSE;
 
 	DbgPrint("vmx_add_memory(%p,%d)\n", list, count);
 	DbgPrint("vmx_add_memory(vmx_password1=%x,vmx_password2=%x)\n", vmx_password1, vmx_password2);

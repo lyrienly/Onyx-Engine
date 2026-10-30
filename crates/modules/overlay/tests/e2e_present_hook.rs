@@ -15,9 +15,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 };
 
 fn scratchpad_dir() -> PathBuf {
-    let p = PathBuf::from(
-        r"C:\Users\susboy\AppData\Local\Temp\claude\c--Users-susboy-Documents-Projects-OnyxEngine\1591b72f-b222-4e3c-8a1f-7cf2a08d69d7\scratchpad",
-    );
+    let p = std::env::temp_dir().join("onyx_overlay_scratchpad");
     fs::create_dir_all(&p).ok();
     p
 }

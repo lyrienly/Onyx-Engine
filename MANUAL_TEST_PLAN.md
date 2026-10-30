@@ -619,6 +619,38 @@ Este documento detalha o roteiro prático e passo a passo para você testar manu
 - Alocações virtuais e de heap são interceptadas sem crash `0xC0000005`.
 - A Radix Tree navega corretamente os nós de 64 bits no Memory Viewer.
 
+---
+
+## 29. Compatibilidade com HVCI, VBS e Isolamento de Kernel (Issue #24)
+
+### O que foi feito
+- **Eliminacao Total de Pools Executaveis**: Todas as ocorrencias residuais de `NonPagedPool` no driver C (`driver/src/*.c`) foram substituidas por `DBK_POOL_NX` (`NonPagedPoolNx = 512`) com tags de rastreamento dedicadas (`'kcpD'`, `'kbtS'`, `'cpAk'`, `'xpEN'`, `'mtlU'`, `'2ltU'`, `'mxmV'`, `'xmvO'`), eliminando violacoes de W^X no Windows 11.
+- **Protecao Contra Falhas de Integridade**: Operacoes de modificacao de registradores de controle (`CR0`) foram encapsuladas com tratamento estruturado de excecoes (SEH) para evitar BugChecks decorrentes de traps de SLAT/EPT do hipervisor.
+- **Deteccao de Ambiente em Rust**: Adicionadas rotinas de alta performance em `crates/core/src/process/kernel.rs` (`is_vbs_active`, `is_hvci_active`, `is_cr3_interception_risk`, `evaluate_security_profile`) consultando diretamente o registro `DeviceGuard` com fallback via CIM.
+- **Alerta de Interceptacao de CR3**: Mensagens de diagnostico orientativas implementadas tanto no backend Rust quanto na interface Pascal (`UI/dbk32/DBK32functions.pas`), alertando sobre a isolacao de paginas do Secure Kernel (VTL 1) quando o VBS estiver ativo.
+- **Preservacao de Compilacao com `/INTEGRITYCHECK`**: Documentada e padronizada a diretiva `/INTEGRITYCHECK` no `driver/README.md` e INF.
+
+### Passo a Passo
+1. Execute os testes unitarios de seguranca de kernel no Rust:
+   ```powershell
+   cargo test -p onyx_core --test kernel_security -- --nocapture
+   ```
+2. Valide o estado de integridade do host via PowerShell:
+   ```powershell
+   Get-CimInstance -ClassName Win32_DeviceGuard -Namespace root\Microsoft\Windows\DeviceGuard | Select-Object VirtualizationBasedSecurityStatus, SecurityServicesRunning
+   ```
+3. Confirme a ausencia de alocacoes executaveis `NonPagedPool` no codigo-fonte do driver:
+   ```powershell
+   Select-String -Path "driver\src\*.c", "driver\include\*.h" -Pattern "NonPagedPool\b"
+   ```
+
+### Criterios de Sucesso
+- `cargo test -p onyx_core --test kernel_security` passa 100% dos testes.
+- Zero ocorrencias de alocacao `NonPagedPool` no driver C.
+- Driver opera sem violar as diretrizes de Integridade de Memoria (HVCI) do Windows 11.
+
+---
+
 ## Roteiro Rápido para Teste Geral do Workspace
 
 Caso queira rodar uma validação total de uma só vez em sua máquina antes de abrir os jogos:

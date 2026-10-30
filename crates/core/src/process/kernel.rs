@@ -770,6 +770,159 @@ impl DbkDriver {
         }
         false
     }
+
+    pub fn is_vbs_active() -> bool {
+        #[cfg(target_os = "windows")]
+        {
+            let subkey: Vec<u16> = "SYSTEM\\CurrentControlSet\\Control\\DeviceGuard\0"
+                .encode_utf16()
+                .collect();
+            let val_vbs: Vec<u16> = "EnableVirtualizationBasedSecurity\0"
+                .encode_utf16()
+                .collect();
+            let mut data: u32 = 0;
+            let mut size: DWORD = std::mem::size_of::<u32>() as DWORD;
+
+            let res = unsafe {
+                RegGetValueW(
+                    HKEY_LOCAL_MACHINE,
+                    subkey.as_ptr(),
+                    val_vbs.as_ptr(),
+                    RRF_RT_REG_DWORD,
+                    std::ptr::null_mut(),
+                    &mut data as *mut _ as LPVOID,
+                    &mut size,
+                )
+            };
+
+            if res == 0 && data == 1 {
+                return true;
+            }
+
+            use std::process::Command;
+            if let Ok(output) = Command::new("powershell")
+                .args([
+                    "-NoProfile",
+                    "-Command",
+                    "(Get-CimInstance -ClassName Win32_DeviceGuard -Namespace root/Microsoft/Windows/DeviceGuard 2>$null).VirtualizationBasedSecurityStatus",
+                ])
+                .output()
+            {
+                let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if text == "2" || text == "1" {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    pub fn is_hvci_active() -> bool {
+        #[cfg(target_os = "windows")]
+        {
+            let subkey_scenario: Vec<u16> =
+                "SYSTEM\\CurrentControlSet\\Control\\DeviceGuard\\Scenarios\\HypervisorEnforcedCodeIntegrity\0"
+                    .encode_utf16()
+                    .collect();
+            let val_enabled: Vec<u16> = "Enabled\0".encode_utf16().collect();
+            let mut data: u32 = 0;
+            let mut size: DWORD = std::mem::size_of::<u32>() as DWORD;
+
+            let res = unsafe {
+                RegGetValueW(
+                    HKEY_LOCAL_MACHINE,
+                    subkey_scenario.as_ptr(),
+                    val_enabled.as_ptr(),
+                    RRF_RT_REG_DWORD,
+                    std::ptr::null_mut(),
+                    &mut data as *mut _ as LPVOID,
+                    &mut size,
+                )
+            };
+
+            if res == 0 && data == 1 {
+                return true;
+            }
+
+            let subkey_dg: Vec<u16> = "SYSTEM\\CurrentControlSet\\Control\\DeviceGuard\0"
+                .encode_utf16()
+                .collect();
+            let val_hvci: Vec<u16> = "HypervisorEnforcedCodeIntegrity\0".encode_utf16().collect();
+            size = std::mem::size_of::<u32>() as DWORD;
+
+            let res2 = unsafe {
+                RegGetValueW(
+                    HKEY_LOCAL_MACHINE,
+                    subkey_dg.as_ptr(),
+                    val_hvci.as_ptr(),
+                    RRF_RT_REG_DWORD,
+                    std::ptr::null_mut(),
+                    &mut data as *mut _ as LPVOID,
+                    &mut size,
+                )
+            };
+
+            if res2 == 0 && data == 1 {
+                return true;
+            }
+
+            use std::process::Command;
+            if let Ok(output) = Command::new("powershell")
+                .args([
+                    "-NoProfile",
+                    "-Command",
+                    "((Get-CimInstance -ClassName Win32_DeviceGuard -Namespace root/Microsoft/Windows/DeviceGuard 2>$null).SecurityServicesRunning -contains 2)",
+                ])
+                .output()
+            {
+                let text = String::from_utf8_lossy(&output.stdout).trim().to_lowercase();
+                if text == "true" {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    pub fn is_cr3_interception_risk() -> bool {
+        Self::is_vbs_active()
+    }
+
+    pub fn evaluate_security_profile() -> KernelSecurityProfile {
+        let secure_boot = Self::is_secure_boot_active();
+        let test_signing = Self::is_test_signing_enabled();
+        let vbs = Self::is_vbs_active();
+        let hvci = Self::is_hvci_active();
+        let cr3_risk = vbs;
+
+        KernelSecurityProfile {
+            secure_boot_active: secure_boot,
+            test_signing_active: test_signing,
+            vbs_active: vbs,
+            hvci_active: hvci,
+            cr3_interception_risk: cr3_risk,
+        }
+    }
+
+    pub fn check_cr3_intercept_advisory(pid: u32) -> Option<String> {
+        if Self::is_cr3_interception_risk() {
+            Some(format!(
+                "Aviso: VBS (Seguranca Baseada em Virtualizacao) esta ativo. Traducoes fisicas de CR3 para o PID {} operam sob SLAT/EPT do hipervisor; paginas protegidas do Secure Kernel (VTL 1) nao podem ser acessadas diretamente.",
+                pid
+            ))
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct KernelSecurityProfile {
+    pub secure_boot_active: bool,
+    pub test_signing_active: bool,
+    pub vbs_active: bool,
+    pub hvci_active: bool,
+    pub cr3_interception_risk: bool,
 }
 
 impl Drop for DbkDriver {

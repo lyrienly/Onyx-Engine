@@ -57,7 +57,12 @@ void mykapc(PKAPC Apc, PKNORMAL_ROUTINE NormalRoutine, PVOID NormalContext, PVOI
 	PKAPC      kApc;
 	LARGE_INTEGER Timeout;
 
-	kApc = ExAllocatePool(NonPagedPool, sizeof(KAPC));
+	kApc = (PKAPC)ExAllocatePoolWithTag(DBK_POOL_NX, sizeof(KAPC), 'cpAk');
+	if (!kApc)
+	{
+		ExFreePool(Apc);
+		return;
+	}
 
 	ExFreePool(Apc);
 
@@ -97,7 +102,9 @@ void CreateRemoteAPC(ULONG threadid,PVOID addresstoexecute)
 	PKTHREAD   kThread;
 	PKAPC      kApc;
 
-	kApc = ExAllocatePool(NonPagedPool, sizeof(KAPC));
+	kApc = (PKAPC)ExAllocatePoolWithTag(DBK_POOL_NX, sizeof(KAPC), 'cpAk');
+	if (!kApc)
+		return;
 
 	kThread=(PKTHREAD)getPEThread(threadid);
 	DbgPrint("(PVOID)KThread=%p\n",kThread);
@@ -1231,7 +1238,7 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 					break;
 				}
 
-				PWCHAR safeBuf = (PWCHAR)ExAllocatePoolWithTag(NonPagedPool, inLen + sizeof(WCHAR), 'kOLS');
+				PWCHAR safeBuf = (PWCHAR)ExAllocatePoolWithTag(DBK_POOL_NX, inLen + sizeof(WCHAR), 'kOLS');
 				if (!safeBuf)
 				{
 					ntStatus = STATUS_INSUFFICIENT_RESOURCES;
@@ -1533,7 +1540,7 @@ static PVOID g_TraceStoreBuffer = NULL;
 					if (!g_TraceStoreBuffer)
 					{
 
-						g_TraceStoreBuffer = ExAllocatePoolWithTag(NonPagedPool, 64 * 1024, 'rtSU');
+						g_TraceStoreBuffer = ExAllocatePoolWithTag(DBK_POOL_NX, 64 * 1024, 'rtSU');
 					}
 
 					if (!g_TraceStoreBuffer)

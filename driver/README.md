@@ -53,6 +53,20 @@ driver/
 └── README.md
 ```
 
-## Compilação e Uso
-O driver pode ser compilado com o **Visual Studio 2022 + WDK (Windows Driver Kit)** configurado para `Release | x64`, `Target OS: Windows 10 and later`.
-Pode ser carregado via serviço de teste assinado ou mapeado furtivamente em ring-0 (kdmapper / RTCore64).
+## Compilação e Conformidade HVCI / VBS (Windows 11)
+
+### 1. Requisitos de Compilação
+O driver deve ser compilado com o **Visual Studio 2022 + WDK (Windows Driver Kit)** configurado para:
+- **Configuração**: `Release | x64`
+- **Target OS**: `Windows 10 and later`
+- **Flag Obrigatória de Integridade**: `/INTEGRITYCHECK` (Linker -> Command Line -> `/INTEGRITYCHECK`).
+  - Esta flag grava `IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY` (0x0080) no cabeçalho PE, exigência formal do subsistema CI.dll para execução compatível com **HVCI (Memory Integrity)**.
+
+### 2. Políticas de Memória Ring-0 (W^X & Pool NX)
+- **Zero NonPagedPool Executável**: Todas as alocações dinâmicas utilizam estritamente `DBK_POOL_NX` (`NonPagedPoolNx = 512`), garantindo o bit No-Execute (NX/XD) ativo em todas as páginas de kernel.
+- **Conformidade W^X**: Nenhuma rotina executa instruções em pools de dados ou tenta modificar páginas de código somente-leitura.
+- **Blindagem de CR0**: Operações de CR0 são protegidas contra traps de SLAT/EPT impostos por hipervisores Type-1 (Microsoft Hyper-V / VBS).
+
+### 3. Modos de Carregamento
+- **Ambiente de Testes Homologado**: Desativação temporária do Secure Boot no firmware UEFI com `bcdedit /set testsigning on` e assinatura de teste local.
+- **Carregamento Furtivo**: Compatível com alocação em Ring-0 através de interfaces de kernel mapping (ex: RTCore64 / BYOVD).
