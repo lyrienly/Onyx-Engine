@@ -4,10 +4,18 @@ use std::sync::atomic::{AtomicBool, Ordering};
 type HWND = *mut std::ffi::c_void;
 
 static HUNTER_STARTED: AtomicBool = AtomicBool::new(false);
+static THREAT_DETECTED: AtomicBool = AtomicBool::new(false);
 
 pub struct AnalysisHunter;
 
 impl AnalysisHunter {
+    pub fn is_active() -> bool {
+        HUNTER_STARTED.load(Ordering::SeqCst)
+    }
+
+    pub fn is_threat_detected() -> bool {
+        THREAT_DETECTED.load(Ordering::SeqCst)
+    }
     pub fn is_blacklisted_title(title: &str) -> bool {
         let lower = title.to_lowercase();
         let targets = [
@@ -46,6 +54,8 @@ impl AnalysisHunter {
 
         std::thread::spawn(|| {
             loop {
+                let detected = Self::scan_window_titles();
+                THREAT_DETECTED.store(detected, Ordering::SeqCst);
                 std::thread::sleep(std::time::Duration::from_millis(1500));
             }
         });

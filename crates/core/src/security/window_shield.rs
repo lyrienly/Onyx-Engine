@@ -213,6 +213,10 @@ impl WindowShield {
         ctx.count
     }
 
+    pub fn is_active() -> bool {
+        WATCHDOG_RUNNING.load(Ordering::SeqCst)
+    }
+
     pub fn protect_current_process(title_camouflage: Option<&str>) -> usize {
         let pid = unsafe { GetCurrentProcessId() };
         Self::protect_process_windows(pid, title_camouflage)

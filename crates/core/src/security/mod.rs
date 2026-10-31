@@ -23,14 +23,18 @@ pub use sk_crypt::SkCrypt;
 pub use taskmgr_cloak::{TaskmgrCloakManager, filter_system_process_information};
 pub use window_shield::WindowShield;
 
-pub fn activate_process_shield() -> Result<(), String> {
+pub fn activate_full_onyx_shield(title_camouflage: Option<&str>) -> Result<(), String> {
     AntiAttach::enable()?;
     let _ = AntiDebug::hide_current_thread();
     let _ = AntiDump::distort_peb_size_of_image(0x100000);
     TaskmgrCloakManager::start_watcher();
     AnalysisHunter::start_monitor();
-    WindowShield::protect_current_process(None);
+    WindowShield::protect_current_process(title_camouflage);
     Ok(())
+}
+
+pub fn activate_process_shield() -> Result<(), String> {
+    activate_full_onyx_shield(None)
 }
 
 #[cfg(test)]
