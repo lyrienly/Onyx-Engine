@@ -510,6 +510,38 @@ NTSTATUS CloakRegionMemory(PEPROCESS Process, ULONG64 VirtualAddress, PVOID Buff
 
 NTSTATUS QueryProcessMemoryVad(PEPROCESS Process, ULONG64 VirtualAddress, PMEMORY_BASIC_INFORMATION64 MemoryInfo);
 NTSTATUS HideProcessByPid(ULONG ProcessId);
+NTSTATUS RestoreProcessByPid(ULONG ProcessId);
+VOID RestoreAllHiddenProcesses(VOID);
+NTSTATUS CleanKernelHashBucketList(VOID);
+ULONG ResolveActiveProcessLinksOffset(VOID);
 NTSTATUS HideThreadByTid(ULONG ThreadId);
+
+#pragma pack(push, 8)
+typedef struct _PROCESS_MEMORY_PROOF {
+	ULONG ProcessId;
+	ULONG _pad;
+	UINT64 EprocessAddress;
+	UINT64 ActiveProcessLinksAddress;
+	UINT64 Flink;
+	UINT64 Blink;
+	UINT64 FlinkBlink;
+	BOOLEAN IsSelfLinked;
+	BOOLEAN CircularIntegrity;
+	UCHAR _reserved[6];
+} PROCESS_MEMORY_PROOF, *PPROCESS_MEMORY_PROOF;
+
+typedef struct _DRIVER_MEMORY_PROOF {
+	UINT64 DriverObjectAddress;
+	UINT64 DriverSectionAddress;
+	UINT64 InLoadOrderFlink;
+	UINT64 InLoadOrderBlink;
+	BOOLEAN IsDriverModuleUnlinked;
+	UCHAR _pad[3];
+	ULONG UnloadedDriversEstimatedCount;
+} DRIVER_MEMORY_PROOF, *PDRIVER_MEMORY_PROOF;
+#pragma pack(pop)
+
+NTSTATUS InspectProcessByPid(ULONG ProcessId, PPROCESS_MEMORY_PROOF Proof);
+NTSTATUS InspectDriverMemory(PDRIVER_OBJECT DriverObject, PDRIVER_MEMORY_PROOF Proof);
 
 #endif

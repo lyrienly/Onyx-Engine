@@ -578,6 +578,32 @@ pub extern "C" fn onyx_kernel_strip_callbacks(restore: i32) -> i32 {
 }
 
 #[no_mangle]
+pub extern "C" fn onyx_kernel_hide_process(pid: u32) -> i32 {
+    if let Some(ref dbk) = get_global_dbk() {
+        if dbk.hide_process(pid).is_ok() {
+            1
+        } else {
+            0
+        }
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn onyx_kernel_restore_process(pid: u32) -> i32 {
+    if let Some(ref dbk) = get_global_dbk() {
+        if dbk.restore_process(pid).is_ok() {
+            1
+        } else {
+            0
+        }
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn onyx_kernel_clean_traces() -> i32 {
     if let Some(ref dbk) = get_global_dbk() {
         if dbk.clean_traces().is_ok() {

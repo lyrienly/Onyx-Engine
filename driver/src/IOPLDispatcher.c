@@ -897,6 +897,51 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				break;
 			}
 
+		case IOCTL_CE_RESTORE_PROCESS:
+			{
+				ULONG inLen = irpStack->Parameters.DeviceIoControl.InputBufferLength;
+				if (inLen < sizeof(ULONG))
+				{
+					ntStatus = STATUS_INFO_LENGTH_MISMATCH;
+					break;
+				}
+				ULONG targetPid = *(PULONG)Irp->AssociatedIrp.SystemBuffer;
+				ntStatus = RestoreProcessByPid(targetPid);
+				break;
+			}
+
+		case IOCTL_CE_INSPECT_PROCESS:
+			{
+				ULONG inLen = irpStack->Parameters.DeviceIoControl.InputBufferLength;
+				ULONG outLen = irpStack->Parameters.DeviceIoControl.OutputBufferLength;
+				if (inLen < sizeof(ULONG) || outLen < sizeof(PROCESS_MEMORY_PROOF))
+				{
+					ntStatus = STATUS_INFO_LENGTH_MISMATCH;
+					break;
+				}
+				ULONG targetPid = *(PULONG)Irp->AssociatedIrp.SystemBuffer;
+				PPROCESS_MEMORY_PROOF proof = (PPROCESS_MEMORY_PROOF)Irp->AssociatedIrp.SystemBuffer;
+				ntStatus = InspectProcessByPid(targetPid, proof);
+				if (NT_SUCCESS(ntStatus))
+					Irp->IoStatus.Information = sizeof(PROCESS_MEMORY_PROOF);
+				break;
+			}
+
+		case IOCTL_CE_INSPECT_DRIVER:
+			{
+				ULONG outLen = irpStack->Parameters.DeviceIoControl.OutputBufferLength;
+				if (outLen < sizeof(DRIVER_MEMORY_PROOF))
+				{
+					ntStatus = STATUS_INFO_LENGTH_MISMATCH;
+					break;
+				}
+				PDRIVER_MEMORY_PROOF proof = (PDRIVER_MEMORY_PROOF)Irp->AssociatedIrp.SystemBuffer;
+				ntStatus = InspectDriverMemory(DeviceObject->DriverObject, proof);
+				if (NT_SUCCESS(ntStatus))
+					Irp->IoStatus.Information = sizeof(DRIVER_MEMORY_PROOF);
+				break;
+			}
+
 		case IOCTL_CE_HIDE_THREAD:
 			{
 				ULONG inLen = irpStack->Parameters.DeviceIoControl.InputBufferLength;

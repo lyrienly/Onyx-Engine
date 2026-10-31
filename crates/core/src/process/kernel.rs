@@ -39,6 +39,36 @@ pub const IOCTL_CE_PROTECT_PROCESS_MEMORY: DWORD = 0x22E1F8;
 pub const IOCTL_CE_HIDE_THREAD: DWORD = 0x22E1FC;
 pub const IOCTL_CE_SETUP_SHARED_RING: DWORD = 0x22E200;
 pub const IOCTL_CE_PROCESS_SHARED_RING: DWORD = 0x22E204;
+pub const IOCTL_CE_RESTORE_PROCESS: DWORD = 0x22E208;
+pub const IOCTL_CE_INSPECT_PROCESS: DWORD = 0x22E20C;
+pub const IOCTL_CE_INSPECT_DRIVER: DWORD = 0x22E210;
+
+#[repr(C)]
+#[derive(Debug, Default, Clone, Copy)]
+pub struct ProcessMemoryProof {
+    pub process_id: u32,
+    pub _pad: u32,
+    pub eprocess_address: u64,
+    pub active_process_links_address: u64,
+    pub flink: u64,
+    pub blink: u64,
+    pub flink_blink: u64,
+    pub is_self_linked: u8,
+    pub circular_integrity: u8,
+    pub _reserved: [u8; 6],
+}
+
+#[repr(C)]
+#[derive(Debug, Default, Clone, Copy)]
+pub struct DriverMemoryProof {
+    pub driver_object_address: u64,
+    pub driver_section_address: u64,
+    pub in_load_order_flink: u64,
+    pub in_load_order_blink: u64,
+    pub is_driver_module_unlinked: u8,
+    pub _pad: [u8; 3],
+    pub unloaded_drivers_estimated_count: u32,
+}
 
 pub const ONYX_RING_MAGIC: u32 = 0x58594E4F; // 'ONYX'
 pub const ONYX_CMD_READ: u32 = 1;
@@ -357,7 +387,89 @@ impl OnyxDriver {
         if ok == TRUE {
             Ok(())
         } else {
-            Err(format!("Failed to hide process PID {} via DKOM", pid))
+            Err(format!(
+                "Failed to hide process PID {} via DKOM (os error: {})",
+                pid,
+                std::io::Error::last_os_error()
+            ))
+        }
+    }
+
+    pub fn restore_process(&self, pid: u32) -> Result<(), String> {
+        let mut input_pid = pid;
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_RESTORE_PROCESS,
+                &mut input_pid as *mut _ as LPVOID,
+                size_of::<u32>() as DWORD,
+                null_mut(),
+                0,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            Ok(())
+        } else {
+            Err(format!(
+                "Failed to restore process PID {} via DKOM (os error: {})",
+                pid,
+                std::io::Error::last_os_error()
+            ))
+        }
+    }
+
+    pub fn inspect_process(&self, pid: u32) -> Result<ProcessMemoryProof, String> {
+        let mut input_pid = pid;
+        let mut proof = ProcessMemoryProof::default();
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_INSPECT_PROCESS,
+                &mut input_pid as *mut _ as LPVOID,
+                size_of::<u32>() as DWORD,
+                &mut proof as *mut _ as LPVOID,
+                size_of::<ProcessMemoryProof>() as DWORD,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            Ok(proof)
+        } else {
+            Err(format!(
+                "Failed to inspect process PID {} (os error: {})",
+                pid,
+                std::io::Error::last_os_error()
+            ))
+        }
+    }
+
+    pub fn inspect_driver(&self) -> Result<DriverMemoryProof, String> {
+        let mut proof = DriverMemoryProof::default();
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_INSPECT_DRIVER,
+                null_mut(),
+                0,
+                &mut proof as *mut _ as LPVOID,
+                size_of::<DriverMemoryProof>() as DWORD,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            Ok(proof)
+        } else {
+            Err(format!(
+                "Failed to inspect driver memory (os error: {})",
+                std::io::Error::last_os_error()
+            ))
         }
     }
 

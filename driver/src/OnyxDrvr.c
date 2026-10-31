@@ -266,7 +266,11 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 		{
 
 			ExFreePool(BufDriverString);
-			ExFreePool(BufDeviceString);
+			if (BufDeviceString)
+	{
+		ExFreePool(BufDeviceString);
+		BufDeviceString = NULL;
+	}
 			ExFreePool(BufProcessEventString);
 			ExFreePool(BufThreadEventString);
 
@@ -284,7 +288,11 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
 			IoDeleteDevice(pDeviceObject);
 
 			ExFreePool(BufDriverString);
-			ExFreePool(BufDeviceString);
+			if (BufDeviceString)
+	{
+		ExFreePool(BufDeviceString);
+		BufDeviceString = NULL;
+	}
 			ExFreePool(BufProcessEventString);
 			ExFreePool(BufThreadEventString);
 
@@ -468,6 +476,7 @@ NTSTATUS DispatchClose(IN PDEVICE_OBJECT DeviceObject,
 
 void UnloadDriver(PDRIVER_OBJECT DriverObject)
 {
+	RestoreAllHiddenProcesses();
 	cleanupDBVM();
 
 	NoExceptions_Cleanup();
@@ -490,7 +499,11 @@ void UnloadDriver(PDRIVER_OBJECT DriverObject)
 		NTSTATUS r = IoDeleteSymbolicLink(&uszDeviceString);
 		DbgPrint("IoDeleteSymbolicLink: %x\n", r);
 	}
-	ExFreePool(BufDeviceString);
+	if (BufDeviceString)
+	{
+		ExFreePool(BufDeviceString);
+		BufDeviceString = NULL;
+	}
 #endif
 
 #if (NTDDI_VERSION >= NTDDI_VISTA)
