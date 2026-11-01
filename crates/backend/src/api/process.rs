@@ -692,3 +692,81 @@ pub unsafe extern "C" fn onyx_kernel_enum_vad(
         -1
     }
 }
+
+#[no_mangle]
+pub extern "C" fn onyx_security_cloak_peb(pid: u32) -> i32 {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        use onyx_core::security::AntiDebug;
+        use onyx_core::win32::{CloseHandle, GetCurrentProcess, OpenProcess, PROCESS_ALL_ACCESS};
+
+        if pid == 0 {
+            if AntiDebug::cloak_target_process(GetCurrentProcess()).is_ok() {
+                1
+            } else {
+                0
+            }
+        } else {
+            let handle = OpenProcess(PROCESS_ALL_ACCESS, 0, pid);
+            if handle.is_null() {
+                return 0;
+            }
+            let res = AntiDebug::cloak_target_process(handle);
+            CloseHandle(handle);
+            if res.is_ok() {
+                1
+            } else {
+                0
+            }
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = pid;
+        0
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn onyx_security_restore_peb(pid: u32) -> i32 {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        use onyx_core::security::AntiDebug;
+        use onyx_core::win32::{CloseHandle, GetCurrentProcess, OpenProcess, PROCESS_ALL_ACCESS};
+
+        if pid == 0 {
+            if AntiDebug::restore_target_process(GetCurrentProcess()).is_ok() {
+                1
+            } else {
+                0
+            }
+        } else {
+            let handle = OpenProcess(PROCESS_ALL_ACCESS, 0, pid);
+            if handle.is_null() {
+                return 0;
+            }
+            let res = AntiDebug::restore_target_process(handle);
+            CloseHandle(handle);
+            if res.is_ok() {
+                1
+            } else {
+                0
+            }
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = pid;
+        0
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn onyx_security_anti_debug_audit() -> i32 {
+    let report = onyx_core::security::AntiDebug::audit();
+    if report.is_under_analysis() {
+        1
+    } else {
+        0
+    }
+}

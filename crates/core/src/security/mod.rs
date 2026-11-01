@@ -12,7 +12,9 @@ pub mod window_shield;
 pub use analysis_hunter::AnalysisHunter;
 pub use anomaly_scanner::{AnomalyKind, MemoryAnomalyScanner, RegionAnomaly};
 pub use anti_attach::AntiAttach;
-pub use anti_debug::{AntiDebug, AntiDebugReport};
+pub use anti_debug::{
+    AntiDebug, AntiDebugQuerySpoofer, AntiDebugReport, PebBackup, PebCloakStatus, RdtscShield,
+};
 pub use anti_dump::AntiDump;
 pub use hook_detection::{
     HookKind, HookReport, PatchRange, classify_hook, detect_patches, find_embedded_pe,
@@ -26,6 +28,7 @@ pub use window_shield::WindowShield;
 pub fn activate_full_onyx_shield(title_camouflage: Option<&str>) -> Result<(), String> {
     AntiAttach::enable()?;
     let _ = AntiDebug::hide_current_thread();
+    let _ = AntiDebug::cloak_current_process();
     let _ = AntiDump::distort_peb_size_of_image(0x100000);
     TaskmgrCloakManager::start_watcher();
     AnalysisHunter::start_monitor();
