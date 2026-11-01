@@ -565,11 +565,62 @@ pub extern "C" fn onyx_kernel_hide_driver() -> i32 {
     }
 }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct OnyxCallbackEntry {
+    pub entry_address: u64,
+    pub object_type: u32,
+    pub operations: u32,
+    pub enabled: u32,
+    pub _pad: u32,
+    pub pre_operation: u64,
+    pub post_operation: u64,
+    pub owner_module: [u8; 64],
+}
+
 #[no_mangle]
-pub extern "C" fn onyx_kernel_strip_callbacks(restore: i32) -> i32 {
+pub extern "C" fn onyx_kernel_strip_callbacks(mode: i32) -> i32 {
     if let Some(ref dbk) = get_global_dbk() {
-        match dbk.strip_callbacks(restore != 0) {
+        match dbk.strip_callbacks_mode(mode as u32) {
             Ok(count) => count as i32,
+            Err(_) => -1,
+        }
+    } else {
+        -1
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_kernel_enum_callbacks(
+    out_callbacks: *mut OnyxCallbackEntry,
+    max_count: u32,
+    out_total: *mut u32,
+) -> i32 {
+    if let Some(ref dbk) = get_global_dbk() {
+        match dbk.enum_callbacks() {
+            Ok(cbs) => {
+                if !out_total.is_null() {
+                    *out_total = cbs.len() as u32;
+                }
+                if out_callbacks.is_null() || max_count == 0 {
+                    return cbs.len() as i32;
+                }
+                let write_count = cbs.len().min(max_count as usize);
+                for i in 0..write_count {
+                    let entry = OnyxCallbackEntry {
+                        entry_address: cbs[i].entry_address,
+                        object_type: cbs[i].object_type as u32,
+                        operations: cbs[i].operations,
+                        enabled: cbs[i].enabled,
+                        _pad: 0,
+                        pre_operation: cbs[i].pre_operation,
+                        post_operation: cbs[i].post_operation,
+                        owner_module: cbs[i].owner_module,
+                    };
+                    *out_callbacks.add(i) = entry;
+                }
+                write_count as i32
+            }
             Err(_) => -1,
         }
     } else {

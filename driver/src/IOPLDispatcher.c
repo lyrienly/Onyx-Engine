@@ -450,14 +450,21 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				ClientID.UniqueThread=(HANDLE)(UINT_PTR)*(PULONG)Irp->AssociatedIrp.SystemBuffer;
 				ThreadHandle=0;
 
+				ULONG stripped = StripProcessAndThreadCallbacks(0);
+
 				__try
 				{
 					ThreadHandle=0;
-					ntStatus=ZwOpenThread(&ThreadHandle,PROCESS_ALL_ACCESS,&ObjectAttributes,&ClientID);
+					ntStatus=ZwOpenThread(&ThreadHandle,THREAD_ALL_ACCESS,&ObjectAttributes,&ClientID);
 				}
 				__except(1)
 				{
 					ntStatus=STATUS_UNSUCCESSFUL;
+				}
+
+				if (stripped > 0)
+				{
+					StripProcessAndThreadCallbacks(1);
 				}
 
 				*(PUINT64)Irp->AssociatedIrp.SystemBuffer=(UINT64)ThreadHandle;
@@ -942,7 +949,27 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 				break;
 			}
 
-		case IOCTL_CE_HIDE_THREAD:
+				case IOCTL_CE_ENUM_CALLBACKS:
+			{
+				ULONG outLen = irpStack->Parameters.DeviceIoControl.OutputBufferLength;
+				if (outLen < sizeof(ENUM_CALLBACKS_OUTPUT))
+				{
+					ntStatus = STATUS_INFO_LENGTH_MISMATCH;
+					break;
+				}
+
+				PENUM_CALLBACKS_OUTPUT outp = (PENUM_CALLBACKS_OUTPUT)Irp->AssociatedIrp.SystemBuffer;
+				RtlZeroMemory(outp, sizeof(ENUM_CALLBACKS_OUTPUT));
+
+				ULONG count = EnumerateKernelObCallbacks(DeviceObject->DriverObject, outp->Callbacks, 32);
+				outp->Count = count;
+
+				Irp->IoStatus.Information = sizeof(ENUM_CALLBACKS_OUTPUT);
+				ntStatus = STATUS_SUCCESS;
+				break;
+			}
+
+case IOCTL_CE_HIDE_THREAD:
 			{
 				ULONG inLen = irpStack->Parameters.DeviceIoControl.InputBufferLength;
 				if (inLen < sizeof(ULONG))
@@ -1507,8 +1534,7 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 					break;
 				}
 
-				BOOLEAN bRestore = (pinp->Restore != 0);
-				ULONG affected = StripProcessCallbacks(bRestore);
+				ULONG affected = StripProcessAndThreadCallbacks(pinp->Restore);
 
 				*(PULONG)Irp->AssociatedIrp.SystemBuffer = affected;
 				ntStatus = STATUS_SUCCESS;

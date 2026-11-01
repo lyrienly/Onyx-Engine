@@ -544,4 +544,26 @@ typedef struct _DRIVER_MEMORY_PROOF {
 NTSTATUS InspectProcessByPid(ULONG ProcessId, PPROCESS_MEMORY_PROOF Proof);
 NTSTATUS InspectDriverMemory(PDRIVER_OBJECT DriverObject, PDRIVER_MEMORY_PROOF Proof);
 
+#pragma pack(push, 8)
+typedef struct _KERNEL_OB_CALLBACK_INFO {
+	UINT64 EntryAddress;
+	UINT64 ObjectType;
+	UINT64 PreOperation;
+	UINT64 PostOperation;
+	ULONG Operations;
+	ULONG Enabled;
+	CHAR OwnerModule[64];
+} KERNEL_OB_CALLBACK_INFO, *PKERNEL_OB_CALLBACK_INFO;
+
+typedef struct _ENUM_CALLBACKS_OUTPUT {
+	ULONG Count;
+	ULONG _pad;
+	KERNEL_OB_CALLBACK_INFO Callbacks[32];
+} ENUM_CALLBACKS_OUTPUT, *PENUM_CALLBACKS_OUTPUT;
+#pragma pack(pop)
+
+ULONG StripProcessAndThreadCallbacks(ULONG Mode);
+#define StripProcessCallbacks(Restore) StripProcessAndThreadCallbacks((Restore) ? 1 : 0)
+ULONG EnumerateKernelObCallbacks(PDRIVER_OBJECT DriverObject, PKERNEL_OB_CALLBACK_INFO OutCallbacks, ULONG MaxCount);
+
 #endif

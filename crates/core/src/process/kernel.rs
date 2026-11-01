@@ -42,6 +42,70 @@ pub const IOCTL_CE_PROCESS_SHARED_RING: DWORD = 0x22E204;
 pub const IOCTL_CE_RESTORE_PROCESS: DWORD = 0x22E208;
 pub const IOCTL_CE_INSPECT_PROCESS: DWORD = 0x22E20C;
 pub const IOCTL_CE_INSPECT_DRIVER: DWORD = 0x22E210;
+pub const IOCTL_CE_ENUM_CALLBACKS: DWORD = 0x22E214;
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct KernelObCallbackInfo {
+    pub entry_address: u64,
+    pub object_type: u64, // 1 = Process, 2 = Thread
+    pub pre_operation: u64,
+    pub post_operation: u64,
+    pub operations: u32,
+    pub enabled: u32,
+    pub owner_module: [u8; 64],
+}
+
+impl Default for KernelObCallbackInfo {
+    fn default() -> Self {
+        Self {
+            entry_address: 0,
+            object_type: 0,
+            pre_operation: 0,
+            post_operation: 0,
+            operations: 0,
+            enabled: 0,
+            owner_module: [0u8; 64],
+        }
+    }
+}
+
+impl KernelObCallbackInfo {
+    pub fn owner_name(&self) -> String {
+        let len = self
+            .owner_module
+            .iter()
+            .position(|&c| c == 0)
+            .unwrap_or(self.owner_module.len());
+        String::from_utf8_lossy(&self.owner_module[..len]).to_string()
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct EnumCallbacksOutput {
+    pub count: u32,
+    pub _pad: u32,
+    pub callbacks: [KernelObCallbackInfo; 32],
+}
+
+impl Default for EnumCallbacksOutput {
+    fn default() -> Self {
+        Self {
+            count: 0,
+            _pad: 0,
+            callbacks: [KernelObCallbackInfo {
+                entry_address: 0,
+                object_type: 0,
+                pre_operation: 0,
+                post_operation: 0,
+                operations: 0,
+                enabled: 0,
+                owner_module: [0u8; 64],
+            }; 32],
+        }
+    }
+}
 
 #[repr(C)]
 #[derive(Debug, Default, Clone, Copy)]
@@ -473,10 +537,8 @@ impl OnyxDriver {
         }
     }
 
-    pub fn strip_callbacks(&self, restore: bool) -> Result<u32, String> {
-        let mut inp = CeStripCallbacksInput {
-            restore: if restore { 1 } else { 0 },
-        };
+    pub fn strip_callbacks_mode(&self, mode: u32) -> Result<u32, String> {
+        let mut inp = CeStripCallbacksInput { restore: mode };
         let mut affected: u32 = 0;
         let mut returned: DWORD = 0;
         let ok = unsafe {
@@ -494,7 +556,41 @@ impl OnyxDriver {
         if ok == TRUE {
             Ok(affected)
         } else {
-            Err("Failed to strip process callbacks".to_string())
+            Err("Failed to execute callback strip/unlink operation".to_string())
+        }
+    }
+
+    pub fn strip_callbacks(&self, restore: bool) -> Result<u32, String> {
+        self.strip_callbacks_mode(if restore { 1 } else { 0 })
+    }
+
+    pub fn unlink_callbacks_dkom(&self) -> Result<u32, String> {
+        self.strip_callbacks_mode(2)
+    }
+
+    pub fn enum_callbacks(&self) -> Result<Vec<KernelObCallbackInfo>, String> {
+        let mut output = EnumCallbacksOutput::default();
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_ENUM_CALLBACKS,
+                null_mut(),
+                0,
+                &mut output as *mut _ as LPVOID,
+                size_of::<EnumCallbacksOutput>() as DWORD,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            let count = (output.count as usize).min(32);
+            Ok(output.callbacks[..count].to_vec())
+        } else {
+            Err(format!(
+                "Failed to enumerate kernel callbacks (os error: {})",
+                std::io::Error::last_os_error()
+            ))
         }
     }
 
