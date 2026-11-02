@@ -694,6 +694,99 @@ pub extern "C" fn onyx_kernel_freeze_process(pid: u32, freeze: i32) -> i32 {
 }
 
 #[no_mangle]
+pub extern "C" fn onyx_kernel_cloak_page(pid: u32, address: u64) -> i32 {
+    if let Some(ref dbk) = get_global_dbk() {
+        if dbk.cloak_page(pid, address).is_ok() {
+            1
+        } else {
+            0
+        }
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn onyx_kernel_uncloak_page(pid: u32, address: u64) -> i32 {
+    if let Some(ref dbk) = get_global_dbk() {
+        if dbk.uncloak_page(pid, address).is_ok() {
+            1
+        } else {
+            0
+        }
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_kernel_write_cloaked(
+    pid: u32,
+    address: u64,
+    buffer: *const u8,
+    size: u32,
+) -> i32 {
+    if buffer.is_null() || size == 0 {
+        return 0;
+    }
+    let data = std::slice::from_raw_parts(buffer, size as usize);
+    if let Some(ref dbk) = get_global_dbk() {
+        if dbk.write_cloaked(pid, address, data).is_ok() {
+            1
+        } else {
+            0
+        }
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_kernel_cloak_region(
+    pid: u32,
+    address: u64,
+    buffer: *const u8,
+    size: u32,
+) -> i32 {
+    if buffer.is_null() || size == 0 {
+        return 0;
+    }
+    let data = std::slice::from_raw_parts(buffer, size as usize);
+    if let Some(ref dbk) = get_global_dbk() {
+        if dbk.cloak_region(pid, address, data).is_ok() {
+            1
+        } else {
+            0
+        }
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_kernel_get_dbvm_status(
+    out_active: *mut u32,
+    out_version: *mut u32,
+) -> i32 {
+    if let Some(ref dbk) = get_global_dbk() {
+        match dbk.get_dbvm_status() {
+            Ok((is_active, version)) => {
+                if !out_active.is_null() {
+                    *out_active = if is_active { 1 } else { 0 };
+                }
+                if !out_version.is_null() {
+                    *out_version = version;
+                }
+                1
+            }
+            Err(_) => 0,
+        }
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn onyx_kernel_cloak_symlink(new_symlink: *const c_char) -> i32 {
     if new_symlink.is_null() {
         return 0;
