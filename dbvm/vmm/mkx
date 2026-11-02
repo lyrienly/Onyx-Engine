@@ -1,9 +1,10 @@
-ASM = yasm
-LD = ld
-CC = gcc
+ASM ?= yasm
+LD ?= ld
+CC ?= gcc
+OBJCOPY ?= objcopy
 AFLAGS = -gDWARF2 -f elf64 -DSERIALPORT=${SERIALPORT} -DDISPLAYDEBUG=${DISPLAYDEBUG} #-DJTAG
-CFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td -O0 -W -Wall -DSERIALPORT=${SERIALPORT} -DDISPLAYDEBUG=${DISPLAYDEBUG} -DSUPPORT_64BIT_OFFSET -DDARKBYTESFUCKEDUPCROSSCOMPILER -fno-builtin-floor -fno-builtin-ceil -fno-builtin-strspn -fno-builtin-memcpy -fno-builtin-strcpy -fno-builtin-strlen -fno-builtin-strcat -fno-builtin-malloc -fno-builtin-snprintf -fno-builtin-memset -fno-stack-protector  -g
-LDFLAGS = -static -T vmm.lnk -Map vmm.map 
+CFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td -O0 -W -Wall -DSERIALPORT=${SERIALPORT} -DDISPLAYDEBUG=${DISPLAYDEBUG} -DSUPPORT_64BIT_OFFSET -DDARKBYTESFUCKEDUPCROSSCOMPILER -fno-builtin-floor -fno-builtin-ceil -fno-builtin-strspn -fno-builtin-memcpy -fno-builtin-strcpy -fno-builtin-strlen -fno-builtin-strcat -fno-builtin-malloc -fno-builtin-snprintf -fno-builtin-memset -fno-stack-protector -fno-pie -fno-pic -mno-red-zone -fcf-protection=none -Wno-unused-function -Wno-unused-variable -Wno-unused-parameter -g
+LDFLAGS = -static -no-pie -T vmm.lnk -Map vmm.map 
 LDFLAGS2 = -Map vmm.map
 C2FLAGS = -Wconversion
 POSTCOMPILE = @mv -f $(DEPDIR)/$*.Td $(DEPDIR)/$*.d && touch $@
@@ -39,8 +40,8 @@ vbe3.o: vbe3.c .d/vbe3.d
 	$(POSTCOMPILE)
 
 psod32.o: psod32.c .d/psod32.d
-	@${CC} ${CFLAGS} -m32 psod32.c -c -o psod32.o.32
-	@objcopy "--input-target=elf32-i386" "--output-target=elf64-x86-64" psod32.o.32 psod32.o
+	@${CC} ${CFLAGS} -m32 -fno-pie -c psod32.c -o psod32.o.32
+	@${OBJCOPY} "--input-target=elf32-i386" "--output-target=elf64-x86-64" psod32.o.32 psod32.o
 	$(POSTCOMPILE)
 
 %.o : %.asm
@@ -70,7 +71,7 @@ include $(wildcard $(patsubst %,$(DEPDIR)/%.d,$(basename $(FILES))))
 all: $(FILES) $(DISTORMFILES) $(LUAFILES) 
 	@echo "Linking"
 	@${LD} ${LDFLAGS} $(FILES) $(DISTORMFILES) $(LUAFILES) -o ../vmm.elf -Map ../vmm.map
-	@objcopy -O binary ../vmm.elf ../vmm.bin
+	@${OBJCOPY} -O binary ../vmm.elf ../vmm.bin
 	@echo "vmm done"
 
 clean:
