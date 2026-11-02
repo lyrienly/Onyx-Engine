@@ -56,22 +56,22 @@ O OnyxEngine separa rigidamente **apresentação gráfica**, **lógica de escane
 
 A Wiki está estruturada em módulos detalhados para engenheiros reversos, pesquisadores de segurança e desenvolvedores de automação:
 
-### 🎮 Tutoriais Práticos & Aplicação Real
+### Tutoriais Práticos & Aplicação Real
 * **[[Tutorial Prático: Criando seu Primeiro Trainer|Tutorial-Reversing-First-Game]]**: Guia completo do zero: anexação, varredura SIMD, detecção com breakpoints de hardware (DR0-DR3), resolução de ponteiros estáticos, criação de script AutoAssembler e automação remota por IA via MCP.
 * **[[Engenharia Reversa de Unreal Engine 4 & 5|Unreal-Engine-Dissector]]**: Arquitetura interna da Unreal Engine (`GObjects`, `FNamePool`, `UWorld`, `APlayerController`), dissecação de classes C++, extração da matriz de ossos esqueléticos (`BoneMatrix`) para ESP/Aimbot e geração de SDK.
 
-### 🛡️ Anticheats, Stealth & Kernel Ring-0
+### Anticheats, Stealth & Kernel Ring-0
 * **[[Evasão Avançada de Anticheats & Ring-0|Anticheat-Bypass-Deep-Dive]]**: Análise do modelo de ameaças de Vanguard, EAC, BattlEye e Ricochet. Implementação técnica de Callstack Spoofing, Syscalls Indiretas (Halo's Gate), Manual Mapping com expurgo de cabeçalhos PE e neutralização de `ObRegisterCallbacks`.
 * **[[Módulos de Stealth & Injeções|Stealth-Injections-Hooks]]**: Especificação dos módulos `onyx_dll_mapper`, `pe_strip`, `callstack_spoof`, `syscalls_indirect`, `taskmgr_cloak`, `vehdebug_dll` e `speedhack_dll`.
 * **[[Driver Ring-0 e Evasão Kernel|Kernel-Driver-Ring0]]**: Paginação física x86_64 a partir do registrador `CR3` ($\text{PML4} \rightarrow \text{PDPT} \rightarrow \text{PD} \rightarrow \text{PT}$), manipulação DKOM em `ActiveProcessLinks` e gravação de execução de CPU via Intel Processor Trace (Intel PT).
 
-### ⚙️ Engenharia de Memória & Runtimes
+### Engenharia de Memória & Runtimes
 * **[[Motor de Varredura SIMD|Memory-Scanner-Engine]]**: VAD walk, particionamento com Rayon, vetorização AVX2/SSE4.2 e comparação de valores exatos, desconhecidos e AOB com wildcards.
 * **[[Resolução & Varredura de Ponteiros|Pointer-Scanner-Algorithms]]**: Algoritmo de Varredura Reversa com Mapa de Ponteiros Indexado, busca binária $O(\log N)$ e algoritmos de Rescan multi-sessão.
 * **[[Desmontagem Zydis & AutoAssembler|Disassembly-Zydis-Engine]]**: Desmontador x86/x64 ultrarrápido Zydis com cálculo em tempo real de RIP-relative e compilador JIT AutoAssembler de 2 passos.
 * **[[Runtimes Gerenciados Mono & .NET|Managed-Runtimes-Mono-DotNet]]**: Extração de metadados Unity/Mono, interceptação JIT de métodos em tempo real e auditoria de heap .NET CoreCLR via DAC.
 
-### 🤖 Automação & Governança
+### Automação & Governança
 * **[[Servidor Nativo MCP & Catálogo IA|MCP-Server-Guide]]**: Protocolo JSON-RPC 2.0 sobre Stdio e Named Pipes, ciclo de vida sob demanda e catálogo exaustivo com as 49 ferramentas para agentes de IA.
 * **[[Referência C-ABI, FFI & Structs|C-ABI-FFI-Reference]]**: Definições exatas de tipos de dados em C e Pascal, alinhamento de memória e convenções de chamada.
 * **[[Compilação, Pipeline & BUILD.bat|Build-and-Deploy]]**: Manual de compilação unificado com `BUILD.bat`.
