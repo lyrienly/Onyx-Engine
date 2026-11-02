@@ -124,56 +124,65 @@ void VirtualAddressToPageEntries64(QWORD address, PPDPTE_PAE *pml4entry, PPDPTE_
 
 BOOLEAN IsAddressSafe(UINT_PTR StartAddress)
 {
-	#ifdef AMD64
-
-	UINT_PTR toppart=(StartAddress >> 47);
+#ifdef AMD64
+	UINT_PTR toppart = (StartAddress >> 47);
 	if (toppart & 1)
 	{
-
 		if (toppart != 0x1ffff)
 			return FALSE;
 	}
 	else
 	{
-
 		if (toppart != 0)
 			return FALSE;
-
 	}
-
-	#endif
+#endif
 
 	if (loadedbydbvm)
 	{
-		BYTE x=0;
-		UINT_PTR lasterror;
+		BYTE x = 0;
+		UINT_PTR lasterror = 0;
 		disableInterrupts();
 		vmx_disable_dataPageFaults();
-
-		x=*(volatile BYTE *)StartAddress;
-
+		__try {
+			x = *(volatile BYTE *)StartAddress;
+		} __except (EXCEPTION_EXECUTE_HANDLER) {
+			x = 0;
+		}
 		vmx_enable_dataPageFaults();
-		lasterror=vmx_getLastSkippedPageFault();
+		lasterror = vmx_getLastSkippedPageFault();
 		enableInterrupts();
 
-		DbgPrint("IsAddressSafe dbvm-mode: lastError=%p\n", lasterror);
-
 		if (lasterror) return FALSE;
+		return TRUE;
 	}
 
-	{
 #ifdef AMD64
-		UINT_PTR kernelbase=0x7fffffffffffffffULL;
+	UINT_PTR kernelbase = 0x7fffffffffffffffULL;
 
-		if (StartAddress<kernelbase)
-			return TRUE;
-		else
+	if (StartAddress < kernelbase)
+	{
+		// Safely probe user-mode address under SEH at passive/apc level
+		if (KeGetCurrentIrql() <= APC_LEVEL)
 		{
-			PHYSICAL_ADDRESS physical;
-			physical.QuadPart=0;
-			physical=MmGetPhysicalAddress((PVOID)StartAddress);
-			return (physical.QuadPart!=0);
+			__try {
+				ProbeForRead((PVOID)StartAddress, 1, 1);
+				return TRUE;
+			} __except (EXCEPTION_EXECUTE_HANDLER) {
+				return FALSE;
+			}
 		}
+		return MmIsAddressValid((PVOID)StartAddress);
+	}
+	else
+	{
+		if (KeGetCurrentIrql() > DISPATCH_LEVEL)
+			return FALSE;
+		if (!MmIsAddressValid((PVOID)StartAddress))
+			return FALSE;
+		PHYSICAL_ADDRESS physical = MmGetPhysicalAddress((PVOID)StartAddress);
+		return (physical.QuadPart != 0);
+	}
 #else
 
 		ULONG kernelbase=0x7ffe0000;
@@ -294,56 +303,55 @@ BOOLEAN WriteProcessMemory(DWORD PID,PEPROCESS PEProcess,PVOID Address,DWORD Siz
 				target=Address;
 				source=Buffer;
 
-				if ((loadedbydbvm) || (KernelWritesIgnoreWP))
+				BOOLEAN intDisabled = FALSE;
+				__try
 				{
-					disableInterrupts();
-
-					if (loadedbydbvm)
-						vmx_disable_dataPageFaults();
-
-					if (KernelWritesIgnoreWP)
+					if ((loadedbydbvm) || (KernelWritesIgnoreWP))
 					{
-						DbgPrint("Disabling CR0.WP");
-						setCR0(getCR0() & (~(1 << 16)));
-						disabledWP = TRUE;
+						disableInterrupts();
+						intDisabled = TRUE;
+
+						if (loadedbydbvm)
+							vmx_disable_dataPageFaults();
+
+						if (KernelWritesIgnoreWP)
+						{
+							setCR0(getCR0() & (~(1 << 16)));
+							disabledWP = TRUE;
+						}
+					}
+
+					if ((!loadedbydbvm) && ((KernelWritesIgnoreWP) || ((UINT_PTR)target >= 0x8000000000000000ULL)))
+					{
+						i = NoExceptions_CopyMemory(target, source, Size);
+						if (i != (int)Size)
+							ntStatus = STATUS_UNSUCCESSFUL;
+						else
+							ntStatus = STATUS_SUCCESS;
+					}
+					else
+					{
+						RtlCopyMemory(target, source, Size);
+						ntStatus = STATUS_SUCCESS;
 					}
 				}
-
-				if ((!loadedbydbvm) && ((KernelWritesIgnoreWP) || ((UINT_PTR)target >= 0x8000000000000000ULL)))
+				__finally
 				{
-					i = NoExceptions_CopyMemory(target, source, Size);
-					if (i != (int)Size)
-						ntStatus = STATUS_UNSUCCESSFUL;
-					else
-						ntStatus = STATUS_SUCCESS;
-				}
-				else
-				{
-					RtlCopyMemory(target, source, Size);
-					ntStatus = STATUS_SUCCESS;
-				}
-
-				if ((loadedbydbvm) || (disabledWP))
-				{
-					UINT_PTR lastError=0;
-
 					if (disabledWP)
 					{
 						setCR0(getCR0() | (1 << 16));
-						DbgPrint("Enabled CR0.WP");
 					}
 
 					if (loadedbydbvm)
 					{
-						lastError = vmx_getLastSkippedPageFault();
+						UINT_PTR lastError = vmx_getLastSkippedPageFault();
 						vmx_enable_dataPageFaults();
+						if (lastError)
+							ntStatus = STATUS_UNSUCCESSFUL;
 					}
 
-					enableInterrupts();
-
-					DbgPrint("lastError=%p\n", lastError);
-					if (lastError)
-						ntStatus=STATUS_UNSUCCESSFUL;
+					if (intDisabled)
+						enableInterrupts();
 				}
 
 			}
@@ -435,37 +443,42 @@ BOOLEAN ReadProcessMemory(DWORD PID,PEPROCESS PEProcess,PVOID Address,DWORD Size
 				target=Buffer;
 				source=Address;
 
-				if (loadedbydbvm)
+				BOOLEAN intDisabled = FALSE;
+				__try
 				{
-					disableInterrupts();
-					vmx_disable_dataPageFaults();
-				}
+					if (loadedbydbvm)
+					{
+						disableInterrupts();
+						intDisabled = TRUE;
+						vmx_disable_dataPageFaults();
+					}
 
-				if ((loadedbydbvm) || ((UINT_PTR)source < 0x8000000000000000ULL))
-				{
-					RtlCopyMemory(target, source, Size);
-					ntStatus = STATUS_SUCCESS;
-				}
-				else
-				{
-					i=NoExceptions_CopyMemory(target, source, Size);
-					if (i != (int)Size)
-						ntStatus = STATUS_UNSUCCESSFUL;
-					else
+					if ((loadedbydbvm) || ((UINT_PTR)source < 0x8000000000000000ULL))
+					{
+						RtlCopyMemory(target, source, Size);
 						ntStatus = STATUS_SUCCESS;
+					}
+					else
+					{
+						i=NoExceptions_CopyMemory(target, source, Size);
+						if (i != (int)Size)
+							ntStatus = STATUS_UNSUCCESSFUL;
+						else
+							ntStatus = STATUS_SUCCESS;
+					}
 				}
-
-				if (loadedbydbvm)
+				__finally
 				{
-					UINT_PTR lastError;
-					lastError=vmx_getLastSkippedPageFault();
-					vmx_enable_dataPageFaults();
+					if (loadedbydbvm)
+					{
+						UINT_PTR lastError = vmx_getLastSkippedPageFault();
+						vmx_enable_dataPageFaults();
+						if (lastError)
+							ntStatus = STATUS_UNSUCCESSFUL;
+					}
 
-					enableInterrupts();
-
-					DbgPrint("lastError=%p\n", lastError);
-					if (lastError)
-						ntStatus=STATUS_UNSUCCESSFUL;
+					if (intDisabled)
+						enableInterrupts();
 				}
 
 			}
