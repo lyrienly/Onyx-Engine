@@ -38,10 +38,19 @@ if not exist "UI\bin\plugins" mkdir "UI\bin\plugins"
 :: Core Engine DLLs
 copy /y "target\release\onyx_backend.dll" "bin\onyx_backend.dll" >nul
 copy /y "target\release\onyx_backend.dll" "UI\bin\onyx_backend.dll" >nul
+copy /y "target\release\onyx_backend.dll" "UI\bin\modules\onyx_backend.dll" >nul
 copy /y "target\release\onyx_scanner.dll" "bin\onyx_scanner.dll" >nul
+copy /y "target\release\onyx_scanner.dll" "UI\bin\onyx_scanner.dll" >nul
+copy /y "target\release\onyx_scanner.dll" "UI\bin\modules\onyx_scanner.dll" >nul
 copy /y "target\release\onyx_pointer.dll" "bin\onyx_pointer.dll" >nul
+copy /y "target\release\onyx_pointer.dll" "UI\bin\onyx_pointer.dll" >nul
+copy /y "target\release\onyx_pointer.dll" "UI\bin\modules\onyx_pointer.dll" >nul
 copy /y "target\release\onyx_disasm.dll" "bin\onyx_disasm.dll" >nul
+copy /y "target\release\onyx_disasm.dll" "UI\bin\onyx_disasm.dll" >nul
+copy /y "target\release\onyx_disasm.dll" "UI\bin\modules\onyx_disasm.dll" >nul
 copy /y "target\release\onyx_freezer.dll" "bin\onyx_freezer.dll" >nul
+copy /y "target\release\onyx_freezer.dll" "UI\bin\onyx_freezer.dll" >nul
+copy /y "target\release\onyx_freezer.dll" "UI\bin\modules\onyx_freezer.dll" >nul
 
 :: Analysis & Runtime Modules
 copy /y "target\release\onyx_aa.dll" "bin\modules\onyx_aa.dll" >nul
