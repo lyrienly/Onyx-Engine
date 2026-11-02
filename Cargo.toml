@@ -20,6 +20,7 @@ members = [
     "crates/dlls/speedhack",
     "crates/dlls/vehdebug",
     "crates/dlls/taskmgr_cloak",
+    "crates/dlls/onyx_shield",
     "crates/plugins/aob_generator",
     "crates/plugins/dll_mapper",
     "crates/syscalls-indirect",

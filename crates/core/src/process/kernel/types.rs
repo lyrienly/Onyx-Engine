@@ -398,6 +398,7 @@ pub struct VadEnumOutputHeader {
     pub count: u32,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct KernelSecurityProfile {
     pub secure_boot_active: bool,
     pub test_signing_active: bool,

@@ -22,3 +22,18 @@ pub use il2cpp::{parse_global_metadata_header, Il2CppMetadataHeader, GLOBAL_META
 pub use runtime::{
     detect_from_module_names, detect_mono_runtime, module_names_of_pid, MonoRuntime,
 };
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_mono_version() -> u32 {
+    0x010000
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_mono_detect_runtime(pid: u32) -> u32 {
+    match detect_mono_runtime(pid) {
+        MonoRuntime::MonoClassic { .. } => 1,
+        MonoRuntime::Il2Cpp { .. } => 2,
+        MonoRuntime::UnityPlayer { .. } => 3,
+        MonoRuntime::None => 0,
+    }
+}
