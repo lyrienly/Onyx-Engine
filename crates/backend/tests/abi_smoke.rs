@@ -284,3 +284,61 @@ fn gdb_abi_roundtrip_with_mock_target() {
     let rc = unsafe { onyx_gdb_stop(handle) };
     assert_eq!(rc, 0);
 }
+
+#[test]
+fn error_c_abi_roundtrip() {
+    use onyx_backend::{
+        onyx_error_clear, onyx_error_get_last_code, onyx_error_get_last_formatted,
+        onyx_error_get_last_message, onyx_error_get_locale, onyx_error_set_locale,
+        onyx_process_read,
+    };
+    use std::ffi::{c_char, CStr};
+
+    unsafe {
+        onyx_error_clear();
+        assert_eq!(onyx_error_get_last_code(), 0);
+
+        // Setting language to PT-BR (1)
+        onyx_error_set_locale(1);
+        assert_eq!(onyx_error_get_locale(), 1);
+
+        // Provoking an invalid process read (null handle)
+        let mut buf = [0u8; 16];
+        let rc = onyx_process_read(
+            std::ptr::null_mut(),
+            0x1000,
+            buf.as_mut_ptr() as *mut std::ffi::c_void,
+            buf.len(),
+            std::ptr::null_mut(),
+        );
+        assert_eq!(rc, 0);
+
+        // Verifying specific error code
+        assert_eq!(onyx_error_get_last_code(), 1007); // ProcessInvalidHandle
+
+        // Checking PT-BR message retrieval
+        let mut msg_buf = [0 as c_char; 512];
+        let len = onyx_error_get_last_message(msg_buf.as_mut_ptr(), 512);
+        assert!(len > 0);
+        let msg = CStr::from_ptr(msg_buf.as_ptr()).to_str().unwrap();
+        assert!(msg.contains("Handle do processo"));
+
+        // Checking diagnostic formatted string
+        let mut fmt_buf = [0 as c_char; 512];
+        let len_fmt = onyx_error_get_last_formatted(fmt_buf.as_mut_ptr(), 512);
+        assert!(len_fmt > 0);
+        let fmt_msg = CStr::from_ptr(fmt_buf.as_ptr()).to_str().unwrap();
+        assert!(fmt_msg.starts_with("[ERRO 1007]"));
+
+        // Switching to EN-US (0)
+        onyx_error_set_locale(0);
+        let len_en = onyx_error_get_last_message(msg_buf.as_mut_ptr(), 512);
+        assert!(len_en > 0);
+        let msg_en = CStr::from_ptr(msg_buf.as_ptr()).to_str().unwrap();
+        assert!(msg_en.contains("process handle is null"));
+
+        // Clear error
+        onyx_error_clear();
+        assert_eq!(onyx_error_get_last_code(), 0);
+    }
+}

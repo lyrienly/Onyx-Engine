@@ -1,6 +1,7 @@
 use crate::types::{
     OnyxMemoryRegion, OnyxModuleEntry, OnyxPeImport, OnyxPeSection, OnyxProcessEntry,
 };
+use onyx_core::error::{clear_last_error, set_last_error, OnyxError};
 use onyx_core::kernel::DbkDriver;
 use onyx_core::process::{
     DbgHelpSymbolEngine, PeInfoParser, Process, ProcessAccessMode, ProcessWatchEvent,
@@ -27,6 +28,7 @@ pub unsafe extern "C" fn onyx_process_list(
     out_total: *mut u32,
 ) -> i32 {
     if out_entries.is_null() || max_count == 0 {
+        set_last_error(OnyxError::invalid_argument("Buffer de processos é nulo ou max_count é zero"));
         return -1;
     }
 
@@ -40,9 +42,13 @@ pub unsafe extern "C" fn onyx_process_list(
             for i in 0..write_count {
                 *out_entries.add(i) = OnyxProcessEntry::new(list[i].pid, &list[i].name);
             }
+            clear_last_error();
             write_count as i32
         }
-        Err(_) => -1,
+        Err(e) => {
+            set_last_error(e);
+            -1
+        }
     }
 }
 
@@ -56,8 +62,14 @@ pub unsafe extern "C" fn onyx_process_attach(pid: u32) -> *mut Process {
     };
 
     match Process::attach_with_mode(pid, mode, dbk) {
-        Ok(proc) => Box::into_raw(Box::new(proc)),
-        Err(_) => std::ptr::null_mut(),
+        Ok(proc) => {
+            clear_last_error();
+            Box::into_raw(Box::new(proc))
+        }
+        Err(e) => {
+            set_last_error(e);
+            std::ptr::null_mut()
+        }
     }
 }
 
@@ -76,7 +88,15 @@ pub unsafe extern "C" fn onyx_process_read(
     size: usize,
     out_bytes_read: *mut usize,
 ) -> i32 {
-    if handle.is_null() || buffer.is_null() || size == 0 {
+    if handle.is_null() {
+        set_last_error(OnyxError::process_invalid_handle());
+        return 0;
+    }
+    if buffer.is_null() {
+        set_last_error(OnyxError::null_pointer("buffer"));
+        return 0;
+    }
+    if size == 0 {
         return 0;
     }
 
@@ -88,9 +108,13 @@ pub unsafe extern "C" fn onyx_process_read(
             if !out_bytes_read.is_null() {
                 *out_bytes_read = bytes_read;
             }
+            clear_last_error();
             1
         }
-        Err(_) => 0,
+        Err(e) => {
+            set_last_error(e);
+            0
+        }
     }
 }
 
@@ -102,7 +126,15 @@ pub unsafe extern "C" fn onyx_process_write(
     size: usize,
     out_bytes_written: *mut usize,
 ) -> i32 {
-    if handle.is_null() || buffer.is_null() || size == 0 {
+    if handle.is_null() {
+        set_last_error(OnyxError::process_invalid_handle());
+        return 0;
+    }
+    if buffer.is_null() {
+        set_last_error(OnyxError::null_pointer("buffer"));
+        return 0;
+    }
+    if size == 0 {
         return 0;
     }
 
@@ -114,9 +146,13 @@ pub unsafe extern "C" fn onyx_process_write(
             if !out_bytes_written.is_null() {
                 *out_bytes_written = size;
             }
+            clear_last_error();
             1
         }
-        Err(_) => 0,
+        Err(e) => {
+            set_last_error(e);
+            0
+        }
     }
 }
 
@@ -129,6 +165,7 @@ pub unsafe extern "C" fn onyx_process_protect(
     old_protect: *mut u32,
 ) -> i32 {
     if handle.is_null() {
+        set_last_error(OnyxError::process_invalid_handle());
         return 0;
     }
 
@@ -138,9 +175,13 @@ pub unsafe extern "C" fn onyx_process_protect(
             if !old_protect.is_null() {
                 *old_protect = old;
             }
+            clear_last_error();
             1
         }
-        Err(_) => 0,
+        Err(e) => {
+            set_last_error(e);
+            0
+        }
     }
 }
 
@@ -152,12 +193,26 @@ pub unsafe extern "C" fn onyx_process_alloc(
     _alloc_type: u32,
     protect: u32,
 ) -> usize {
-    if handle.is_null() || size == 0 {
+    if handle.is_null() {
+        set_last_error(OnyxError::process_invalid_handle());
+        return 0;
+    }
+    if size == 0 {
+        set_last_error(OnyxError::invalid_argument("Tamanho de alocação não pode ser zero"));
         return 0;
     }
 
     let proc = &*handle;
-    proc.alloc(size, protect).unwrap_or(0)
+    match proc.alloc(size, protect) {
+        Ok(addr) => {
+            clear_last_error();
+            addr
+        }
+        Err(e) => {
+            set_last_error(e);
+            0
+        }
+    }
 }
 
 #[no_mangle]
@@ -168,13 +223,20 @@ pub unsafe extern "C" fn onyx_process_free(
     _free_type: u32,
 ) -> i32 {
     if handle.is_null() {
+        set_last_error(OnyxError::process_invalid_handle());
         return 0;
     }
 
     let proc = &*handle;
     match proc.free(base_address) {
-        Ok(_) => 1,
-        Err(_) => 0,
+        Ok(_) => {
+            clear_last_error();
+            1
+        }
+        Err(e) => {
+            set_last_error(e);
+            0
+        }
     }
 }
 

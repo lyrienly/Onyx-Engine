@@ -1,3 +1,4 @@
+use crate::error::{set_last_error, OnyxError, OnyxErrorCode, OnyxResult};
 use crate::kernel::DbkDriver;
 use crate::win32::*;
 use std::ffi::c_void;
@@ -114,7 +115,7 @@ pub struct Process {
 }
 
 impl Process {
-    pub fn list_all_nt() -> Result<Vec<ProcessEntry>, String> {
+    pub fn list_all_nt() -> OnyxResult<Vec<ProcessEntry>> {
         let mut buffer_size: u32 = 256 * 1024;
         let mut buffer: Vec<u8> = vec![0u8; buffer_size as usize];
         let mut return_len: u32 = 0;
@@ -132,10 +133,7 @@ impl Process {
                     buffer_size = return_len.max(buffer_size * 2) + 64 * 1024;
                     buffer.resize(buffer_size as usize, 0);
                 } else if status < 0 {
-                    return Err(format!(
-                        "NtQuerySystemInformation failed with NTSTATUS: {:#X}",
-                        status
-                    ));
+                    let err = OnyxError::process_snapshot_failed(status as u32); set_last_error(err.clone()); return Err(err);
                 } else {
                     break;
                 }
@@ -184,7 +182,7 @@ impl Process {
         }
     }
 
-    pub fn list_all() -> Result<Vec<ProcessEntry>, String> {
+    pub fn list_all() -> OnyxResult<Vec<ProcessEntry>> {
         if let Ok(entries) = Self::list_all_nt()
             && !entries.is_empty()
         {
@@ -193,7 +191,7 @@ impl Process {
 
         let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
         if snapshot == INVALID_HANDLE_VALUE {
-            return Err("Failed to create process snapshot".to_string());
+            let err = OnyxError::process_snapshot_failed(unsafe { GetLastError() }); set_last_error(err.clone()); return Err(err);
         }
 
         let mut entries = Vec::new();
@@ -228,7 +226,7 @@ impl Process {
         Ok(entries)
     }
 
-    pub fn find_by_name(name: &str) -> Result<Option<ProcessEntry>, String> {
+    pub fn find_by_name(name: &str) -> OnyxResult<Option<ProcessEntry>> {
         let list = Self::list_all()?;
         let lower = name.to_lowercase();
         for p in list {
@@ -239,12 +237,12 @@ impl Process {
         Ok(None)
     }
 
-    pub fn attach_current() -> Result<Self, String> {
+    pub fn attach_current() -> OnyxResult<Self> {
         let pid = unsafe { GetCurrentProcessId() };
         Self::attach(pid)
     }
 
-    pub fn attach(pid: u32) -> Result<Self, String> {
+    pub fn attach(pid: u32) -> OnyxResult<Self> {
         Self::attach_with_mode(pid, ProcessAccessMode::NtApi, None)
     }
 
@@ -252,7 +250,7 @@ impl Process {
         pid: u32,
         mode: ProcessAccessMode,
         dbk: Option<Arc<DbkDriver>>,
-    ) -> Result<Self, String> {
+    ) -> OnyxResult<Self> {
         let _ = enable_debug_privilege();
 
         let mut handle: HANDLE = null_mut();
@@ -315,10 +313,7 @@ impl Process {
                 let fallback_h = unsafe { OpenProcess(fallback_access, FALSE, pid) };
                 if fallback_h.is_null() {
                     let err = unsafe { GetLastError() };
-                    return Err(format!(
-                        "Failed to open process PID {} via NtOpenProcess/OpenProcess (Error: 0x{:X})",
-                        pid, err
-                    ));
+                    let err_obj = if err == 5 { OnyxError::process_access_denied(pid, err) } else { OnyxError::process_attach_failed(pid, &format!("OpenProcess error 0x{:X}", err)) }; set_last_error(err_obj.clone()); return Err(err_obj);
                 }
                 handle = fallback_h;
             } else {
@@ -348,39 +343,39 @@ impl Process {
         self.dbk = dbk;
     }
 
-    pub fn get_cr3(&self) -> Result<u64, String> {
+    pub fn get_cr3(&self) -> OnyxResult<u64> {
         if let Some(ref dbk) = self.dbk {
-            dbk.get_cr3(self.pid)
+            dbk.get_cr3(self.pid).map_err(|s| OnyxError::new(OnyxErrorCode::DriverCr3WalkFailed, s.clone(), s))
         } else {
-            Err("DBK driver not attached".to_string())
+            { let err = OnyxError::driver_not_connected(); set_last_error(err.clone()); Err(err) }
         }
     }
 
-    pub fn attach_by_name(name: &str) -> Result<Self, String> {
+    pub fn attach_by_name(name: &str) -> OnyxResult<Self> {
         let found =
-            Self::find_by_name(name)?.ok_or_else(|| format!("Process '{}' not found", name))?;
+            Self::find_by_name(name)?.ok_or_else(|| { let e = OnyxError::process_not_found(0).with_context(name); set_last_error(e.clone()); e })?;
         Self::attach(found.pid)
     }
 
-    pub fn suspend(&self) -> Result<(), String> {
+    pub fn suspend(&self) -> OnyxResult<()> {
         let status = unsafe { NtSuspendProcess(self.handle) };
         if status == 0 {
             Ok(())
         } else {
-            Err(format!("NtSuspendProcess failed with status {:#X}", status))
+            { let err = OnyxError::process_suspension_failed(self.pid, status as u32); set_last_error(err.clone()); Err(err) }
         }
     }
 
-    pub fn resume(&self) -> Result<(), String> {
+    pub fn resume(&self) -> OnyxResult<()> {
         let status = unsafe { NtResumeProcess(self.handle) };
         if status == 0 {
             Ok(())
         } else {
-            Err(format!("NtResumeProcess failed with status {:#X}", status))
+            { let err = OnyxError::process_resume_failed(self.pid, status as u32); set_last_error(err.clone()); Err(err) }
         }
     }
 
-    pub fn modules(&self) -> Result<Vec<ModuleEntry>, String> {
+    pub fn modules(&self) -> OnyxResult<Vec<ModuleEntry>> {
         if self.access_mode == ProcessAccessMode::KernelDbk
             && let Some(ref dbk) = self.dbk
             && let Ok(vad_mods) = dbk.enum_vad_modules(self.pid)
@@ -397,10 +392,7 @@ impl Process {
             {
                 return Ok(vad_mods);
             }
-            return Err(format!(
-                "Failed to create module snapshot for PID {}",
-                self.pid
-            ));
+            let err = OnyxError::process_snapshot_failed(unsafe { GetLastError() }).with_context(format!("PID {}", self.pid)); set_last_error(err.clone()); return Err(err);
         }
 
         let mut mods = Vec::new();
@@ -451,7 +443,7 @@ impl Process {
         })
     }
 
-    pub fn regions(&self, writable_only: bool) -> Result<Vec<MemoryRegion>, String> {
+    pub fn regions(&self, writable_only: bool) -> OnyxResult<Vec<MemoryRegion>> {
         let mut regions = Vec::new();
         let mut addr: usize = 0x10000;
         let max_addr: usize = if size_of::<usize>() == 8 {
@@ -517,7 +509,7 @@ impl Process {
         Ok(regions)
     }
 
-    pub fn read_raw(&self, address: usize, buf: &mut [u8]) -> Result<usize, String> {
+    pub fn read_raw(&self, address: usize, buf: &mut [u8]) -> OnyxResult<usize> {
         if buf.is_empty() {
             return Ok(0);
         }
@@ -573,18 +565,18 @@ impl Process {
         if ok == TRUE && bytes_read > 0 {
             Ok(bytes_read)
         } else {
-            Err(format!("Memory read failed at 0x{:X}", address))
+            { let err = OnyxError::memory_read_failed(address, buf.len(), unsafe { GetLastError() }); set_last_error(err.clone()); Err(err) }
         }
     }
 
-    pub fn read_bytes(&self, address: usize, len: usize) -> Result<Vec<u8>, String> {
+    pub fn read_bytes(&self, address: usize, len: usize) -> OnyxResult<Vec<u8>> {
         let mut buf = vec![0u8; len];
         let read = self.read_raw(address, &mut buf)?;
         buf.truncate(read);
         Ok(buf)
     }
 
-    pub fn read<T: Copy>(&self, address: usize) -> Result<T, String> {
+    pub fn read<T: Copy>(&self, address: usize) -> OnyxResult<T> {
         let mut val: T = unsafe { zeroed() };
         let buf = unsafe {
             std::slice::from_raw_parts_mut(&mut val as *mut T as *mut u8, size_of::<T>())
@@ -598,7 +590,7 @@ impl Process {
         address: usize,
         max_len: usize,
         utf16: bool,
-    ) -> Result<String, String> {
+    ) -> OnyxResult<String> {
         if utf16 {
             let mut words = vec![0u16; max_len];
             let buf = unsafe {
@@ -615,7 +607,7 @@ impl Process {
         }
     }
 
-    pub fn write_raw(&self, address: usize, data: &[u8]) -> Result<usize, String> {
+    pub fn write_raw(&self, address: usize, data: &[u8]) -> OnyxResult<usize> {
         if data.is_empty() {
             return Ok(0);
         }
@@ -714,18 +706,18 @@ impl Process {
         if ok == TRUE && bytes_written > 0 {
             Ok(bytes_written)
         } else {
-            Err(format!("Memory write failed at 0x{:X}", address))
+            { let err = OnyxError::memory_write_failed(address, data.len(), unsafe { GetLastError() }); set_last_error(err.clone()); Err(err) }
         }
     }
 
-    pub fn write<T: Copy>(&self, address: usize, val: &T) -> Result<(), String> {
+    pub fn write<T: Copy>(&self, address: usize, val: &T) -> OnyxResult<()> {
         let slice =
             unsafe { std::slice::from_raw_parts(val as *const T as *const u8, size_of::<T>()) };
         self.write_raw(address, slice)?;
         Ok(())
     }
 
-    pub fn alloc(&self, size: usize, protect: u32) -> Result<usize, String> {
+    pub fn alloc(&self, size: usize, protect: u32) -> OnyxResult<usize> {
         if self.access_mode == ProcessAccessMode::NtApi
             || self.access_mode == ProcessAccessMode::KernelDbk
         {
@@ -756,7 +748,7 @@ impl Process {
             )
         };
         if addr.is_null() {
-            Err("Memory allocation failed (NtAllocateVirtualMemory / VirtualAllocEx)".to_string())
+            { let err = OnyxError::memory_alloc_failed(size, protect, unsafe { GetLastError() }); set_last_error(err.clone()); Err(err) }
         } else {
             Ok(addr as usize)
         }
@@ -767,7 +759,7 @@ impl Process {
         preferred_addr: usize,
         size: usize,
         protect: u32,
-    ) -> Result<usize, String> {
+    ) -> OnyxResult<usize> {
         if preferred_addr == 0 {
             return self.alloc(size, protect);
         }
@@ -813,7 +805,7 @@ impl Process {
         self.alloc(size, protect)
     }
 
-    pub fn free(&self, address: usize) -> Result<(), String> {
+    pub fn free(&self, address: usize) -> OnyxResult<()> {
         if self.access_mode == ProcessAccessMode::NtApi
             || self.access_mode == ProcessAccessMode::KernelDbk
         {
@@ -831,11 +823,11 @@ impl Process {
         if ok == TRUE {
             Ok(())
         } else {
-            Err(format!("Memory free failed at 0x{:X}", address))
+            { let err = OnyxError::memory_free_failed(address, unsafe { GetLastError() }); set_last_error(err.clone()); Err(err) }
         }
     }
 
-    pub fn protect(&self, address: usize, size: usize, new_protect: u32) -> Result<u32, String> {
+    pub fn protect(&self, address: usize, size: usize, new_protect: u32) -> OnyxResult<u32> {
         if self.access_mode == ProcessAccessMode::NtApi
             || self.access_mode == ProcessAccessMode::KernelDbk
         {
@@ -869,14 +861,14 @@ impl Process {
         if ok == TRUE {
             Ok(old_protect)
         } else {
-            Err(format!("VirtualProtect failed at 0x{:X}", address))
+            { let err = OnyxError::memory_protect_failed(address, new_protect, unsafe { GetLastError() }); set_last_error(err.clone()); Err(err) }
         }
     }
 
-    pub fn threads(&self) -> Result<Vec<u32>, String> {
+    pub fn threads(&self) -> OnyxResult<Vec<u32>> {
         let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0) };
         if snapshot == INVALID_HANDLE_VALUE {
-            return Err("Failed to create thread snapshot".to_string());
+            let err = OnyxError::new(OnyxErrorCode::ProcessThreadSnapshotFailed, "Failed to create thread snapshot", "Falha ao capturar threads do processo").with_win32(unsafe { GetLastError() }); set_last_error(err.clone()); return Err(err);
         }
 
         let mut thread_ids = Vec::new();
@@ -900,10 +892,10 @@ impl Process {
         Ok(thread_ids)
     }
 
-    pub fn resolve_dll_path(path_str: &str) -> Result<PathBuf, String> {
+    pub fn resolve_dll_path(path_str: &str) -> OnyxResult<PathBuf> {
         let p = Path::new(path_str);
         if p.is_absolute() && p.exists() {
-            return std::fs::canonicalize(p).map_err(|e| e.to_string());
+            return std::fs::canonicalize(p).map_err(|e| OnyxError::injection_dll_not_found(path_str).with_context(e.to_string()));
         }
 
         if let Ok(exe_path) = std::env::current_exe()
@@ -911,18 +903,18 @@ impl Process {
         {
             let candidate = exe_dir.join(p);
             if candidate.exists() {
-                return std::fs::canonicalize(&candidate).map_err(|e| e.to_string());
+                return std::fs::canonicalize(&candidate).map_err(|e| OnyxError::injection_dll_not_found(path_str).with_context(e.to_string()));
             }
             if let Some(filename) = p.file_name() {
                 let candidate2 = exe_dir.join(filename);
                 if candidate2.exists() {
-                    return std::fs::canonicalize(&candidate2).map_err(|e| e.to_string());
+                    return std::fs::canonicalize(&candidate2).map_err(|e| OnyxError::injection_dll_not_found(path_str).with_context(e.to_string()));
                 }
             }
         }
 
         if p.exists() {
-            return std::fs::canonicalize(p).map_err(|e| e.to_string());
+            return std::fs::canonicalize(p).map_err(|e| OnyxError::injection_dll_not_found(path_str).with_context(e.to_string()));
         }
 
         if let Some(filename) = p.file_name() {
@@ -944,18 +936,15 @@ impl Process {
             ];
             for c in &candidates {
                 if c.exists() {
-                    return std::fs::canonicalize(c).map_err(|e| e.to_string());
+                    return std::fs::canonicalize(c).map_err(|e| OnyxError::injection_dll_not_found(path_str).with_context(e.to_string()));
                 }
             }
         }
 
-        Err(format!(
-            "Could not locate DLL '{}' in executable directory, CWD, or build folders",
-            path_str
-        ))
+        { let e = OnyxError::injection_dll_not_found(path_str); set_last_error(e.clone()); Err(e) }
     }
 
-    pub fn inject_dll(&self, dll_path: &str) -> Result<usize, String> {
+    pub fn inject_dll(&self, dll_path: &str) -> OnyxResult<usize> {
         let full_path = Self::resolve_dll_path(dll_path)?;
         let full_path_str = full_path.to_str().ok_or("Invalid UTF-8 DLL path")?;
         let clean_path = full_path_str.strip_prefix(r"\\?\").unwrap_or(full_path_str);
@@ -972,21 +961,21 @@ impl Process {
 
         if let Err(e) = self.write_raw(remote_buf, slice) {
             let _ = self.free(remote_buf);
-            return Err(format!("Failed to write DLL path to remote process: {}", e));
+            let err = OnyxError::new(OnyxErrorCode::InjectionWritePathFailed, format!("Failed to write DLL path to remote process: {}", e), format!("Falha ao gravar caminho da DLL na memória do processo: {}", e)); set_last_error(err.clone()); return Err(err);
         }
 
         let k32_name: Vec<u16> = "kernel32.dll\0".encode_utf16().collect();
         let h_k32 = unsafe { crate::win32::GetModuleHandleW(k32_name.as_ptr()) };
         if h_k32.is_null() {
             let _ = self.free(remote_buf);
-            return Err("Failed to get kernel32.dll handle".to_string());
+            let err = OnyxError::new(OnyxErrorCode::InjectionLoadLibraryFailed, "Failed to get kernel32.dll handle", "Falha ao obter handle de kernel32.dll"); set_last_error(err.clone()); return Err(err);
         }
 
         let loadlib_proc =
             unsafe { crate::win32::GetProcAddress(h_k32, b"LoadLibraryW\0".as_ptr()) };
         if loadlib_proc.is_null() {
             let _ = self.free(remote_buf);
-            return Err("Failed to resolve LoadLibraryW".to_string());
+            let err = OnyxError::new(OnyxErrorCode::InjectionLoadLibraryFailed, "Failed to resolve LoadLibraryW address", "Falha ao resolver endereço de LoadLibraryW"); set_last_error(err.clone()); return Err(err);
         }
 
         let thread_start = unsafe {
@@ -1007,9 +996,7 @@ impl Process {
 
         if h_thread.is_null() || h_thread == INVALID_HANDLE_VALUE {
             let _ = self.free(remote_buf);
-            return Err(format!("CreateRemoteThread failed (Error: {})", unsafe {
-                GetLastError()
-            }));
+            let err = OnyxError::injection_thread_failed(unsafe { GetLastError() }); set_last_error(err.clone()); return Err(err);
         }
 
         unsafe {
@@ -1020,14 +1007,14 @@ impl Process {
             let _ = self.free(remote_buf);
 
             if exit_code == 0 {
-                Err("LoadLibraryW returned NULL in target process".to_string())
+                { let err = OnyxError::new(OnyxErrorCode::InjectionLoadLibraryFailed, "LoadLibraryW returned NULL in target process", "LoadLibraryW retornou NULL no processo alvo. Verifique se a DLL possui dependências não resolvidas"); set_last_error(err.clone()); Err(err) }
             } else {
                 Ok(exit_code as usize)
             }
         }
     }
 
-    pub fn create_thread(&self, start_address: usize) -> Result<usize, String> {
+    pub fn create_thread(&self, start_address: usize) -> OnyxResult<usize> {
         let thread_start = unsafe {
             std::mem::transmute::<LPVOID, unsafe extern "system" fn(LPVOID) -> DWORD>(
                 start_address as LPVOID,
@@ -1046,9 +1033,7 @@ impl Process {
             )
         };
         if h_thread.is_null() || h_thread == INVALID_HANDLE_VALUE {
-            Err(format!("CreateRemoteThread failed (Error: {})", unsafe {
-                GetLastError()
-            }))
+            { let err = OnyxError::injection_thread_failed(unsafe { GetLastError() }); set_last_error(err.clone()); Err(err) }
         } else {
             unsafe { CloseHandle(h_thread) };
             Ok(thread_id as usize)
@@ -1066,7 +1051,7 @@ impl Drop for Process {
     }
 }
 
-pub fn enable_debug_privilege() -> Result<(), String> {
+pub fn enable_debug_privilege() -> OnyxResult<()> {
     let mut token: HANDLE = null_mut();
     unsafe {
         if OpenProcessToken(
@@ -1075,7 +1060,7 @@ pub fn enable_debug_privilege() -> Result<(), String> {
             &mut token,
         ) != TRUE
         {
-            return Err("OpenProcessToken failed".to_string());
+            let err = OnyxError::new(OnyxErrorCode::DriverSeDebugGrantFailed, "OpenProcessToken failed", "Falha ao abrir token do processo atual").with_win32(GetLastError()); set_last_error(err.clone()); return Err(err);
         }
 
         let priv_name: Vec<u16> = "SeDebugPrivilege\0".encode_utf16().collect();
@@ -1083,7 +1068,7 @@ pub fn enable_debug_privilege() -> Result<(), String> {
 
         if LookupPrivilegeValueW(null(), priv_name.as_ptr(), &mut luid) != TRUE {
             CloseHandle(token);
-            return Err("LookupPrivilegeValueW failed".to_string());
+            let err = OnyxError::new(OnyxErrorCode::DriverSeDebugGrantFailed, "LookupPrivilegeValueW failed", "Falha ao consultar SeDebugPrivilege").with_win32(GetLastError()); set_last_error(err.clone()); return Err(err);
         }
 
         let mut tp: TOKEN_PRIVILEGES = zeroed();
@@ -1104,7 +1089,7 @@ pub fn enable_debug_privilege() -> Result<(), String> {
         if ok == TRUE {
             Ok(())
         } else {
-            Err("AdjustTokenPrivileges failed".to_string())
+            { let err = OnyxError::new(OnyxErrorCode::DriverSeDebugGrantFailed, "AdjustTokenPrivileges failed", "Falha ao ajustar privilégios do token").with_win32(GetLastError()); set_last_error(err.clone()); Err(err) }
         }
     }
 }
@@ -1150,7 +1135,7 @@ mod tests {
 
         let magic: u64 = 0xDEADBEEFCAFE1337;
         let addr = &magic as *const u64 as usize;
-        let val: Result<u64, String> = p.read(addr);
+        let val: OnyxResult<u64> = p.read(addr);
         assert!(
             val.is_ok(),
             "Failed to read via NtReadVirtualMemory: {:?}",

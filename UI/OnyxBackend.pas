@@ -250,10 +250,80 @@ const
   ONYX_PTR_PHASE_CANCELLED = 5;
   ONYX_PTR_PHASE_FAILED = 6;
 
+  // Onyx Error Locales
+  ONYX_LOCALE_EN_US = 0;
+  ONYX_LOCALE_PT_BR = 1;
+
+  // Onyx Central Error Codes
+  ONYX_ERR_SUCCESS = 0;
+  ONYX_ERR_NULL_POINTER = 101;
+  ONYX_ERR_INVALID_ARGUMENT = 102;
+  ONYX_ERR_BUFFER_TOO_SMALL = 103;
+  ONYX_ERR_BUFFER_OVERFLOW = 104;
+  ONYX_ERR_INDEX_OUT_OF_BOUNDS = 105;
+  ONYX_ERR_INVALID_STATE = 106;
+  ONYX_ERR_OPERATION_CANCELLED = 107;
+  ONYX_ERR_OPERATION_TIMEOUT = 108;
+  ONYX_ERR_NOT_IMPLEMENTED = 109;
+  ONYX_ERR_INTERNAL_ERROR = 110;
+
+  ONYX_ERR_PROCESS_NOT_FOUND = 1001;
+  ONYX_ERR_PROCESS_ACCESS_DENIED = 1002;
+  ONYX_ERR_PROCESS_ATTACH_FAILED = 1003;
+  ONYX_ERR_PROCESS_SNAPSHOT_FAILED = 1004;
+  ONYX_ERR_PROCESS_SUSPENSION_FAILED = 1005;
+  ONYX_ERR_PROCESS_RESUME_FAILED = 1006;
+  ONYX_ERR_PROCESS_INVALID_HANDLE = 1007;
+  ONYX_ERR_PROCESS_THREAD_SNAPSHOT_FAILED = 1008;
+
+  ONYX_ERR_MEMORY_READ_FAILED = 1101;
+  ONYX_ERR_MEMORY_WRITE_FAILED = 1102;
+  ONYX_ERR_MEMORY_ALLOC_FAILED = 1103;
+  ONYX_ERR_MEMORY_PROTECT_FAILED = 1104;
+  ONYX_ERR_MEMORY_FREE_FAILED = 1105;
+  ONYX_ERR_MEMORY_QUERY_FAILED = 1106;
+  ONYX_ERR_MEMORY_PAGE_GUARD = 1108;
+
+  ONYX_ERR_DRIVER_NOT_CONNECTED = 2001;
+  ONYX_ERR_DRIVER_CONNECTION_FAILED = 2002;
+  ONYX_ERR_DRIVER_IOCTL_FAILED = 2003;
+  ONYX_ERR_DRIVER_PHYSICAL_READ = 2004;
+  ONYX_ERR_DRIVER_PHYSICAL_WRITE = 2005;
+  ONYX_ERR_DRIVER_CR3_WALK_FAILED = 2006;
+  ONYX_ERR_DRIVER_INTEL_PT_UNSUPPORTED = 2010;
+
+  ONYX_ERR_SCANNER_PATTERN_PARSE = 3001;
+  ONYX_ERR_SCANNER_INVALID_DATA_TYPE = 3002;
+  ONYX_ERR_SCANNER_BUFFER_OVERFLOW = 3003;
+  ONYX_ERR_SCANNER_NO_ACTIVE_SCAN = 3004;
+  ONYX_ERR_POINTER_CHAIN_BROKEN = 3010;
+
+  ONYX_ERR_INJECTION_DLL_NOT_FOUND = 4001;
+  ONYX_ERR_INJECTION_REMOTE_ALLOC = 4002;
+  ONYX_ERR_INJECTION_WRITE_PATH = 4003;
+  ONYX_ERR_INJECTION_THREAD_CREATION = 4004;
+  ONYX_ERR_INJECTION_LOAD_LIBRARY = 4005;
+  ONYX_ERR_HOOK_TRAMPOLINE_FAILED = 4006;
+  ONYX_ERR_HOOK_TARGET_TOO_SMALL = 4007;
+  ONYX_ERR_MANUAL_MAP_INVALID_PE = 4010;
+
 // Native Rust Backend Export Declarations
 function onyx_backend_version: DWORD; stdcall; external OnyxBackendDLL;
 function onyx_backend_ping: integer; stdcall; external OnyxBackendDLL;
 function onyx_security_cloak_self: integer; stdcall; external OnyxBackendDLL;
+
+// Central Error Subsystem Declarations
+function onyx_error_get_last_code: DWORD; stdcall; external OnyxBackendDLL;
+function onyx_error_get_last_message(out_buf: PAnsiChar; max_len: DWORD): DWORD; stdcall; external OnyxBackendDLL;
+function onyx_error_get_last_formatted(out_buf: PAnsiChar; max_len: DWORD): DWORD; stdcall; external OnyxBackendDLL;
+procedure onyx_error_set_locale(locale_code: DWORD); stdcall; external OnyxBackendDLL;
+function onyx_error_get_locale: DWORD; stdcall; external OnyxBackendDLL;
+procedure onyx_error_clear; stdcall; external OnyxBackendDLL;
+
+function OnyxGetLastErrorMessage: string;
+function OnyxGetLastErrorFormatted: string;
+procedure OnyxSetLanguage(const ALocale: DWORD);
+function OnyxCheckOperation(const ASuccess: boolean; const AOpContext: string): boolean;
 
 function onyx_process_list(out_entries: Pointer; max_count: DWORD; out_total: PDWORD): integer; stdcall; external OnyxBackendDLL;
 function onyx_process_attach(pid: DWORD): Pointer; stdcall; external OnyxBackendDLL;
@@ -1757,7 +1827,54 @@ begin
   fnDllMapDllNamed := nil;
 end;
 
+function OnyxGetLastErrorMessage: string;
+var
+  buf: array[0..1023] of AnsiChar;
+  len: DWORD;
+begin
+  FillChar(buf, SizeOf(buf), 0);
+  len := onyx_error_get_last_message(@buf[0], SizeOf(buf));
+  if len > 0 then
+    Result := StrPas(buf)
+  else
+    Result := '';
+end;
+
+function OnyxGetLastErrorFormatted: string;
+var
+  buf: array[0..2047] of AnsiChar;
+  len: DWORD;
+begin
+  FillChar(buf, SizeOf(buf), 0);
+  len := onyx_error_get_last_formatted(@buf[0], SizeOf(buf));
+  if len > 0 then
+    Result := StrPas(buf)
+  else
+    Result := '';
+end;
+
+procedure OnyxSetLanguage(const ALocale: DWORD);
+begin
+  onyx_error_set_locale(ALocale);
+end;
+
+function OnyxCheckOperation(const ASuccess: boolean; const AOpContext: string): boolean;
+var
+  errCode: DWORD;
+  diag: string;
+begin
+  Result := ASuccess;
+  if not ASuccess then
+  begin
+    errCode := onyx_error_get_last_code;
+    diag := OnyxGetLastErrorFormatted;
+    if diag = '' then
+      diag := Format('[ERRO %d] Falha na operação: %s', [errCode, AOpContext]);
+  end;
+end;
+
 initialization
+  onyx_error_set_locale(ONYX_LOCALE_PT_BR);
   InitOnyxBackend;
 
 finalization

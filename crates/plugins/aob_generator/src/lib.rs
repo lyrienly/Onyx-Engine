@@ -6,6 +6,7 @@ use onyx_core::memory::scanner::AobByte;
 use onyx_core::memory::signature_maker::SignatureMaker;
 use onyx_core::process::pdb::DbgHelpSymbolEngine;
 use onyx_core::process::process::Process;
+use onyx_core::error::{set_last_error, OnyxError};
 
 pub const ONYX_PLUGIN_API_VERSION: u32 = 1;
 
@@ -112,7 +113,12 @@ pub unsafe extern "system" fn OnyxPlugin_ValidateAOB(
     module_filter_ptr: *const c_char,
     out_result: *mut OnyxAobMatchResult,
 ) -> i32 {
-    if pattern_ptr.is_null() || out_result.is_null() {
+    if pattern_ptr.is_null() {
+        set_last_error(OnyxError::null_pointer("pattern_ptr"));
+        return ONYX_PLUGIN_ERR_INVALID_PARAM;
+    }
+    if out_result.is_null() {
+        set_last_error(OnyxError::null_pointer("out_result"));
         return ONYX_PLUGIN_ERR_INVALID_PARAM;
     }
 
@@ -132,7 +138,10 @@ pub unsafe extern "system" fn OnyxPlugin_ValidateAOB(
 
     let parsed_aob = match parse_aob_pattern_str(pattern_str) {
         Ok(a) => a,
-        Err(_) => return ONYX_PLUGIN_ERR_INVALID_PARAM,
+        Err(e) => {
+            set_last_error(OnyxError::scanner_invalid_pattern(pattern_str, &e));
+            return ONYX_PLUGIN_ERR_INVALID_PARAM;
+        }
     };
 
     let proc = if pid == 0 {
