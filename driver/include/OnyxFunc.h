@@ -429,6 +429,50 @@ void forEachCpu(PKDEFERRED_ROUTINE dpcfunction, PVOID DeferredContext, PVOID  Sy
 void forEachCpuAsync(PKDEFERRED_ROUTINE dpcfunction, PVOID DeferredContext, PVOID  SystemArgument1, PVOID  SystemArgument2, OPTIONAL PPREDPC_CALLBACK preDPCCallback);
 void forEachCpuPassive(PF f, UINT_PTR param);
 
+
+typedef struct _KLDR_DATA_TABLE_ENTRY {
+	LIST_ENTRY InLoadOrderLinks;
+	LIST_ENTRY InMemoryOrderLinks;
+	LIST_ENTRY InInitializationOrderLinks;
+	PVOID DllBase;
+	PVOID EntryPoint;
+	ULONG SizeOfImage;
+	UNICODE_STRING FullDllName;
+	UNICODE_STRING BaseDllName;
+	ULONG Flags;
+	USHORT LoadCount;
+	USHORT __Undefined5;
+	PVOID SectionPointer;
+	ULONG CheckSum;
+	PVOID LoadedImports;
+	PVOID PatchInformation;
+} KLDR_DATA_TABLE_ENTRY, *PKLDR_DATA_TABLE_ENTRY;
+
+typedef struct _SAFE_PHYSICAL_MEMORY_RANGE {
+	ULONG64 BaseAddress;
+	ULONG64 EndAddress;
+} SAFE_PHYSICAL_MEMORY_RANGE;
+
+typedef struct _PIDDB_CACHE_ENTRY
+{
+	LIST_ENTRY		List;
+	UNICODE_STRING	DriverName;
+	ULONG			TimeDateStamp;
+	NTSTATUS		LoadStatus;
+	CHAR			_pad[16];
+} PIDDB_CACHE_ENTRY, *PPIDDB_CACHE_ENTRY;
+
+typedef struct _UNLOADED_DRIVER_ENTRY
+{
+	UNICODE_STRING	Name;
+	PVOID			StartAddress;
+	PVOID			EndAddress;
+	LARGE_INTEGER	CurrentTime;
+} UNLOADED_DRIVER_ENTRY, *PUNLOADED_DRIVER_ENTRY;
+
+typedef BOOLEAN (NTAPI *PFN_RtlDeleteElementGenericTableAvl)(PVOID Table, PVOID Buffer);
+typedef PVOID (NTAPI *PFN_RtlLookupElementGenericTableAvl)(PVOID Table, PVOID Buffer);
+
 NTKERNELAPI PVOID NTAPI PsGetProcessSectionBaseAddress(PEPROCESS Process);
 VOID HideDriverFromLoadedModuleList(PDRIVER_OBJECT DriverObject);
 UINT64 GetProcessCR3(PEPROCESS Process);
