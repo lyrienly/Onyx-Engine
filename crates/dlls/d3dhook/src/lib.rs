@@ -1,235 +1,79 @@
+//! Overlay de telemetria do OnyxEngine via [`hudhook`].
+//!
+//! A DLL é injetada no processo alvo (jogo). O macro `hudhook!` abaixo
+//! define o `DllMain` que:
+//! 1. Hooka o pipeline de apresentação DX11 (via `ImguiDx11Hooks`).
+//! 2. Captura device/context/swap chain do jogo.
+//! 3. Chama `OnyxOverlay::render` a cada frame antes do `Present` original.
+//! 4. Restaura os hooks limpamente no `DLL_PROCESS_DETACH`.
+//!
+//! A ABI de `D3DHook_*` consumida pelo frontend Pascal fica preservada em
+//! [`exports`] como stubs — o overlay roda sozinho sem precisar da chamada
+//! do frontend.
+
 #![allow(
+    static_mut_refs,
+    dead_code,
     non_snake_case,
     non_camel_case_types,
-    dead_code,
-    unsafe_op_in_unsafe_fn,
-    static_mut_refs
+    unsafe_op_in_unsafe_fn
 )]
 
-use std::ffi::c_void;
-use std::ptr::null_mut;
-use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU32, Ordering};
+use hudhook::hooks::dx11::ImguiDx11Hooks;
+use hudhook::imgui::{self, Condition};
+use hudhook::{ImguiRenderLoop, hudhook};
+use std::time::Instant;
 
-type HANDLE = *mut c_void;
-type HMODULE = *mut c_void;
-type HWND = *mut c_void;
-type BOOL = i32;
-type DWORD = u32;
-type HRESULT = i32;
+pub mod exports;
+mod telemetry;
 
-const S_OK: HRESULT = 0;
-const PAGE_EXECUTE_READWRITE: DWORD = 0x40;
-const MEM_COMMIT: DWORD = 0x1000;
-const MEM_RESERVE: DWORD = 0x2000;
+pub use exports::{
+    D3DHook_ClearCommands, D3DHook_GetCommandCount, D3DHook_Initialize, D3DHook_Shutdown,
+    RenderCommand,
+};
 
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct RenderCommand {
-    pub cmd_type: u32,
-    pub x: f32,
-    pub y: f32,
-    pub w: f32,
-    pub h: f32,
-    pub color_rgba: u32,
-    pub text_len: u32,
-    pub text_buf: [u8; 64],
+pub struct OnyxOverlay {
+    frame_count: u64,
+    start: Instant,
 }
 
-const MAX_COMMANDS: usize = 256;
-static mut COMMAND_BUFFER: [RenderCommand; MAX_COMMANDS] = [RenderCommand {
-    cmd_type: 0,
-    x: 0.0,
-    y: 0.0,
-    w: 0.0,
-    h: 0.0,
-    color_rgba: 0,
-    text_len: 0,
-    text_buf: [0u8; 64],
-}; MAX_COMMANDS];
-
-static COMMAND_COUNT: AtomicU32 = AtomicU32::new(0);
-static HOOK_INSTALLED: AtomicBool = AtomicBool::new(false);
-static PIPE_THREAD_RUNNING: AtomicBool = AtomicBool::new(false);
-static PIPE_HANDLE: AtomicIsize = AtomicIsize::new(-1);
-
-unsafe extern "system" {
-    fn GetModuleHandleA(lpModuleName: *const u8) -> HMODULE;
-    fn GetProcAddress(hModule: HMODULE, lpProcName: *const u8) -> *mut c_void;
-    fn VirtualProtect(
-        lpAddress: *mut c_void,
-        dwSize: usize,
-        flNewProtect: DWORD,
-        lpflOldProtect: *mut DWORD,
-    ) -> BOOL;
-    fn VirtualAlloc(
-        lpAddress: *mut c_void,
-        dwSize: usize,
-        flAllocationType: DWORD,
-        flProtect: DWORD,
-    ) -> *mut c_void;
-    fn GetCurrentProcessId() -> DWORD;
-    fn CreateThread(
-        lpThreadAttributes: *mut c_void,
-        dwStackSize: usize,
-        lpStartAddress: unsafe extern "system" fn(*mut c_void) -> DWORD,
-        lpParameter: *mut c_void,
-        dwCreationFlags: DWORD,
-        lpThreadId: *mut DWORD,
-    ) -> HANDLE;
-    fn CreateNamedPipeA(
-        lpName: *const u8,
-        dwOpenMode: DWORD,
-        dwPipeMode: DWORD,
-        nMaxInstances: DWORD,
-        nOutBufferSize: DWORD,
-        nInBufferSize: DWORD,
-        nDefaultTimeOut: DWORD,
-        lpSecurityAttributes: *mut c_void,
-    ) -> HANDLE;
-    fn ConnectNamedPipe(hNamedPipe: HANDLE, lpOverlapped: *mut c_void) -> BOOL;
-    fn DisconnectNamedPipe(hNamedPipe: HANDLE) -> BOOL;
-    fn ReadFile(
-        hFile: HANDLE,
-        lpBuffer: *mut c_void,
-        nNumberOfBytesToRead: DWORD,
-        lpNumberOfBytesRead: *mut DWORD,
-        lpOverlapped: *mut c_void,
-    ) -> BOOL;
-    fn CloseHandle(hObject: HANDLE) -> BOOL;
-}
-
-type FnPresent = unsafe extern "system" fn(*mut c_void, u32, u32) -> HRESULT;
-static mut ORIG_PRESENT: Option<FnPresent> = None;
-
-unsafe extern "system" fn hook_present(
-    p_swap_chain: *mut c_void,
-    sync_interval: u32,
-    flags: u32,
-) -> HRESULT {
-    let _count = COMMAND_COUNT.load(Ordering::Relaxed);
-
-    if let Some(orig) = ORIG_PRESENT {
-        orig(p_swap_chain, sync_interval, flags)
-    } else {
-        S_OK
+impl Default for OnyxOverlay {
+    fn default() -> Self {
+        Self {
+            frame_count: 0,
+            start: Instant::now(),
+        }
     }
 }
 
-unsafe fn hook_vtable_function(vtable_slot: *mut *mut c_void, detour: *mut c_void) -> *mut c_void {
-    let orig = *vtable_slot;
-    let mut old_protect: DWORD = 0;
-    VirtualProtect(
-        vtable_slot as *mut c_void,
-        std::mem::size_of::<*mut c_void>(),
-        PAGE_EXECUTE_READWRITE,
-        &mut old_protect,
-    );
-    *vtable_slot = detour;
-    VirtualProtect(
-        vtable_slot as *mut c_void,
-        std::mem::size_of::<*mut c_void>(),
-        old_protect,
-        &mut old_protect,
-    );
-    orig
-}
+impl ImguiRenderLoop for OnyxOverlay {
+    fn render(&mut self, ui: &mut imgui::Ui) {
+        self.frame_count += 1;
 
-unsafe extern "system" fn pipe_server_worker(_param: *mut c_void) -> DWORD {
-    let pid = GetCurrentProcessId();
-    let pipe_name = format!("\\\\.\\pipe\\ce_d3dhook_{}\0", pid);
+        ui.window("Onyx Telemetry")
+            .position([20.0, 20.0], Condition::FirstUseEver)
+            .size([320.0, 220.0], Condition::FirstUseEver)
+            .build(|| {
+                let io = ui.io();
+                let fps = io.framerate;
+                let frame_ms = if fps > 0.0 { 1000.0 / fps } else { 0.0 };
 
-    while PIPE_THREAD_RUNNING.load(Ordering::SeqCst) {
-        let pipe = CreateNamedPipeA(
-            pipe_name.as_ptr(),
-            0x00000003,
-            0x00000000,
-            1,
-            4096,
-            4096,
-            0,
-            null_mut(),
-        );
+                ui.text(format!("FPS:        {:.1}", fps));
+                ui.text(format!("Frame:      {:.2} ms", frame_ms));
+                ui.text(format!("Frames:     {}", self.frame_count));
+                ui.separator();
 
-        if pipe == -1isize as HANDLE {
-            break;
-        }
+                let (mem_mb, peak_mb) = telemetry::process_memory_mb();
+                ui.text(format!("Memory:     {} MB", mem_mb));
+                ui.text(format!("Peak:       {} MB", peak_mb));
+                ui.separator();
 
-        PIPE_HANDLE.store(pipe as isize, Ordering::SeqCst);
-
-        let connected = ConnectNamedPipe(pipe, null_mut()) != 0 || { true };
-
-        if connected {
-            let mut buf = [0u8; std::mem::size_of::<RenderCommand>()];
-            let mut read_bytes: DWORD = 0;
-
-            while ReadFile(
-                pipe,
-                buf.as_mut_ptr() as *mut c_void,
-                buf.len() as DWORD,
-                &mut read_bytes,
-                null_mut(),
-            ) != 0
-            {
-                if read_bytes as usize == std::mem::size_of::<RenderCommand>() {
-                    let cmd = std::ptr::read_unaligned(buf.as_ptr() as *const RenderCommand);
-                    let current = COMMAND_COUNT.load(Ordering::Relaxed) as usize;
-                    if current < MAX_COMMANDS {
-                        COMMAND_BUFFER[current] = cmd;
-                        COMMAND_COUNT.fetch_add(1, Ordering::SeqCst);
-                    }
-                }
-            }
-        }
-
-        DisconnectNamedPipe(pipe);
-        CloseHandle(pipe);
-        PIPE_HANDLE.store(-1, Ordering::SeqCst);
+                let uptime = self.start.elapsed().as_secs_f32();
+                ui.text(format!("Uptime:     {:.1}s", uptime));
+                ui.separator();
+                ui.text_colored([0.4, 0.9, 0.4, 1.0], "OnyxEngine Overlay");
+            });
     }
-
-    0
 }
 
-#[unsafe(no_mangle)]
-pub unsafe extern "system" fn D3DHook_Initialize() -> BOOL {
-    if HOOK_INSTALLED.load(Ordering::SeqCst) {
-        return 1;
-    }
-
-    PIPE_THREAD_RUNNING.store(true, Ordering::SeqCst);
-    CreateThread(null_mut(), 0, pipe_server_worker, null_mut(), 0, null_mut());
-
-    HOOK_INSTALLED.store(true, Ordering::SeqCst);
-    1
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "system" fn D3DHook_GetCommandCount() -> u32 {
-    COMMAND_COUNT.load(Ordering::Relaxed)
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "system" fn D3DHook_ClearCommands() {
-    COMMAND_COUNT.store(0, Ordering::SeqCst);
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "system" fn DllMain(
-    _hinst_dll: *mut c_void,
-    fdw_reason: u32,
-    _lpv_reserved: *mut c_void,
-) -> BOOL {
-    match fdw_reason {
-        1 => {
-            D3DHook_Initialize();
-        }
-        0 => {
-            PIPE_THREAD_RUNNING.store(false, Ordering::SeqCst);
-            let h_val = PIPE_HANDLE.swap(-1, Ordering::SeqCst);
-            if h_val != -1 {
-                CloseHandle(h_val as HANDLE);
-            }
-        }
-        _ => {}
-    }
-    1
-}
+hudhook!(ImguiDx11Hooks, OnyxOverlay::default());
