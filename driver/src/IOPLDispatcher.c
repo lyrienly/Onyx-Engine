@@ -2662,6 +2662,60 @@ static PVOID g_TraceStoreBuffer = NULL;
 			break;
 		}
 
+		case IOCTL_CE_GET_HVCI_STATUS:
+		{
+			if (irpStack->Parameters.DeviceIoControl.OutputBufferLength >= sizeof(HVCI_STATUS_OUTPUT))
+			{
+				PHVCI_STATUS_OUTPUT pStatus = (PHVCI_STATUS_OUTPUT)Irp->AssociatedIrp.SystemBuffer;
+				RtlZeroMemory(pStatus, sizeof(HVCI_STATUS_OUTPUT));
+
+				int cpuInfo[4] = {0};
+				__cpuid(cpuInfo, 1);
+				if ((cpuInfo[2] & (1 << 31)) != 0)
+				{
+					pStatus->VbsEnabled = 1;
+				}
+
+				UNICODE_STRING uRoutine;
+				RtlInitUnicodeString(&uRoutine, L"ZwQuerySystemInformation");
+				typedef NTSTATUS (NTAPI *PFN_ZwQuerySystemInformation)(ULONG, PVOID, ULONG, PULONG);
+				PFN_ZwQuerySystemInformation pfnZwQuery = (PFN_ZwQuerySystemInformation)MmGetSystemRoutineAddress(&uRoutine);
+				if (pfnZwQuery)
+				{
+					typedef struct _SYSTEM_CODEINTEGRITY_INFO {
+						ULONG Length;
+						ULONG CodeIntegrityOptions;
+					} SYSTEM_CODEINTEGRITY_INFO;
+
+					SYSTEM_CODEINTEGRITY_INFO sci = {0};
+					sci.Length = sizeof(sci);
+					ULONG retLen = 0;
+					NTSTATUS status = pfnZwQuery(103 /* SystemCodeIntegrityInformation */, &sci, sizeof(sci), &retLen);
+					if (NT_SUCCESS(status))
+					{
+						pStatus->CodeIntegrityOpts = sci.CodeIntegrityOptions;
+						if (sci.CodeIntegrityOptions & 0x00000400)
+						{
+							pStatus->HvciEnabled = 1;
+							pStatus->VbsEnabled = 1;
+						}
+						if (sci.CodeIntegrityOptions & 0x00001000)
+						{
+							pStatus->StrictMode = 1;
+						}
+					}
+				}
+
+				Irp->IoStatus.Information = sizeof(HVCI_STATUS_OUTPUT);
+				ntStatus = STATUS_SUCCESS;
+			}
+			else
+			{
+				ntStatus = STATUS_BUFFER_TOO_SMALL;
+			}
+			break;
+		}
+
         default:
 			DbgPrint("Unhandled IO request: %x\n", IoControlCode);
             break;
