@@ -11,6 +11,7 @@ pub mod exports;
 pub mod hooks;
 pub mod manager;
 pub mod pipe;
+pub mod state;
 pub mod vtable;
 
 pub use exports::{
