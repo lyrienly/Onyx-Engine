@@ -48,4 +48,5 @@ ACE.rar
 lydumen/
 
 obj/
+*.zip
 bin/

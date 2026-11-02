@@ -71,12 +71,111 @@ O `onyx_pointer.dll` emprega o algoritmo de **Varredura Reversa com Mapa de Pont
 
 ## 4. Otimizações de Performance do `onyx_pointer.dll`
 
-1. **Bucket Hash + Binary Search Híbrido**: O mapa de memória é segmentado em *buckets* de 2 MB indexados por hash, reduzindo o espaço de busca da busca binária de $N$ para $K \ll N$.
+1. **Bucket Hash + Binary Search Híbrido**: O mapa de memória é segmentado em *buckets* indexados, reduzindo o espaço de busca da busca binária de $N$ para $K \ll N$.
 2. **Poda de Ramos Cíclicos**: Caminhos que referenciam estruturas circulares de dados (listas encadeadas em que $A \rightarrow B \rightarrow A$) são abortados imediatamente para evitar loops infinitos.
 3. **Rescan Multi-Sessão**:
    - Um scan inicial pode encontrar 500.000 caminhos possíveis.
-   - Ao reiniciar o jogo ou mudar de fase, o endereço da vida muda para um novo valor.
+   - Ao reiniciar o jogo ou mudar de fase, o endereço da variável muda para um novo valor.
    - O comando de **Rescan** testa cada uma das 500.000 cadeias salvas contra o novo endereço alvo, descartando ponteiros que apontam para lixo e filtrando até restar apenas **1 a 5 caminhos verdadeiros**.
+
+### 4.1 Algoritmo de Expansão de Frente de Onda (`scan_wavefront`)
+
+O núcleo do scanner de ponteiros implementa uma busca em largura (*Breadth-First Search*) paralela que expande nós candidatos a partir do endereço alvo em direção aos módulos estáticos carregados:
+
+```rust
+// crates/modules/pointer/src/compute.rs
+#[derive(Clone)]
+struct WavefrontNode {
+    current_address: u64,
+    offsets: Vec<usize>,
+    visited: HashSet<u64>,
+}
+
+pub fn scan_wavefront(
+    matrix: &CompactPointerMatrix,
+    target_address: u64,
+    max_depth: usize,
+    max_offset: usize,
+    alignment: usize,
+    max_results: usize,
+    modules: &[ModuleEntry],
+    cancel_flag: Option<Arc<AtomicBool>>,
+    progress_cb: Option<&mut dyn FnMut(f32, usize) -> bool>,
+) -> Vec<PointerPath> {
+    let mut results = Vec::new();
+    if matrix.is_empty() || max_depth == 0 {
+        return results;
+    }
+
+    let mut queue: Vec<WavefrontNode> = vec![WavefrontNode {
+        current_address: target_address,
+        offsets: Vec::new(),
+        visited: {
+            let mut set = HashSet::with_capacity(max_depth + 1);
+            set.insert(target_address);
+            set
+        },
+    }];
+
+    let mut current_depth = 0;
+
+    while current_depth < max_depth && !queue.is_empty() && results.len() < max_results {
+        if let Some(ref cancel) = cancel_flag {
+            if cancel.load(Ordering::Relaxed) {
+                break;
+            }
+        }
+
+        let mut next_queue = Vec::with_capacity(queue.len() * 4);
+
+        for node in &queue {
+            if results.len() >= max_results {
+                break;
+            }
+
+            // Localiza todos os ponteiros no mapa que apontam para [node.current_address - max_offset .. node.current_address]
+            let candidates = matrix.find_candidates(node.current_address, max_offset, alignment);
+
+            for (from_addr, offset) in candidates {
+                if node.visited.contains(&from_addr) {
+                    continue; // Poda de ciclo
+                }
+
+                let mut new_offsets = node.offsets.clone();
+                new_offsets.push(offset);
+
+                // Verifica se from_addr reside no intervalo de memória de algum módulo DLL/EXE carregado
+                if let Some(m) = modules.iter().find(|m| {
+                    (from_addr as usize) >= m.base && (from_addr as usize) < (m.base + m.size)
+                }) {
+                    let base_offset = (from_addr as usize) - m.base;
+                    let mut path_offsets = new_offsets.clone();
+                    path_offsets.reverse();
+
+                    results.push(PointerPath {
+                        module_name: m.name.clone(),
+                        base_offset,
+                        offsets: path_offsets,
+                    });
+                } else if current_depth + 1 < max_depth {
+                    let mut next_visited = node.visited.clone();
+                    next_visited.insert(from_addr);
+                    next_queue.push(WavefrontNode {
+                        current_address: from_addr,
+                        offsets: new_offsets,
+                        visited: next_visited,
+                    });
+                }
+            }
+        }
+
+        queue = next_queue;
+        current_depth += 1;
+    }
+
+    results
+}
+```
 
 ---
 

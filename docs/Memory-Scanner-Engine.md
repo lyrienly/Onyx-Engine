@@ -57,33 +57,62 @@ O motor suporta todos os tipos primitivos de dados com alinhamento configurável
 
 ## 4. Algoritmos de First Scan e Next Scan
 
-### 4.1 First Scan: Valor Exato (`Exact Value`)
-Na primeira varredura, o scanner não possui dados prévios. Ele divide cada região elegível em blocos de memória e aplica a rotina SIMD para testar 8 inteiros de 32 bits simultaneamente por ciclo de clock:
+### 4.1 First Scan: Valor Exato (`Exact Value`) com Vetorização AVX2
+Na primeira varredura, o scanner divide cada região de memória elegível em blocos contíguos e executa o comparador vetorizado em hardware. Para inteiros de 32 bits, 8 lanes são comparadas simultaneamente em uma única instrução `_mm256_cmpeq_epi32`:
 
 ```rust
+// crates/modules/scanner/src/value_scan.rs
 #[target_feature(enable = "avx2")]
-pub unsafe fn scan_chunk_exact_i32(buffer: &[u8], target_val: i32, results: &mut Vec<usize>) {
-    let target_vec = _mm256_set1_epi32(target_val);
-    let len = buffer.len();
-    let mut offset = 0;
+pub unsafe fn scan_exact_i32(buffer: &[u8], target: i32, align: usize) -> Vec<usize> {
+    let step = effective_align(ValueKind::I32, align);
+    let sz = 4usize;
+    if buffer.len() < sz {
+        return Vec::new();
+    }
+    let end = buffer.len() - sz;
+    let mut out = Vec::new();
+    let needle = _mm256_set1_epi32(target);
 
-    while offset + 32 <= len {
-        // Carrega 32 bytes não alinhados da memória do alvo
-        let data_vec = _mm256_loadu_si256(buffer.as_ptr().add(offset) as *const __m256i);
-        // Compara 8 valores de 32 bits em paralelo
-        let cmp = _mm256_cmpeq_epi32(data_vec, target_vec);
-        let mask = _mm256_movemask_epi8(cmp) as u32;
+    if step == sz {
+        // Caso rápido: alinhamento natural (4 bytes), janelas de 32B, 8 lanes por iteração
+        let lanes = 8usize;
+        let mut i = 0usize;
+        while i + 32 <= buffer.len() {
+            let chunk = _mm256_loadu_si256(buffer.as_ptr().add(i) as *const __m256i);
+            let eq = _mm256_cmpeq_epi32(chunk, needle);
+            let bits = _mm256_movemask_epi8(eq) as u32;
 
-        if mask != 0 {
-            // Decodifica quais das 8 posições deram match
-            for i in 0..8 {
-                if (mask & (0xF << (i * 4))) == (0xF << (i * 4)) {
-                    results.push(offset + (i * 4));
+            // Cada lane de 32 bits gera 4 bits na máscara (0xF). Testa os nibbles correspondentes
+            for lane in 0..lanes {
+                if (bits >> (lane * 4)) & 0xF != 0 {
+                    let pos = i + lane * sz;
+                    if pos <= end {
+                        out.push(pos);
+                    }
                 }
             }
+            i += 32;
         }
-        offset += 32;
+        // Tail escalar para os bytes restantes não cobertos pela janela AVX2
+        while i <= end {
+            let v = i32::from_le_bytes([buffer[i], buffer[i + 1], buffer[i + 2], buffer[i + 3]]);
+            if v == target {
+                out.push(i);
+            }
+            i += step;
+        }
+    } else {
+        // Fallback escalar quando o usuário seleciona alinhamento arbitrário (ex: align=1)
+        let mut i = 0usize;
+        while i <= end {
+            let v = i32::from_le_bytes([buffer[i], buffer[i + 1], buffer[i + 2], buffer[i + 3]]);
+            if v == target {
+                out.push(i);
+            }
+            i += step;
+        }
     }
+    out
 }
 ```
 

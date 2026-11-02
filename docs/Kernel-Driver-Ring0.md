@@ -42,7 +42,49 @@ O **OwMemDriver.sys** (também integrado como **OnyxDriver**) é o subsistema de
 - **Desvio de Hooks Usermode**: Não utiliza APIs como `NtReadVirtualMemory` ou `ReadProcessMemory`, que são monitoradas por EDRs e anti-cheats.
 - **Caminhada de Tabelas de Páginas**: A partir do ponteiro `CR3` (Directory Table Base) do `EPROCESS` alvo, o driver resolve o endereço virtual em endereço físico através da hierarquia de paginação de 4 níveis do x86_64:
   $$\text{Virtual Address} \longrightarrow \text{PML4} \longrightarrow \text{PDPT} \longrightarrow \text{PD} \longrightarrow \text{PT} \longrightarrow \text{Physical Frame}$$
-- **Mapeamento Seguro**: Utiliza `MmMapIoSpaceEx` ou o manipulador de seção física `\Device\PhysicalMemory` com verificações estritas de limites e tratamento de exceções estruturadas (SEH), prevenindo Blue Screen of Death (BSOD) em acessos a páginas inválidas.
+- **Mapeamento Seguro**: Utiliza `MmMapIoSpaceEx` com verificações estritas de limites e tratamento de exceções estruturadas (SEH), prevenindo Blue Screen of Death (BSOD) em acessos a páginas inválidas.
+
+Exemplo de implementação em C nativo do driver:
+```c
+ULONG64 TranslateVirtualToPhysical(ULONG64 cr3, ULONG64 virtualAddress)
+{
+    ULONG64 pml4Index = (virtualAddress >> 39) & 0x1FF;
+    ULONG64 pdptIndex = (virtualAddress >> 30) & 0x1FF;
+    ULONG64 pdIndex   = (virtualAddress >> 21) & 0x1FF;
+    ULONG64 ptIndex   = (virtualAddress >> 12) & 0x1FF;
+    ULONG64 pageOffset = virtualAddress & 0xFFF;
+
+    ULONG64 pml4Base = cr3 & ~0xFFFULL;
+    ULONG64 pml4Entry = 0;
+    if (!ReadPhysicalMemoryInternal(pml4Base + (pml4Index * 8), &pml4Entry, sizeof(ULONG64)) || !(pml4Entry & 1))
+        return 0;
+
+    ULONG64 pdptBase = pml4Entry & 0x000FFFFFFFFFF000ULL;
+    ULONG64 pdptEntry = 0;
+    if (!ReadPhysicalMemoryInternal(pdptBase + (pdptIndex * 8), &pdptEntry, sizeof(ULONG64)) || !(pdptEntry & 1))
+        return 0;
+
+    // Página gigante de 1GB (PS flag bit 7)
+    if (pdptEntry & 0x80)
+        return (pdptEntry & 0x000FFFFFC0000000ULL) + (virtualAddress & 0x3FFFFFFFULL);
+
+    ULONG64 pdBase = pdptEntry & 0x000FFFFFFFFFF000ULL;
+    ULONG64 pdEntry = 0;
+    if (!ReadPhysicalMemoryInternal(pdBase + (pdIndex * 8), &pdEntry, sizeof(ULONG64)) || !(pdEntry & 1))
+        return 0;
+
+    // Grande página de 2MB (PS flag bit 7)
+    if (pdEntry & 0x80)
+        return (pdEntry & 0x000FFFFFFFE00000ULL) + (virtualAddress & 0x1FFFFFULL);
+
+    ULONG64 ptBase = pdEntry & 0x000FFFFFFFFFF000ULL;
+    ULONG64 ptEntry = 0;
+    if (!ReadPhysicalMemoryInternal(ptBase + (ptIndex * 8), &ptEntry, sizeof(ULONG64)) || !(ptEntry & 1))
+        return 0;
+
+    return (ptEntry & 0x000FFFFFFFFFF000ULL) + pageOffset;
+}
+```
 
 ### 3.2 Evasão e Desvinculação de ObRegisterCallbacks (`callbacks.c`)
 - Sistemas anticheat usam `ObRegisterCallbacks` para interceptar tentativas de obtenção de handles para processos de jogos via `NtOpenProcess`, reduzindo privilégios para `PROCESS_QUERY_LIMITED_INFORMATION`.
@@ -50,6 +92,62 @@ O **OwMemDriver.sys** (também integrado como **OnyxDriver**) é o subsistema de
   - `ObpProcessCallbackList`
   - `ObpThreadCallbackList`
 - O driver desconecta ou neutraliza as rotinas de pré-operação (`PreOperationCallback`) e pós-operação (`PostOperationCallback`), restaurando permissões totais de acesso (`PROCESS_ALL_ACCESS`) transparentemente.
+
+Trecho da rotina em nível de kernel:
+```c
+typedef struct _OB_CALLBACK_ENTRY {
+    LIST_ENTRY CallbackList;
+    ULONG Operations;
+    ULONG Enabled;
+    PVOID Entry;
+    POBJECT_TYPE ObjectType;
+    PVOID PreOperation;
+    PVOID PostOperation;
+    KSPIN_LOCK Lock;
+} OB_CALLBACK_ENTRY, *POB_CALLBACK_ENTRY;
+
+ULONG StripProcessAndThreadCallbacks(ULONG Mode)
+{
+    if (KeGetCurrentIrql() > APC_LEVEL) return 0;
+    InitCallbackBackupLock();
+
+    KIRQL oldIrql;
+    KeAcquireSpinLock(&g_CallbackBackupLock, &oldIrql);
+    ULONG affected = 0;
+
+    __try {
+        if (Mode == 0) { // Strip
+            POBJECT_TYPE targets[2] = { *PsProcessType, *PsThreadType };
+            for (int t = 0; t < 2; t++) {
+                PLIST_ENTRY listHead = GetObjectTypeCallbackList(targets[t]);
+                if (!listHead) continue;
+
+                for (PLIST_ENTRY curr = listHead->Flink; curr != listHead; curr = curr->Flink) {
+                    POB_CALLBACK_ENTRY entry = (POB_CALLBACK_ENTRY)curr;
+                    if (!MmIsAddressValid(entry) || entry->Operations == 0) continue;
+
+                    // Backup original callback state
+                    g_CallbackBackups[g_CallbackBackupCount].EntryAddress = entry;
+                    g_CallbackBackups[g_CallbackBackupCount].OriginalOperations = entry->Operations;
+                    g_CallbackBackups[g_CallbackBackupCount].OriginalEnabled = entry->Enabled;
+                    g_CallbackBackups[g_CallbackBackupCount].OriginalPreOperation = entry->PreOperation;
+                    g_CallbackBackups[g_CallbackBackupCount].OriginalPostOperation = entry->PostOperation;
+                    g_CallbackBackupCount++;
+
+                    // Neutraliza verificações definindo flags e rotinas para NULL
+                    entry->Operations = 0;
+                    entry->PreOperation = NULL;
+                    entry->PostOperation = NULL;
+                    affected++;
+                }
+            }
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {}
+
+    KeReleaseSpinLock(&g_CallbackBackupLock, oldIrql);
+    return affected;
+}
+```
 
 ### 3.3 Direct Kernel Object Manipulation - DKOM (`dkom.c`)
 - **Ocultação de Processo**: Desvincula a estrutura `EPROCESS` do processo alvo da lista circular duplamente encadeada `ActiveProcessLinks`. O processo continua executando na CPU pelo escalonador de threads (`KTHREAD`), mas desaparece completamente de chamadas como `NtQuerySystemInformation` e do Gerenciador de Tarefas do Windows.

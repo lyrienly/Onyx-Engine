@@ -23,28 +23,28 @@ Sistemas de proteção contemporâneos (**Vanguard, Easy Anti-Cheat, BattlEye, R
 +---------------------------------------------------------------------------------+
 |                                 VETORES KERNELMODE                              |
 |  - Intercepção de Handles de Processo via ObRegisterCallbacks                   |
+|  - Proteção de Processos PPL (Protected Process Light)                          |
 |  - Auditoria de Drivers Carregados (PiDDBCacheTable, MmUnloadedDrivers)         |
 |  - Verificação de Assinatura de Código e Certificados Revogados                 |
-|  - Detecção de Hipervisores (Timing Attacks RDTSC / CPUID VM-Exit)              |
 |  - Varredura de ActiveProcessLinks e Threads de Sistema PsCreateSystemThread    |
 +---------------------------------------------------------------------------------+
                                        ^
                                        | Contra-ataque OnyxEngine:
-                                       | - Leitura/Escrita Física Direta via CR3
+                                       | - Leitura/Escrita Física Direta via CR3 com Range Safety
                                        | - Desvinculação Dinâmica de ObRegisterCallbacks
-                                       | - DKOM em ActiveProcessLinks
+                                       | - Remoção Dinâmica de PPL (DKOM PsIsProtectedProcess)
                                        | - Limpeza de PiDDBCacheTable e MmUnloadedDrivers
                                        | - Hardware Tracing via Intel PT (ToPA buffers)
 ```
 
 ---
 
-## 2. Evasão Usermode: Passo a Passo Técnico
+## 2. Evasão Usermode com Código de Produção
 
 ### 2.1 Quebrando a Auditoria de Callstack (*Callstack Spoofing*)
-Quando um cheat chama `NtWriteVirtualMemory`, o driver do anticheat ou a hook usermode inspeciona a pilha de execução com `RtlCaptureStackBackTrace`. Se o endereço de retorno estiver dentro de uma região `MEM_PRIVATE` (código injetado avulso), o anticheat emite um alerta de telemetria.
+Quando um cheat chama `NtWriteVirtualMemory`, o driver do anticheat inspeciona a pilha de execução com `RtlCaptureStackBackTrace`. Se o endereço de retorno apontar para uma região de memória anônima (`MEM_PRIVATE`), a injeção é denunciada.
 
-O OnyxEngine implementa um trampolim de spoofing em Assembly puro x64 (`callstack_spoof.dll`):
+O OnyxEngine implementa o sintetizador de pilha em Assembly x64 (`crates/callstack-spoof`):
 
 ```assembly
 ; callstack_spoof_stub.asm - Sintetizador de Frames Legítimos
@@ -86,65 +86,190 @@ SpoofCall ENDP
 END
 ```
 
-### 2.2 Syscalls Indiretas via Halo's Gate (`syscalls_indirect.dll`)
-Anticheats hookam funções como `NtProtectVirtualMemory` sobrescrevendo os primeiros 5 bytes com `JMP <anticheat_hook>`. Para contornar essa interceptação:
-1. O OnyxEngine lê os bytes de `NtProtectVirtualMemory` na memória da `ntdll.dll`.
-2. Se o padrão começar com `E9` (`JMP`), o algoritmo **Halo's Gate** examina os vizinhos adjacentes (+32 bytes para cima ou para baixo) que não estão hookados.
-3. Como os System Service Numbers (SSN) são estritamente sequenciais no Windows x64, o SSN da função hookada é inferido com precisão matemática:
-   $$\text{SSN}_{\text{alvo}} = \text{SSN}_{\text{vizinho}} \pm \text{Distância}$$
-4. O registrador `EAX` é carregado com o SSN calculado e a execução salta para uma instrução `syscall; ret` localizada dentro do próprio corpo original da NTDLL, garantindo que o RIP de transição pertença a uma página executável legítima e assinada da Microsoft.
+### 2.2 Syscalls Indiretas via Halo's Gate (`crates/syscalls-indirect/src/lib.rs`)
+Anticheats hookam APIs na `ntdll.dll` sobrescrevendo o prólogo com `JMP <anticheat>`. O módulo do OnyxEngine resolve o System Service Number (SSN) dinamicamente lendo os vizinhos não hookados e salta para um gadget limpo `syscall; ret`:
+
+```rust
+// crates/syscalls-indirect/src/lib.rs
+pub struct NtdllInfo {
+    pub base: *const u8,
+    pub ssn: HashMap<String, u32>,
+    pub gadget: *const u8, // Aponta para instrução 'syscall; ret' na NTDLL
+}
+
+// Resolução de SSN contornando hooks inline
+pub fn resolve_ssn_halos_gate(func_ptr: *const u8) -> Option<u32> {
+    unsafe {
+        // Se a função começar com 0x4C, 0x8B, 0xD1, 0xB8 (mov r10, rcx; mov eax, ssn)
+        if *func_ptr == 0x4C && *func_ptr.add(1) == 0x8B && *func_ptr.add(3) == 0xB8 {
+            return Some(*(func_ptr.add(4) as *const u32));
+        }
+
+        // Se estiver hookada com JMP (0xE9): busca nos vizinhos (+32 / -32 bytes)
+        if *func_ptr == 0xE9 {
+            for idx in 1..32 {
+                // Vizinho abaixo
+                let down = func_ptr.add(idx * 32);
+                if *down == 0x4C && *down.add(3) == 0xB8 {
+                    let ssn = *(down.add(4) as *const u32);
+                    return Some(ssn.wrapping_sub(idx as u32));
+                }
+                // Vizinho acima
+                let up = func_ptr.sub(idx * 32);
+                if *up == 0x4C && *up.add(3) == 0xB8 {
+                    let ssn = *(up.add(4) as *const u32);
+                    return Some(ssn.wrapping_add(idx as u32));
+                }
+            }
+        }
+        None
+    }
+}
+```
 
 ---
 
-## 3. Evasão Kernelmode: Engenharia de Ring-0
+## 3. Evasão Kernelmode com Código C do Driver (`OwMemDriver.sys`)
 
-### 3.1 Tradução Física Direta sem Handles via CR3
-Mesmo que um anticheat retire todos os privilégios do handle usermode do OnyxEngine via `ObRegisterCallbacks` (concedendo apenas `0x1000` / `PROCESS_QUERY_LIMITED_INFORMATION`), o driver `OwMemDriver.sys` opera em nível de hardware, tornando a concessão de handles totalmente irrelevante:
+### 3.1 Tradução Física Direta sem Handles via CR3 (`driver/src/physmem.c`)
+O driver do OnyxEngine valida intervalos físicos reais do hardware com `MmGetPhysicalMemoryRanges`, impedindo Blue Screens (BSOD) ao navegar por tabelas de página:
 
 ```c
-// physmem.c - Caminhada pelas tabelas de paginação x86_64
+// driver/src/physmem.c - Verificação de Segurança de Faixas Físicas
+static SAFE_PHYSICAL_MEMORY_RANGE g_SafePhysicalRanges[128];
+static ULONG g_SafePhysicalRangeCount = 0;
+
+VOID InitializeSafePhysicalRanges(VOID)
+{
+    PPHYSICAL_MEMORY_RANGE ranges = MmGetPhysicalMemoryRanges();
+    if (!ranges) return;
+
+    ULONG count = 0;
+    for (ULONG i = 0; count < 128; i++) {
+        if (ranges[i].BaseAddress.QuadPart == 0 && ranges[i].NumberOfBytes.QuadPart == 0)
+            break;
+
+        ULONG64 base = (ULONG64)ranges[i].BaseAddress.QuadPart;
+        ULONG64 size = (ULONG64)ranges[i].NumberOfBytes.QuadPart;
+        if (size > 0) {
+            g_SafePhysicalRanges[count].BaseAddress = base;
+            g_SafePhysicalRanges[count].EndAddress = base + size;
+            count++;
+        }
+    }
+    ExFreePool(ranges);
+    g_SafePhysicalRangeCount = count;
+}
+```
+
+Com os limites de memória garantidos, o driver caminha pela hierarquia de 4 níveis x86_64:
+
+```c
+// driver/src/physmem.c - Resolução de Paginação de 4 Níveis
 ULONG64 TranslateVirtualToPhysical(ULONG64 cr3, ULONG64 virtual_address) {
-    // 1. Extração dos índices de 9 bits da hierarquia de páginas
     ULONG64 pml4_idx = (virtual_address >> 39) & 0x1FF;
     ULONG64 pdpt_idx = (virtual_address >> 30) & 0x1FF;
     ULONG64 pd_idx   = (virtual_address >> 21) & 0x1FF;
     ULONG64 pt_idx   = (virtual_address >> 12) & 0x1FF;
     ULONG64 offset   = virtual_address & 0xFFF;
 
-    // 2. Leitura da tabela PML4 a partir do endereço físico no CR3
     ULONG64 pml4e = ReadPhysicalUlong64(cr3 + (pml4_idx * 8));
-    if (!(pml4e & 1)) return 0; // Bit de presença ausente
+    if (!(pml4e & 1)) return 0;
 
-    // 3. Leitura da tabela PDPT
     ULONG64 pdpte = ReadPhysicalUlong64((pml4e & 0x000FFFFFFFFFF000ULL) + (pdpt_idx * 8));
     if (!(pdpte & 1)) return 0;
+    if (pdpte & 0x80) return (pdpte & 0x000FFFFFC0000000ULL) + (virtual_address & 0x3FFFFFFFULL); // 1 GB Page
 
-    // 4. Verificação de página grande (1 GB)
-    if (pdpte & 0x80) return (pdpte & 0x000FFFFFC0000000ULL) + (virtual_address & 0x3FFFFFFFULL);
-
-    // 5. Leitura do Diretório de Páginas (PD)
     ULONG64 pde = ReadPhysicalUlong64((pdpte & 0x000FFFFFFFFFF000ULL) + (pd_idx * 8));
     if (!(pde & 1)) return 0;
+    if (pde & 0x80) return (pde & 0x000FFFFFFFE00000ULL) + (virtual_address & 0x1FFFFFULL);       // 2 MB Page
 
-    // 6. Verificação de página grande (2 MB)
-    if (pde & 0x80) return (pde & 0x000FFFFFFFE00000ULL) + (virtual_address & 0x1FFFFFULL);
-
-    // 7. Leitura da Tabela de Páginas (PT)
     ULONG64 pte = ReadPhysicalUlong64((pde & 0x000FFFFFFFFFF000ULL) + (pt_idx * 8));
     if (!(pte & 1)) return 0;
 
-    // 8. Endereço físico final do quadro de 4 KB
-    return (pte & 0x000FFFFFFFFFF000ULL) + offset;
+    return (pte & 0x000FFFFFFFFFF000ULL) + offset; // 4 KB Page
 }
 ```
 
-A leitura é realizada mapeando o quadro físico diretamente com `MmMapIoSpaceEx(PhysicalAddress, Size, PAGE_READWRITE)`. Esse método contorna:
-- Notificações de acesso a memória do kernel.
-- Permissões de proteção de página de usermode (`PAGE_NOACCESS`, `PAGE_GUARD`).
-- Hooks colocados por filtros de driver de anticheats.
+---
 
-### 3.2 Desvinculação Dinâmica de ObRegisterCallbacks
-Para restaurar a capacidade de depuração usermode quando necessário, o driver localiza a lista não exportada de callbacks do subsistema de objetos:
-1. Analisa a função exportada `ObUnRegisterCallbacks` para extrair o ponteiro da lista circular `ObpProcessCallbackList`.
-2. Itera sobre os nós `CALLBACK_ENTRY_ITEM`.
-3. Ao identificar a entrada pertencente ao anticheat (pelo endereço base do driver correspondente), o driver altera os ponteiros de função de `PreOperation` e `PostOperation` para ponteiros nulos ou retorna `OB_PREOP_SUCCESS` sem aplicar as máscaras restritivas de acesso.
+### 3.2 Desvinculação Dinâmica de ObRegisterCallbacks (`driver/src/callbacks.c`)
+O driver localiza e manipula as estruturas internas `_OB_CALLBACK_ENTRY`:
+
+```c
+// driver/src/callbacks.c
+#pragma pack(push, 1)
+typedef struct _OB_CALLBACK_ENTRY {
+    LIST_ENTRY CallbackList;
+    ULONG Operations;
+    ULONG Enabled;
+    PVOID Entry;
+    POBJECT_TYPE ObjectType;
+    PVOID PreOperation;
+    PVOID PostOperation;
+    KSPIN_LOCK Lock;
+} OB_CALLBACK_ENTRY, *POB_CALLBACK_ENTRY;
+#pragma pack(pop)
+
+// Desconecta a rotina de interceptação do anticheat
+NTSTATUS StripProcessCallbacks(PVOID TargetDriverBase, ULONG TargetDriverSize)
+{
+    PLIST_ENTRY list = GetObjectTypeCallbackList(*PsProcessType);
+    if (!list) return STATUS_NOT_FOUND;
+
+    PLIST_ENTRY current = list->Flink;
+    while (current != list) {
+        POB_CALLBACK_ENTRY entry = CONTAINING_RECORD(current, OB_CALLBACK_ENTRY, CallbackList);
+        // Se a função PreOperation estiver dentro da faixa de memória do driver do anticheat:
+        if ((ULONG64)entry->PreOperation >= (ULONG64)TargetDriverBase &&
+            (ULONG64)entry->PreOperation < (ULONG64)TargetDriverBase + TargetDriverSize)
+        {
+            // Desativa a interceptação restaurando permissões
+            InterlockedExchangePointer(&entry->PreOperation, NULL);
+        }
+        current = current->Flink;
+    }
+    return STATUS_SUCCESS;
+}
+```
+
+---
+
+### 3.3 Remoção Dinâmica de PPL via Desmontagem em Runtime (`driver/src/dkom.c`)
+Para processos com proteção **PPL (Protected Process Light)**, o offset exato de `_PS_PROTECTION` varia conforme o build do Windows 10/11 (21H2, 22H2, 23H2, 24H2). O driver do OnyxEngine resolve o deslocamento desmontando `PsIsProtectedProcess` em tempo de execução:
+
+```c
+// driver/src/dkom.c - Resolução Dinâmica de Deslocamento de Proteção
+ULONG ResolveProcessProtectionOffset(VOID)
+{
+    UNICODE_STRING uRoutine;
+    RtlInitUnicodeString(&uRoutine, L"PsIsProtectedProcess");
+    PUCHAR pfn = (PUCHAR)MmGetSystemRoutineAddress(&uRoutine);
+    if (!pfn) return 0;
+
+    // Varre as instruções buscando o opcode de teste do campo de proteção
+    for (ULONG i = 0; i < 48; i++) {
+        // Padrão: test byte ptr [rcx + offset], 7
+        if (pfn[i] == 0xF6 && pfn[i + 1] == 0x81 && pfn[i + 6] == 0x07) {
+            ULONG offset = *(PULONG)(pfn + i + 2);
+            if (offset >= 0x400 && offset <= 0x1000) return offset;
+        }
+        // Padrão alternativo: mov al, byte ptr [rcx + offset]
+        else if (pfn[i] == 0x8A && pfn[i + 1] == 0x81) {
+            ULONG offset = *(PULONG)(pfn + i + 2);
+            if (offset >= 0x400 && offset <= 0x1000) return offset;
+        }
+    }
+    return 0x87A; // Fallback para builds Windows 11 modernos
+}
+
+// Zera a proteção PPL no EPROCESS permitindo OpenProcess com PROCESS_ALL_ACCESS
+VOID StripPPL(PEPROCESS Process)
+{
+    ULONG offset = ResolveProcessProtectionOffset();
+    if (offset != 0) {
+        PUCHAR pProtection = (PUCHAR)Process + offset;
+        *pProtection = 0; // Type = 0 (None), Signer = 0 (None)
+    }
+}
+```
