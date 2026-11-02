@@ -3352,8 +3352,15 @@ int handle_rdtsc(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
 
   if (t<lTSC)
   {
+    /* HETEROGENEOUS P/E-CORE FIX:
+     * When threads migrate between P-cores and E-cores, or if core clock skews exist,
+     * time must never travel backward. Clamping forward guarantees strict monotonicity.
+     */
+    t=lTSC+1;
+  }
+  else
+  {
     lTSC=t;
-
   }
 
   if (adjustTimestampCounters)
@@ -3384,7 +3391,15 @@ int handle_rdtsc(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
   vmregisters->rdx=t >> 32;
 
   if (lowestTSC<t)
-    lowestTSC=t;
+  {
+    QWORD curLowest = lowestTSC;
+    while (t > curLowest)
+    {
+      if (__sync_bool_compare_and_swap(&lowestTSC, curLowest, t))
+        break;
+      curLowest = lowestTSC;
+    }
+  }
 
   if (isAMD)
   {
@@ -3831,12 +3846,15 @@ int handleVMEvent_internal(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FX
 
     case vm_exit_vmx_preemptiontimer_reachedzero:
     {
-
       nosendchar[getAPICID()]=0;
 
-      vmwrite(vm_preemption_timer_value,10000);
+      /* Provide stable VMM preemption quantum across heterogeneous P/E-cores */
+      QWORD quantum = 25000ULL;
+      vmwrite(vm_preemption_timer_value, quantum);
 
+#if DISPLAYDEBUG==1
       ddDrawRectangle(0,0,100,100,_rdtsc());
+#endif
       return 0;
     }
 
