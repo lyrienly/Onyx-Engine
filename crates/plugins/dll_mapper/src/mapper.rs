@@ -76,7 +76,7 @@ pub fn resolve_pid(target: &str) -> Result<u32, String> {
 }
 
 fn open_target(pid: u32, use_driver: bool) -> Result<HANDLE, String> {
-    if use_driver || onyx_core::process::kernel::DbkDriver::connect().is_ok() {
+    if use_driver {
         if let Ok(driver) = onyx_core::process::kernel::DbkDriver::connect() {
             if let Ok(h) = driver.open_process(pid) {
                 return Ok(h);
@@ -1105,7 +1105,7 @@ pub fn map_dll(pid: u32, dll_path: &str, options: &MapOptions) -> Result<MapOutc
 
     let stub_code = call_stub();
     let stub = alloc_remote(process, stub_code.len(), PAGE_EXECUTE_READWRITE)?;
-    let request = alloc_remote(process, SCRATCH_SIZE, PAGE_READWRITE)?;
+    let request = alloc_remote(process, SCRATCH_SIZE, PAGE_EXECUTE_READWRITE)?;
     let name_buffer = alloc_remote(process, NAME_BUFFER_SIZE, PAGE_READWRITE)?;
 
     let setup = write_remote(process, stub, &stub_code);

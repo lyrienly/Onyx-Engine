@@ -17,7 +17,7 @@
 ### Stealth, Injeções & Kernel Ring-0
 * [[Módulos de Stealth & Injeções|Stealth-Injections-Hooks]]
 * [[Evasão Avançada de Anticheats & Ring-0|Anticheat-Bypass-Deep-Dive]]
-* [[Driver Ring-0 e Evasão Kernel|Kernel-Driver-Ring-0]]
+* [[Driver Ring-0 e Evasão Kernel|Kernel-Driver-Ring0]]
 
 ### Automação & Inteligência Artificial
 * [[Servidor Nativo MCP & Catálogo IA|MCP-Server-Guide]]
