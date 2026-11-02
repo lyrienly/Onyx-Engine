@@ -22,6 +22,12 @@
 #include <elf.h>
 #include <signal.h>
 #include <sys/prctl.h>
+#ifndef PR_SET_PTRACER
+#define PR_SET_PTRACER 0x59616d61
+#endif
+#ifndef PR_SET_PTRACER_ANY
+#define PR_SET_PTRACER_ANY ((unsigned long)-1)
+#endif
 
 #include <unistd.h>
 #include <errno.h>
@@ -835,9 +841,17 @@ case CMD_SETTHREADCONTEXT:
               sendall(currentsocket, lz4block, lz4size, 0);
             }
             else
-              debug_log("Error while compressing with LZ4\n");
+            {
+              debug_log("Error while compressing with LZ4 or uncompressedSize is 0\n");
+              compressedSize=0;
+              sendall(currentsocket, &uncompressedSize, sizeof(uncompressedSize), MSG_MORE);
+              sendall(currentsocket, &compressedSize, sizeof(compressedSize), (uncompressedSize > 0) ? MSG_MORE : 0);
+              if (uncompressedSize > 0)
+                sendall(currentsocket, uncompressed, uncompressedSize, 0);
+            }
 
-            free(lz4block);
+            if (lz4block)
+              free(lz4block);
           }
           else
           {
@@ -1966,6 +1980,13 @@ int main(int argc, char *argv[])
   int a;
 
   pthread_mutex_init(&connectionsCS, NULL);
+
+#ifdef __linux__
+  prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
+#ifdef PR_SET_PTRACER
+  prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY, 0, 0, 0);
+#endif
+#endif
 
   initAPI();
 

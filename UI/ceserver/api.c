@@ -122,6 +122,22 @@ int ATTACH_TO_ACCESS_MEMORY = 0;
 int ATTACH_TO_WRITE_MEMORY = 1;
 unsigned char SPECIFIED_ARCH = 9;
 
+#ifndef SYS_process_vm_readv
+  #if defined(__aarch64__)
+    #define SYS_process_vm_readv 270
+    #define SYS_process_vm_writev 271
+  #elif defined(__arm__)
+    #define SYS_process_vm_readv 376
+    #define SYS_process_vm_writev 377
+  #elif defined(__x86_64__)
+    #define SYS_process_vm_readv 310
+    #define SYS_process_vm_writev 311
+  #elif defined(__i386__)
+    #define SYS_process_vm_readv 347
+    #define SYS_process_vm_writev 348
+  #endif
+#endif
+
 #ifdef SYS_process_vm_readv
 
 ssize_t process_vm_readv2(pid_t process_id, const struct iovec *io_local, unsigned long liovcnt, const struct iovec *io_remote, unsigned long riovcnt, unsigned long flags) {
@@ -3507,12 +3523,20 @@ HANDLE OpenProcess(DWORD pid)
             debug_log("Falling back to MEMORY_SEARCH_OPTION=2 (process_vm_readv and process_vm_writev)\n");
             MEMORY_SEARCH_OPTION=2;
           }
+#ifdef SYS_process_vm_readv
+          else
+          {
+            debug_log("Falling back to MEMORY_SEARCH_OPTION=3 (process_vm_readv2 syscall)\n");
+            MEMORY_SEARCH_OPTION=3;
+          }
+#else
           else
           {
             MEMORY_SEARCH_OPTION=1;
             ATTACH_TO_ACCESS_MEMORY=1;
             debug_log("Falling back to MEMORY_SEARCH_OPTION=1 (ptrace)\n");
           }
+#endif
         }
         else
         {
