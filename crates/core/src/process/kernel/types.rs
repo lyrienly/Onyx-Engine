@@ -28,6 +28,11 @@ pub const IOCTL_CE_FREEZE_PROCESS: DWORD = 0x22E1BC;
 pub const IOCTL_CE_SET_PROCESS_PROTECTION: DWORD = 0x22E1C0;
 pub const IOCTL_CE_CLEAN_KERNEL_TRACES: DWORD = 0x22E1C4;
 pub const IOCTL_CE_CLOAK_DEVICE_SYMLINK: DWORD = 0x22E1C8;
+pub const IOCTL_CE_GET_DBVM_STATUS: DWORD = 0x22E1D0;
+pub const IOCTL_CE_CLOAK_REGION: DWORD = 0x22E1D4;
+pub const IOCTL_CE_START_DBVM_WATCH: DWORD = 0x22E1D8;
+pub const IOCTL_CE_STOP_DBVM_WATCH: DWORD = 0x22E1DC;
+pub const IOCTL_CE_POLL_DBVM_WATCH: DWORD = 0x22E1E0;
 pub const IOCTL_CE_PHYSICAL_RAM_SCAVENGE: DWORD = 0x22E1CC;
 pub const IOCTL_CE_HIDE_PROCESS: DWORD = 0x22E1EC;
 pub const IOCTL_CE_ALLOCATE_PROCESS_MEMORY: DWORD = 0x22E1F0;
@@ -181,6 +186,21 @@ pub struct CeCloakInput {
 #[derive(Clone, Copy)]
 pub struct CeWriteCloakedHeader {
     pub process_id: u32,
+    pub virtual_address: u64,
+    pub size: u32,
+}
+
+#[repr(C, packed)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CeDbvmStatusOutput {
+    pub is_active: u32,
+    pub version: u32,
+}
+
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct CeCloakRegionHeader {
+    pub process_id: u64,
     pub virtual_address: u64,
     pub size: u32,
 }

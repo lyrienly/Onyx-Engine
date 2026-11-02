@@ -344,24 +344,31 @@ BOOL ept_handleCloakEvent(pcpuinfo currentcpuinfo, QWORD Address, QWORD AddressV
       }
 
       if (evi.X)
-        *(QWORD *)(cloakdata->eptentry[currentcpuinfo->cpunr])=cloakdata->PhysicalAddressExecutable;
+      {
+        /* Split-EPT: Instruction fetch triggers Execute-Only mapped to Modified Executable page */
+        cloakdata->eptentry[currentcpuinfo->cpunr]->PFN=(cloakdata->PhysicalAddressExecutable >> 12);
+        cloakdata->eptentry[currentcpuinfo->cpunr]->RA=0;
+        cloakdata->eptentry[currentcpuinfo->cpunr]->WA=0;
+        cloakdata->eptentry[currentcpuinfo->cpunr]->XA=1;
+      }
       else
       {
+        /* Split-EPT: Read/Write integrity scan triggers Read/Write-Only mapped to Clean Data page */
         if (isMegaJmp==0)
         {
-
-          *(QWORD *)(cloakdata->eptentry[currentcpuinfo->cpunr])=cloakdata->PhysicalAddressData;
+          cloakdata->eptentry[currentcpuinfo->cpunr]->PFN=(cloakdata->PhysicalAddressData >> 12);
+          cloakdata->eptentry[currentcpuinfo->cpunr]->RA=1;
+          cloakdata->eptentry[currentcpuinfo->cpunr]->WA=evi.W ? 1 : 0;
+          cloakdata->eptentry[currentcpuinfo->cpunr]->XA=0;
         }
         else
         {
-
-          *(QWORD *)(cloakdata->eptentry[currentcpuinfo->cpunr])=cloakdata->PhysicalAddressExecutable;
+          cloakdata->eptentry[currentcpuinfo->cpunr]->PFN=(cloakdata->PhysicalAddressExecutable >> 12);
+          cloakdata->eptentry[currentcpuinfo->cpunr]->RA=1;
+          cloakdata->eptentry[currentcpuinfo->cpunr]->WA=1;
+          cloakdata->eptentry[currentcpuinfo->cpunr]->XA=1;
         }
-
       }
-      cloakdata->eptentry[currentcpuinfo->cpunr]->WA=1;
-      cloakdata->eptentry[currentcpuinfo->cpunr]->RA=1;
-      cloakdata->eptentry[currentcpuinfo->cpunr]->XA=1;
 
       vmx_enableSingleStepMode();
       vmx_addSingleSteppingReasonEx(currentcpuinfo, 2,cloakdata);
@@ -414,7 +421,7 @@ int ept_handleCloakEventAfterStep(pcpuinfo currentcpuinfo,  PCloakedPageData clo
   }
   else
   {
-    *(QWORD *)(cloakdata->eptentry[currentcpuinfo->cpunr])=cloakdata->PhysicalAddressExecutable;
+    cloakdata->eptentry[currentcpuinfo->cpunr]->PFN=(cloakdata->PhysicalAddressExecutable >> 12);
     cloakdata->eptentry[currentcpuinfo->cpunr]->WA=0;
     cloakdata->eptentry[currentcpuinfo->cpunr]->RA=0;
     if (has_EPT_ExecuteOnlySupport)
@@ -546,6 +553,7 @@ int ept_cloak_activate(QWORD physicalAddress, int mode)
     {
 
       EPT_PTE temp=*(cloakdata->eptentry[cpunr]);
+      temp.PFN=(cloakdata->PhysicalAddressExecutable >> 12);
       if (has_EPT_ExecuteOnlySupport)
         temp.XA=1;
       else

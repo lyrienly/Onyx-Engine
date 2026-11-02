@@ -574,6 +574,75 @@ impl OnyxDriver {
         }
     }
 
+    pub fn cloak_region(&self, pid: u32, virtual_address: u64, data: &[u8]) -> Result<(), String> {
+        let header_size = size_of::<CeCloakRegionHeader>();
+        let total_size = header_size + data.len();
+        let mut buffer = vec![0u8; total_size];
+
+        let header = CeCloakRegionHeader {
+            process_id: pid as u64,
+            virtual_address,
+            size: data.len() as u32,
+        };
+
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                &header as *const _ as *const u8,
+                buffer.as_mut_ptr(),
+                header_size,
+            );
+            std::ptr::copy_nonoverlapping(
+                data.as_ptr(),
+                buffer.as_mut_ptr().add(header_size),
+                data.len(),
+            );
+        }
+
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_CLOAK_REGION,
+                buffer.as_ptr() as LPVOID,
+                total_size as DWORD,
+                null_mut(),
+                0,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            Ok(())
+        } else {
+            Err(format!(
+                "IOCTL_CE_CLOAK_REGION failed for PID {} at {:#X}",
+                pid, virtual_address
+            ))
+        }
+    }
+
+    pub fn get_dbvm_status(&self) -> Result<(bool, u32), String> {
+        let mut status = CeDbvmStatusOutput::default();
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_GET_DBVM_STATUS,
+                null_mut(),
+                0,
+                &mut status as *mut _ as LPVOID,
+                size_of::<CeDbvmStatusOutput>() as DWORD,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            Ok((status.is_active != 0, status.version))
+        } else {
+            Err("IOCTL_CE_GET_DBVM_STATUS failed".to_string())
+        }
+    }
+
     pub fn stealth_read_pte(
         &self,
         pid: u32,
