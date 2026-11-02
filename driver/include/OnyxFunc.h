@@ -1,9 +1,24 @@
+
 #ifndef ONYXFUNC_H
 #define ONYXFUNC_H
 
 #pragma warning( disable: 4214 )
 
 #include <ntifs.h>
+
+NTKERNELAPI
+NTSTATUS
+NTAPI
+MmCopyVirtualMemory(
+    _In_ PEPROCESS SourceProcess,
+    _In_ PVOID SourceAddress,
+    _In_ PEPROCESS TargetProcess,
+    _Out_ PVOID TargetAddress,
+    _In_ SIZE_T BufferSize,
+    _In_ KPROCESSOR_MODE PreviousMode,
+    _Out_ PSIZE_T ReturnSize
+);
+
 #include <ntstrsafe.h>
 
 #include <windef.h>

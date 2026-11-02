@@ -344,6 +344,10 @@ impl OnyxDriver {
         self.bulk_dump_cr3(pid, address, len)
     }
 
+    pub fn write_memory_cr3(&self, pid: u32, address: u64, data: &[u8]) -> Result<usize, String> {
+        self.write_memory(pid, address as usize, data)
+    }
+
     pub fn allocate_memory(
         &self,
         pid: u32,

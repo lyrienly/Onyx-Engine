@@ -100,6 +100,50 @@ static PVOID SafeMapPhysicalMemory(PHYSICAL_ADDRESS PhysicalAddress, SIZE_T Size
 }
 
 static BOOLEAN WritePhysicalChunk(ULONG64 PhysAddr, PVOID Buffer, SIZE_T Size);
+
+static PVOID MapPhysicalWithMdl(ULONG64 PhysAddr, SIZE_T Size, MEMORY_CACHING_TYPE CacheType, PMDL* OutMdl)
+{
+	if (!OutMdl || Size == 0)
+		return NULL;
+
+	*OutMdl = NULL;
+	ULONG pfnCount = (ULONG)(((PhysAddr & 0xFFF) + Size + 0xFFF) >> 12);
+	PMDL mdl = IoAllocateMdl(NULL, (ULONG)Size, FALSE, FALSE, NULL);
+	if (!mdl)
+		return NULL;
+
+	PPFN_NUMBER pfnArray = MmGetMdlPfnArray(mdl);
+	ULONG64 startPfn = PhysAddr >> 12;
+	for (ULONG i = 0; i < pfnCount; i++) {
+		pfnArray[i] = (PFN_NUMBER)(startPfn + i);
+	}
+	mdl->MdlFlags |= MDL_PAGES_LOCKED;
+
+	PVOID mapped = NULL;
+	__try {
+		mapped = MmMapLockedPagesSpecifyCache(mdl, KernelMode, CacheType, NULL, FALSE, NormalPagePriority);
+	} __except (EXCEPTION_EXECUTE_HANDLER) {
+		mapped = NULL;
+	}
+
+	if (!mapped) {
+		IoFreeMdl(mdl);
+		return NULL;
+	}
+
+	*OutMdl = mdl;
+	return (PVOID)((PUCHAR)mapped + (PhysAddr & 0xFFF));
+}
+
+static VOID UnmapPhysicalWithMdl(PMDL Mdl, PVOID MappedAddress)
+{
+	if (Mdl && MappedAddress) {
+		PVOID pageAligned = (PVOID)((ULONG_PTR)MappedAddress & ~(ULONG_PTR)0xFFF);
+		MmUnmapLockedPages(pageAligned, Mdl);
+		IoFreeMdl(Mdl);
+	}
+}
+
 static BOOLEAN ReadPhysicalChunk(ULONG64 PhysAddr, PVOID Buffer, SIZE_T Size)
 {
 	if (!Buffer || Size == 0)
@@ -153,6 +197,24 @@ static BOOLEAN ReadPhysicalChunk(ULONG64 PhysAddr, PVOID Buffer, SIZE_T Size)
 				mapped = NULL;
 			}
 			success = FALSE;
+		}
+
+		if (!success)
+		{
+			PMDL mdl = NULL;
+			PVOID mdlMapped = MapPhysicalWithMdl(PhysAddr, Size, MmCached, &mdl);
+			if (!mdlMapped)
+				mdlMapped = MapPhysicalWithMdl(PhysAddr, Size, MmNonCached, &mdl);
+
+			if (mdlMapped)
+			{
+				__try {
+					RtlCopyMemory(Buffer, mdlMapped, Size);
+					success = TRUE;
+				} __finally {
+					UnmapPhysicalWithMdl(mdl, mdlMapped);
+				}
+			}
 		}
 		return success;
 	}
@@ -968,6 +1030,24 @@ static BOOLEAN WritePhysicalChunk(ULONG64 PhysAddr, PVOID Buffer, SIZE_T Size)
 			mapped = NULL;
 		}
 		success = FALSE;
+	}
+
+	if (!success)
+	{
+		PMDL mdl = NULL;
+		PVOID mdlMapped = MapPhysicalWithMdl(PhysAddr, Size, MmCached, &mdl);
+		if (!mdlMapped)
+			mdlMapped = MapPhysicalWithMdl(PhysAddr, Size, MmNonCached, &mdl);
+
+		if (mdlMapped)
+		{
+			__try {
+				RtlCopyMemory(mdlMapped, Buffer, Size);
+				success = TRUE;
+			} __finally {
+				UnmapPhysicalWithMdl(mdl, mdlMapped);
+			}
+		}
 	}
 
 	return success;

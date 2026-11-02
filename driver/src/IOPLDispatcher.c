@@ -736,21 +736,8 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 
 					if (PsLookupProcessByProcessId((PVOID)(UINT_PTR)(pinp->ProcessID),&selectedprocess)==STATUS_SUCCESS)
 					{
-						KAPC_STATE apc_state;
-						RtlZeroMemory(&apc_state,sizeof(apc_state));
-    					KeStackAttachProcess((PVOID)selectedprocess,&apc_state);
-
-						__try
-						{
-							physical=MmGetPhysicalAddress((PVOID)(UINT_PTR)pinp->BaseAddress);
-						}
-						__finally
-						{
-							KeUnstackDetachProcess(&apc_state);
-						}
-
+						physical.QuadPart = (LONGLONG)TranslateVirtualToPhysicalCR3(selectedprocess, (ULONG64)pinp->BaseAddress);
 						ObDereferenceObject(selectedprocess);
-
 					}
 				}
 				__except(1)
@@ -1004,9 +991,9 @@ case IOCTL_CE_HIDE_THREAD:
 
 				if (NT_SUCCESS(PsLookupProcessByProcessId((HANDLE)(UINT_PTR)inp->ProcessID, &selectedprocess)))
 				{
-					KAPC_STATE apc_state;
-					KeStackAttachProcess((PKPROCESS)selectedprocess, &apc_state);
-					__try
+					HANDLE hProcess = NULL;
+					NTSTATUS hStatus = ObOpenObjectByPointer(selectedprocess, OBJ_KERNEL_HANDLE, NULL, PROCESS_ALL_ACCESS, *PsProcessType, KernelMode, &hProcess);
+					if (NT_SUCCESS(hStatus) && hProcess)
 					{
 						PVOID base = (PVOID)(UINT_PTR)inp->BaseAddress;
 						SIZE_T regionSize = (SIZE_T)inp->Size;
@@ -1014,22 +1001,23 @@ case IOCTL_CE_HIDE_THREAD:
 						ULONG protect = inp->Protect ? inp->Protect : PAGE_EXECUTE_READWRITE;
 
 						NTSTATUS status = ZwAllocateVirtualMemory(
-							ZwCurrentProcess(),
+							hProcess,
 							&base,
 							0,
 							&regionSize,
 							allocType,
 							protect
 						);
+						ZwClose(hProcess);
 
 						outp->BaseAddress = (UINT64)(UINT_PTR)base;
 						outp->Status = (UINT32)status;
 						Irp->IoStatus.Information = sizeof(ALLOC_PROCESS_MEMORY_OUTPUT);
 						ntStatus = NT_SUCCESS(status) ? STATUS_SUCCESS : status;
 					}
-					__finally
+					else
 					{
-						KeUnstackDetachProcess(&apc_state);
+						ntStatus = hStatus;
 					}
 					ObDereferenceObject(selectedprocess);
 				}
@@ -1060,9 +1048,9 @@ case IOCTL_CE_HIDE_THREAD:
 
 				if (NT_SUCCESS(PsLookupProcessByProcessId((HANDLE)(UINT_PTR)inp->ProcessID, &selectedprocess)))
 				{
-					KAPC_STATE apc_state;
-					KeStackAttachProcess((PKPROCESS)selectedprocess, &apc_state);
-					__try
+					HANDLE hProcess = NULL;
+					NTSTATUS hStatus = ObOpenObjectByPointer(selectedprocess, OBJ_KERNEL_HANDLE, NULL, PROCESS_ALL_ACCESS, *PsProcessType, KernelMode, &hProcess);
+					if (NT_SUCCESS(hStatus) && hProcess)
 					{
 						PVOID base = (PVOID)(UINT_PTR)inp->BaseAddress;
 						SIZE_T regionSize = (SIZE_T)inp->Size;
@@ -1074,16 +1062,17 @@ case IOCTL_CE_HIDE_THREAD:
 						}
 
 						ntStatus = ZwFreeVirtualMemory(
-							ZwCurrentProcess(),
+							hProcess,
 							&base,
 							&regionSize,
 							freeType
 						);
+						ZwClose(hProcess);
 						Irp->IoStatus.Information = 0;
 					}
-					__finally
+					else
 					{
-						KeUnstackDetachProcess(&apc_state);
+						ntStatus = hStatus;
 					}
 					ObDereferenceObject(selectedprocess);
 				}
@@ -1116,21 +1105,22 @@ case IOCTL_CE_HIDE_THREAD:
 
 				if (NT_SUCCESS(PsLookupProcessByProcessId((HANDLE)(UINT_PTR)inp->ProcessID, &selectedprocess)))
 				{
-					KAPC_STATE apc_state;
-					KeStackAttachProcess((PKPROCESS)selectedprocess, &apc_state);
-					__try
+					HANDLE hProcess = NULL;
+					NTSTATUS hStatus = ObOpenObjectByPointer(selectedprocess, OBJ_KERNEL_HANDLE, NULL, PROCESS_ALL_ACCESS, *PsProcessType, KernelMode, &hProcess);
+					if (NT_SUCCESS(hStatus) && hProcess)
 					{
 						PVOID base = (PVOID)(UINT_PTR)inp->BaseAddress;
 						SIZE_T regionSize = (SIZE_T)inp->Size;
 						ULONG oldProtect = 0;
 
 						NTSTATUS status = ZwProtectVirtualMemory(
-							ZwCurrentProcess(),
+							hProcess,
 							&base,
 							&regionSize,
 							inp->NewProtect,
 							&oldProtect
 						);
+						ZwClose(hProcess);
 
 						outp->BaseAddress = (UINT64)(UINT_PTR)base;
 						outp->Size = (UINT64)regionSize;
@@ -1139,9 +1129,9 @@ case IOCTL_CE_HIDE_THREAD:
 						Irp->IoStatus.Information = sizeof(PROTECT_PROCESS_MEMORY_OUTPUT);
 						ntStatus = NT_SUCCESS(status) ? STATUS_SUCCESS : status;
 					}
-					__finally
+					else
 					{
-						KeUnstackDetachProcess(&apc_state);
+						ntStatus = hStatus;
 					}
 					ObDereferenceObject(selectedprocess);
 				}

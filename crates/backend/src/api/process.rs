@@ -821,3 +821,45 @@ pub extern "C" fn onyx_security_anti_debug_audit() -> i32 {
         0
     }
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_kernel_read_memory_cr3(
+    pid: u32,
+    address: u64,
+    buffer: *mut u8,
+    size: usize,
+) -> i32 {
+    if buffer.is_null() || size == 0 {
+        return 0;
+    }
+    match onyx_core::process::kernel::OnyxDriver::connect() {
+        Ok(driver) => match driver.read_memory_cr3(pid, address, size) {
+            Ok(bytes) => {
+                std::ptr::copy_nonoverlapping(bytes.as_ptr(), buffer, bytes.len());
+                bytes.len() as i32
+            }
+            Err(_) => 0,
+        },
+        Err(_) => 0,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_kernel_write_memory_cr3(
+    pid: u32,
+    address: u64,
+    data: *const u8,
+    size: usize,
+) -> i32 {
+    if data.is_null() || size == 0 {
+        return 0;
+    }
+    let slice = std::slice::from_raw_parts(data, size);
+    match onyx_core::process::kernel::OnyxDriver::connect() {
+        Ok(driver) => match driver.write_memory_cr3(pid, address, slice) {
+            Ok(written) => written as i32,
+            Err(_) => 0,
+        },
+        Err(_) => 0,
+    }
+}
