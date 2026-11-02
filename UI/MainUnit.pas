@@ -2519,7 +2519,7 @@ var
   op: string;
 begin
   //unhandled exeption. Also clean lua stack
-  s:={$ifdef THREADNAMESUPPORT}GetThreadName+': '+{$endif}'Unhandled exception: '+e.message+' (Exception class '+ e.ClassName+')';
+  s:='Unhandled exception: '+e.message+' (Exception class '+ e.ClassName+')';
 
 
   {$ifdef windows}
@@ -4143,13 +4143,13 @@ end;
 procedure TMainForm.miMCPStartClick(Sender: TObject);
 begin
   if LuaVM <> nil then
-    lua_dostring(LuaVM, 'if StartMCPBridge then StartMCPBridge() showMessage("[MCP] Servidor MCP ligado com sucesso!" .. string.char(10) .. "Escutando requisicoes no pipe local.") else showMessage("[MCP] Erro: Ponte MCP nao carregada.") end');
+    lua_dostring(LuaVM, 'if StartMCPBridge then StartMCPBridge(); showMessage("[MCP] Servidor MCP ligado com sucesso!" .. string.char(10) .. "Escutando requisicoes no pipe local.") else showMessage("[MCP] Erro: Ponte MCP nao carregada.") end');
 end;
 
 procedure TMainForm.miMCPStopClick(Sender: TObject);
 begin
   if LuaVM <> nil then
-    lua_dostring(LuaVM, 'if StopMCPBridge then StopMCPBridge() showMessage("[MCP] Servidor MCP desligado.") else showMessage("[MCP] Erro: Ponte MCP nao encontrada.") end');
+    lua_dostring(LuaVM, 'if StopMCPBridge then StopMCPBridge(); showMessage("[MCP] Servidor MCP desligado.") else showMessage("[MCP] Erro: Ponte MCP nao encontrada.") end');
 end;
 
 procedure TMainForm.miMCPRestartClick(Sender: TObject);

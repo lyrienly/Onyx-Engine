@@ -292,7 +292,14 @@ var
   path: string;
   noautorun: boolean;
 
+{$ifdef windows}
+function SetCurrentProcessExplicitAppUserModelID(AppID: PWideChar): HRESULT; stdcall; external 'shell32.dll';
+{$endif}
+
 begin
+  {$ifdef windows}
+  SetCurrentProcessExplicitAppUserModelID('OnyxEngine');
+  {$endif}
   Application.Title:='OnyxEngine';
   {$ifdef darwin}
   macPortFixRegPath;

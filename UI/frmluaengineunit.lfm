@@ -831,7 +831,7 @@ object frmLuaEngine: TfrmLuaEngine
       object cbShowOnPrint: TMenuItem
         AutoCheck = True
         Caption = 'Show on "print"'
-        Checked = True
+        Checked = False
       end
       object miResizeOutput: TMenuItem
         AutoCheck = True

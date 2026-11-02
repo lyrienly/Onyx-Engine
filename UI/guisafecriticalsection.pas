@@ -31,7 +31,6 @@ type
 
 implementation
 
-uses SyncObjs2;
 
 resourcestring
   rsCriticalsectionLeaveWithoutEnter = 'Criticalsection leave without enter';
@@ -63,7 +62,7 @@ begin
 
       if (maxtimeout<>INFINITE) and (deadlockprevention>maxtimeout) then
       begin
-        raise exception.create('Pipe lock timeout. Still in use by thread '+inttostr(dword(lockedthreadid)){$ifdef THREADNAMESUPPORT} +' ('+GetThreadName(lockedthreadid)+')'{$endif});
+        raise exception.create('Pipe lock timeout. Still in use by thread ' + inttostr(dword(lockedthreadid)));
 
       end;
     end;

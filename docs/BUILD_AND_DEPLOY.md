@@ -18,7 +18,7 @@ O ecossistema nativo do OnyxEngine utiliza o Cargo Workspace para orquestrar tod
 
 ```powershell
 # Navegar até a raiz do repositório
-cd C:\Users\Administrator\Desktop\OnyxEngine
+cd OnyxEngine
 
 # Limpeza opcional de cache de compilação
 cargo clean

@@ -80,7 +80,7 @@ implementation
 {$R *.lfm}
 
 uses
-  MemoryBrowserFormUnit, processlist, ProcessWindowUnit, NewKernelHandler;
+  MemoryBrowserFormUnit, processlist, ProcessWindowUnit;
 
 procedure TfrmManualMapper.FormCreate(Sender: TObject);
 begin
@@ -231,7 +231,7 @@ var
 begin
   newPid := GetSelectedPid;
   if newPid <> 0 then
-    processid := newPid;
+    processhandler.processid := newPid;
   UpdateDriverStatus;
 end;
 

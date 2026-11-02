@@ -388,7 +388,7 @@ local function initializeSandboxMenu()
     end
     top.add(miTest)
 
-    pcall(function() print("[OnyxLuaSandbox] menu Lua inicializado.") end)
+    -- menu inicializado silencioso
     return true
 end
 
@@ -401,4 +401,4 @@ initTimer.OnTimer = function(t)
     end
 end
 
-pcall(function() print("[OnyxLuaSandbox] carregado; use o menu Lua para log e reset.") end)
+-- carregado silencioso

@@ -1382,6 +1382,7 @@ var
   multicaret: TSynPluginMultiCaret;
 begin
 
+  cbShowOnPrint.checked := false;
   synhighlighter:=TSynLuaSyn.Create(self);
   reloadHighlighterSettings;
 

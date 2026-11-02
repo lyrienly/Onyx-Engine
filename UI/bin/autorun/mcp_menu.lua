@@ -9,7 +9,7 @@ function ShowMCPSettingsDialog()
     local curPipe = (s and s["PipeName"] and s["PipeName"] ~= "") and s["PipeName"] or "Onyx_MCP_Bridge_v1"
     local curPort = (s and s["TcpPort"] and s["TcpPort"] ~= "") and s["TcpPort"] or "9876"
     local curTimeout = (s and s["Timeout"] and s["Timeout"] ~= "") and s["Timeout"] or "30"
-    local curAutostart = not (s and (s["Autostart"] == "0" or s["Autostart"] == "false"))
+    local curAutostart = (s and (s["Autostart"] == "1" or s["Autostart"] == "true"))
     local curAutoKernel = (s and s["AutoKernel"] == "1")
     local curAutoStrip = (s and s["AutoStripCallbacks"] == "1")
     local curAutoCloak = (s and s["AutoCloak"] == "1")
@@ -268,7 +268,7 @@ local function initializeMCPMenu()
     end
 
     if MainForm.miMCP then
-        safeLog("Menu nativo miMCP detectado ao lado do D3D.")
+        -- safeLog silencioso no startup
         pcall(function() MainForm.miMCP.Caption = "[MCP Engine] - Offline" end)
         local statusTimer = createTimer(MainForm)
         statusTimer.Interval = 1000
@@ -598,7 +598,7 @@ local function initializeMCPMenu()
         end)
     end
 
-    safeLog("Menu MCP em portugues inicializado ao lado do D3D.")
+    -- safeLog silencioso no startup
     return true
 end
 

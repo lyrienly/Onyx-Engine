@@ -5626,6 +5626,12 @@ local function PipeWorker(thread)
             pipe.acceptConnection()
         end)
 
+        if thread.Terminated or not serverState.running then
+            pcall(function() pipe.destroy() end)
+            serverState.workerPipe = nil
+            break
+        end
+
         if pipe.Connected and not thread.Terminated then
             -- Issue #5: CE's TPipeConnection (luapipe.pas) latches
             -- fconnected=false on the first ReadFile hiccup, so the inner
@@ -5735,17 +5741,30 @@ local function PipeWorker(thread)
 end
 
 function StopMCPBridge()
-    if serverState.workerThread then
+    if serverState.workerThread or serverState.running then
         log("Stopping Server (Terminating Thread)...")
-        serverState.workerThread.terminate()
+        serverState.running = false
+        serverState.connected = false
 
-        if serverState.workerPipe then
-            pcall(function() serverState.workerPipe.destroy() end)
-            serverState.workerPipe = nil
+        if serverState.workerThread then
+            serverState.workerThread.terminate()
         end
 
+        local p = serverState.workerPipe
+        serverState.workerPipe = nil
         serverState.workerThread = nil
-        serverState.running = false
+
+        if p then
+            pcall(function()
+                if p.unblock then
+                    p.unblock()
+                else
+                    local fs = createFileStream("\\\\.\\pipe\\" .. tostring(PIPE_NAME), 0)
+                    if fs then fs.destroy() end
+                end
+            end)
+            pcall(function() p.destroy() end)
+        end
     end
 
     if serverState.timer then
@@ -5756,6 +5775,12 @@ function StopMCPBridge()
     cleanupZombieState()
 
     log("Server Stopped")
+    pcall(function()
+        if getLuaEngine then
+            local le = getLuaEngine()
+            if le and le.Visible then le.hide() end
+        end
+    end)
 end
 
 function StartMCPBridge()
@@ -5764,6 +5789,12 @@ function StartMCPBridge()
     PIPE_NAME = GetConfiguredMCPPipeName()
 
     log("Starting MCP Bridge v" .. VERSION)
+    pcall(function()
+        if getLuaEngine then
+            local le = getLuaEngine()
+            if le then le.show() end
+        end
+    end)
 
     serverState.running = true
     serverState.connected = false
@@ -5782,17 +5813,17 @@ function GetMCPServerState() return serverState end
 function GetMCPPipeName() return PIPE_NAME end
 function GetMCPVersion() return VERSION end
 
-local autostart = true
+local autostart = false
 pcall(function()
     local s = getSettings("OnyxEngine_MCP")
-    if s and (s["Autostart"] == "0" or s["Autostart"] == "false") then
-        autostart = false
+    if s and (s["Autostart"] == "1" or s["Autostart"] == "true") then
+        autostart = true
     end
 end)
 
 if autostart then
     StartMCPBridge()
 else
-    log("MCP Bridge autostart disabled in OnyxEngine settings. Use 'MCP Bridge' menu to start.")
+    -- modo sob-demanda silencioso
 end
 
