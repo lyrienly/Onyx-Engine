@@ -8,7 +8,6 @@ use parking_lot::Mutex;
 use windows::Win32::Graphics::Direct3D11::ID3D11Device;
 use windows::Win32::Graphics::Direct3D12::{ID3D12CommandQueue, ID3D12Device};
 use windows::Win32::Graphics::Dxgi::IDXGISwapChain;
-use windows::core::Interface;
 
 pub enum CapturedApi {
     None,

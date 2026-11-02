@@ -75,9 +75,10 @@ pub unsafe fn resolve_present_from_instance(instance_handle: u64) {
         return;
     }
     type FnGetInstanceProcAddr =
-        unsafe extern "system" fn(instance: u64, name: *const u8) -> Option<*mut c_void>;
+        unsafe extern "system" fn(instance: u64, name: *const u8) -> *mut c_void;
     let getter: FnGetInstanceProcAddr = std::mem::transmute(getter_addr);
-    if let Some(p) = getter(instance_handle, b"vkQueuePresentKHR\0".as_ptr()) {
+    let p = getter(instance_handle, b"vkQueuePresentKHR\0".as_ptr());
+    if !p.is_null() {
         ORIG_QUEUE_PRESENT_KHR.store(p as usize, Ordering::SeqCst);
     }
 }
