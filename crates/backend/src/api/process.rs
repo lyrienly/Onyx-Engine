@@ -988,3 +988,97 @@ pub unsafe extern "C" fn onyx_kernel_get_hvci_status(out_vbs: *mut u32, out_hvci
     }
     1
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_ultimap2_setup(
+    pid: u32,
+    buffer_size: u32,
+    range_start: u64,
+    range_end: u64,
+) -> i32 {
+    let mut config = onyx_core::process::kernel::CeUltimap2Config::default();
+    config.pid = pid;
+    config.buffer_size = buffer_size;
+    if range_start < range_end {
+        config.range_count = 1;
+        config.ranges[0].start_address = range_start;
+        config.ranges[0].end_address = range_end;
+        config.ranges[0].is_stop_address = 0;
+    }
+    match onyx_core::process::kernel::OnyxDriver::connect() {
+        Ok(driver) => match driver.setup_ultimap2(&config) {
+            Ok(_) => 1,
+            Err(_) => 0,
+        },
+        Err(_) => 0,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_ultimap2_disable() -> i32 {
+    match onyx_core::process::kernel::OnyxDriver::connect() {
+        Ok(driver) => match driver.disable_ultimap2() {
+            Ok(_) => 1,
+            Err(_) => 0,
+        },
+        Err(_) => 0,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_ultimap2_pause() -> i32 {
+    match onyx_core::process::kernel::OnyxDriver::connect() {
+        Ok(driver) => match driver.pause_ultimap2() {
+            Ok(_) => 1,
+            Err(_) => 0,
+        },
+        Err(_) => 0,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_ultimap2_resume() -> i32 {
+    match onyx_core::process::kernel::OnyxDriver::connect() {
+        Ok(driver) => match driver.resume_ultimap2() {
+            Ok(_) => 1,
+            Err(_) => 0,
+        },
+        Err(_) => 0,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_ultimap2_get_trace_size(out_size: *mut u64) -> i32 {
+    if out_size.is_null() {
+        return 0;
+    }
+    match onyx_core::process::kernel::OnyxDriver::connect() {
+        Ok(driver) => match driver.get_ultimap2_trace_size() {
+            Ok(size) => {
+                *out_size = size;
+                1
+            }
+            Err(_) => 0,
+        },
+        Err(_) => 0,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_intel_pt_decode_stream(
+    buffer: *const u8,
+    size: usize,
+    filter_start: u64,
+    filter_end: u64,
+) -> usize {
+    if buffer.is_null() || size == 0 {
+        return 0;
+    }
+    let slice = std::slice::from_raw_parts(buffer, size);
+    let mut decoder = onyx_core::debugger::intel_pt::IntelPtDecoder::new();
+    if filter_start < filter_end {
+        decoder.add_filter_range(filter_start, filter_end);
+    }
+    let events = decoder.reconstruct_execution_flow(slice);
+    events.len()
+}

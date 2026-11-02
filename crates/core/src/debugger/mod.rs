@@ -4,6 +4,7 @@ pub mod debugger;
 pub mod disasm;
 pub mod dissect_code;
 pub mod hook;
+pub mod intel_pt;
 pub mod page_guard;
 pub mod relocator;
 pub mod rip_scanner;
@@ -25,3 +26,5 @@ pub use rip_scanner::*;
 pub use rop_finder::*;
 pub use string_referencer::*;
 pub use veh::*;
+
+pub use intel_pt::*;

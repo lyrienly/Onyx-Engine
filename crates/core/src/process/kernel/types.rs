@@ -47,6 +47,62 @@ pub const IOCTL_CE_INSPECT_DRIVER: DWORD = 0x22E210;
 pub const IOCTL_CE_ENUM_CALLBACKS: DWORD = 0x22E214;
 pub const IOCTL_CE_GET_HVCI_STATUS: DWORD = 0x22E218;
 
+pub const IOCTL_CE_ULTIMAP2: DWORD = 0x22E13C;
+pub const IOCTL_CE_DISABLEULTIMAP2: DWORD = 0x22E140;
+pub const IOCTL_CE_ULTIMAP2_WAITFORDATA: DWORD = 0x22E144;
+pub const IOCTL_CE_ULTIMAP2_CONTINUE: DWORD = 0x22E148;
+pub const IOCTL_CE_ULTIMAP2_FLUSH: DWORD = 0x22E14C;
+pub const IOCTL_CE_ULTIMAP2_PAUSE: DWORD = 0x22E150;
+pub const IOCTL_CE_ULTIMAP2_RESUME: DWORD = 0x22E154;
+pub const IOCTL_CE_ULTIMAP2_LOCKFILE: DWORD = 0x22E158;
+pub const IOCTL_CE_ULTIMAP2_RELEASEFILE: DWORD = 0x22E15C;
+pub const IOCTL_CE_ULTIMAP2_GETTRACESIZE: DWORD = 0x22E168;
+pub const IOCTL_CE_ULTIMAP2_RESETTRACESIZE: DWORD = 0x22E16C;
+
+#[repr(C, packed)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct CeUltimapRange {
+    pub start_address: u64,
+    pub end_address: u64,
+    pub is_stop_address: u64,
+}
+
+#[repr(C, packed)]
+#[derive(Debug, Clone, Copy)]
+pub struct CeUltimap2Config {
+    pub pid: u32,
+    pub buffer_size: u32,
+    pub range_count: u32,
+    pub no_pmi: u32,
+    pub user_mode: u32,
+    pub kernel_mode: u32,
+    pub ranges: [CeUltimapRange; 8],
+    pub file_name: [u16; 200],
+}
+
+impl Default for CeUltimap2Config {
+    fn default() -> Self {
+        Self {
+            pid: 0,
+            buffer_size: 4096 * 1024,
+            range_count: 0,
+            no_pmi: 0,
+            user_mode: 1,
+            kernel_mode: 0,
+            ranges: [CeUltimapRange::default(); 8],
+            file_name: [0u16; 200],
+        }
+    }
+}
+
+#[repr(C, packed)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct CeUltimap2DataEvent {
+    pub address: u64,
+    pub size: u64,
+    pub cpu_id: u64,
+}
+
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct CeHvciStatusOutput {
