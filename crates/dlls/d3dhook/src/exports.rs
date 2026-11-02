@@ -1,3 +1,11 @@
+//! ABI preservada para o frontend Pascal/Lazarus.
+//!
+//! A partir da adoção do `hudhook`, o overlay é renderizado inteiramente
+//! em Rust e as funções abaixo tornam-se stubs de compatibilidade — o
+//! frontend pode continuar chamando `D3DHook_Initialize` sem efeito
+//! colateral, enquanto o overlay já roda via `DllMain` gerado pelo macro
+//! `hudhook!`.
+
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 pub const MAX_COMMANDS: usize = 256;
@@ -15,39 +23,21 @@ pub struct RenderCommand {
     pub text_buf: [u8; 64],
 }
 
-pub static mut COMMAND_BUFFER: [RenderCommand; MAX_COMMANDS] = [RenderCommand {
-    cmd_type: 0,
-    x: 0.0,
-    y: 0.0,
-    w: 0.0,
-    h: 0.0,
-    color_rgba: 0,
-    text_len: 0,
-    text_buf: [0u8; 64],
-}; MAX_COMMANDS];
+static COMMAND_COUNT: AtomicU32 = AtomicU32::new(0);
+static HOOK_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
-pub static COMMAND_COUNT: AtomicU32 = AtomicU32::new(0);
-pub static HOOK_INSTALLED: AtomicBool = AtomicBool::new(false);
-
+/// Stub: o overlay inicializa automaticamente no `DLL_PROCESS_ATTACH`
+/// gerado pelo `hudhook!`. Mantido para compatibilidade com o frontend.
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn D3DHook_Initialize() -> i32 {
-    if HOOK_INSTALLED.load(Ordering::SeqCst) {
-        return 1;
-    }
-    crate::pipe::spawn_pipe_server();
-    crate::manager::install_all();
-    HOOK_INSTALLED.store(true, Ordering::SeqCst);
+    HOOK_INITIALIZED.store(true, Ordering::SeqCst);
     1
 }
 
+/// Stub: o unhook é feito pelo próprio `hudhook` no `DLL_PROCESS_DETACH`.
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn D3DHook_Shutdown() -> i32 {
-    if !HOOK_INSTALLED.load(Ordering::SeqCst) {
-        return 1;
-    }
-    crate::manager::uninstall_all();
-    crate::pipe::stop_pipe_server();
-    HOOK_INSTALLED.store(false, Ordering::SeqCst);
+    HOOK_INITIALIZED.store(false, Ordering::SeqCst);
     1
 }
 
