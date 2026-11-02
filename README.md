@@ -1,131 +1,143 @@
 # OnyxEngine
 
-OnyxEngine e uma plataforma avancada de analise de memoria, inspecao de processos e engenharia reversa. O sistema integra uma arquitetura hibrida composta por um frontend em Free Pascal/Lazarus, um backend nativo de alta performance desenvolvido em Rust, um driver de modo kernel em C para operacoes privilegiadas em ring-0 e uma interface de automacao baseada no Model Context Protocol (MCP).
+OnyxEngine é uma plataforma avançada de análise de memória, inspeção de processos e engenharia reversa. O sistema integra uma arquitetura híbrida de alta performance composta por um frontend gráfico nativo em Free Pascal / Lazarus, um ecossistema modular de baixo nível desenvolvido em Rust (backend, scanner SIMD, desmontador Zydis, gerador de ponteiros e injeções stealth), um driver de modo kernel em C para operações privilegiadas em ring-0 (`OwMemDriver.sys`) e uma interface de automação nativa baseada no Model Context Protocol (MCP).
 
 ---
 
 ## Arquitetura do Sistema
 
-O projeto e estruturado em quatro camadas operacionais:
+O projeto é estruturado em quatro camadas operacionais totalmente desacopladas e 100% nativas (sem dependência de interpretadores externos):
 
 ```text
 +-------------------------------------------------------------------+
 |                        Frontend Visual (LCL)                      |
-|                  Cheat Engine UI Base / Lazarus Pascal            |
+|                  OnyxEngine UI / Lazarus Free Pascal              |
 +-------------------------------------------------------------------+
            |                                       |
-           | C-ABI FFI                             | TCP RPC (52736)
+           | C-ABI FFI (stdcall / cdecl)           | Named Pipe IPC / Stdio
            v                                       v
 +-------------------------------+      +----------------------------+
-|     Backend Nativo (Rust)     |      |    Servidor MCP (Python)   |
-|   Varredura SIMD, Disasm,     |      |  Bridge de Automacao para  |
-|    Injecao e Pointer Scanner  |      |   Agentes e Assistentes    |
+|     Backend Nativo (Rust)     |      |    Servidor MCP Nativo     |
+|   Varredura SIMD, Disasm,     |      |  onyx_mcp.dll / server.exe |
+|    Injeção e Pointer Scanner  |      |   Controle Total para IA   |
 +-------------------------------+      +----------------------------+
            |
-           | DeviceIoControl
+           | DeviceIoControl (Fast I/O)
            v
 +-------------------------------------------------------------------+
 |                    Driver de Kernel (C / Ring-0)                  |
-|          OwMemDriver.sys - Acesso Fisico e Bypass de ObCallbacks  |
+|          OwMemDriver.sys - Acesso Físico e Bypass de ObCallbacks  |
 +-------------------------------------------------------------------+
 ```
 
 ### 1. Frontend em Free Pascal / Lazarus (`UI/`)
-Responsavel pela apresentacao grafica, gerenciamento de tabelas de enderecos, visualizacao de desassemblagem e depuracao visual. O frontend foi totalmente extraido do monolito original para `UI/`. As chamadas criticas de memoria e varredura sao interceptadas por bridges que redirecionam o fluxo para a DLL nativa em Rust.
+Responsável pela interface gráfica de alta responsividade, visualização de tabelas de endereços, desassemblagem e depuração visual. As rotinas pesadas de memória, congelamento e varredura são interceptadas e despachadas para o backend nativo em Rust via FFI de baixa latência.
 
-### 2. Backend Nativo em Rust (`crates/`)
-Substitui os mecanismos legados de varredura e manipulacao de processos por implementacoes seguras e altamente paralelizadas em Rust:
-* `crates/core`: Primitivas de memoria, manipulacao de processos Win32 e gerenciamento de memoria virtual.
-* `crates/modules/scanner`: Motor de varredura multithread com particionamento paralelo (Rayon) e comparadores vetorizados.
-* `crates/modules/debugger`: Bridge de desassemblagem integrando decodificadores modernos com a interface grafica.
-* `crates/backend`: Camada de exportacao C-ABI (`onyx_backend.dll`) consumida dinamicamente pelo frontend.
+### 2. Backend Nativo e Módulos em Rust (`crates/`)
+Substitui os mecanismos legados por implementações seguras, com proteção de memória e paralelismo determinístico:
+* `crates/core`: Primitivas de memória Win32, paginação virtual, manipulação de processos e tratamento unificado de erros com suporte a PT-BR.
+* `crates/backend`: Orquestrador C-ABI principal (`onyx_backend.dll`).
+* `crates/modules/`: Módulos modulares independentes (`scanner`, `pointer`, `disasm`, `freezer`, `aa`, `mono`, `mono_hook`, `dotnet`, `gdb_server`, `overlay`, `hook`).
+* `crates/dlls/`: Módulos de injeção e stealth (`speedhack`, `vehdebug`, `d3dhook`, `allochook`, `luaclient`, `onyx_shield`, `taskmgr_cloak`, `onyx_mcp`).
+* `crates/plugins/`: Extensões dinâmicas (`dll_mapper`, `aob_generator`).
+* `crates/pe-strip`, `crates/syscalls-indirect`, `crates/callstack-spoof`: Primitivas de evasão e segurança operacional.
 
 ### 3. Hipervisor e Runtimes (`dbvm/` e `lua/`)
 Componentes essenciais desacoplados na raiz:
-* `dbvm/`: Codigo-fonte do hipervisor DBVM para operacoes em nivel de hardware e virtualizacao.
-* `lua/`: Runtimes, bibliotecas auxiliares e wrappers de script para automacao.
+* `dbvm/`: Hipervisor DBVM para virtualização por hardware (VT-x / AMD-V).
+* `lua/`: Runtimes e bibliotecas auxiliares de script para automação de tabelas.
 
-### 4. Bridge de Automacao MCP (`UI/bin/mcp`)
-Interface de integracao compativel com a especificacao Model Context Protocol (MCP), viabilizando o controle remoto de sessoes de depuracao, escaneamento e injecao de memoria por agentes de inteligencia artificial e ferramentas automatizadas.
+### 4. Servidor Nativo MCP (Model Context Protocol)
+Interface de controle nativa em Rust (`onyx_mcp.dll` e `onyx_mcp_server.exe`), permitindo que agentes de inteligência artificial inspecionem processos, leiam/escrevam memória, executem scans, resolvam ponteiros e injetem código via JSON-RPC 2.0 padrão sobre standard I/O ou Named Pipes (`\\.\pipe\OnyxEngine_MCP_IPC`), operando sob demanda com zero consumo ocioso.
 
 ---
 
 ## Estrutura do Repositorio
 
-O projeto original do Cheat Engine foi totalmente destrinchado e reorganizado na raiz:
+O projeto organiza seus fontes e scripts de automação de forma modular na raiz:
 
 ```text
 OnyxEngine/
 |-- Cargo.toml                          # Manifesto do workspace Rust
-|-- CONTRIBUTING.md                     # Diretrizes de contribuicao e engenharia
-|-- README.md                           # Documentacao tecnica do projeto
-|-- BUILD.bat                           # Script de compilacao unificada
-|-- BUILD_ONYX.bat                      # Script rapido de backend e deploy
+|-- CONTRIBUTING.md                     # Diretrizes de contribuição e engenharia
+|-- README.md                           # Documentação técnica do projeto
+|-- BUILD.bat                           # Script mestre unificado de compilação
+|-- docs/                               # Manuais técnicos, arquitetura e catálogo de erros
 |-- UI/                                 # Frontend Pascal/Lazarus (.lpi, .pas, .lfm)
-|   `-- bin/                            # Recursos, bibliotecas auxiliares e scripts autorun
-|-- crates/                             # Codigo-fonte do motor em Rust
-|   |-- backend/                        # DLL C-ABI (onyx_backend)
-|   |-- core/                           # Subsistemas de processo, memoria, IOCTL e scanners
-|   |-- modules/                        # Modulos de scanner, freezer e desassembler
-|   `-- dlls/                           # Modulos de injecao (speedhack, vehdebug, d3dhook)
+|   `-- bin/                            # Recursos de desenvolvimento e scripts autorun
+|-- crates/                             # Código-fonte do motor em Rust
+|   |-- core/                           # Subsistemas de processo, memória, IOCTL e diagnósticos
+|   |-- backend/                        # DLL C-ABI principal (onyx_backend.dll)
+|   |-- modules/                        # Módulos de análise, runtime e varredura
+|   |-- dlls/                           # Injeções, stealth e servidor MCP nativo
+|   `-- plugins/                        # Extensões dinâmicas de mapeamento e AOB
 |-- dbvm/                               # Hipervisor DBVM desacoplado na raiz
 `-- lua/                                # Runtimes e bibliotecas Lua na raiz
 ```
 
 ---
 
-## Politica de Distribuicao de Binarios
+## Política de Distribuição de Binários
 
-O repositorio de codigo-fonte versiona estritamente codigos-fonte, scripts e configuracoes necessarias para a geracao dos componentes. 
+O repositório versiona estritamente código-fonte, scripts e recursos de compilação:
 
-* **Diretorio `bin/` local:** Os artefatos compilados localmente residem em `bin/` apenas em tempo de desenvolvimento. Esta pasta e ignorada pelo Git e nao e enviada ao repositorio.
-* **Releases Estaveis:** Pacotes compilados, testados e assinados sao disponibilizados exclusivamente atraves da aba de **Releases** do GitHub para versoes homologadas.
+* **Diretório `bin/` local:** Gerado automaticamente pelo `BUILD.bat` para conter os artefatos compilados em tempo de desenvolvimento. É ignorado pelo Git para manter o repositório leve.
+* **Releases Estáveis:** Pacotes binários oficiais homologados são publicados exclusivamente na aba de **Releases** do GitHub.
 
 ---
 
-## Instrucoes de Compilacao
+## Instruções de Compilação
 
-### Pre-requisitos de Ambiente
+### Pré-requisitos de Ambiente
 
 * **Sistema Operacional:** Windows 10 ou Windows 11 (64-bit)
-* **Rust Toolchain:** Versao estavel (`1.75+`) com target `x86_64-pc-windows-msvc`
-* **Lazarus IDE / Free Pascal:** Versao 2.2 ou superior instalada (com `lazbuild` configurado no PATH ou em `C:\lazarus\lazbuild.exe`)
-* **Python:** Versao 3.10 ou superior para o servico de relay MCP (dependencias em `requirements.txt`)
-* **Windows Driver Kit (WDK):** Necessario caso deseje recompilar o driver `OwMemDriver` a partir dos fontes
+* **Rust Toolchain:** Versão estável (`1.85+`) com target `x86_64-pc-windows-msvc`
+* **Lazarus IDE / Free Pascal:** FPC 3.2.2+ / Lazarus 2.2+ instalado com `lazbuild` no `PATH` ou em `C:\lazarus\lazbuild.exe`
+* **Microsoft Visual C++ Build Tools:** MSVC v143 x64 instalado (Build Tools ou Visual Studio)
+* **Windows Driver Kit (WDK):** Opcional, apenas se for recompilar o driver `OwMemDriver.sys` a partir dos fontes em C
 
-### 1. Compilacao do Backend em Rust
-```cmd
-cargo build --release -p onyx_backend
-```
-O artefato compilado sera gerado em `target\release\onyx_backend.dll`.
+### Pipeline Unificado (Recomendado)
 
-### 2. Compilacao do Frontend em Free Pascal
-```cmd
-lazbuild --build-mode="Release 64-Bit" "UI\onyxengine.lpi"
-```
-O executavel principal sera gerado em `UI\bin\OnyxEngine-x86_64.exe`.
+Para compilar todo o ecossistema (Rust Workspace + Frontend Pascal) e desdobrar as DLLs e executáveis em `bin\`, execute na raiz:
 
-### 3. Compilacao Unificada via Script
-Para compilar simultaneamente o motor em Rust, sincronizar os artefatos e compilar a interface Pascal, execute na raiz do repositorio:
 ```cmd
 BUILD.bat
 ```
 
+O script automatiza:
+1. Validação de ferramentas (`cargo` e `lazbuild`).
+2. Compilação de todos os 25 crates em modo Release otimizado (`cargo build --release --workspace`).
+3. Implantação estruturada das DLLs de backend, injeções, plugins e MCP para `bin\` e `UI\bin\`.
+4. Compilação do executável gráfico (`lazbuild -B --build-mode="Release 64-Bit" "UI\onyxengine.lpi"`).
+5. Sincronização automática para `bin\OnyxEngine-CE.exe`.
+
+### Compilação Manual dos Componentes
+
+#### 1. Backend em Rust
+```cmd
+cargo build --release --workspace
+```
+Os artefatos compilados residem em `target\release\`.
+
+#### 2. Frontend em Free Pascal
+```cmd
+lazbuild -B --build-mode="Release 64-Bit" "UI\onyxengine.lpi"
+```
+O executável principal é gerado em `UI\bin\OnyxEngine-x86_64.exe`.
+
 ---
 
-## Fluxo de Contribuicao e Engenharia
+## Fluxo de Contribuição e Engenharia
 
-O projeto adota regras estritas de governanca de codigo:
+1. **Rastreamento por Issues:** Alterações substanciais devem referenciar uma Issue aberta previamente.
+2. **Pipelines Verificados:** O workspace Rust e o frontend Pascal devem compilar sem erros através do `BUILD.bat`.
+3. **Branches de Trabalho:** Desenvolvimento isolado em branches temáticas (`feat/`, `fix/`, `refactor/`).
+4. **Revisão de Código:** Submissões via Pull Request direcionadas à branch `main`.
 
-1. **Rastreamento Obrigatorio por Issues:** Nenhuma alteracao de codigo pode ser submetida sem uma Issue formal aberta previamente.
-2. **Preservacao de Workflows:** E dever do colaborador manter os pipelines de build e testes unitarios passando sem falhas. Qualquer PR que quebre fluxos existentes sera reprovado.
-3. **Branches por Funcionalidade:** Todo trabalho deve ser realizado em branches especificas (`feat/`, `fix/`, `refactor/`).
-4. **Revisao de Codigo:** Todos os Pull Requests sao direcionados para a branch `main` e passam por analise e aprovacao do mantenedor principal (**ErlonLy**).
-
-Consulte o arquivo [CONTRIBUTING.md](CONTRIBUTING.md) para detalhes completos sobre o fluxo operacional.
+Consulte o arquivo [CONTRIBUTING.md](CONTRIBUTING.md) para detalhes completos sobre padrões de código e governança.
 
 ---
 
 ## Aviso Legal
 
-Este software foi desenvolvido com a finalidade de fornecer uma plataforma para analise de memoria, engenharia reversa de software, pesquisa de seguranca da informacao e desenvolvimento de ferramentas de instrumentacao de sistemas operacionais. Os desenvolvedores nao se responsabilizam pelo uso indevido deste utilitario em violacao a termos de servico de terceiros ou legislacoes vigentes.
+Este software foi desenvolvido com a finalidade de fornecer uma plataforma para análise de memória, engenharia reversa de software, pesquisa de segurança da informação e instrumentação avançada de sistemas operacionais. Os desenvolvedores não se responsabilizam pelo uso indevido deste utilitário em violação a termos de serviço de terceiros ou legislações vigentes.

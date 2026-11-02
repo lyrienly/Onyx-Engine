@@ -18,9 +18,10 @@ O subsistema MCP opera sob dois modos de inicialização:
    - Suporta flags de linha de comando: `--manifest` (exibe todas as 49 ferramentas em JSON) e `--version`.
    - Não requer Python, pip, ou bibliotecas de terceiros instaladas na máquina host.
 
-2. **Modo Biblioteca Dinâmica (`bin/onyx_mcp.dll`):**
-   - Pode ser carregada em tempo de execução pelo executável principal `OnyxEngine-CE.exe` ou injetada em processos.
-   - Expõe funções C-ABI para despacho direto de payloads JSON na memória (`onyx_mcp_dispatch_json`) e execução em thread separada de I/O (`onyx_mcp_start_stdio_thread`).
+2. **Modo Biblioteca Dinâmica e Ponte IPC (`bin/onyx_mcp.dll` / `autorun/ce_mcp_bridge.lua`):**
+   - Opera sob demanda: os recursos de rede/pipes permanecem 100% ociosos até o operador acionar o servidor explicitamente via menu `[MCP Engine] -> Ligar Servidor`.
+   - Comunicação assíncrona bidirecional via Windows Named Pipe: `\\.\pipe\OnyxEngine_MCP_IPC`.
+   - O desligamento do servidor utiliza o método nativo `unblock` de `TLuaPipeServer`, garantindo que a chamada bloqueante `ConnectNamedPipe` no kernel do Windows seja liberada instantaneamente, permitindo o encerramento limpo da worker thread sem congelar a thread de UI da aplicação.
 
 ---
 
@@ -112,7 +113,7 @@ Adicione ao arquivo `%APPDATA%\Claude\claude_desktop_config.json`:
 {
   "mcpServers": {
     "onyx_engine": {
-      "command": "C:\\Users\\Administrator\\Desktop\\OnyxEngine\\bin\\onyx_mcp_server.exe",
+      "command": "<CAMINHO_DO_ONYX>\\bin\\onyx_mcp_server.exe",
       "args": []
     }
   }
@@ -120,13 +121,13 @@ Adicione ao arquivo `%APPDATA%\Claude\claude_desktop_config.json`:
 ```
 
 ### 4.2 Integração com Antigravity / Cursor
-No arquivo `onyx_mcp_config.json` ou nas configurações do Cursor MCP:
+Nas configurações do MCP (stdio):
 
 ```json
 {
   "mcpServers": {
     "onyx_engine": {
-      "command": "C:\\Users\\Administrator\\Desktop\\OnyxEngine\\bin\\onyx_mcp_server.exe",
+      "command": "<CAMINHO_DO_ONYX>\\bin\\onyx_mcp_server.exe",
       "transport": "stdio"
     }
   }
