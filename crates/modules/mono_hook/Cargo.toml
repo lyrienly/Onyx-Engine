@@ -5,7 +5,7 @@ edition = "2021"
 
 [lib]
 name = "onyx_mono_hook"
-crate-type = ["rlib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 onyx_hook = { path = "../hook" }

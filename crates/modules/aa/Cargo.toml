@@ -5,7 +5,7 @@ edition = "2021"
 
 [lib]
 name = "onyx_aa"
-crate-type = ["rlib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 

@@ -6,6 +6,7 @@ edition = "2021"
 [lib]
 name = "syscalls_indirect"
 path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
 
 [[example]]
 name = "demo_indirect_syscall"

@@ -17,3 +17,8 @@ pub use dx::PRESENT_VTABLE_INDEX;
 pub use engine::{OverlayEngine, OverlayError, OverlayFrame};
 pub use present_hook::resolve_present_slot;
 pub use renderer::Renderer;
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_overlay_version() -> u32 {
+    0x010000
+}
