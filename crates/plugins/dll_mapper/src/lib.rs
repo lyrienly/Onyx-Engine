@@ -9,6 +9,7 @@ mod stub;
 use std::ffi::{c_char, CStr};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
+use onyx_core::error::{set_last_error, OnyxError};
 
 pub const ONYX_PLUGIN_API_VERSION: u32 = 1;
 
@@ -173,7 +174,12 @@ pub unsafe extern "system" fn OnyxPlugin_MapDllPid(
     options: *const OnyxMapOptions,
     out_result: *mut OnyxMapResult,
 ) -> i32 {
-    if dll_path.is_null() || out_result.is_null() {
+    if dll_path.is_null() {
+        set_last_error(OnyxError::null_pointer("dll_path"));
+        return ONYX_PLUGIN_ERR_INVALID_PARAM;
+    }
+    if out_result.is_null() {
+        set_last_error(OnyxError::null_pointer("out_result"));
         return ONYX_PLUGIN_ERR_INVALID_PARAM;
     }
     clear_c_string(&mut (*out_result).error);

@@ -7,6 +7,7 @@ pub mod types;
 pub use api::aa::*;
 pub use api::abi_util::*;
 pub use api::disasm::*;
+pub use api::error::*;
 pub use api::freezer::*;
 pub use api::gdb::*;
 pub use api::hook::*;

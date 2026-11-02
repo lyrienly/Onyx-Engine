@@ -1,4 +1,5 @@
 pub mod debugger;
+pub mod error;
 pub mod injection;
 pub mod memory;
 pub mod mono;
@@ -8,6 +9,7 @@ pub mod security;
 pub mod symbols;
 
 pub use debugger::{disasm, hook, veh};
+pub use error::*;
 pub use injection::{allochook, speedhack};
 pub use memory::{freeze, pointer_scanner, scanner, structure};
 pub use process::{kernel, symbol, win32};
