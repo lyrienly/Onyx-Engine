@@ -239,15 +239,34 @@ BOOLEAN WriteProcessMemory(DWORD PID,PEPROCESS PEProcess,PVOID Address,DWORD Siz
 
 	if (selectedprocess==NULL)
 	{
-
-        if (!NT_SUCCESS(PsLookupProcessByProcessId((PVOID)(UINT_PTR)PID,&selectedprocess)))
+		if (!NT_SUCCESS(PsLookupProcessByProcessId((PVOID)(UINT_PTR)PID,&selectedprocess)))
 		   return FALSE;
-
 	}
 
+	// 1. Direct Ring 0 Physical CR3 Page-Table Translation (Zero-Attach)
 	{
 		SIZE_T physBytesWritten = 0;
 		if (WriteProcessMemoryPhysicalCR3(selectedprocess, (ULONG64)Address, Buffer, (SIZE_T)Size, &physBytesWritten) && physBytesWritten == (SIZE_T)Size)
+		{
+			if (PEProcess == NULL && selectedprocess)
+				ObDereferenceObject(selectedprocess);
+			return TRUE;
+		}
+	}
+
+	// 2. Direct MmCopyVirtualMemory (Zero-Attach)
+	{
+		SIZE_T transferred = 0;
+		ntStatus = MmCopyVirtualMemory(
+			PsGetCurrentProcess(),
+			Buffer,
+			selectedprocess,
+			Address,
+			Size,
+			KernelMode,
+			&transferred
+		);
+		if (NT_SUCCESS(ntStatus) && transferred == (SIZE_T)Size)
 		{
 			if (PEProcess == NULL && selectedprocess)
 				ObDereferenceObject(selectedprocess);
@@ -350,7 +369,6 @@ BOOLEAN WriteProcessMemory(DWORD PID,PEPROCESS PEProcess,PVOID Address,DWORD Siz
 BOOLEAN ReadProcessMemory(DWORD PID,PEPROCESS PEProcess,PVOID Address,DWORD Size, PVOID Buffer)
 {
 	PEPROCESS selectedprocess=PEProcess;
-
 	NTSTATUS ntStatus=STATUS_UNSUCCESSFUL;
 
 	if (PEProcess==NULL)
@@ -359,9 +377,41 @@ BOOLEAN ReadProcessMemory(DWORD PID,PEPROCESS PEProcess,PVOID Address,DWORD Size
 		   return FALSE;
 	}
 
+	// 1. Direct Ring 0 Physical CR3 Page-Table Translation (Zero-Attach)
 	{
 		SIZE_T physBytesRead = 0;
 		if (ReadProcessMemoryPhysicalCR3(selectedprocess, (ULONG64)Address, Buffer, (SIZE_T)Size, &physBytesRead) && physBytesRead == (SIZE_T)Size)
+		{
+			if (PEProcess == NULL && selectedprocess)
+				ObDereferenceObject(selectedprocess);
+			return TRUE;
+		}
+	}
+
+	// 2. Stealth Read via PTE Translation (Zero-Attach)
+	{
+		SIZE_T pteBytesRead = 0;
+		if (StealthReadProcessMemoryPTE(selectedprocess, (ULONG64)Address, Buffer, (SIZE_T)Size, &pteBytesRead) && pteBytesRead == (SIZE_T)Size)
+		{
+			if (PEProcess == NULL && selectedprocess)
+				ObDereferenceObject(selectedprocess);
+			return TRUE;
+		}
+	}
+
+	// 3. Direct MmCopyVirtualMemory (Zero-Attach)
+	{
+		SIZE_T transferred = 0;
+		ntStatus = MmCopyVirtualMemory(
+			selectedprocess,
+			Address,
+			PsGetCurrentProcess(),
+			Buffer,
+			Size,
+			KernelMode,
+			&transferred
+		);
+		if (NT_SUCCESS(ntStatus) && transferred == (SIZE_T)Size)
 		{
 			if (PEProcess == NULL && selectedprocess)
 				ObDereferenceObject(selectedprocess);
