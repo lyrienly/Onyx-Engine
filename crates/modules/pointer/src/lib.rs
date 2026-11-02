@@ -1,81 +1,17 @@
+pub mod compute;
+pub mod matrix;
+pub mod session;
+
+pub use compute::*;
+pub use matrix::*;
+pub use session::*;
+
 use std::ffi::{c_char, CStr};
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
-use std::thread::JoinHandle;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use onyx_core::pointer_scanner::{PointerPath, PointerScanConfig, PointerScanner};
-use onyx_core::process::{ModuleEntry, Process};
-
-#[repr(u32)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OnyxPointerScanPhase {
-    Idle = 0,
-    GeneratingMap = 1,
-    SearchingPaths = 2,
-    Rescanning = 3,
-    Completed = 4,
-    Cancelled = 5,
-    Failed = 6,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct OnyxPointerPathRecord {
-    pub module_name: [c_char; 260],
-    pub base_offset: usize,
-    pub offsets: [usize; 16],
-    pub offset_count: u32,
-    pub final_address: usize,
-}
-
-impl Default for OnyxPointerPathRecord {
-    fn default() -> Self {
-        Self {
-            module_name: [0; 260],
-            base_offset: 0,
-            offsets: [0; 16],
-            offset_count: 0,
-            final_address: 0,
-        }
-    }
-}
-
-pub struct PointerScannerSession {
-    pub scanner: Arc<Mutex<PointerScanner>>,
-    pub results: Arc<RwLock<Vec<PointerPath>>>,
-    pub loaded_modules: Arc<RwLock<Vec<ModuleEntry>>>,
-    pub phase: Arc<AtomicU32>,
-    pub progress_pct: Arc<Mutex<f32>>,
-    pub found_count: Arc<AtomicUsize>,
-    pub cancel_flag: Arc<AtomicBool>,
-    pub worker_handle: Option<JoinHandle<()>>,
-}
-
-impl PointerScannerSession {
-    pub fn new() -> Self {
-        Self {
-            scanner: Arc::new(Mutex::new(PointerScanner::new())),
-            results: Arc::new(RwLock::new(Vec::new())),
-            loaded_modules: Arc::new(RwLock::new(Vec::new())),
-            phase: Arc::new(AtomicU32::new(OnyxPointerScanPhase::Idle as u32)),
-            progress_pct: Arc::new(Mutex::new(0.0)),
-            found_count: Arc::new(AtomicUsize::new(0)),
-            cancel_flag: Arc::new(AtomicBool::new(false)),
-            worker_handle: None,
-        }
-    }
-
-    pub fn cancel(&self) {
-        self.cancel_flag.store(true, Ordering::SeqCst);
-    }
-}
-
-impl Default for PointerScannerSession {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
+use onyx_core::process::Process;
 #[no_mangle]
 pub extern "C" fn onyx_pointer_module_ping() -> i32 {
     1
@@ -195,8 +131,29 @@ pub unsafe extern "C" fn onyx_pointer_scanner_start_scan(
             Err(poisoned) => poisoned.into_inner(),
         };
 
-        let scan_res =
-            scanner.scan_paths_with_progress(&process, target_addr, &config, &mut |pct, found| {
+        let mut matrix = CompactPointerMatrix::with_capacity(scanner.total_pointers);
+        for nodes in scanner.pointer_map.values() {
+            for node in nodes {
+                matrix.push(node.from_address as u64, node.to_address as u64);
+            }
+        }
+        matrix.sort_and_dedup();
+
+        let modules = match process.modules() {
+            Ok(mods) => mods,
+            Err(_) => Vec::new(),
+        };
+
+        let scan_res: Result<Vec<PointerPath>, String> = Ok(ComputePointerScanner::scan_wavefront(
+            &matrix,
+            target_addr as u64,
+            config.max_depth,
+            config.max_offset,
+            config.alignment,
+            config.max_results,
+            &modules,
+            Some(Arc::clone(&cancel_arc)),
+            Some(&mut |pct, found| {
                 if cancel_arc.load(Ordering::Relaxed) {
                     return false;
                 }
@@ -205,7 +162,8 @@ pub unsafe extern "C" fn onyx_pointer_scanner_start_scan(
                 }
                 count_arc.store(found, Ordering::Relaxed);
                 true
-            });
+            }),
+        ));
 
         match scan_res {
             Ok(paths) => {
@@ -765,6 +723,61 @@ pub unsafe extern "C" fn onyx_pointer_scanner_intersect_file(
         s.found_count.store(intersected.len(), Ordering::SeqCst);
         *current = intersected;
         1
+    } else {
+        0
+    }
+}
+
+// --- Matrix & Compute C-ABI Exports ---
+
+#[no_mangle]
+pub extern "C" fn onyx_pointer_matrix_create() -> *mut CompactPointerMatrix {
+    Box::into_raw(Box::new(CompactPointerMatrix::new()))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_pointer_matrix_destroy(matrix: *mut CompactPointerMatrix) {
+    if !matrix.is_null() {
+        drop(Box::from_raw(matrix));
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_pointer_matrix_add(
+    matrix: *mut CompactPointerMatrix,
+    from_addr: u64,
+    to_addr: u64,
+) {
+    if let Some(m) = matrix.as_mut() {
+        m.push(from_addr, to_addr);
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_pointer_matrix_sort(matrix: *mut CompactPointerMatrix) {
+    if let Some(m) = matrix.as_mut() {
+        m.sort_and_dedup();
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_pointer_matrix_count(matrix: *const CompactPointerMatrix) -> usize {
+    if let Some(m) = matrix.as_ref() {
+        m.len()
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_pointer_matrix_find_candidates(
+    matrix: *const CompactPointerMatrix,
+    target_addr: u64,
+    max_offset: usize,
+    alignment: usize,
+) -> usize {
+    if let Some(m) = matrix.as_ref() {
+        m.find_candidates(target_addr, max_offset, alignment).len()
     } else {
         0
     }
