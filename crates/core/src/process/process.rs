@@ -114,6 +114,9 @@ pub struct Process {
     pub dbk: Option<Arc<DbkDriver>>,
 }
 
+unsafe impl Send for Process {}
+unsafe impl Sync for Process {}
+
 impl Process {
     pub fn list_all_nt() -> OnyxResult<Vec<ProcessEntry>> {
         let mut buffer_size: u32 = 256 * 1024;

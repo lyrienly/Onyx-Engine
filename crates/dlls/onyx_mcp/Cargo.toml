@@ -1,0 +1,24 @@
+[package]
+name = "onyx_mcp"
+version = "1.0.0"
+edition = "2021"
+
+[lib]
+name = "onyx_mcp"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "onyx_mcp_server"
+path = "src/main.rs"
+
+[dependencies]
+onyx_core = { path = "../../core" }
+onyx_aa = { path = "../../modules/aa" }
+onyx_dotnet = { path = "../../modules/dotnet" }
+onyx_mono = { path = "../../modules/mono" }
+onyx_freezer = { path = "../../modules/freezer" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[lints]
+workspace = true

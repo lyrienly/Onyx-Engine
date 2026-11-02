@@ -93,7 +93,7 @@ OnyxEngine/
 └── docs/                            # Documentação técnica de engenharia
 ```
 
-## 3. As 24 Bibliotecas Modulares (DLLs)
+## 3. As 25 Bibliotecas Modulares (DLLs)
 
 A engenharia do OnyxEngine opera sob modularidade estrita. Nenhuma rotina crítica reside monolithicamente no executável, permitindo substituição, atualização e patching independente de cada subsistema:
 
@@ -121,6 +121,7 @@ A engenharia do OnyxEngine opera sob modularidade estrita. Nenhuma rotina críti
 22. `onyx_shield.dll`: Módulo consolidado de proteção contra dump, anexação indevida e depuração ativa.
 23. `onyx_dll_mapper.dll`: Injetor manual de bibliotecas (Manual Mapping) com evasão de VAD e module stomping.
 24. `onyx_aob_tool.dll`: Gerador e validador de assinaturas e máscaras de bytes (AOB).
+25. `onyx_mcp.dll`: Servidor nativo Model Context Protocol (MCP) para agentes de IA e automações externas.
 
 ## 4. Comunicação entre Camadas
 
