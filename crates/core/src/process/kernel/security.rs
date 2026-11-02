@@ -124,6 +124,89 @@ impl OnyxDriver {
         }
     }
 
+    pub fn get_hvci_status(&self) -> Result<CeHvciStatusOutput, String> {
+        let mut status = CeHvciStatusOutput::default();
+        let mut returned: DWORD = 0;
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_GET_HVCI_STATUS,
+                null_mut(),
+                0,
+                &mut status as *mut _ as LPVOID,
+                size_of::<CeHvciStatusOutput>() as DWORD,
+                &mut returned,
+                null_mut(),
+            )
+        };
+        if ok == TRUE {
+            Ok(status)
+        } else {
+            Err(format!(
+                "Failed to query HVCI status from driver (os error: {})",
+                std::io::Error::last_os_error()
+            ))
+        }
+    }
+
+    pub fn is_hypervisor_present() -> bool {
+        #[cfg(target_arch = "x86_64")]
+        {
+            let res = std::arch::x86_64::__cpuid(1);
+            (res.ecx & (1 << 31)) != 0
+        }
+        #[cfg(not(target_arch = "x86_64"))]
+        {
+            false
+        }
+    }
+
+    pub fn query_system_code_integrity() -> Option<(bool, bool, u32)> {
+        #[cfg(target_os = "windows")]
+        {
+            #[repr(C)]
+            struct SystemCodeIntegrityInformation {
+                length: u32,
+                code_integrity_options: u32,
+            }
+
+            type PfnNtQuerySystemInformation = unsafe extern "system" fn(
+                system_information_class: u32,
+                system_information: *mut std::ffi::c_void,
+                system_information_length: u32,
+                return_length: *mut u32,
+            ) -> i32;
+
+            let ntdll = unsafe { GetModuleHandleA(b"ntdll.dll\0".as_ptr()) };
+            if !ntdll.is_null() {
+                let proc = unsafe { GetProcAddress(ntdll, b"NtQuerySystemInformation\0".as_ptr()) };
+                if !proc.is_null() {
+                    let nt_query: PfnNtQuerySystemInformation =
+                        unsafe { std::mem::transmute(proc) };
+                    let mut sci = SystemCodeIntegrityInformation {
+                        length: std::mem::size_of::<SystemCodeIntegrityInformation>() as u32,
+                        code_integrity_options: 0,
+                    };
+                    let mut ret_len = 0u32;
+                    let status = unsafe {
+                        nt_query(
+                            103, // SystemCodeIntegrityInformation
+                            &mut sci as *mut _ as *mut std::ffi::c_void,
+                            std::mem::size_of::<SystemCodeIntegrityInformation>() as u32,
+                            &mut ret_len,
+                        )
+                    };
+                    if status >= 0 {
+                        let hvci_enabled = (sci.code_integrity_options & 0x00000400) != 0; // CODEINTEGRITY_OPTION_HVCI_KMCI_ENABLED
+                        let strict_mode = (sci.code_integrity_options & 0x00001000) != 0; // CODEINTEGRITY_OPTION_HVCI_KMCI_STRICTMODE_ENABLED
+                        return Some((hvci_enabled, strict_mode, sci.code_integrity_options));
+                    }
+                }
+            }
+        }
+        None
+    }
+
     pub fn is_secure_boot_active() -> bool {
         #[cfg(target_os = "windows")]
         {
@@ -163,6 +246,11 @@ impl OnyxDriver {
     pub fn is_vbs_active() -> bool {
         #[cfg(target_os = "windows")]
         {
+            // HVCI strictly requires VBS
+            if Self::is_hvci_active() {
+                return true;
+            }
+
             let subkey: Vec<u16> = "SYSTEM\\CurrentControlSet\\Control\\DeviceGuard\0"
                 .encode_utf16()
                 .collect();
@@ -209,6 +297,12 @@ impl OnyxDriver {
     pub fn is_hvci_active() -> bool {
         #[cfg(target_os = "windows")]
         {
+            if let Some((hvci, _, _)) = Self::query_system_code_integrity() {
+                if hvci {
+                    return true;
+                }
+            }
+
             let subkey_scenario: Vec<u16> =
                 "SYSTEM\\CurrentControlSet\\Control\\DeviceGuard\\Scenarios\\HypervisorEnforcedCodeIntegrity\0"
                     .encode_utf16()
@@ -301,6 +395,38 @@ impl OnyxDriver {
             ))
         } else {
             None
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hvci_status_struct_size_and_alignment() {
+        assert_eq!(std::mem::size_of::<CeHvciStatusOutput>(), 16);
+    }
+
+    #[test]
+    fn test_hypervisor_detection_does_not_panic() {
+        let _ = OnyxDriver::is_hypervisor_present();
+    }
+
+    #[test]
+    fn test_code_integrity_query_does_not_panic() {
+        let _ = OnyxDriver::query_system_code_integrity();
+    }
+
+    #[test]
+    fn test_security_profile_evaluation() {
+        let profile = OnyxDriver::evaluate_security_profile();
+        if profile.hvci_active {
+            assert!(profile.vbs_active, "HVCI cannot be active without VBS");
+            assert!(
+                profile.cr3_interception_risk,
+                "CR3 risk must be set when VBS/HVCI is active"
+            );
         }
     }
 }

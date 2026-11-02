@@ -45,6 +45,16 @@ pub const IOCTL_CE_RESTORE_PROCESS: DWORD = 0x22E208;
 pub const IOCTL_CE_INSPECT_PROCESS: DWORD = 0x22E20C;
 pub const IOCTL_CE_INSPECT_DRIVER: DWORD = 0x22E210;
 pub const IOCTL_CE_ENUM_CALLBACKS: DWORD = 0x22E214;
+pub const IOCTL_CE_GET_HVCI_STATUS: DWORD = 0x22E218;
+
+#[repr(C, packed)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct CeHvciStatusOutput {
+    pub vbs_enabled: u32,
+    pub hvci_enabled: u32,
+    pub strict_mode: u32,
+    pub code_integrity_opts: u32,
+}
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

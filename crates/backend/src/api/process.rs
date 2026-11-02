@@ -956,3 +956,35 @@ pub unsafe extern "C" fn onyx_kernel_write_memory_cr3(
         Err(_) => 0,
     }
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn onyx_kernel_get_hvci_status(out_vbs: *mut u32, out_hvci: *mut u32) -> i32 {
+    if !out_vbs.is_null() {
+        *out_vbs = 0;
+    }
+    if !out_hvci.is_null() {
+        *out_hvci = 0;
+    }
+
+    if let Ok(driver) = onyx_core::process::kernel::OnyxDriver::connect() {
+        if let Ok(status) = driver.get_hvci_status() {
+            if !out_vbs.is_null() {
+                *out_vbs = status.vbs_enabled;
+            }
+            if !out_hvci.is_null() {
+                *out_hvci = status.hvci_enabled;
+            }
+            return 1;
+        }
+    }
+
+    let vbs = onyx_core::process::kernel::OnyxDriver::is_vbs_active();
+    let hvci = onyx_core::process::kernel::OnyxDriver::is_hvci_active();
+    if !out_vbs.is_null() {
+        *out_vbs = if vbs { 1 } else { 0 };
+    }
+    if !out_hvci.is_null() {
+        *out_hvci = if hvci { 1 } else { 0 };
+    }
+    1
+}
