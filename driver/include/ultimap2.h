@@ -102,6 +102,18 @@ typedef struct
 	UINT64 CpuID;
 } ULTIMAP2DATAEVENT, *PULTIMAP2DATAEVENT;
 
+typedef struct
+{
+	UINT32 PID;
+	UINT32 BufferSize;
+	UINT32 RangeCount;
+	UINT32 NoPMI;
+	UINT32 UserMode;
+	UINT32 KernelMode;
+	URANGE Ranges[8];
+	WCHAR FileName[200];
+} ULTIMAP2_CONFIG, *PULTIMAP2_CONFIG;
+
 #pragma pack(pop)
 
 void SetupUltimap2(UINT32 PID, UINT32 BufferSize, WCHAR *Path, int rangeCount, PURANGE Ranges, int NoPMI, int UserMode, int KernelMode);

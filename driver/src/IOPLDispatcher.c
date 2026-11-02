@@ -10,6 +10,7 @@
 
 #include "vmxhelper.h"
 #include "vmxoffload.h"
+#include "ultimap2.h"
 UINT64 PhysicalMemoryRanges=0;
 UINT64 PhysicalMemoryRangesListSize=0;
 
@@ -2204,16 +2205,130 @@ static PVOID g_TraceStoreBuffer = NULL;
 			}
 
 		case IOCTL_CE_ULTIMAP2:
-		case IOCTL_CE_ULTIMAP2_WAITFORDATA:
-		case IOCTL_CE_ULTIMAP2_LOCKFILE:
-		case IOCTL_CE_ULTIMAP2_RELEASEFILE:
-		case IOCTL_CE_ULTIMAP2_GETTRACESIZE:
-		case IOCTL_CE_ULTIMAP2_RESETTRACESIZE:
-		case IOCTL_CE_ULTIMAP2_CONTINUE:
-		case IOCTL_CE_ULTIMAP2_FLUSH:
-		case IOCTL_CE_ULTIMAP2_PAUSE:
-		case IOCTL_CE_ULTIMAP2_RESUME:
+		{
+			if (irpStack->Parameters.DeviceIoControl.InputBufferLength >= sizeof(ULTIMAP2_CONFIG))
+			{
+				PULTIMAP2_CONFIG cfg = (PULTIMAP2_CONFIG)Irp->AssociatedIrp.SystemBuffer;
+				SetupUltimap2(cfg->PID, cfg->BufferSize, cfg->FileName, cfg->RangeCount, cfg->Ranges, cfg->NoPMI, cfg->UserMode, cfg->KernelMode);
+				ntStatus = STATUS_SUCCESS;
+			}
+			else
+			{
+				ntStatus = STATUS_BUFFER_TOO_SMALL;
+			}
+			break;
+		}
+
 		case IOCTL_CE_DISABLEULTIMAP2:
+		{
+			DisableUltimap2();
+			ntStatus = STATUS_SUCCESS;
+			break;
+		}
+
+		case IOCTL_CE_ULTIMAP2_WAITFORDATA:
+		{
+			if (irpStack->Parameters.DeviceIoControl.InputBufferLength >= sizeof(ULONG) &&
+				irpStack->Parameters.DeviceIoControl.OutputBufferLength >= sizeof(ULTIMAP2DATAEVENT))
+			{
+				ULONG timeout = *(PULONG)Irp->AssociatedIrp.SystemBuffer;
+				PULTIMAP2DATAEVENT data = (PULTIMAP2DATAEVENT)Irp->AssociatedIrp.SystemBuffer;
+				ntStatus = ultimap2_waitForData(timeout, data);
+				if (NT_SUCCESS(ntStatus))
+					Irp->IoStatus.Information = sizeof(ULTIMAP2DATAEVENT);
+			}
+			else
+			{
+				ntStatus = STATUS_INVALID_PARAMETER;
+			}
+			break;
+		}
+
+		case IOCTL_CE_ULTIMAP2_CONTINUE:
+		{
+			if (irpStack->Parameters.DeviceIoControl.InputBufferLength >= sizeof(int))
+			{
+				int cpunr = *(int*)Irp->AssociatedIrp.SystemBuffer;
+				ntStatus = ultimap2_continue(cpunr);
+			}
+			else
+			{
+				ntStatus = STATUS_INVALID_PARAMETER;
+			}
+			break;
+		}
+
+		case IOCTL_CE_ULTIMAP2_FLUSH:
+		{
+			ntStatus = ultimap2_flushBuffers();
+			break;
+		}
+
+		case IOCTL_CE_ULTIMAP2_PAUSE:
+		{
+			ntStatus = ultimap2_pause();
+			break;
+		}
+
+		case IOCTL_CE_ULTIMAP2_RESUME:
+		{
+			ntStatus = ultimap2_resume();
+			break;
+		}
+
+		case IOCTL_CE_ULTIMAP2_LOCKFILE:
+		{
+			if (irpStack->Parameters.DeviceIoControl.InputBufferLength >= sizeof(int))
+			{
+				int cpunr = *(int*)Irp->AssociatedIrp.SystemBuffer;
+				ultimap2_LockFile(cpunr);
+				ntStatus = STATUS_SUCCESS;
+			}
+			else
+			{
+				ntStatus = STATUS_INVALID_PARAMETER;
+			}
+			break;
+		}
+
+		case IOCTL_CE_ULTIMAP2_RELEASEFILE:
+		{
+			if (irpStack->Parameters.DeviceIoControl.InputBufferLength >= sizeof(int))
+			{
+				int cpunr = *(int*)Irp->AssociatedIrp.SystemBuffer;
+				ultimap2_ReleaseFile(cpunr);
+				ntStatus = STATUS_SUCCESS;
+			}
+			else
+			{
+				ntStatus = STATUS_INVALID_PARAMETER;
+			}
+			break;
+		}
+
+		case IOCTL_CE_ULTIMAP2_GETTRACESIZE:
+		{
+			if (irpStack->Parameters.DeviceIoControl.OutputBufferLength >= sizeof(UINT64))
+			{
+				PUINT64 pSize = (PUINT64)Irp->AssociatedIrp.SystemBuffer;
+				*pSize = ultimap2_GetTraceFileSize();
+				Irp->IoStatus.Information = sizeof(UINT64);
+				ntStatus = STATUS_SUCCESS;
+			}
+			else
+			{
+				ntStatus = STATUS_BUFFER_TOO_SMALL;
+			}
+			break;
+		}
+
+		case IOCTL_CE_ULTIMAP2_RESETTRACESIZE:
+		{
+			ultimap2_ResetTraceFileSize();
+			ntStatus = STATUS_SUCCESS;
+			break;
+		}
+
 		case IOCTL_CE_ULTIMAP:
 		case IOCTL_CE_ULTIMAP_DISABLE:
 		case IOCTL_CE_ULTIMAP_WAITFORDATA:

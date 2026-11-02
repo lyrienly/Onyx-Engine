@@ -818,8 +818,15 @@ void ultimap2_setup_dpc(struct _KDPC *Dpc, PVOID DeferredContext, PVOID SystemAr
 
 		if (Ultimap2Ranges && Ultimap2RangeCount)
 		{
+			int cpuid_pt[4] = {0};
+			__cpuidex(cpuid_pt, 0x14, 1);
+			int maxRanges = cpuid_pt[0] & 0x7;
+			if (maxRanges == 0) maxRanges = 2;
+			int effectiveRangeCount = Ultimap2RangeCount;
+			if (effectiveRangeCount > maxRanges)
+				effectiveRangeCount = maxRanges;
 
-			for (i = 0; i < Ultimap2RangeCount; i++)
+			for (i = 0; i < effectiveRangeCount; i++)
 			{
 				ULONG msr_start = IA32_RTIT_ADDR0_A + (2 * i);
 				ULONG msr_stop = IA32_RTIT_ADDR0_B + (2 * i);
