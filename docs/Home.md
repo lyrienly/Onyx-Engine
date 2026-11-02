@@ -63,7 +63,7 @@ A Wiki está estruturada em módulos detalhados para engenheiros reversos, pesqu
 ### Anticheats, Stealth & Kernel Ring-0
 * **[[Evasão Avançada de Anticheats & Ring-0|Anticheat-Bypass-Deep-Dive]]**: Análise do modelo de ameaças de Vanguard, EAC, BattlEye e Ricochet. Implementação técnica de Callstack Spoofing, Syscalls Indiretas (Halo's Gate), Manual Mapping com expurgo de cabeçalhos PE e neutralização de `ObRegisterCallbacks`.
 * **[[Módulos de Stealth & Injeções|Stealth-Injections-Hooks]]**: Especificação dos módulos `onyx_dll_mapper`, `pe_strip`, `callstack_spoof`, `syscalls_indirect`, `taskmgr_cloak`, `vehdebug_dll` e `speedhack_dll`.
-* **[[Driver Ring-0 e Evasão Kernel|Kernel-Driver-Ring0]]**: Paginação física x86_64 a partir do registrador `CR3` ($\text{PML4} \rightarrow \text{PDPT} \rightarrow \text{PD} \rightarrow \text{PT}$), manipulação DKOM em `ActiveProcessLinks` e gravação de execução de CPU via Intel Processor Trace (Intel PT).
+* **[[Driver Ring-0 e Evasão Kernel|Kernel-Driver-Ring-0]]**: Paginação física x86_64 a partir do registrador `CR3` ($\text{PML4} \rightarrow \text{PDPT} \rightarrow \text{PD} \rightarrow \text{PT}$), manipulação DKOM em `ActiveProcessLinks` e gravação de execução de CPU via Intel Processor Trace (Intel PT).
 
 ### Engenharia de Memória & Runtimes
 * **[[Motor de Varredura SIMD|Memory-Scanner-Engine]]**: VAD walk, particionamento com Rayon, vetorização AVX2/SSE4.2 e comparação de valores exatos, desconhecidos e AOB com wildcards.
