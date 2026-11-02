@@ -146,18 +146,44 @@ int setContext(int tid, CONTEXT *context)
   {
     switch (context->type)
     {
+#if defined(__i386__) || defined(__x86_64__)
       case 0:
-        break;
-
       case 1:
+#ifdef NT_PRFPREG
+        iov.iov_base=&context->fp;
+        iov.iov_len=sizeof(CONTEXT_FP);
+        safe_ptrace(PTRACE_SETREGSET, tid, (void*)NT_PRFPREG, &iov);
+#endif
         break;
+#endif
 
+#ifdef __arm__
       case 2:
+#ifdef NT_ARM_VFP
+        iov.iov_base=&context->fp;
+        iov.iov_len=sizeof(CONTEXT_FP);
+        safe_ptrace(PTRACE_SETREGSET, tid, (void*)NT_ARM_VFP, &iov);
+#endif
+        break;
+#endif
+
+#ifdef __aarch64__
+      case 2:
+#ifdef NT_ARM_VFP
+        iov.iov_base=&context->fp32;
+        iov.iov_len=sizeof(CONTEXT_FP32);
+        safe_ptrace(PTRACE_SETREGSET, tid, (void*)NT_ARM_VFP, &iov);
+#endif
         break;
 
       case 3:
-
+#ifdef NT_PRFPREG
+        iov.iov_base=&context->fp;
+        iov.iov_len=sizeof(CONTEXT_FP);
+        safe_ptrace(PTRACE_SETREGSET, tid, (void*)NT_PRFPREG, &iov);
+#endif
         break;
+#endif
 
       default:
         break;
