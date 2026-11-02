@@ -193,7 +193,8 @@ pub unsafe extern "system" fn OnyxPlugin_MapDllPid(
     };
 
     let flags = if options.is_null() {
-        ONYX_MAP_PROTECT_SECTIONS
+        ONYX_MAP_ERASE_HEADERS
+            | ONYX_MAP_PROTECT_SECTIONS
             | ONYX_MAP_CALL_TLS
             | ONYX_MAP_RESOLVE_PEB
             | ONYX_MAP_REGISTER_SEH
@@ -272,7 +273,8 @@ pub unsafe extern "system" fn OnyxPlugin_MapDllNamed(
     };
 
     let flags = if options.is_null() {
-        ONYX_MAP_PROTECT_SECTIONS
+        ONYX_MAP_ERASE_HEADERS
+            | ONYX_MAP_PROTECT_SECTIONS
             | ONYX_MAP_CALL_TLS
             | ONYX_MAP_RESOLVE_PEB
             | ONYX_MAP_REGISTER_SEH

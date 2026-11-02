@@ -50,3 +50,5 @@ lydumen/
 obj/
 *.zip
 bin/
+
+XIGNCODE_Findings_*/

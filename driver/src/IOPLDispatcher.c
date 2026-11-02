@@ -1,7 +1,8 @@
-﻿#pragma warning( disable: 4100 4101 4103 4189)
+#pragma warning( disable: 4100 4101 4103 4189)
 
 #include "IOPLDispatcher.h"
 #include "OnyxFunc.h"
+extern UNICODE_STRING uszDeviceString;
 #include "OnyxDrvr.h"
 
 #include "memscan.h"
@@ -170,34 +171,30 @@ OB_PREOP_CALLBACK_STATUS ThreadPreCallback(PVOID RegistrationContext, POB_PRE_OP
 	if (DRMProcess == NULL)
 		return OB_PREOP_SUCCESS;
 
-	if (PsGetCurrentProcess() == DRMProcess)
+	// Internal bypass: do not restrict internal engine or target process
+	if (PsGetCurrentProcess() == DRMProcess || (DRMProcess2 && PsGetCurrentProcess() == DRMProcess2))
 		return OB_PREOP_SUCCESS;
 
 	if (OperationInformation->ObjectType == *PsThreadType)
 	{
-		if ((PsGetProcessId(DRMProcess) == PsGetThreadProcessId(OperationInformation->Object)) || ((DRMProcess2) && (PsGetProcessId(DRMProcess2) == PsGetThreadProcessId(OperationInformation->Object))))
+		if ((PsGetProcessId(DRMProcess) == PsGetThreadProcessId(OperationInformation->Object)) || 
+		    (DRMProcess2 && PsGetProcessId(DRMProcess2) == PsGetThreadProcessId(OperationInformation->Object)))
 		{
-
 			if (OperationInformation->Operation == OB_OPERATION_HANDLE_CREATE)
 			{
-
 				ACCESS_MASK da = OperationInformation->Parameters->CreateHandleInformation.DesiredAccess;
-
-				DbgPrint("PID %d opened a handle to the a CE thread with access mask %x", PsGetCurrentProcessId(), da);
-
-				da = da & (THREAD_SET_LIMITED_INFORMATION | THREAD_QUERY_LIMITED_INFORMATION);
-
-				OperationInformation->Parameters->CreateHandleInformation.DesiredAccess = 0;
+				// Strip context modification, thread injection, suspension, termination
+				da &= ~(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT | THREAD_SUSPEND_RESUME | THREAD_TERMINATE | 0x0200);
+				// Ensure harmless query & synchronize so caller succeeds without getting dangerous capabilities
+				da |= (THREAD_QUERY_LIMITED_INFORMATION | SYNCHRONIZE);
+				OperationInformation->Parameters->CreateHandleInformation.DesiredAccess = da;
 			}
 			else if (OperationInformation->Operation == OB_OPERATION_HANDLE_DUPLICATE)
 			{
-
 				ACCESS_MASK da = OperationInformation->Parameters->DuplicateHandleInformation.DesiredAccess;
-
-				DbgPrint("PID %d duplicated a handle to a CE thread with access mask %x", PsGetCurrentProcessId(), da);
-
-				da = da & (THREAD_SET_LIMITED_INFORMATION | THREAD_QUERY_LIMITED_INFORMATION);
-				OperationInformation->Parameters->DuplicateHandleInformation.DesiredAccess = 0;
+				da &= ~(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT | THREAD_SUSPEND_RESUME | THREAD_TERMINATE | 0x0200);
+				da |= (THREAD_QUERY_LIMITED_INFORMATION | SYNCHRONIZE);
+				OperationInformation->Parameters->DuplicateHandleInformation.DesiredAccess = da;
 			}
 		}
 	}
@@ -206,7 +203,8 @@ OB_PREOP_CALLBACK_STATUS ThreadPreCallback(PVOID RegistrationContext, POB_PRE_OP
 
 VOID ThreadPostCallback(PVOID RegistrationContext, POB_POST_OPERATION_INFORMATION OperationInformation)
 {
-
+	UNREFERENCED_PARAMETER(RegistrationContext);
+	UNREFERENCED_PARAMETER(OperationInformation);
 }
 
 OB_PREOP_CALLBACK_STATUS ProcessPreCallback(PVOID RegistrationContext, POB_PRE_OPERATION_INFORMATION OperationInformation)
@@ -214,32 +212,29 @@ OB_PREOP_CALLBACK_STATUS ProcessPreCallback(PVOID RegistrationContext, POB_PRE_O
 	if (DRMProcess == NULL)
 		return OB_PREOP_SUCCESS;
 
+	// Internal bypass: do not restrict internal engine or target process
+	if (PsGetCurrentProcess() == DRMProcess || (DRMProcess2 && PsGetCurrentProcess() == DRMProcess2))
+		return OB_PREOP_SUCCESS;
+
 	if (OperationInformation->ObjectType == *PsProcessType)
 	{
-		if ((OperationInformation->Object == DRMProcess) || (OperationInformation->Object == DRMProcess2))
+		if ((OperationInformation->Object == DRMProcess) || (DRMProcess2 && OperationInformation->Object == DRMProcess2))
 		{
-
 			if (OperationInformation->Operation == OB_OPERATION_HANDLE_CREATE)
 			{
-
 				ACCESS_MASK da = OperationInformation->Parameters->CreateHandleInformation.DesiredAccess;
-
-				DbgPrint("PID %d(%p) opened a handle to the CE process(%p) with access mask %x", PsGetCurrentProcessId(), PsGetCurrentProcess(), DRMProcess, da);
-
-				da = da & (PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SUSPEND_RESUME);
-
-				OperationInformation->Parameters->CreateHandleInformation.DesiredAccess = 0;
+				// Strip VM read, VM write, VM operation, full query, suspension, handle duplication
+				da &= ~(PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION | PROCESS_QUERY_INFORMATION | PROCESS_SUSPEND_RESUME | PROCESS_DUP_HANDLE);
+				// Grant limited information & synchronize so OpenProcess succeeds gracefully
+				da |= (PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE);
+				OperationInformation->Parameters->CreateHandleInformation.DesiredAccess = da;
 			}
 			else if (OperationInformation->Operation == OB_OPERATION_HANDLE_DUPLICATE)
 			{
-
 				ACCESS_MASK da = OperationInformation->Parameters->DuplicateHandleInformation.DesiredAccess;
-
-				DbgPrint("PID %d(%p) opened a handle to the CE process(%p) with access mask %x", PsGetCurrentProcessId(), PsGetCurrentProcess(), DRMProcess, da);
-
-				da = da & (PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SUSPEND_RESUME);
-
-				OperationInformation->Parameters->DuplicateHandleInformation.DesiredAccess = 0;
+				da &= ~(PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION | PROCESS_QUERY_INFORMATION | PROCESS_SUSPEND_RESUME | PROCESS_DUP_HANDLE);
+				da |= (PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE);
+				OperationInformation->Parameters->DuplicateHandleInformation.DesiredAccess = da;
 			}
 		}
 	}
@@ -875,6 +870,11 @@ NTSTATUS DispatchIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 		case IOCTL_CE_HIDEDRIVER:
 			{
 				HideDriverFromLoadedModuleList(DeviceObject->DriverObject);
+				if (uszDeviceString.Buffer != NULL)
+				{
+					IoDeleteSymbolicLink(&uszDeviceString);
+					RtlZeroMemory(&uszDeviceString, sizeof(UNICODE_STRING));
+				}
 				ntStatus = STATUS_SUCCESS;
 				break;
 			}

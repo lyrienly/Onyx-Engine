@@ -495,6 +495,7 @@ void UnloadDriver(PDRIVER_OBJECT DriverObject)
 
 #ifndef CETC_RELEASE
 	DbgPrint("DeviceString=%S\n",uszDeviceString.Buffer);
+	if (uszDeviceString.Buffer != NULL)
 	{
 		NTSTATUS r = IoDeleteSymbolicLink(&uszDeviceString);
 		DbgPrint("IoDeleteSymbolicLink: %x\n", r);

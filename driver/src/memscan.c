@@ -221,8 +221,6 @@ BOOLEAN IsAddressSafe(UINT_PTR StartAddress)
 			return TRUE;
 		}
 #endif
-	}
-
 }
 
 UINT_PTR getPEThread(UINT_PTR threadid)
