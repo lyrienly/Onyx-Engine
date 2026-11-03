@@ -1,5 +1,5 @@
 use eframe::egui::{self, Color32, RichText, Rounding, Stroke, Vec2};
-use onyx_core::disasm::Disassembler;
+use onyx_core::disasm::{Disassembler, format_symbol};
 use onyx_core::freeze::Freezer;
 use onyx_core::kernel::OnyxDriver;
 use onyx_core::lua_api::CeLuaEngine;
@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::state::GuiTableEntry;
+use crate::state::{DisasmFlow, DisasmRowView, GuiTableEntry};
 use crate::ui;
 
 pub struct OnyxEngineApp {
@@ -36,6 +36,8 @@ pub struct OnyxEngineApp {
     pub val_type_idx: usize,
     pub is_hex: bool,
     pub candidates: Vec<(usize, String, String)>,
+    pub candidate_page: usize,
+    pub candidate_page_size: usize,
     pub found_count: usize,
     pub has_scanned: bool,
     pub status_msg: String,
@@ -83,6 +85,9 @@ pub struct OnyxEngineApp {
     pub mem_history_idx: usize,
     pub disasm_lines: Vec<(usize, usize, String)>,
     pub disasm_instructions: Vec<onyx_core::disasm::DecodedInsn>,
+    pub disasm_rows: Vec<DisasmRowView>,
+    pub mem_header_symbol: String,
+    pub mem_region_info: String,
     pub hex_dump_bytes: Vec<u8>,
     pub hex_dump_base: usize,
     pub hex_view_mode: usize,
@@ -149,6 +154,8 @@ impl OnyxEngineApp {
             val_type_idx: 4,
             is_hex: false,
             candidates: Vec::new(),
+            candidate_page: 0,
+            candidate_page_size: 100,
             found_count: 0,
             has_scanned: false,
             status_msg: "OnyxEngine Ready. Select a process to begin.".to_string(),
@@ -195,6 +202,10 @@ impl OnyxEngineApp {
             mem_history_idx: 0,
             disasm_lines: Vec::new(),
             disasm_instructions: Vec::new(),
+            disasm_rows: Vec::new(),
+            mem_header_symbol: "Please open a process first".to_string(),
+            mem_region_info: "Protect: None   AllocationBase=00000000   Base=00000000   Size=0"
+                .to_string(),
             hex_dump_bytes: Vec::new(),
             hex_dump_base: 0,
             hex_view_mode: 0,
@@ -358,6 +369,8 @@ dealloc(newmem)
 
                 self.attached_proc = Some(p);
                 self.show_proc_modal = false;
+                self.candidate_page = 0;
+                self.update_memory_view();
             }
             Err(e) => {
                 self.status_msg = format!("Failed to attach: {}", e);
@@ -485,6 +498,7 @@ dealloc(newmem)
             Ok(count) => {
                 self.found_count = count;
                 self.has_scanned = true;
+                self.candidate_page = 0;
                 self.status_msg = format!("First Scan: {} found in {:.2?}", count, start.elapsed());
                 self.refresh_candidates_cache();
             }
@@ -558,6 +572,7 @@ dealloc(newmem)
         match self.scanner.next_scan(proc, condition) {
             Ok(count) => {
                 self.found_count = count;
+                self.candidate_page = 0;
                 self.status_msg =
                     format!("Next Scan: {} remaining in {:.2?}", count, start.elapsed());
                 self.refresh_candidates_cache();
@@ -572,6 +587,7 @@ dealloc(newmem)
         if self.scanner.undo_scan() {
             self.found_count = self.scanner.candidates.len();
             self.has_scanned = !self.scanner.candidates.is_empty();
+            self.candidate_page = 0;
             self.status_msg = format!("Undid scan. Restored {} candidates.", self.found_count);
             self.refresh_candidates_cache();
         } else {
@@ -579,9 +595,39 @@ dealloc(newmem)
         }
     }
 
+    /// Number of pages required to show every candidate. Always at least one
+    /// so the UI can render an empty page without special-casing.
+    pub fn candidate_page_count(&self) -> usize {
+        let total = self.scanner.candidates.len();
+        if total == 0 {
+            1
+        } else {
+            total.div_ceil(self.candidate_page_size)
+        }
+    }
+
+    /// Keep `candidate_page` inside the valid range (e.g. after a scan that
+    /// reduced the result set).
+    pub fn clamp_candidate_page(&mut self) {
+        let pages = self.candidate_page_count();
+        if self.candidate_page >= pages {
+            self.candidate_page = pages - 1;
+        }
+    }
+
+    /// Rebuild the display cache for the *current page only*.
+    ///
+    /// Previously the GUI cached the first 150 results and rendered every one
+    /// of them. Formatting just one page keeps the cost proportional to what
+    /// the user can actually see, regardless of how many candidates exist.
     pub fn refresh_candidates_cache(&mut self) {
-        let sample = self.scanner.results(150);
-        self.candidates = sample
+        self.clamp_candidate_page();
+
+        let total = self.scanner.candidates.len();
+        let start = (self.candidate_page * self.candidate_page_size).min(total);
+        let end = (start + self.candidate_page_size).min(total);
+
+        self.candidates = self.scanner.candidates[start..end]
             .iter()
             .map(|c| {
                 (
@@ -591,6 +637,18 @@ dealloc(newmem)
                 )
             })
             .collect();
+    }
+
+    pub fn goto_candidate_page(&mut self, page: usize) {
+        let pages = self.candidate_page_count();
+        self.candidate_page = page.min(pages - 1);
+        self.refresh_candidates_cache();
+    }
+
+    pub fn set_candidate_page_size(&mut self, size: usize) {
+        self.candidate_page_size = size.clamp(10, 5000);
+        self.candidate_page = 0;
+        self.refresh_candidates_cache();
     }
 
     pub fn add_candidate_to_table(&mut self, addr: usize, val_type: ValType) {
@@ -875,31 +933,156 @@ dealloc(newmem)
         }
     }
 
+    /// Read and pre-format a window of instructions.
+    ///
+    /// All string building (symbol resolution, byte formatting, mnemonic
+    /// classification and comments) happens here, once per navigation,
+    /// instead of on every frame. The renderer then only paints the visible
+    /// slice of `disasm_rows`.
     pub fn update_disasm_view(&mut self) {
         let addr = Self::parse_hex_addr(&self.mem_addr_text, 0);
-        if let Some(proc) = &self.attached_proc {
-            let mut buf = [0u8; 512];
-            if let Ok(bytes_read) = proc.read_raw(addr, &mut buf) {
-                let instrs = Disassembler::disassemble_block(addr, &buf[..bytes_read], 40);
-                let modules = proc.modules().unwrap_or_default();
+
+        let Some(proc) = &self.attached_proc else {
+            self.disasm_lines.clear();
+            self.disasm_instructions.clear();
+            self.disasm_rows.clear();
+            self.mem_header_symbol = "Please open a process first".to_string();
+            return;
+        };
+
+        let modules = proc.modules().unwrap_or_default();
+        self.mem_header_symbol = format_symbol(addr, &modules);
+
+        // Larger window: virtualization makes extra rows almost free, while
+        // the previous 512-byte/40-instruction cap forced many manual
+        // navigations.
+        let mut buf = [0u8; 4096];
+        match proc.read_raw(addr, &mut buf) {
+            Ok(bytes_read) => {
+                let instrs = Disassembler::disassemble_block(addr, &buf[..bytes_read], 256);
+
+                self.disasm_rows = instrs
+                    .iter()
+                    .map(|insn| {
+                        let flow = if insn.mnemonic == "ret" {
+                            DisasmFlow::Ret
+                        } else if insn.mnemonic.starts_with('j')
+                            || insn.mnemonic == "call"
+                            || insn.mnemonic == "loop"
+                        {
+                            DisasmFlow::Branch
+                        } else {
+                            DisasmFlow::Normal
+                        };
+
+                        let comment =
+                            if insn.operands.contains("rsp") || insn.operands.contains("rbp") {
+                                "stack frame".to_string()
+                            } else {
+                                String::new()
+                            };
+
+                        DisasmRowView {
+                            address: insn.address,
+                            length: insn.length,
+                            mnemonic: insn.mnemonic.clone(),
+                            addr_str: format_symbol(insn.address, &modules),
+                            bytes_str: insn
+                                .bytes
+                                .iter()
+                                .map(|b| format!("{:02X}", b))
+                                .collect::<Vec<_>>()
+                                .join(" "),
+                            opcode_str: format!("{} {}", insn.mnemonic, insn.operands),
+                            comment,
+                            flow,
+                        }
+                    })
+                    .collect();
+
                 self.disasm_lines = instrs
                     .iter()
                     .map(|i| (i.address, i.length, i.to_symbolic_string(&modules)))
                     .collect();
                 self.disasm_instructions = instrs;
             }
+            Err(_) => {
+                self.disasm_lines.clear();
+                self.disasm_instructions.clear();
+                self.disasm_rows.clear();
+            }
         }
     }
 
     pub fn update_hex_view(&mut self) {
         let addr = Self::parse_hex_addr(&self.hex_addr_text, 0);
-        if let Some(proc) = &self.attached_proc {
-            let mut buf = [0u8; 512];
-            if let Ok(bytes_read) = proc.read_raw(addr, &mut buf) {
+
+        let Some(proc) = &self.attached_proc else {
+            self.hex_dump_bytes.clear();
+            self.hex_dump_base = addr;
+            self.mem_region_info =
+                "Protect: None   AllocationBase=00000000   Base=00000000   Size=0".to_string();
+            return;
+        };
+
+        // 4 KiB instead of 512 B. Only the visible rows are painted now, so
+        // the extra data costs nothing at render time.
+        let mut buf = [0u8; 4096];
+        match proc.read_raw(addr, &mut buf) {
+            Ok(bytes_read) => {
                 self.hex_dump_bytes = buf[..bytes_read].to_vec();
                 self.hex_dump_base = addr;
             }
+            Err(_) => {
+                self.hex_dump_bytes.clear();
+                self.hex_dump_base = addr;
+            }
         }
+
+        self.mem_region_info = Self::build_region_info(proc, addr);
+    }
+
+    /// Build the status line shown above the hex view.
+    ///
+    /// This used to run on every frame, enumerating every memory region and
+    /// module of the target process. It is now rebuild only when the view
+    /// navigates.
+    fn build_region_info(proc: &Process, addr: usize) -> String {
+        let Ok(regions) = proc.regions(false) else {
+            return "Memory unavailable".to_string();
+        };
+
+        let Some(region) = regions
+            .into_iter()
+            .find(|r| addr >= r.base && addr < r.base.saturating_add(r.size))
+        else {
+            return format!("Protect:Unknown   Base={:016X}", addr);
+        };
+
+        let prot_str = if region.is_writable() && region.is_executable() {
+            "Execute/Read/Write"
+        } else if region.is_writable() {
+            "Read/Write"
+        } else if region.is_executable() {
+            "Execute/Read"
+        } else {
+            "ReadOnly"
+        };
+
+        let module_name = proc
+            .modules()
+            .ok()
+            .and_then(|mods| {
+                mods.into_iter()
+                    .find(|m| addr >= m.base && addr < m.base.saturating_add(m.size))
+            })
+            .map(|m| m.name)
+            .unwrap_or_else(|| "none".to_string());
+
+        format!(
+            "Protect:{}   AllocationBase={:08X}   Base={:08X}   Size={:X}   Module={}",
+            prot_str, region.base, region.base, region.size, module_name
+        )
     }
 
     pub fn update_memory_view(&mut self) {
