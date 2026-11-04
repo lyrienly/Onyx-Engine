@@ -52,6 +52,31 @@ if not exist "UI\bin\modules" mkdir "UI\bin\modules"
 if not exist "UI\bin\modules\injections" mkdir "UI\bin\modules\injections"
 if not exist "UI\bin\plugins" mkdir "UI\bin\plugins"
 
+:: Sync static vendor runtime assets (Lua, clibs, debuggers, symbol servers)
+if exist "UI\bin\lua53-64.dll" copy /y "UI\bin\lua53-64.dll" "bin\lua53-64.dll" >nul
+if exist "UI\bin\lua53-32.dll" copy /y "UI\bin\lua53-32.dll" "bin\lua53-32.dll" >nul
+if exist "UI\bin\clibs64" (
+    if not exist "bin\clibs64" mkdir "bin\clibs64"
+    copy /y "UI\bin\clibs64\*" "bin\clibs64\" >nul
+    if exist "UI\bin\clibs64\lfs.dll" (
+        copy /y "UI\bin\clibs64\lfs.dll" "bin\lfs.dll" >nul
+        copy /y "UI\bin\clibs64\lfs.dll" "bin\lfs53.dll" >nul
+    )
+)
+if exist "UI\bin\clibs32" (
+    if not exist "bin\clibs32" mkdir "bin\clibs32"
+    copy /y "UI\bin\clibs32\*" "bin\clibs32\" >nul
+)
+if exist "UI\bin\win64" (
+    if not exist "bin\win64" mkdir "bin\win64"
+    copy /y "UI\bin\win64\*" "bin\win64\" >nul
+)
+if exist "UI\bin\win32" (
+    if not exist "bin\win32" mkdir "bin\win32"
+    copy /y "UI\bin\win32\*" "bin\win32\" >nul
+)
+if exist "driver\bin\Release\OnyxDriver.sys" copy /y "driver\bin\Release\OnyxDriver.sys" "bin\OnyxDriver.sys" >nul
+
 :: Core Engine DLLs
 copy /y "target\release\onyx_backend.dll" "bin\onyx_backend.dll" >nul
 copy /y "target\release\onyx_backend.dll" "UI\bin\onyx_backend.dll" >nul
