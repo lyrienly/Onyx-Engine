@@ -66,6 +66,7 @@ pub struct OnyxEngineApp {
     pub freeze_interval_ms: u64,
 
     pub ghost_mode: bool,
+    shield_armed: bool,
 
     pub pointer_scanner: PointerScanner,
     pub ptr_target_addr_text: String,
@@ -178,6 +179,7 @@ impl OnyxEngineApp {
             dbk_status_msg: String::new(),
             freeze_interval_ms: 50,
             ghost_mode: false,
+            shield_armed: false,
 
             pointer_scanner: PointerScanner::new(),
             ptr_target_addr_text: "0x7FF700000000".to_string(),
@@ -943,10 +945,62 @@ dealloc(newmem)
     }
 }
 
+fn install_cbt_anti_minimize() {
+    type Hhook = *mut std::ffi::c_void;
+    type HookProc = Option<unsafe extern "system" fn(i32, usize, isize) -> isize>;
+
+    unsafe extern "system" {
+        fn SetWindowsHookExW(
+            id_hook: i32,
+            lpfn: HookProc,
+            hmod: *mut std::ffi::c_void,
+            thread_id: u32,
+        ) -> Hhook;
+        fn CallNextHookEx(
+            hhk: Hhook,
+            code: i32,
+            wparam: usize,
+            lparam: isize,
+        ) -> isize;
+        fn GetCurrentThreadId() -> u32;
+    }
+
+    const WH_CBT: i32 = 5;
+    const HCBT_MINMAX: i32 = 1;
+    const SW_MINIMIZE: i32 = 6;
+    const SW_SHOWMINIMIZED: i32 = 2;
+    const SW_SHOWMINNOACTIVE: i32 = 7;
+    const SW_FORCEMINIMIZE: i32 = 11;
+
+    unsafe extern "system" fn cbt_proc(code: i32, wparam: usize, lparam: isize) -> isize {
+        if code == HCBT_MINMAX {
+            let cmd = (lparam & 0xFFFF) as i32;
+            if cmd == SW_MINIMIZE
+                || cmd == SW_SHOWMINIMIZED
+                || cmd == SW_SHOWMINNOACTIVE
+                || cmd == SW_FORCEMINIMIZE
+            {
+                return 1;
+            }
+        }
+        unsafe { CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam) }
+    }
+
+    unsafe {
+        let tid = GetCurrentThreadId();
+        SetWindowsHookExW(WH_CBT, Some(cbt_proc), std::ptr::null_mut(), tid);
+    }
+}
+
 impl eframe::App for OnyxEngineApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if self.icons.is_none() {
             self.icons = Some(crate::ui::CeIcons::load(ctx));
+        }
+
+        if !self.shield_armed {
+            self.shield_armed = true;
+            install_cbt_anti_minimize();
         }
 
         if self.last_table_update.elapsed() >= std::time::Duration::from_millis(150) {
