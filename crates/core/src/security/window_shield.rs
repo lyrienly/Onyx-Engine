@@ -15,6 +15,8 @@ pub const WM_SYSCOMMAND: u32 = 0x0112;
 pub const SC_MINIMIZE: usize = 0xF020;
 pub const WM_WINDOWPOSCHANGING: u32 = 0x0046;
 pub const WM_SHOWWINDOW: u32 = 0x0018;
+pub const WM_SIZE: u32 = 0x0005;
+pub const SIZE_MINIMIZED: usize = 1;
 
 pub const SWP_NOSIZE: u32 = 0x0001;
 pub const SWP_NOMOVE: u32 = 0x0002;
@@ -84,26 +86,34 @@ unsafe extern "system" fn window_shield_wndproc(
         WM_SYSCOMMAND => {
             let cmd = wparam & 0xFFF0;
             if cmd == SC_MINIMIZE {
-                // Intercept & block external or anti-cheat minimize command!
                 return 0;
             }
         }
         WM_WINDOWPOSCHANGING => {
             if lparam != 0 {
                 let pos = unsafe { &mut *(lparam as *mut WindowPos) };
-                // Strip forced SWP_HIDEWINDOW
                 if (pos.flags & SWP_HIDEWINDOW) != 0 {
                     pos.flags &= !SWP_HIDEWINDOW;
                     pos.flags |= SWP_SHOWWINDOW;
                 }
-                // Disallow anti-cheat from forcing window to bottom of Z-order
                 if pos.hwnd_insert_after == HWND_BOTTOM {
                     pos.hwnd_insert_after = HWND_TOPMOST;
                 }
+                // Block ShowWindow(SW_MINIMIZE) — Windows moves the window
+                // to (-32000, -32000) when minimizing
+                if pos.x == -32000 || pos.y == -32000 {
+                    pos.flags |= SWP_NOMOVE | SWP_NOSIZE;
+                    pos.x = 0;
+                    pos.y = 0;
+                }
             }
         }
+        WM_SIZE if wparam == SIZE_MINIMIZED => {
+            // ShowWindow(SW_MINIMIZE) lands here; immediately restore
+            unsafe { ShowWindow(hwnd, SW_RESTORE); }
+            return 0;
+        }
         WM_SHOWWINDOW if wparam == 0 => {
-            // Ignore external hide request
             return 0;
         }
         _ => {}
@@ -229,7 +239,7 @@ impl WindowShield {
         {
             thread::spawn(|| {
                 while WATCHDOG_RUNNING.load(Ordering::SeqCst) {
-                    thread::sleep(Duration::from_millis(120));
+                    thread::sleep(Duration::from_millis(50));
 
                     let windows = {
                         let guard = PROTECTED_WINDOWS.lock().unwrap();

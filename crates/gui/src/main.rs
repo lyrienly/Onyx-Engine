@@ -24,7 +24,7 @@ fn main() -> eframe::Result<()> {
     };
 
     eframe::run_native(
-        "CheatEngine",
+        "OnyxEngine",
         native_options,
         Box::new(|cc| {
             let mut visuals = egui::Visuals::dark();
