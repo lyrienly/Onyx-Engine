@@ -155,6 +155,41 @@ impl OnyxDriver {
         }
     }
 
+    pub fn query_virtual_memory(
+        &self,
+        pid: u32,
+        address: u64,
+    ) -> Result<MemoryBasicInformation64, String> {
+        let mut input = CeQueryVirtualMemoryInput {
+            process_id: pid as u64,
+            start_address: address,
+        };
+        let mut output: MemoryBasicInformation64 = unsafe { std::mem::zeroed() };
+        let mut returned: DWORD = 0;
+
+        let ok = unsafe {
+            DeviceIoControl(
+                self.device_handle,
+                IOCTL_CE_QUERY_VIRTUAL_MEMORY,
+                &mut input as *mut _ as LPVOID,
+                size_of::<CeQueryVirtualMemoryInput>() as DWORD,
+                &mut output as *mut _ as LPVOID,
+                size_of::<MemoryBasicInformation64>() as DWORD,
+                &mut returned,
+                null_mut(),
+            )
+        };
+
+        if ok == TRUE && returned > 0 {
+            Ok(output)
+        } else {
+            Err(format!(
+                "IOCTL_CE_QUERY_VIRTUAL_MEMORY failed for PID {} addr 0x{:X}",
+                pid, address
+            ))
+        }
+    }
+
     pub fn setup_shared_ring(&self) -> Result<*mut OnyxSharedRing, String> {
         let mut output = SetupSharedRingOutput {
             user_address: 0,

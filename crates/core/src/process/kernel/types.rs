@@ -340,6 +340,26 @@ pub struct CeOpenProcessOutput {
 }
 
 #[repr(C, packed)]
+pub struct CeQueryVirtualMemoryInput {
+    pub process_id: u64,
+    pub start_address: u64,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct MemoryBasicInformation64 {
+    pub base_address: u64,
+    pub allocation_base: u64,
+    pub allocation_protect: u32,
+    pub _alignment1: u32,
+    pub region_size: u64,
+    pub state: u32,
+    pub protect: u32,
+    pub mem_type: u32,
+    pub _alignment2: u32,
+}
+
+#[repr(C, packed)]
 pub struct CeTranslateCr3Input {
     pub process_id: u32,
     pub virtual_address: u64,

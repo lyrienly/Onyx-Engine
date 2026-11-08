@@ -447,6 +447,9 @@ impl Process {
     }
 
     pub fn regions(&self, writable_only: bool) -> OnyxResult<Vec<MemoryRegion>> {
+        let use_kernel_query = self.access_mode == ProcessAccessMode::KernelDbk
+            && self.dbk.is_some();
+
         let mut regions = Vec::new();
         let mut addr: usize = 0x10000;
         let max_addr: usize = if size_of::<usize>() == 8 {
@@ -458,10 +461,22 @@ impl Process {
         let mut mbi: MEMORY_BASIC_INFORMATION = unsafe { zeroed() };
 
         while addr < max_addr {
-            let mut return_len: SIZE_T = 0;
-            let success = if self.access_mode == ProcessAccessMode::NtApi
-                || self.access_mode == ProcessAccessMode::KernelDbk
-            {
+            let success = if use_kernel_query {
+                let dbk = self.dbk.as_ref().unwrap();
+                if let Ok(info) = dbk.query_virtual_memory(self.pid, addr as u64) {
+                    mbi.BaseAddress = info.base_address as PVOID;
+                    mbi.AllocationBase = info.allocation_base as PVOID;
+                    mbi.AllocationProtect = info.allocation_protect;
+                    mbi.RegionSize = info.region_size as SIZE_T;
+                    mbi.State = info.state;
+                    mbi.Protect = info.protect;
+                    mbi.Type = info.mem_type;
+                    true
+                } else {
+                    false
+                }
+            } else if self.access_mode == ProcessAccessMode::NtApi {
+                let mut return_len: SIZE_T = 0;
                 let status = unsafe {
                     NtQueryVirtualMemory(
                         self.handle,
