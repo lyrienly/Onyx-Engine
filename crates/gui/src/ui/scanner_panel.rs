@@ -65,88 +65,220 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, upper_height: f32) {
                         let mut to_disasm: Option<usize> = None;
                         let mut to_copy: Option<String> = None;
 
+                        let total_rows = app.scanner.candidates.len();
+                        let pages = app.candidate_page_count();
+                        let page = app.candidate_page;
+                        let page_size = app.candidate_page_size;
+                        let row_offset = page * page_size;
+                        let first_row = if total_rows == 0 { 0 } else { row_offset + 1 };
+                        let last_row = (row_offset + app.candidates.len()).min(total_rows);
+
+                        let row_h = 19.0;
+                        let scroll_h = (list_h - 26.0 - 30.0).max(60.0);
+
+                        // `show_rows` computes the virtual height from the UI
+                        // item spacing, so remove vertical spacing while rows
+                        // are allocated (each row already has an explicit
+                        // height). This keeps scroll position and row painting
+                        // perfectly aligned.
+                        let prev_spacing = ui.spacing().item_spacing;
+                        ui.spacing_mut().item_spacing = Vec2::new(prev_spacing.x, 0.0);
+
+                        // Virtualized rendering: `show_rows` only invokes the
+                        // closure for rows inside the viewport. Combined with
+                        // pagination this keeps the per-frame widget count
+                        // constant even with millions of scan results.
                         egui::ScrollArea::vertical()
                             .id_salt("ce_candidates_scroll")
-                            .max_height(list_h - 26.0)
+                            .max_height(scroll_h)
                             .auto_shrink([false, false])
-                            .show(ui, |ui| {
-                                ui.set_min_width(left_width - 8.0);
-                                egui::Grid::new("ce_found_grid")
-                                    .striped(true)
-                                    .min_col_width(90.0)
-                                    .spacing(Vec2::new(8.0, 3.0))
-                                    .show(ui, |ui| {
-                                        for (row_idx, (addr, val, prev)) in
-                                            app.candidates.iter().enumerate()
-                                        {
-                                            let hex_str = format!("{:08X}", addr);
-                                            let is_diff = val != prev;
+                            .show_rows(ui, row_h, app.candidates.len(), |ui, range| {
+                                ui.set_min_width(left_width - 10.0);
+                                ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
 
-                                            let row_bg = if row_idx % 2 == 0 {
-                                                Color32::from_rgb(24, 27, 34)
-                                            } else {
-                                                Color32::from_rgb(20, 22, 28)
-                                            };
+                                for row_idx in range {
+                                    let (addr, val, prev) = &app.candidates[row_idx];
+                                    let hex_str = format!("{:08X}", addr);
+                                    let is_diff = val != prev;
+                                    let global_row = row_offset + row_idx;
 
-                                            let addr_resp = ui.add(
-                                                egui::Button::new(
-                                                    RichText::new(&hex_str)
-                                                        .monospace()
-                                                        .size(12.0)
-                                                        .color(Color32::from_rgb(80, 200, 255)),
-                                                )
+                                    let row_bg = if global_row.is_multiple_of(2) {
+                                        Color32::from_rgb(24, 27, 34)
+                                    } else {
+                                        Color32::from_rgb(20, 22, 28)
+                                    };
+
+                                    ui.allocate_ui_with_layout(
+                                        Vec2::new(ui.available_width(), row_h),
+                                        egui::Layout::left_to_right(egui::Align::Center),
+                                        |ui| {
+                                            egui::Frame::none()
                                                 .fill(row_bg)
-                                                .stroke(Stroke::NONE)
-                                                .rounding(Rounding::same(1.0)),
-                                            );
+                                                .inner_margin(egui::Margin::symmetric(3.0, 0.0))
+                                                .show(ui, |ui| {
+                                                    ui.set_min_width(ui.available_width());
+                                                    ui.set_min_height(row_h);
 
-                                            if addr_resp.double_clicked() {
-                                                to_add = Some(*addr);
-                                            }
+                                                    let addr_resp = ui.add_sized(
+                                                        [120.0, 17.0],
+                                                        egui::Button::new(
+                                                            RichText::new(&hex_str)
+                                                                .monospace()
+                                                                .size(12.0)
+                                                                .color(Color32::from_rgb(
+                                                                    80, 200, 255,
+                                                                )),
+                                                        )
+                                                        .fill(Color32::TRANSPARENT)
+                                                        .stroke(Stroke::NONE)
+                                                        .rounding(Rounding::same(1.0)),
+                                                    );
 
-                                            addr_resp.context_menu(|ui| {
-                                                if ui.button("Add to address list").clicked() {
-                                                    to_add = Some(*addr);
-                                                    ui.close_menu();
-                                                }
-                                                if ui.button("Browse in Hex Memory View").clicked()
-                                                {
-                                                    to_browse = Some(*addr);
-                                                    ui.close_menu();
-                                                }
+                                                    if addr_resp.double_clicked() {
+                                                        to_add = Some(*addr);
+                                                    }
+
+                                                    addr_resp.context_menu(|ui| {
+                                                        if ui
+                                                            .button("Add to address list")
+                                                            .clicked()
+                                                        {
+                                                            to_add = Some(*addr);
+                                                            ui.close_menu();
+                                                        }
+                                                        if ui
+                                                            .button("Browse in Hex Memory View")
+                                                            .clicked()
+                                                        {
+                                                            to_browse = Some(*addr);
+                                                            ui.close_menu();
+                                                        }
+                                                        if ui
+                                                            .button("Disassemble this instruction")
+                                                            .clicked()
+                                                        {
+                                                            to_disasm = Some(*addr);
+                                                            ui.close_menu();
+                                                        }
+                                                        if ui.button("Copy address").clicked() {
+                                                            to_copy = Some(hex_str.clone());
+                                                            ui.close_menu();
+                                                        }
+                                                    });
+
+                                                    let val_color = if is_diff {
+                                                        Color32::from_rgb(255, 205, 100)
+                                                    } else {
+                                                        Color32::WHITE
+                                                    };
+
+                                                    ui.add_sized(
+                                                        [110.0, 17.0],
+                                                        egui::Label::new(
+                                                            RichText::new(val)
+                                                                .monospace()
+                                                                .strong()
+                                                                .color(val_color),
+                                                        )
+                                                        .truncate(),
+                                                    );
+                                                    ui.add_sized(
+                                                        [100.0, 17.0],
+                                                        egui::Label::new(
+                                                            RichText::new(prev).monospace().color(
+                                                                Color32::from_rgb(140, 145, 155),
+                                                            ),
+                                                        )
+                                                        .truncate(),
+                                                    );
+                                                });
+                                        },
+                                    );
+                                }
+                            });
+
+                        ui.spacing_mut().item_spacing = prev_spacing;
+
+                        ui.add_space(2.0);
+
+                        ui.horizontal(|ui| {
+                            let nav_btn = |ui: &mut egui::Ui, label: &str, enabled: bool| -> bool {
+                                let text_color = if enabled {
+                                    Color32::WHITE
+                                } else {
+                                    Color32::from_rgb(90, 95, 105)
+                                };
+                                ui.add_enabled(
+                                    enabled,
+                                    egui::Button::new(
+                                        RichText::new(label)
+                                            .size(11.0)
+                                            .monospace()
+                                            .strong()
+                                            .color(text_color),
+                                    )
+                                    .fill(Color32::from_rgb(32, 36, 46))
+                                    .stroke(Stroke::new(1.0_f32, Color32::from_rgb(48, 54, 68)))
+                                    .rounding(Rounding::same(1.0))
+                                    .min_size(Vec2::new(24.0, 18.0)),
+                                )
+                                .clicked()
+                            };
+
+                            if nav_btn(ui, "|<", page > 0) {
+                                app.goto_candidate_page(0);
+                            }
+                            if nav_btn(ui, "<", page > 0) {
+                                app.goto_candidate_page(page - 1);
+                            }
+
+                            ui.label(
+                                RichText::new(format!("Page {}/{}", page + 1, pages))
+                                    .size(11.0)
+                                    .strong()
+                                    .color(Color32::from_rgb(200, 205, 215)),
+                            );
+
+                            if nav_btn(ui, ">", page + 1 < pages) {
+                                app.goto_candidate_page(page + 1);
+                            }
+                            if nav_btn(ui, ">|", page + 1 < pages) {
+                                app.goto_candidate_page(pages - 1);
+                            }
+
+                            ui.label(
+                                RichText::new(format!(
+                                    "{}-{} of {}",
+                                    first_row, last_row, total_rows
+                                ))
+                                .size(10.5)
+                                .color(Color32::from_rgb(140, 145, 155)),
+                            );
+
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    egui::ComboBox::from_id_salt("ce_candidate_page_size")
+                                        .width(64.0)
+                                        .selected_text(
+                                            RichText::new(format!("{} /pg", page_size)).size(10.5),
+                                        )
+                                        .show_ui(ui, |ui| {
+                                            for size in [50usize, 100, 250, 500, 1000] {
                                                 if ui
-                                                    .button("Disassemble this instruction")
+                                                    .selectable_label(
+                                                        page_size == size,
+                                                        format!("{}", size),
+                                                    )
                                                     .clicked()
                                                 {
-                                                    to_disasm = Some(*addr);
-                                                    ui.close_menu();
+                                                    app.set_candidate_page_size(size);
                                                 }
-                                                if ui.button("Copy address").clicked() {
-                                                    to_copy = Some(hex_str.clone());
-                                                    ui.close_menu();
-                                                }
-                                            });
-
-                                            let val_color = if is_diff {
-                                                Color32::from_rgb(255, 205, 100)
-                                            } else {
-                                                Color32::WHITE
-                                            };
-                                            ui.label(
-                                                RichText::new(val)
-                                                    .monospace()
-                                                    .strong()
-                                                    .color(val_color),
-                                            );
-                                            ui.label(
-                                                RichText::new(prev)
-                                                    .monospace()
-                                                    .color(Color32::from_rgb(140, 145, 155)),
-                                            );
-                                            ui.end_row();
-                                        }
-                                    });
-                            });
+                                            }
+                                        });
+                                },
+                            );
+                        });
 
                         let val_type = app.parse_val_type_from_idx();
                         if let Some(addr) = to_add {
@@ -255,6 +387,7 @@ pub fn render(app: &mut OnyxEngineApp, ui: &mut egui::Ui, upper_height: f32) {
                     {
                         app.has_scanned = false;
                         app.candidates.clear();
+                        app.candidate_page = 0;
                         app.found_count = 0;
                         app.scanner.candidates.clear();
                         app.status_msg = "Scan reset. Ready for First Scan.".to_string();

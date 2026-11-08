@@ -1,5 +1,31 @@
 use onyx_core::scanner::ValType;
 
+/// Classification used to colour disassembly rows without re-parsing the
+/// mnemonic every frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DisasmFlow {
+    Normal,
+    Branch,
+    Ret,
+}
+
+/// Pre-formatted disassembly row.
+///
+/// Building this once when the view is refreshed avoids repeated string
+/// allocation and symbol lookup for every row on every frame. The renderer
+/// only paints the rows that are actually visible.
+#[derive(Debug, Clone)]
+pub struct DisasmRowView {
+    pub address: usize,
+    pub length: usize,
+    pub mnemonic: String,
+    pub addr_str: String,
+    pub bytes_str: String,
+    pub opcode_str: String,
+    pub comment: String,
+    pub flow: DisasmFlow,
+}
+
 #[derive(Debug, Clone)]
 pub struct GuiTableEntry {
     pub active: bool,

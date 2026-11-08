@@ -1,6 +1,6 @@
 use crate::app::OnyxEngineApp;
+use crate::state::DisasmFlow;
 use eframe::egui::{self, Color32, RichText, Stroke, Vec2};
-use onyx_core::disasm::format_symbol;
 
 fn get_mnemonic_description(mnemonic: &str) -> &'static str {
     match mnemonic.to_lowercase().as_str() {
@@ -141,14 +141,14 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                 .frame(egui::Frame::none().fill(Color32::from_rgb(32, 32, 32)).inner_margin(egui::Margin::symmetric(10.0, 4.0)))
                 .show(ctx, |ui| {
                     ui.vertical_centered(|ui| {
-                        let header_text = if let Some(proc) = &app.attached_proc {
-                            let cur_addr = OnyxEngineApp::parse_hex_addr(&app.mem_addr_text, 0);
-                            let modules = proc.modules().unwrap_or_default();
-                            format_symbol(cur_addr, &modules)
-                        } else {
-                            "Please open a process first".to_string()
-                        };
-                        ui.label(RichText::new(header_text).size(13.0).color(Color32::WHITE).strong());
+                        // Cached by `update_disasm_view`; previously this
+                        // enumerated every module on every frame.
+                        ui.label(
+                            RichText::new(&app.mem_header_symbol)
+                                .size(13.0)
+                                .color(Color32::WHITE)
+                                .strong(),
+                        );
                     });
                 });
 
@@ -196,89 +196,174 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                             let mut hex_click: Option<usize> = None;
                             let mut copy_click: Option<usize> = None;
 
-                            let modules = app.attached_proc.as_ref().and_then(|p| p.modules().ok()).unwrap_or_default();
+                            // Resolve the selected row's description even when
+                            // the row is currently scrolled out of the virtual
+                            // window.
+                            if let Some(sel) = app.selected_disasm_addr
+                                && let Some(row) =
+                                    app.disasm_rows.iter().find(|r| r.address == sel)
+                            {
+                                selected_op_desc = get_mnemonic_description(&row.mnemonic);
+                            }
 
-                            egui::ScrollArea::vertical()
-                                .id_salt("ce_disasm_scroll")
-                                .max_height(disasm_h - 26.0)
-                                .auto_shrink([false, false])
-                                .show(ui, |ui| {
-                                    if app.disasm_instructions.is_empty() {
-                                        ui.vertical_centered(|ui| {
-                                            ui.add_space(40.0);
-                                            ui.label(RichText::new("No assembly instructions loaded. Open a process or navigate to an address.").color(Color32::GRAY));
-                                        });
-                                    } else {
-                                        for insn in &app.disasm_instructions {
-                                            let is_sel = app.selected_disasm_addr == Some(insn.address);
-                                            if is_sel {
-                                                selected_op_desc = get_mnemonic_description(&insn.mnemonic);
-                                            }
-
-                                            let row_bg = if is_sel {
-                                                Color32::from_rgb(0, 120, 215)
-                                            } else {
-                                                Color32::TRANSPARENT
-                                            };
-
-                                            let text_color = if is_sel { Color32::WHITE } else { Color32::from_rgb(220, 220, 220) };
-
-                                            let addr_str = format_symbol(insn.address, &modules);
-                                            let bytes_str = insn.bytes.iter().map(|b| format!("{:02X}", b)).collect::<Vec<_>>().join(" ");
-                                            let opcode_str = format!("{} {}", insn.mnemonic, insn.operands);
-
-                                            let resp = ui.allocate_ui_with_layout(
-                                                Vec2::new(ui.available_width(), 18.0),
-                                                egui::Layout::left_to_right(egui::Align::Center),
-                                                |ui| {
-                                                    egui::Frame::none().fill(row_bg).show(ui, |ui| {
-                                                        ui.add_space(8.0);
-                                                        ui.add_sized([180.0, 18.0], egui::Label::new(RichText::new(&addr_str).monospace().size(12.0).color(if is_sel { Color32::WHITE } else { Color32::from_rgb(120, 190, 255) })));
-                                                        ui.add_sized([140.0, 18.0], egui::Label::new(RichText::new(&bytes_str).monospace().size(12.0).color(text_color)));
-
-                                                        let op_color = if is_sel {
-                                                            Color32::WHITE
-                                                        } else if insn.mnemonic.starts_with('j') || insn.mnemonic == "call" {
-                                                            Color32::from_rgb(60, 220, 120)
-                                                        } else if insn.mnemonic == "ret" {
-                                                            Color32::from_rgb(255, 120, 120)
-                                                        } else {
-                                                            Color32::from_rgb(100, 200, 255)
-                                                        };
-
-                                                        ui.add_sized([220.0, 18.0], egui::Label::new(RichText::new(&opcode_str).monospace().size(12.0).strong().color(op_color)));
-
-                                                        let comment_str = if insn.operands.contains("rsp") || insn.operands.contains("rbp") {
-                                                            "stack frame"
-                                                        } else {
-                                                            ""
-                                                        };
-                                                        ui.add_sized([120.0, 18.0], egui::Label::new(RichText::new(comment_str).size(11.0).color(Color32::GRAY)));
-                                                    });
-                                                },
-                                            ).response;
-
-                                            if resp.clicked() {
-                                                sel_addr_click = Some(insn.address);
-                                            }
-
-                                            resp.context_menu(|ui| {
-                                                if ui.button("NOP instruction").clicked() {
-                                                    nop_click = Some((insn.address, insn.length));
-                                                    ui.close_menu();
-                                                }
-                                                if ui.button("Follow in Hex View").clicked() {
-                                                    hex_click = Some(insn.address);
-                                                    ui.close_menu();
-                                                }
-                                                if ui.button("Copy Address").clicked() {
-                                                    copy_click = Some(insn.address);
-                                                    ui.close_menu();
-                                                }
-                                            });
-                                        }
-                                    }
+                            if app.disasm_rows.is_empty() {
+                                ui.vertical_centered(|ui| {
+                                    ui.add_space(40.0);
+                                    ui.label(RichText::new("No assembly instructions loaded. Open a process or navigate to an address.").color(Color32::GRAY));
                                 });
+                            } else {
+                                // Virtualized list: format strings were built
+                                // once in `update_disasm_view`, so only the
+                                // rows inside the viewport are painted.
+                                let disasm_row_h = 18.0;
+                                // Compensate the virtual row height used by
+                                // `show_rows` (see scanner_panel.rs).
+                                let prev_spacing = ui.spacing().item_spacing;
+                                ui.spacing_mut().item_spacing =
+                                    Vec2::new(prev_spacing.x, 0.0);
+
+                                egui::ScrollArea::vertical()
+                                    .id_salt("ce_disasm_scroll")
+                                    .max_height(disasm_h - 26.0)
+                                    .auto_shrink([false, false])
+                                    .show_rows(
+                                        ui,
+                                        disasm_row_h,
+                                        app.disasm_rows.len(),
+                                        |ui, range| {
+                                            ui.spacing_mut().item_spacing = Vec2::new(0.0, 0.0);
+
+                                            for idx in range {
+                                                let row = &app.disasm_rows[idx];
+                                                let is_sel =
+                                                    app.selected_disasm_addr == Some(row.address);
+
+                                                let row_bg = if is_sel {
+                                                    Color32::from_rgb(0, 120, 215)
+                                                } else {
+                                                    Color32::TRANSPARENT
+                                                };
+
+                                                let text_color = if is_sel {
+                                                    Color32::WHITE
+                                                } else {
+                                                    Color32::from_rgb(220, 220, 220)
+                                                };
+
+                                                let op_color = if is_sel {
+                                                    Color32::WHITE
+                                                } else {
+                                                    match row.flow {
+                                                        DisasmFlow::Branch => {
+                                                            Color32::from_rgb(60, 220, 120)
+                                                        }
+                                                        DisasmFlow::Ret => {
+                                                            Color32::from_rgb(255, 120, 120)
+                                                        }
+                                                        DisasmFlow::Normal => {
+                                                            Color32::from_rgb(100, 200, 255)
+                                                        }
+                                                    }
+                                                };
+
+                                                let inner = ui.allocate_ui_with_layout(
+                                                    Vec2::new(
+                                                        ui.available_width(),
+                                                        disasm_row_h,
+                                                    ),
+                                                    egui::Layout::left_to_right(
+                                                        egui::Align::Center,
+                                                    ),
+                                                    |ui| {
+                                                        egui::Frame::none()
+                                                            .fill(row_bg)
+                                                            .show(ui, |ui| {
+                                                                ui.set_min_width(
+                                                                    ui.available_width(),
+                                                                );
+                                                                ui.set_min_height(disasm_row_h);
+                                                                ui.add_space(8.0);
+                                                                ui.add_sized(
+                                                                    [180.0, disasm_row_h],
+                                                                    egui::Label::new(
+                                                                        RichText::new(&row.addr_str)
+                                                                            .monospace()
+                                                                            .size(12.0)
+                                                                            .color(if is_sel {
+                                                                                Color32::WHITE
+                                                                            } else {
+                                                                                Color32::from_rgb(120, 190, 255)
+                                                                            }),
+                                                                    ),
+                                                                );
+                                                                ui.add_sized(
+                                                                    [140.0, disasm_row_h],
+                                                                    egui::Label::new(
+                                                                        RichText::new(&row.bytes_str)
+                                                                            .monospace()
+                                                                            .size(12.0)
+                                                                            .color(text_color),
+                                                                    ),
+                                                                );
+                                                                ui.add_sized(
+                                                                    [220.0, disasm_row_h],
+                                                                    egui::Label::new(
+                                                                        RichText::new(&row.opcode_str)
+                                                                            .monospace()
+                                                                            .size(12.0)
+                                                                            .strong()
+                                                                            .color(op_color),
+                                                                    ),
+                                                                );
+                                                                ui.add_sized(
+                                                                    [120.0, disasm_row_h],
+                                                                    egui::Label::new(
+                                                                        RichText::new(&row.comment)
+                                                                            .size(11.0)
+                                                                            .color(Color32::GRAY),
+                                                                    ),
+                                                                );
+                                                            });
+                                                    },
+                                                );
+
+                                                // `allocate_ui_with_layout` returns a
+                                                // hover-only response, so make the
+                                                // full row explicitly clickable.
+                                                let resp = ui.interact(
+                                                    inner.response.rect,
+                                                    ui.make_persistent_id((
+                                                        "ce_disasm_row",
+                                                        row.address,
+                                                    )),
+                                                    egui::Sense::click(),
+                                                );
+
+                                                if resp.clicked() {
+                                                    sel_addr_click = Some(row.address);
+                                                }
+
+                                                resp.context_menu(|ui| {
+                                                    if ui.button("NOP instruction").clicked() {
+                                                        nop_click =
+                                                            Some((row.address, row.length));
+                                                        ui.close_menu();
+                                                    }
+                                                    if ui.button("Follow in Hex View").clicked() {
+                                                        hex_click = Some(row.address);
+                                                        ui.close_menu();
+                                                    }
+                                                    if ui.button("Copy Address").clicked() {
+                                                        copy_click = Some(row.address);
+                                                        ui.close_menu();
+                                                    }
+                                                });
+                                            }
+                                        },
+                                    );
+
+                                ui.spacing_mut().item_spacing = prev_spacing;
+                            }
 
                             if let Some(addr) = sel_addr_click {
                                 app.selected_disasm_addr = Some(addr);
@@ -311,37 +396,17 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
                         .show(ui, |ui| {
                             ui.set_height(hex_h);
 
-                            let cur_hex = OnyxEngineApp::parse_hex_addr(&app.hex_addr_text, 0);
-                            let region_info = if let Some(proc) = &app.attached_proc {
-                                if let Ok(regs) = proc.regions(false) {
-                                    if let Some(r) = regs.into_iter().find(|reg| cur_hex >= reg.base && cur_hex < reg.base + reg.size) {
-                                        let prot_str = if r.is_writable() && r.is_executable() {
-                                            "Execute/Read/Write"
-                                        } else if r.is_writable() {
-                                            "Read/Write"
-                                        } else if r.is_executable() {
-                                            "Execute/Read"
-                                        } else {
-                                            "ReadOnly"
-                                        };
-                                        let mod_name = proc.modules().ok()
-                                            .and_then(|mods| mods.into_iter().find(|m| cur_hex >= m.base && cur_hex < m.base + m.size))
-                                            .map(|m| m.name)
-                                            .unwrap_or_else(|| "none".to_string());
-                                        format!("Protect:{}   AllocationBase={:08X}   Base={:08X}   Size={:X}   Module={}", prot_str, r.base, r.base, r.size, mod_name)
-                                    } else {
-                                        format!("Protect:Unknown   Base={:016X}", cur_hex)
-                                    }
-                                } else {
-                                    "Memory unavailable".to_string()
-                                }
-                            } else {
-                                "Protect: None   AllocationBase=00000000   Base=00000000   Size=0".to_string()
-                            };
-
+                            // Cached by `update_hex_view`. Building this used
+                            // to enumerate every region and module on each
+                            // frame of the viewport.
                             ui.horizontal(|ui| {
                                 ui.add_space(8.0);
-                                ui.label(RichText::new(region_info).size(11.0).monospace().color(Color32::LIGHT_GRAY));
+                                ui.label(
+                                    RichText::new(&app.mem_region_info)
+                                        .size(11.0)
+                                        .monospace()
+                                        .color(Color32::LIGHT_GRAY),
+                                );
                             });
 
                             ui.horizontal(|ui| {
@@ -359,77 +424,198 @@ pub fn render(app: &mut OnyxEngineApp, ctx: &egui::Context) {
 
                             let mut edit_target: Option<(usize, u8)> = None;
 
-                            egui::ScrollArea::vertical()
-                                .id_salt("ce_hex_scroll")
-                                .max_height(hex_h - 50.0)
-                                .auto_shrink([false, false])
-                                .show(ui, |ui| {
-                                    if app.hex_dump_bytes.is_empty() {
-                                        ui.vertical_centered(|ui| {
-                                            ui.add_space(40.0);
-                                            ui.label(RichText::new("No memory dump loaded. Open a process to view memory.").color(Color32::GRAY));
-                                        });
-                                    } else {
-                                        for (row_idx, chunk) in app.hex_dump_bytes.chunks(16).enumerate() {
-                                            let row_addr = app.hex_dump_base + (row_idx * 16);
+                            if app.hex_dump_bytes.is_empty() {
+                                ui.vertical_centered(|ui| {
+                                    ui.add_space(40.0);
+                                    ui.label(RichText::new("No memory dump loaded. Open a process to view memory.").color(Color32::GRAY));
+                                });
+                            } else {
+                                // Virtualized hex grid: only the visible 16-byte
+                                // rows are built each frame. The dump itself is
+                                // 4 KiB, so scrolling no longer scales the
+                                // per-frame widget count with the dump size.
+                                let hex_row_h = 20.0;
+                                let total_hex_rows = app.hex_dump_bytes.len().div_ceil(16);
+                                let prev_spacing = ui.spacing().item_spacing;
+                                ui.spacing_mut().item_spacing =
+                                    Vec2::new(prev_spacing.x, 0.0);
 
-                                            ui.horizontal(|ui| {
-                                                ui.add_space(8.0);
+                                egui::ScrollArea::vertical()
+                                    .id_salt("ce_hex_scroll")
+                                    .max_height(hex_h - 50.0)
+                                    .auto_shrink([false, false])
+                                    .show_rows(
+                                        ui,
+                                        hex_row_h,
+                                        total_hex_rows,
+                                        |ui, range| {
+                                            ui.spacing_mut().item_spacing =
+                                                Vec2::new(0.0, 0.0);
 
-                                                ui.label(RichText::new(format!("{:012X}", row_addr)).monospace().size(12.0).color(Color32::WHITE));
-                                                ui.add_space(12.0);
+                                            for row_idx in range {
+                                                let start = row_idx * 16;
+                                                let end = (start + 16)
+                                                    .min(app.hex_dump_bytes.len());
+                                                let chunk = &app.hex_dump_bytes[start..end];
+                                                let row_addr =
+                                                    app.hex_dump_base + start;
 
-                                                ui.horizontal(|ui| {
-                                                    ui.spacing_mut().item_spacing = Vec2::new(4.0, 0.0);
-                                                    for (b_idx, &b) in chunk.iter().take(8).enumerate() {
-                                                        let b_addr = row_addr + b_idx;
-                                                        let b_text = format!("{:02X}", b);
-                                                        let b_resp = ui.add(egui::Label::new(RichText::new(b_text).monospace().size(12.0).color(Color32::from_rgb(0, 210, 0))).sense(egui::Sense::click()));
-                                                        if b_resp.double_clicked() || (b_resp.clicked() && ui.input(|i| i.modifiers.ctrl)) {
-                                                            edit_target = Some((b_addr, b));
-                                                        }
-                                                        b_resp.context_menu(|ui| {
-                                                            if ui.button("Edit Byte (Hex)").clicked() {
-                                                                edit_target = Some((b_addr, b));
-                                                                ui.close_menu();
-                                                            }
-                                                        });
-                                                    }
-                                                });
+                                                ui.allocate_ui_with_layout(
+                                                    Vec2::new(
+                                                        ui.available_width(),
+                                                        hex_row_h,
+                                                    ),
+                                                    egui::Layout::left_to_right(
+                                                        egui::Align::Center,
+                                                    ),
+                                                    |ui| {
+                                                        ui.set_min_height(hex_row_h);
+                                                        ui.add_space(8.0);
 
-                                                ui.add_space(4.0);
+                                                        ui.label(
+                                                            RichText::new(format!(
+                                                                "{:012X}",
+                                                                row_addr
+                                                            ))
+                                                            .monospace()
+                                                            .size(12.0)
+                                                            .color(Color32::WHITE),
+                                                        );
+                                                        ui.add_space(12.0);
 
-                                                egui::Frame::none()
-                                                    .stroke(Stroke::new(1.0_f32, Color32::from_rgb(220, 200, 60)))
-                                                    .inner_margin(egui::Margin::symmetric(3.0, 0.0))
-                                                    .show(ui, |ui| {
                                                         ui.horizontal(|ui| {
-                                                            ui.spacing_mut().item_spacing = Vec2::new(4.0, 0.0);
-                                                            for (b_idx, &b) in chunk.iter().skip(8).take(8).enumerate() {
-                                                                let b_addr = row_addr + 8 + b_idx;
-                                                                let b_text = format!("{:02X}", b);
-                                                                let b_resp = ui.add(egui::Label::new(RichText::new(b_text).monospace().size(12.0).color(Color32::from_rgb(0, 210, 0))).sense(egui::Sense::click()));
-                                                                if b_resp.double_clicked() || (b_resp.clicked() && ui.input(|i| i.modifiers.ctrl)) {
-                                                                    edit_target = Some((b_addr, b));
+                                                            ui.spacing_mut().item_spacing =
+                                                                Vec2::new(4.0, 0.0);
+                                                            for (b_idx, &b) in
+                                                                chunk.iter().take(8).enumerate()
+                                                            {
+                                                                let b_addr =
+                                                                    row_addr + b_idx;
+                                                                let b_text =
+                                                                    format!("{:02X}", b);
+                                                                let b_resp = ui.add(
+                                                                    egui::Label::new(
+                                                                        RichText::new(b_text)
+                                                                            .monospace()
+                                                                            .size(12.0)
+                                                                            .color(Color32::from_rgb(0, 210, 0)),
+                                                                    )
+                                                                    .sense(egui::Sense::click()),
+                                                                );
+                                                                if b_resp.double_clicked()
+                                                                    || (b_resp.clicked()
+                                                                        && ui.input(|i| {
+                                                                            i.modifiers.ctrl
+                                                                        }))
+                                                                {
+                                                                    edit_target =
+                                                                        Some((b_addr, b));
                                                                 }
                                                                 b_resp.context_menu(|ui| {
-                                                                    if ui.button("Edit Byte (Hex)").clicked() {
-                                                                        edit_target = Some((b_addr, b));
+                                                                    if ui
+                                                                        .button(
+                                                                            "Edit Byte (Hex)",
+                                                                        )
+                                                                        .clicked()
+                                                                    {
+                                                                        edit_target =
+                                                                            Some((b_addr, b));
                                                                         ui.close_menu();
                                                                     }
                                                                 });
                                                             }
                                                         });
-                                                    });
 
-                                                ui.add_space(10.0);
+                                                        ui.add_space(4.0);
 
-                                                let ascii_text: String = chunk.iter().map(|&b| if (0x20..=0x7E).contains(&b) { b as char } else { '.' }).collect();
-                                                ui.label(RichText::new(ascii_text).monospace().size(12.0).color(Color32::from_rgb(140, 220, 140)));
-                                            });
-                                        }
-                                    }
-                                });
+                                                        egui::Frame::none()
+                                                            .stroke(Stroke::new(
+                                                                1.0_f32,
+                                                                Color32::from_rgb(
+                                                                    220, 200, 60,
+                                                                ),
+                                                            ))
+                                                            .inner_margin(
+                                                                egui::Margin::symmetric(
+                                                                    3.0, 0.0,
+                                                                ),
+                                                            )
+                                                            .show(ui, |ui| {
+                                                                ui.horizontal(|ui| {
+                                                                    ui.spacing_mut().item_spacing =
+                                                                        Vec2::new(4.0, 0.0);
+                                                                    for (b_idx, &b) in chunk
+                                                                        .iter()
+                                                                        .skip(8)
+                                                                        .take(8)
+                                                                        .enumerate()
+                                                                    {
+                                                                        let b_addr =
+                                                                            row_addr + 8 + b_idx;
+                                                                        let b_text =
+                                                                            format!("{:02X}", b);
+                                                                        let b_resp = ui.add(
+                                                                            egui::Label::new(
+                                                                                RichText::new(b_text)
+                                                                                    .monospace()
+                                                                                    .size(12.0)
+                                                                                    .color(Color32::from_rgb(0, 210, 0)),
+                                                                            )
+                                                                            .sense(egui::Sense::click()),
+                                                                        );
+                                                                        if b_resp.double_clicked()
+                                                                            || (b_resp.clicked()
+                                                                                && ui.input(|i| {
+                                                                                    i.modifiers.ctrl
+                                                                                }))
+                                                                        {
+                                                                            edit_target =
+                                                                                Some((b_addr, b));
+                                                                        }
+                                                                        b_resp.context_menu(|ui| {
+                                                                            if ui
+                                                                                .button(
+                                                                                    "Edit Byte (Hex)",
+                                                                                )
+                                                                                .clicked()
+                                                                            {
+                                                                                edit_target =
+                                                                                    Some((b_addr, b));
+                                                                                ui.close_menu();
+                                                                            }
+                                                                        });
+                                                                    }
+                                                                });
+                                                            });
+
+                                                        ui.add_space(10.0);
+
+                                                        let ascii_text: String = chunk
+                                                            .iter()
+                                                            .map(|&b| {
+                                                                if (0x20..=0x7E)
+                                                                    .contains(&b)
+                                                                {
+                                                                    b as char
+                                                                } else {
+                                                                    '.'
+                                                                }
+                                                            })
+                                                            .collect();
+                                                        ui.label(
+                                                            RichText::new(ascii_text)
+                                                                .monospace()
+                                                                .size(12.0)
+                                                                .color(Color32::from_rgb(140, 220, 140)),
+                                                        );
+                                                    },
+                                                );
+                                            }
+                                        },
+                                    );
+
+                                ui.spacing_mut().item_spacing = prev_spacing;
+                            }
 
                             if let Some((addr, byte)) = edit_target {
                                 app.edit_byte_addr = addr;
