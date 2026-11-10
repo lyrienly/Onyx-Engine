@@ -1044,7 +1044,7 @@ unsafe extern "C" fn ce_lua_stacktrace(L: LuaState) -> c_int {
                     let count = read / 8;
                     for i in 0..count {
                         let potential_ret = stack_buf[i];
-                        if potential_ret > 0x10000 && potential_ret < 0x7FFFFFFF_FFFFFFFF {
+                        if potential_ret > 0x10000 && potential_ret < crate::memory::MAX_USER_ADDRESS {
                             let mut mbi: MEMORY_BASIC_INFORMATION = std::mem::zeroed();
                             if VirtualQueryEx(
                                 h_proc as HANDLE,

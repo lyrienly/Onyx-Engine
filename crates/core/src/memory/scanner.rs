@@ -669,7 +669,7 @@ impl Scanner {
             history: Vec::new(),
             scan_count: 0,
             start_addr: 0x0000000000000000,
-            stop_addr: 0x7FFFFFFFFFFF,
+            stop_addr: crate::memory::MAX_USER_ADDRESS,
             writable_only: true,
             executable: false,
             copy_on_write: false,

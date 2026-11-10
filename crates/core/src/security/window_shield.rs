@@ -49,6 +49,10 @@ static WATCHDOG_RUNNING: AtomicBool = AtomicBool::new(false);
 static PROTECTED_WINDOWS: Mutex<Option<Vec<usize>>> = Mutex::new(None);
 
 unsafe extern "system" {
+    #[cfg(target_arch = "x86_64")]
+    fn SetWindowLongPtrW(hwnd: HWND, index: i32, new_long: isize) -> isize;
+    #[cfg(target_arch = "x86")]
+    #[link_name = "SetWindowLongW"]
     fn SetWindowLongPtrW(hwnd: HWND, index: i32, new_long: isize) -> isize;
     fn CallWindowProcW(
         prev_wnd_proc: WNDPROC,

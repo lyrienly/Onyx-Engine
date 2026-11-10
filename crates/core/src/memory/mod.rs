@@ -17,6 +17,11 @@ pub mod structure;
 pub mod timeline;
 pub mod transaction;
 
+#[cfg(target_pointer_width = "64")]
+pub const MAX_USER_ADDRESS: usize = 0x7FFF_FFFF_FFFF;
+#[cfg(target_pointer_width = "32")]
+pub const MAX_USER_ADDRESS: usize = 0x7FFF_FFFF;
+
 pub use aob_validator::*;
 pub use cache::{CacheStats, CachedChunk, DEFAULT_CACHE_CHUNK_SIZE, MemoryCache};
 pub use codecave::*;

@@ -161,8 +161,16 @@ impl OnyxEngineApp {
             has_scanned: false,
             status_msg: "OnyxEngine Ready. Select a process to begin.".to_string(),
 
-            start_addr_text: "0000000000000000".to_string(),
-            stop_addr_text: "7FFFFFFFFFFFFFFF".to_string(),
+            start_addr_text: if cfg!(target_pointer_width = "64") {
+                "0000000000000000".to_string()
+            } else {
+                "00000000".to_string()
+            },
+            stop_addr_text: if cfg!(target_pointer_width = "64") {
+                "7FFFFFFFFFFFFFFF".to_string()
+            } else {
+                "7FFFFFFF".to_string()
+            },
             fast_scan: true,
             alignment_idx: 0,
             writable_only: true,
@@ -428,7 +436,7 @@ dealloc(newmem)
 
     pub fn configure_scanner_params(&mut self) {
         self.scanner.start_addr = Self::parse_hex_addr(&self.start_addr_text, 0);
-        self.scanner.stop_addr = Self::parse_hex_addr(&self.stop_addr_text, 0x7FFFFFFFFFFF);
+        self.scanner.stop_addr = Self::parse_hex_addr(&self.stop_addr_text, onyx_core::memory::MAX_USER_ADDRESS);
         self.scanner.writable_only = self.writable_only;
         self.scanner.executable = self.executable;
         self.scanner.copy_on_write = self.copy_on_write;

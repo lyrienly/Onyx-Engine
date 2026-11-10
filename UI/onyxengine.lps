@@ -3,7 +3,7 @@
   <ProjectSession>
     <PathDelim Value="\"/>
     <Version Value="12"/>
-    <BuildModes Active="Release 64-Bit"/>
+    <BuildModes Active="Release 32-Bit"/>
     <Units Count="425">
       <Unit0>
         <Filename Value="onyxengine.lpr"/>

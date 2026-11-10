@@ -452,11 +452,7 @@ impl Process {
 
         let mut regions = Vec::new();
         let mut addr: usize = 0x10000;
-        let max_addr: usize = if size_of::<usize>() == 8 {
-            0x7FFF_FFFF_FFFF
-        } else {
-            0x7FFF_FFFF
-        };
+        let max_addr: usize = crate::memory::MAX_USER_ADDRESS;
 
         let mut mbi: MEMORY_BASIC_INFORMATION = unsafe { zeroed() };
 

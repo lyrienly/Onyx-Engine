@@ -371,7 +371,7 @@ impl McpSession {
         })];
 
         for (i, &offset) in offsets.iter().enumerate() {
-            let mut ptr_buf = [0u8; 8];
+            let mut ptr_buf = [0u8; std::mem::size_of::<usize>()];
             proc.read_raw(current, &mut ptr_buf)
                 .map_err(|e| format!("Falha ao ler ponteiro no passo {} (0x{:X}): {}", i, current, e.format(get_locale())))?;
             let deref = usize::from_le_bytes(ptr_buf);

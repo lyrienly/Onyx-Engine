@@ -130,7 +130,7 @@ pub unsafe extern "C" fn onyx_scanner_first_scan(
     s.alignment = if alignment == 0 { 4 } else { alignment };
     s.start_addr = start_addr;
     s.stop_addr = if stop_addr == 0 {
-        0x7FFFFFFFFFFFFFFF
+        onyx_core::memory::MAX_USER_ADDRESS
     } else {
         stop_addr
     };

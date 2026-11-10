@@ -49,7 +49,7 @@ impl Default for PointerScanConfig {
             max_results: 20000,
             static_only: true,
             min_address: 0x10000,
-            max_address: 0x7FFF_FFFF_FFFF,
+            max_address: crate::memory::MAX_USER_ADDRESS,
         }
     }
 }
