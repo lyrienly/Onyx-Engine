@@ -25,13 +25,15 @@ function Build-Package {
     }
 
     Write-Host "===================================================" -ForegroundColor Cyan
-    Write-Host " Assembling Release Package: $PkgName" -ForegroundColor Cyan
+    Write-Host " Assembling Discrete Release Package: $PkgName" -ForegroundColor Cyan
     Write-Host "===================================================" -ForegroundColor Cyan
 
-    New-Item -ItemType Directory -Path (Join-Path $PkgDir "modules\injections") -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $PkgDir "modules\system") -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $PkgDir "modules\extensions") -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $PkgDir "plugins") -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $PkgDir "driver") -Force | Out-Null
 
-    # 1. Main Executables (Pascal / Lazarus Native UI)
+    # 1. Main Executables (Native Pascal / Lazarus Frontend Only)
     $LazarusExe = Join-Path $RootDir "UI\bin\$ExeName"
     if (Test-Path $LazarusExe) {
         Copy-Item -Path $LazarusExe -Destination (Join-Path $PkgDir "OnyxEngine-CE.exe") -Force
@@ -56,28 +58,30 @@ function Build-Package {
         Copy-Item -Path $McpExe -Destination (Join-Path $PkgDir "onyx_mcp_server.exe") -Force
     }
 
-    # 3. Modules
+    # 3. System Interceptors & Modules
     $Modules = @("onyx_aa.dll", "onyx_mono.dll", "onyx_mono_hook.dll", "onyx_dotnet.dll", "onyx_gdb_server.dll", "onyx_overlay.dll", "onyx_hook.dll")
     foreach ($m in $Modules) {
         $p = Join-Path $RustOut $m
         if (Test-Path $p) {
             Copy-Item -Path $p -Destination (Join-Path $PkgDir "modules\$m") -Force
+            Copy-Item -Path $p -Destination (Join-Path $PkgDir "modules\extensions\$m") -Force
         }
     }
 
-    # 4. Injections & Stealth
-    $Injections = @("onyx_shield.dll", "taskmgr_cloak.dll", "speedhack_dll.dll", "vehdebug_dll.dll", "d3dhook_dll.dll", "allochook_dll.dll", "luaclient_dll.dll", "callstack_spoof.dll", "pe_strip.dll", "syscalls_indirect.dll")
-    foreach ($inj in $Injections) {
-        $p = Join-Path $RustOut $inj
+    # 4. Low-Level System Interceptors
+    $SystemDlls = @("onyx_shield.dll", "taskmgr_cloak.dll", "speedhack_dll.dll", "vehdebug_dll.dll", "d3dhook_dll.dll", "allochook_dll.dll", "luaclient_dll.dll", "callstack_spoof.dll", "pe_strip.dll", "syscalls_indirect.dll")
+    foreach ($sd in $SystemDlls) {
+        $p = Join-Path $RustOut $sd
         if (Test-Path $p) {
-            Copy-Item -Path $p -Destination (Join-Path $PkgDir "modules\injections\$inj") -Force
-            if ($inj -eq "taskmgr_cloak.dll") {
+            Copy-Item -Path $p -Destination (Join-Path $PkgDir "modules\system\$sd") -Force
+            Copy-Item -Path $p -Destination (Join-Path $PkgDir "modules\$sd") -Force
+            if ($sd -eq "taskmgr_cloak.dll") {
                 Copy-Item -Path $p -Destination (Join-Path $PkgDir "taskmgr_cloak.dll") -Force
             }
         }
     }
 
-    # 5. Plugins
+    # 5. Dynamic Extensions / Plugins
     $Plugins = @("onyx_dll_mapper.dll", "onyx_aob_tool.dll")
     foreach ($plg in $Plugins) {
         $p = Join-Path $RustOut $plg
@@ -86,7 +90,7 @@ function Build-Package {
         }
     }
 
-    # 6. Copy Shared Assets from UI\bin
+    # 6. Shared Assets from UI\bin
     $UiBin = Join-Path $RootDir "UI\bin"
     $CommonDirs = @("autorun", "languages", "lua_extra", "include")
     foreach ($d in $CommonDirs) {
@@ -101,7 +105,27 @@ function Build-Package {
         Copy-Item -Path $RootLua -Destination (Join-Path $PkgDir "lua") -Recurse -Force
     }
 
-    # Architecture-specific runtimes and hooks
+    # 7. Kernel Driver Packaging (Integrated into zip)
+    $DriverFiles = @("OwMemDriver.sys", "DBK64.inf")
+    foreach ($df in $DriverFiles) {
+        $src = Join-Path $UiBin $df
+        if (Test-Path $src) {
+            # In root of package
+            Copy-Item -Path $src -Destination (Join-Path $PkgDir $df) -Force
+            # In dedicated driver folder
+            Copy-Item -Path $src -Destination (Join-Path $PkgDir "driver\$df") -Force
+        }
+    }
+    # Also provide OnyxDriver alias in root and driver/
+    if (Test-Path (Join-Path $UiBin "OwMemDriver.sys")) {
+        Copy-Item -Path (Join-Path $UiBin "OwMemDriver.sys") -Destination (Join-Path $PkgDir "OnyxDriver.sys") -Force
+        Copy-Item -Path (Join-Path $UiBin "OwMemDriver.sys") -Destination (Join-Path $PkgDir "driver\OnyxDriver.sys") -Force
+    }
+    if (Test-Path (Join-Path $RootDir "driver\OnyxDriver.inf")) {
+        Copy-Item -Path (Join-Path $RootDir "driver\OnyxDriver.inf") -Destination (Join-Path $PkgDir "driver\OnyxDriver.inf") -Force
+    }
+
+    # 8. Architecture-specific Runtimes
     if ($Arch -eq "win32") {
         if (Test-Path (Join-Path $UiBin "lua53-32.dll")) {
             Copy-Item -Path (Join-Path $UiBin "lua53-32.dll") -Destination (Join-Path $PkgDir "lua53-32.dll") -Force
@@ -166,7 +190,7 @@ function Build-Package {
     }
 
     # Static scripts & resources
-    $StaticFiles = @("buildsigs.bat", "class.lua", "classwrapper.lua", "commonmodulelist.txt", "DBK64.inf", "defines.lua", "donottrace.txt", "main.lua", "onyxlua.txt", "overlay.fx", "packfiles.bat", "standalonephase1.dat", "tiny.dat", "OwMemDriver.sys")
+    $StaticFiles = @("buildsigs.bat", "class.lua", "classwrapper.lua", "commonmodulelist.txt", "defines.lua", "donottrace.txt", "main.lua", "onyxlua.txt", "overlay.fx", "packfiles.bat", "standalonephase1.dat", "tiny.dat")
     foreach ($sf in $StaticFiles) {
         $src = Join-Path $UiBin $sf
         if (Test-Path $src) {
@@ -178,7 +202,7 @@ function Build-Package {
         Copy-Item -Path (Join-Path $RootDir "Onyx.ico") -Destination (Join-Path $PkgDir "Onyx.ico") -Force
     }
 
-    # 7. Create ZIP archive
+    # 9. Create ZIP Archive (All included, nothing loose)
     $ZipPath = Join-Path $ReleaseDir "$PkgName.zip"
     if (Test-Path $ZipPath) {
         Remove-Item -Force $ZipPath
@@ -192,8 +216,7 @@ Build-Package -Arch "win64" -TargetTriple "x86_64-pc-windows-msvc" -ExeName "Ony
 Build-Package -Arch "win32" -TargetTriple "i686-pc-windows-msvc" -ExeName "OnyxEngine-i386.exe"
 
 Write-Host "===================================================" -ForegroundColor Green
-Write-Host " RELEASE PACKAGES GENERATED SUCCESSFULLY!" -ForegroundColor Green
+Write-Host " ALL RELEASES COMPILED & ZIPPED WITH DRIVER INCLUDED" -ForegroundColor Green
 Write-Host " 64-Bit Release: release\OnyxEngine-v$Version-win64.zip" -ForegroundColor Green
 Write-Host " 32-Bit Release: release\OnyxEngine-v$Version-win32.zip" -ForegroundColor Green
 Write-Host "===================================================" -ForegroundColor Green
-

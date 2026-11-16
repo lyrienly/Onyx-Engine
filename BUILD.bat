@@ -36,11 +36,13 @@ if %errorlevel% neq 0 (
 :: Create base output directories
 if not exist "bin" mkdir "bin"
 if not exist "bin\modules" mkdir "bin\modules"
-if not exist "bin\modules\injections" mkdir "bin\modules\injections"
+if not exist "bin\modules\system" mkdir "bin\modules\system"
+if not exist "bin\modules\extensions" mkdir "bin\modules\extensions"
 if not exist "bin\plugins" mkdir "bin\plugins"
 if not exist "UI\bin" mkdir "UI\bin"
 if not exist "UI\bin\modules" mkdir "UI\bin\modules"
-if not exist "UI\bin\modules\injections" mkdir "UI\bin\modules\injections"
+if not exist "UI\bin\modules\system" mkdir "UI\bin\modules\system"
+if not exist "UI\bin\modules\extensions" mkdir "UI\bin\modules\extensions"
 if not exist "UI\bin\plugins" mkdir "UI\bin\plugins"
 
 :: Determine architectures to build
@@ -133,29 +135,29 @@ if %BUILD_X64% equ 1 (
     copy /y "!RUST_X64!\onyx_hook.dll" "bin\modules\onyx_hook.dll" >nul
     copy /y "!RUST_X64!\onyx_hook.dll" "UI\bin\modules\onyx_hook.dll" >nul
 
-    copy /y "!RUST_X64!\onyx_shield.dll" "bin\modules\injections\onyx_shield.dll" >nul
-    copy /y "!RUST_X64!\onyx_shield.dll" "UI\bin\modules\injections\onyx_shield.dll" >nul
+    copy /y "!RUST_X64!\onyx_shield.dll" "bin\modules\system\onyx_shield.dll" >nul
+    copy /y "!RUST_X64!\onyx_shield.dll" "UI\bin\modules\system\onyx_shield.dll" >nul
     copy /y "!RUST_X64!\taskmgr_cloak.dll" "bin\taskmgr_cloak.dll" >nul
-    copy /y "!RUST_X64!\taskmgr_cloak.dll" "bin\modules\injections\taskmgr_cloak.dll" >nul
+    copy /y "!RUST_X64!\taskmgr_cloak.dll" "bin\modules\system\taskmgr_cloak.dll" >nul
     copy /y "!RUST_X64!\taskmgr_cloak.dll" "UI\bin\taskmgr_cloak.dll" >nul
-    copy /y "!RUST_X64!\taskmgr_cloak.dll" "UI\bin\modules\injections\taskmgr_cloak.dll" >nul
+    copy /y "!RUST_X64!\taskmgr_cloak.dll" "UI\bin\modules\system\taskmgr_cloak.dll" >nul
 
-    copy /y "!RUST_X64!\speedhack_dll.dll" "bin\modules\injections\speedhack_dll.dll" >nul
-    copy /y "!RUST_X64!\speedhack_dll.dll" "UI\bin\modules\injections\speedhack_dll.dll" >nul
-    copy /y "!RUST_X64!\vehdebug_dll.dll" "bin\modules\injections\vehdebug_dll.dll" >nul
-    copy /y "!RUST_X64!\vehdebug_dll.dll" "UI\bin\modules\injections\vehdebug_dll.dll" >nul
-    copy /y "!RUST_X64!\d3dhook_dll.dll" "bin\modules\injections\d3dhook_dll.dll" >nul
-    copy /y "!RUST_X64!\d3dhook_dll.dll" "UI\bin\modules\injections\d3dhook_dll.dll" >nul
-    copy /y "!RUST_X64!\allochook_dll.dll" "bin\modules\injections\allochook_dll.dll" >nul
-    copy /y "!RUST_X64!\allochook_dll.dll" "UI\bin\modules\injections\allochook_dll.dll" >nul
-    copy /y "!RUST_X64!\luaclient_dll.dll" "bin\modules\injections\luaclient_dll.dll" >nul
-    copy /y "!RUST_X64!\luaclient_dll.dll" "UI\bin\modules\injections\luaclient_dll.dll" >nul
-    copy /y "!RUST_X64!\callstack_spoof.dll" "bin\modules\injections\callstack_spoof.dll" >nul
-    copy /y "!RUST_X64!\callstack_spoof.dll" "UI\bin\modules\injections\callstack_spoof.dll" >nul
-    copy /y "!RUST_X64!\pe_strip.dll" "bin\modules\injections\pe_strip.dll" >nul
-    copy /y "!RUST_X64!\pe_strip.dll" "UI\bin\modules\injections\pe_strip.dll" >nul
-    copy /y "!RUST_X64!\syscalls_indirect.dll" "bin\modules\injections\syscalls_indirect.dll" >nul
-    copy /y "!RUST_X64!\syscalls_indirect.dll" "UI\bin\modules\injections\syscalls_indirect.dll" >nul
+    copy /y "!RUST_X64!\speedhack_dll.dll" "bin\modules\system\speedhack_dll.dll" >nul
+    copy /y "!RUST_X64!\speedhack_dll.dll" "UI\bin\modules\system\speedhack_dll.dll" >nul
+    copy /y "!RUST_X64!\vehdebug_dll.dll" "bin\modules\system\vehdebug_dll.dll" >nul
+    copy /y "!RUST_X64!\vehdebug_dll.dll" "UI\bin\modules\system\vehdebug_dll.dll" >nul
+    copy /y "!RUST_X64!\d3dhook_dll.dll" "bin\modules\system\d3dhook_dll.dll" >nul
+    copy /y "!RUST_X64!\d3dhook_dll.dll" "UI\bin\modules\system\d3dhook_dll.dll" >nul
+    copy /y "!RUST_X64!\allochook_dll.dll" "bin\modules\system\allochook_dll.dll" >nul
+    copy /y "!RUST_X64!\allochook_dll.dll" "UI\bin\modules\system\allochook_dll.dll" >nul
+    copy /y "!RUST_X64!\luaclient_dll.dll" "bin\modules\system\luaclient_dll.dll" >nul
+    copy /y "!RUST_X64!\luaclient_dll.dll" "UI\bin\modules\system\luaclient_dll.dll" >nul
+    copy /y "!RUST_X64!\callstack_spoof.dll" "bin\modules\system\callstack_spoof.dll" >nul
+    copy /y "!RUST_X64!\callstack_spoof.dll" "UI\bin\modules\system\callstack_spoof.dll" >nul
+    copy /y "!RUST_X64!\pe_strip.dll" "bin\modules\system\pe_strip.dll" >nul
+    copy /y "!RUST_X64!\pe_strip.dll" "UI\bin\modules\system\pe_strip.dll" >nul
+    copy /y "!RUST_X64!\syscalls_indirect.dll" "bin\modules\system\syscalls_indirect.dll" >nul
+    copy /y "!RUST_X64!\syscalls_indirect.dll" "UI\bin\modules\system\syscalls_indirect.dll" >nul
 
     copy /y "!RUST_X64!\onyx_mcp.dll" "bin\onyx_mcp.dll" >nul
     copy /y "!RUST_X64!\onyx_mcp.dll" "bin\modules\onyx_mcp.dll" >nul

@@ -1,6 +1,6 @@
 # OnyxEngine
 
-OnyxEngine é uma plataforma avançada de análise de memória, inspeção de processos e engenharia reversa. O sistema integra uma arquitetura híbrida de alta performance composta por um frontend gráfico nativo em Free Pascal / Lazarus, um ecossistema modular de baixo nível desenvolvido em Rust (backend, scanner SIMD, desmontador Zydis, gerador de ponteiros e injeções stealth), um driver de modo kernel em C para operações privilegiadas em ring-0 (`OwMemDriver.sys`) e uma interface de automação nativa baseada no Model Context Protocol (MCP).
+OnyxEngine é uma plataforma avançada de análise de memória, inspeção de processos e engenharia reversa. O sistema integra uma arquitetura híbrida de alta performance composta por um frontend gráfico nativo em Free Pascal / Lazarus, um ecossistema modular de baixo nível desenvolvido em Rust (backend, scanner SIMD, desmontador Zydis, gerador de ponteiros e módulos de instrumentação e interceptação), um driver de modo kernel em C para operações privilegiadas em ring-0 (`OwMemDriver.sys`) e uma interface de automação nativa baseada no Model Context Protocol (MCP).
 
 ---
 
@@ -38,9 +38,9 @@ Substitui os mecanismos legados por implementações seguras, com proteção de 
 * `crates/core`: Primitivas de memória Win32, paginação virtual, manipulação de processos e tratamento unificado de erros com suporte a PT-BR.
 * `crates/backend`: Orquestrador C-ABI principal (`onyx_backend.dll`).
 * `crates/modules/`: Módulos modulares independentes (`scanner`, `pointer`, `disasm`, `freezer`, `aa`, `mono`, `mono_hook`, `dotnet`, `gdb_server`, `overlay`, `hook`).
-* `crates/dlls/`: Módulos de injeção e stealth (`speedhack`, `vehdebug`, `d3dhook`, `allochook`, `luaclient`, `onyx_shield`, `taskmgr_cloak`, `onyx_mcp`).
+* `crates/dlls/`: Módulos de instrumentação e monitoramento de sistema (`speedhack`, `vehdebug`, `d3dhook`, `allochook`, `luaclient`, `onyx_shield`, `taskmgr_cloak`, `onyx_mcp`).
 * `crates/plugins/`: Extensões dinâmicas (`dll_mapper`, `aob_generator`).
-* `crates/pe-strip`, `crates/syscalls-indirect`, `crates/callstack-spoof`: Primitivas de evasão e segurança operacional.
+* `crates/pe-strip`, `crates/syscalls-indirect`, `crates/callstack-spoof`: Primitivas de chamadas diretas de sistema e integridade operacional.
 
 ### 3. Hipervisor e Runtimes (`dbvm/` e `lua/`)
 Componentes essenciais desacoplados na raiz:
@@ -69,7 +69,7 @@ OnyxEngine/
 |   |-- core/                           # Subsistemas de processo, memória, IOCTL e diagnósticos
 |   |-- backend/                        # DLL C-ABI principal (onyx_backend.dll)
 |   |-- modules/                        # Módulos de análise, runtime e varredura
-|   |-- dlls/                           # Injeções, stealth e servidor MCP nativo
+|   |-- dlls/                           # Módulos dinâmicos e servidor MCP nativo
 |   `-- plugins/                        # Extensões dinâmicas de mapeamento e AOB
 |-- dbvm/                               # Hipervisor DBVM desacoplado na raiz
 `-- lua/                                # Runtimes e bibliotecas Lua na raiz
@@ -107,7 +107,7 @@ BUILD.bat
 O script automatiza:
 1. Validação de ferramentas (`cargo` e `lazbuild`).
 2. Compilação de todos os 25 crates em modo Release otimizado (`cargo build --release --workspace`).
-3. Implantação estruturada das DLLs de backend, injeções, plugins e MCP para `bin\` e `UI\bin\`.
+3. Implantação estruturada das DLLs de backend, extensões de sistema, plugins e MCP para `bin\` e `UI\bin\`.
 4. Compilação do executável gráfico (`lazbuild -B --build-mode="Release 64-Bit" "UI\onyxengine.lpi"`).
 5. Sincronização automática para `bin\OnyxEngine-CE.exe`.
 
