@@ -27,7 +27,7 @@
       <AutoIncrementBuild Value="True"/>
       <MajorVersionNr Value="7"/>
       <MinorVersionNr Value="5"/>
-      <BuildNr Value="7758"/>
+      <BuildNr Value="7761"/>
       <CharSet Value="04B0"/>
       <StringTable CompanyName="OnyxEngine" FileDescription="OnyxEngine Platform" InternalName="OnyxEngine" OriginalFilename="OnyxEngine-CE.exe" ProductName="OnyxEngine" ProductVersion="1.0"/>
     </VersionInfo>

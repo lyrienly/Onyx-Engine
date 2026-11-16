@@ -8,7 +8,11 @@ uses
   windows, sysutils, classes, NewKernelHandler, commontypedefs;
 
 const
+  {$ifdef cpu64}
   OnyxBackendDLL = 'onyx_backend.dll';
+  {$else}
+  OnyxBackendDLL = 'onyx_backend-32.dll';
+  {$endif}
 
 type
   TOnyxProcessEntry = packed record

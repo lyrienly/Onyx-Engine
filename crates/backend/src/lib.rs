@@ -23,11 +23,13 @@ pub use loader::*;
 
 #[no_mangle]
 pub extern "C" fn onyx_backend_version() -> u32 {
+    loader::ensure_initialized();
     100
 }
 
 #[no_mangle]
 pub extern "C" fn onyx_backend_ping() -> i32 {
+    loader::ensure_initialized();
     1
 }
 
@@ -45,21 +47,8 @@ pub extern "C" fn onyx_security_cloak_self() -> i32 {
 #[no_mangle]
 pub extern "system" fn DllMain(
     _hinst_dll: *mut std::ffi::c_void,
-    fdw_reason: u32,
+    _fdw_reason: u32,
     _lpv_reserved: *mut std::ffi::c_void,
 ) -> i32 {
-    const DLL_PROCESS_ATTACH: u32 = 1;
-    const DLL_PROCESS_DETACH: u32 = 0;
-
-    match fdw_reason {
-        DLL_PROCESS_ATTACH => {
-            loader::init_modules();
-        }
-        DLL_PROCESS_DETACH => {
-            loader::cleanup_modules();
-        }
-        _ => {}
-    }
-
     1
 }

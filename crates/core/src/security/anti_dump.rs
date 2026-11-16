@@ -12,17 +12,23 @@ impl AntiDump {
                 return Err("Failed to resolve PEB address".to_string());
             }
 
-            let ldr_ptr = *(peb_ptr.add(0x18) as *const *mut u8);
+            let (ldr_offset, list_entry_offset, size_of_image_offset) = if cfg!(target_pointer_width = "64") {
+                (0x18usize, 0x10usize, 0x40usize)
+            } else {
+                (0x0Cusize, 0x0Cusize, 0x20usize)
+            };
+
+            let ldr_ptr = *(peb_ptr.add(ldr_offset) as *const *mut u8);
             if ldr_ptr.is_null() {
                 return Err("PEB.Ldr is null".to_string());
             }
 
-            let first_entry = *(ldr_ptr.add(0x10) as *const *mut u8);
+            let first_entry = *(ldr_ptr.add(list_entry_offset) as *const *mut u8);
             if first_entry.is_null() {
                 return Err("InLoadOrderModuleList is empty".to_string());
             }
 
-            let size_of_image_ptr = first_entry.add(0x40) as *mut u32;
+            let size_of_image_ptr = first_entry.add(size_of_image_offset) as *mut u32;
 
             let old_val = *size_of_image_ptr;
             *size_of_image_ptr = old_val.wrapping_add(extra_bytes);

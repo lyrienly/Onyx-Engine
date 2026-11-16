@@ -206,6 +206,7 @@ if %BUILD_X86% equ 1 (
 
     if not exist "bin\win32_bins" mkdir "bin\win32_bins"
     set RUST_X86=target\i686-pc-windows-msvc\release
+    copy /y "!RUST_X86!\onyx_backend.dll" "UI\bin\onyx_backend-32.dll" >nul
     copy /y "!RUST_X86!\*.dll" "bin\win32_bins\" >nul 2>nul
     copy /y "!RUST_X86!\*.exe" "bin\win32_bins\" >nul 2>nul
     if exist "UI\bin\OnyxEngine-i386.exe" (

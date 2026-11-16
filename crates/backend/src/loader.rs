@@ -24,6 +24,13 @@ unsafe impl Send for ModuleRegistry {}
 unsafe impl Sync for ModuleRegistry {}
 
 static REGISTRY: Mutex<Option<ModuleRegistry>> = Mutex::new(None);
+static INIT_ONCE: std::sync::Once = std::sync::Once::new();
+
+pub fn ensure_initialized() {
+    INIT_ONCE.call_once(|| {
+        init_modules();
+    });
+}
 
 fn get_exe_dir() -> PathBuf {
     let mut buf = vec![0u16; 1024];

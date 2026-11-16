@@ -50,6 +50,13 @@ function Build-Package {
         if (Test-Path $p) {
             Copy-Item -Path $p -Destination (Join-Path $PkgDir $dll) -Force
             Copy-Item -Path $p -Destination (Join-Path $PkgDir "modules\$dll") -Force
+            if ($dll -eq "onyx_backend.dll") {
+                if ($Arch -eq "win32") {
+                    Copy-Item -Path $p -Destination (Join-Path $PkgDir "onyx_backend-32.dll") -Force
+                } else {
+                    Copy-Item -Path $p -Destination (Join-Path $PkgDir "onyx_backend-64.dll") -Force
+                }
+            }
         }
     }
 
