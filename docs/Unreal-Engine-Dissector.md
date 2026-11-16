@@ -2,7 +2,7 @@
 
 ## 1. Visão Geral do Modelo de Objetos da Unreal Engine
 
-Jogos desenvolvidos sobre a **Unreal Engine (UE4 / UE5)** compartilham uma arquitetura padronizada de reflexão de objetos baseada na classe fundamental `UObject`. Compreendendo a disposição das estruturas mestras em memória, o OnyxEngine permite navegar por todo o grafo de entidades do jogo (jogadores, inimigos, armas, veículos, projéteis e coordenadas 3D) de forma totalmente genérica.
+Aplicações e simulações 3D desenvolvidas sobre a **Unreal Engine (UE4 / UE5)** compartilham uma arquitetura padronizada de reflexão de objetos baseada na classe fundamental `UObject`. Compreendendo a disposição das estruturas mestras em memória, o OnyxEngine permite navegar por todo o grafo de entidades do software (atores, entidades lógicas, câmeras, componentes esqueléticos e coordenadas 3D) de forma totalmente genérica.
 
 ```text
                                +-------------------+
@@ -29,7 +29,7 @@ Jogos desenvolvidos sobre a **Unreal Engine (UE4 / UE5)** compartilham uma arqui
                        v                                   v
         +-----------------------------+     +-----------------------------+
         |     APawn / ACharacter      |     |         APlayerCamera       |
-        |   (Entidade do Jogador)     |     |   (Matriz ViewProjection)   |
+        |   (Entidade / Ator Principal)     |     |   (Matriz ViewProjection)   |
         +-----------------------------+     +-----------------------------+
                        |
                        v
@@ -44,7 +44,7 @@ Jogos desenvolvidos sobre a **Unreal Engine (UE4 / UE5)** compartilham uma arqui
 ## 2. As Estruturas Globais Centrais
 
 ### 2.1 `GObjects` (`TUObjectArray`)
-O `GObjects` é o array mestre que mantém ponteiros para todas as instâncias de classes alocadas no jogo.
+O `GObjects` é o array mestre que mantém ponteiros para todas as instâncias de classes alocadas na aplicação.
 - **Na UE 4.11 a 4.20:** Array bidimensional de chunks de 64 KB de objetos (`FUObjectItem`).
 - **Na UE 4.21 a 5.x:** Tabela segmentada indexada por `ObjectIndex`:
   $$\text{Chunk} = \text{ObjectIndex} / 65536, \quad \text{IndexInChunk} = \text{ObjectIndex} \% 65536$$
@@ -60,9 +60,9 @@ Todos os identificadores de texto (nomes de classes, propriedades, funções e o
 ## 3. Dissecador Automático de Estruturas do OnyxEngine
 
 O OnyxEngine inclui um dissecador de memória especializado em arquiteturas orientadas a objetos C++ e Unreal:
-1. Anexe ao jogo e abra **Memory View** (`Ctrl + M`).
+1. Anexe à aplicação e abra **Memory View** (`Ctrl + M`).
 2. Vá em **Tools -> Dissect Data / Structures** (`Ctrl + D`).
-3. Digite o endereço do ponteiro do seu jogador (`APawn`).
+3. Digite o endereço do ponteiro da entidade principal (`APawn`).
 4. O OnyxEngine lê a memória adjacente, identifica a **Virtual Method Table (VTable)** no offset `0x00`, e classifica automaticamente cada campo:
    - Inteiros e Contadores (32 e 64 bits)
    - Pointers apontando para memória executável (VTable) ou Heap (Instâncias filhas)
@@ -74,7 +74,7 @@ O OnyxEngine inclui um dissecador de memória especializado em arquiteturas orie
 
 ## 4. Extração de Matriz de Ossos (*Bone Matrix*)
 
-Para renderizar ESP (esqueleto na tela) ou implementar mira assistida (Aimbot direcionado à cabeça), precisamos das coordenadas 3D dos ossos da malha esquelética (`USkeletalMeshComponent`):
+Para análise de cinemática de malhas 3D e inspeção de transformações espaciais em tempo real, mapeamos as coordenadas dos nós esqueléticos (`USkeletalMeshComponent`):
 
 ### 4.1 Estrutura `FTransform`
 Cada osso possui sua própria transformação local composta por:
@@ -87,7 +87,7 @@ struct FTransform {
 ```
 
 ### 4.2 Multiplicação Matricial para Espaço de Mundo
-A coordenada real do osso no mundo 3D do jogo é obtida multiplicando a transformação do osso pela transformação do componente esquelético:
+A coordenada real do osso no mundo 3D da aplicação é obtida multiplicando a transformação do osso pela transformação do componente esquelético:
 
 $$\mathbf{M}_{\text{World}} = \mathbf{M}_{\text{BoneLocal}} \times \mathbf{M}_{\text{ComponentToWorld}}$$
 
@@ -98,7 +98,7 @@ USkeletalMeshComponent + 0x4B0 -> TArray<FTransform> BoneArray
   BoneArray[1]  -> Pelvis
   BoneArray[6]  -> Spine
   BoneArray[8]  -> Neck
-  BoneArray[9]  -> Head (Cabeça do Jogador Alvo)
+  BoneArray[9]  -> Head (Nó Superior / Extremidade da Malha)
 ```
 
 ---
@@ -120,4 +120,4 @@ Através da ferramenta `dissect_structure` do servidor MCP, um agente de IA pode
 }
 ```
 
-O servidor retorna o layout de memória completo com os tipos de dados identificados, gerando automaticamente os arquivos de cabeçalho (.h) da SDK do jogo sem necessidade de recompilar ferramentas externas.
+O servidor retorna o layout de memória completo com os tipos de dados identificados, gerando automaticamente os arquivos de cabeçalho (.h) da SDK da aplicação sem necessidade de recompilar ferramentas externas.

@@ -111,20 +111,20 @@ pub fn apply_relocations(
 
 ## 3. Expurgo e Destruição de Cabeçalhos PE (`pe_strip.dll`)
 
-Após o carregamento da DLL na memória remota, scanners de assinatura de memória (como Moneta, PE-sieve ou módulos anticheat) realizam varreduras buscando assinaturas de executáveis como a marca mágica `MZ` (`0x5A4D`) ou `PE\0\0` (`0x00004550`).
+Após o carregamento da DLL na memória remota, scanners de assinatura de memória (como Moneta, PE-sieve ou módulos de auditoria de integridade) realizam varreduras buscando assinaturas de executáveis como a marca mágica `MZ` (`0x5A4D`) ou `PE\0\0` (`0x00004550`).
 
 O `pe_strip.dll` sobrescreve todos os cabeçalhos da imagem injetada com zeros ou ruído criptográfico pseudo-aleatório:
 - `IMAGE_DOS_HEADER` (64 bytes zerados)
 - `IMAGE_NT_HEADERS` (Signature + FileHeader + OptionalHeader zerados)
 - Tabela de seções (`IMAGE_SECTION_HEADER` zerada)
 
-Isso transforma a DLL em um bloco anônimo de memória privada (`MEM_PRIVATE`), indistinguível de um buffer comum de dados do jogo.
+Isso transforma a DLL em um bloco anônimo de memória privada (`MEM_PRIVATE`), indistinguível de um buffer comum de dados da aplicação.
 
 ---
 
 ## 4. Falsificação de Pilha de Chamadas (`callstack_spoof.dll`)
 
-Sistemas de detecção modernos interceptam APIs de alto privilégio (`NtReadVirtualMemory`, `NtAllocateVirtualMemory`) e inspecionam o endereço de retorno na pilha de execução (*Callstack Return Address*). Se o retorno apontar para uma região de memória anônima (fora dos módulos assinados do jogo ou do sistema operacional), a injeção é denunciada imediatamente.
+Sistemas de detecção modernos interceptam APIs de alto privilégio (`NtReadVirtualMemory`, `NtAllocateVirtualMemory`) e inspecionam o endereço de retorno na pilha de execução (*Callstack Return Address*). Se o retorno apontar para uma região de memória anônima (fora dos módulos assinados da aplicação ou do sistema operacional), a injeção é denunciada imediatamente.
 
 O `callstack_spoof.dll` utiliza trampolins em Assembly para **forjar frames legítimos na pilha**:
 
@@ -143,7 +143,7 @@ Pilha Forjada pelo callstack_spoof:
 
 ## 5. Chamadas de Sistema Indiretas (`syscalls_indirect.dll`)
 
-Muitos anticheats instalam hooks inline (instruções `JMP <detour>`) nos primeiros 5 a 14 bytes das funções em `ntdll.dll` para monitorar chamadas de sistema.
+Muitos agentes de proteção instalam hooks inline (instruções `JMP <detour>`) nos primeiros 5 a 14 bytes das funções em `ntdll.dll` para monitorar chamadas de sistema.
 
 O `syscalls_indirect.dll` contorna todos os hooks usermode através de **Syscalls Indiretas**:
 

@@ -1,8 +1,8 @@
-# Guia Profundo de Evasão de Anticheats & Engenharia de Ring-0
+# Guia Profundo de Evasão de Sistemas de Proteção & Engenharia de Ring-0
 
-## 1. O Modelo de Ameaça dos Anticheats Modernos
+## 1. O Modelo de Ameaça de Drivers de Segurança e EDRs
 
-Sistemas de proteção contemporâneos (**Vanguard, Easy Anti-Cheat, BattlEye, Ricochet, ACE**) operam em modelo híbrido com agentes em **Ring-3 (Usermode)** e drivers de alta prioridade em **Ring-0 (Kernelmode)**. Para instrumentar a memória de um jogo protegido sem disparar banimentos imediatos ou integridade de cliente violada, é indispensável dissecar cada vetor de detecção e contra-atacar na camada exata de execução.
+Soluções corporativas de proteção, agentes de segurança e drivers EDR operam em modelo híbrido com agentes em **Ring-3 (Usermode)** e drivers de alta prioridade em **Ring-0 (Kernelmode)**. Para instrumentar a memória de um processo protegido sem disparar alertas de integridade ou violações de acesso, é indispensável dissecar cada vetor de detecção e contra-atacar na camada exata de execução.
 
 ```text
 +---------------------------------------------------------------------------------+
@@ -42,7 +42,7 @@ Sistemas de proteção contemporâneos (**Vanguard, Easy Anti-Cheat, BattlEye, R
 ## 2. Evasão Usermode com Código de Produção
 
 ### 2.1 Quebrando a Auditoria de Callstack (*Callstack Spoofing*)
-Quando um cheat chama `NtWriteVirtualMemory`, o driver do anticheat inspeciona a pilha de execução com `RtlCaptureStackBackTrace`. Se o endereço de retorno apontar para uma região de memória anônima (`MEM_PRIVATE`), a injeção é denunciada.
+Quando uma ferramenta de instrumentação chama `NtWriteVirtualMemory`, o driver de proteção inspeciona a pilha de execução com `RtlCaptureStackBackTrace`. Se o endereço de retorno apontar para uma região de memória anônima (`MEM_PRIVATE`), a injeção é denunciada.
 
 O OnyxEngine implementa o sintetizador de pilha em Assembly x64 (`crates/callstack-spoof`):
 
@@ -87,7 +87,7 @@ END
 ```
 
 ### 2.2 Syscalls Indiretas via Halo's Gate (`crates/syscalls-indirect/src/lib.rs`)
-Anticheats hookam APIs na `ntdll.dll` sobrescrevendo o prólogo com `JMP <anticheat>`. O módulo do OnyxEngine resolve o System Service Number (SSN) dinamicamente lendo os vizinhos não hookados e salta para um gadget limpo `syscall; ret`:
+Agentes de segurança e EDRs hookam APIs na `ntdll.dll` sobrescrevendo o prólogo com `JMP <security_driver>`. O módulo do OnyxEngine resolve o System Service Number (SSN) dinamicamente lendo os vizinhos não hookados e salta para um gadget limpo `syscall; ret`:
 
 ```rust
 // crates/syscalls-indirect/src/lib.rs
@@ -211,7 +211,7 @@ typedef struct _OB_CALLBACK_ENTRY {
 } OB_CALLBACK_ENTRY, *POB_CALLBACK_ENTRY;
 #pragma pack(pop)
 
-// Desconecta a rotina de interceptação do anticheat
+// Desconecta a rotina de interceptação de segurança
 NTSTATUS StripProcessCallbacks(PVOID TargetDriverBase, ULONG TargetDriverSize)
 {
     PLIST_ENTRY list = GetObjectTypeCallbackList(*PsProcessType);
@@ -220,7 +220,7 @@ NTSTATUS StripProcessCallbacks(PVOID TargetDriverBase, ULONG TargetDriverSize)
     PLIST_ENTRY current = list->Flink;
     while (current != list) {
         POB_CALLBACK_ENTRY entry = CONTAINING_RECORD(current, OB_CALLBACK_ENTRY, CallbackList);
-        // Se a função PreOperation estiver dentro da faixa de memória do driver do anticheat:
+        // Se a função PreOperation estiver dentro da faixa de memória do driver monitorado:
         if ((ULONG64)entry->PreOperation >= (ULONG64)TargetDriverBase &&
             (ULONG64)entry->PreOperation < (ULONG64)TargetDriverBase + TargetDriverSize)
         {

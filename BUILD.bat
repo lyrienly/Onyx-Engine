@@ -171,11 +171,6 @@ if %BUILD_X64% equ 1 (
     copy /y "!RUST_X64!\onyx_aob_tool.dll" "bin\plugins\onyx_aob_tool.dll" >nul
     copy /y "!RUST_X64!\onyx_aob_tool.dll" "UI\bin\plugins\onyx_aob_tool.dll" >nul
 
-    if exist "!RUST_X64!\OnyxEngine.exe" (
-        copy /y "!RUST_X64!\OnyxEngine.exe" "bin\OnyxEngine-Rust.exe" >nul
-        copy /y "!RUST_X64!\OnyxEngine.exe" "UI\bin\OnyxEngine-Rust.exe" >nul
-    )
-
     if exist "UI\bin\OnyxEngine-x86_64.exe" (
         copy /y "UI\bin\OnyxEngine-x86_64.exe" "bin\OnyxEngine-CE.exe" >nul
         copy /y "UI\bin\OnyxEngine-x86_64.exe" "bin\OnyxEngine-x86_64.exe" >nul

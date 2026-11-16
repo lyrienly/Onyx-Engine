@@ -2,7 +2,7 @@
 
 ## 1. Visão Geral
 
-O módulo **`onyx_scanner.dll`** é o motor nativo de alto desempenho responsável pela enumeração, filtragem e localização de padrões de valores na memória virtual de processos alvos. Desenvolvido em Rust com paralelismo determinístico (baseado no framework **Rayon**) e comparadores vetorizados em hardware (**AVX2 / SSE4.2 / NEON**), ele substitui o algoritmo de varredura monolítico legado do Cheat Engine original, alcançando velocidades de processamento de até **5 GB/s** em memória física mapeada.
+O módulo **`onyx_scanner.dll`** é o motor nativo de alto desempenho responsável pela enumeração, filtragem e localização de padrões de valores na memória virtual de processos alvos. Desenvolvido em Rust com paralelismo determinístico (baseado no framework **Rayon**) e comparadores vetorizados em hardware (**AVX2 / SSE4.2 / NEON**), ele substitui o algoritmo de varredura monolítico legado monolítico original, alcançando velocidades de processamento de até **5 GB/s** em memória física mapeada.
 
 ---
 

@@ -83,7 +83,7 @@ No contexto de engenharia reversa e segurança de sistemas, erros silenciosos ou
   - **Resolução:** Atualizar a lista de processos via `onyx_process_list` para confirmar a existência do alvo.
 
 - **Código 1002: `ProcessAccessDenied`**
-  - **Causa:** A chamada ao Win32 `OpenProcess` ou NT Native `NtOpenProcess` retornou código de acesso negado (`ERROR_ACCESS_DENIED` ou `STATUS_ACCESS_DENIED`). Ocorre frequentemente quando o alvo é um Processo Protegido (PPL), possui driver anticheat com ObRegisterCallbacks ou o processo executor não possui elevação administrativa.
+  - **Causa:** A chamada ao Win32 `OpenProcess` ou NT Native `NtOpenProcess` retornou código de acesso negado (`ERROR_ACCESS_DENIED` ou `STATUS_ACCESS_DENIED`). Ocorre frequentemente quando o alvo é um Processo Protegido (PPL), possui driver de proteção / EDR com ObRegisterCallbacks ou o processo executor não possui elevação administrativa.
   - **Diagnóstico PT-BR:** Acesso negado ao anexar ao processo. O alvo pode ser protegido por PPL, possuir filtros de kernel ou requerer privilégios administrativos.
   - **Resolução:** Executar o executável com permissões de Administrador e habilitar o modo Ring-0 através do driver `OwMemDriver`.
 
@@ -157,7 +157,7 @@ No contexto de engenharia reversa e segurança de sistemas, erros silenciosos ou
   - **Resolução:** Consultar a proteção da página com `onyx_process_regions` antes de requisitar leitura de grandes blocos.
 
 - **Código 1102: `MemoryWriteFailed`**
-  - **Causa:** Tentativa de gravação em página de memória com atributos somente leitura (`PAGE_READONLY`, `PAGE_EXECUTE_READ`) sem que a proteção tenha sido relaxada, ou intercepção por proteção anti-cheat de integridade.
+  - **Causa:** Tentativa de gravação em página de memória com atributos somente leitura (`PAGE_READONLY`, `PAGE_EXECUTE_READ`) sem que a proteção tenha sido relaxada, ou intercepção por proteção de integridade de memória.
   - **Diagnóstico PT-BR:** Falha na gravação de memória remota. Página protegida contra escrita.
   - **Resolução:** Aplicar alteração temporária de proteção via `onyx_process_protect` para `PAGE_EXECUTE_READWRITE` antes da escrita.
 
@@ -539,7 +539,7 @@ No contexto de engenharia reversa e segurança de sistemas, erros silenciosos ou
 - **Código 6001: `MonoModuleNotFound`**
   - **Causa:** Nenhuma das bibliotecas conhecidas do runtime Mono (`mono-2.0-bdwgc.dll`, `mono.dll`, `UnityPlayer.dll`) foi encontrada na memória do alvo.
   - **Diagnóstico PT-BR:** Módulo de runtime Mono ou Unity não foi localizado no processo alvo.
-  - **Resolução:** Certificar-se de que o jogo ou aplicativo é baseado em Unity/Mono e aguardar a inicialização do motor.
+  - **Resolução:** Certificar-se de que o aplicativo alvo é baseado em Unity/Mono e aguardar a inicialização do motor.
 
 - **Código 6002: `MonoRootDomainFailed`**
   - **Causa:** A invocação da API exportada `mono_get_root_domain` retornou ponteiro nulo.
@@ -554,7 +554,7 @@ No contexto de engenharia reversa e segurança de sistemas, erros silenciosos ou
 - **Código 6004: `MonoAssemblyLoadFailed`**
   - **Causa:** Falha ao carregar um assembly gerenciado (`.dll`) no domínio do Mono.
   - **Diagnóstico PT-BR:** Falha ao carregar assembly gerenciado no domínio do Mono.
-  - **Resolução:** Validar a compatibilidade da versão do assembly com o framework do jogo alvo.
+  - **Resolução:** Validar a compatibilidade da versão do assembly com o framework da aplicação alvo.
 
 - **Código 6005: `MonoImageOpenFailed`**
   - **Causa:** A imagem executável interna do assembly gerenciado retornou ponteiro corrompido ao ser aberta.
@@ -587,7 +587,7 @@ No contexto de engenharia reversa e segurança de sistemas, erros silenciosos ou
   - **Resolução:** Atualizar a enumeração de módulos gerenciados do processo alvo.
 
 - **Código 6011: `LuaScriptExecutionError`**
-  - **Causa:** O motor de scripts Lua encontrou um erro em tempo de execução ao executar um comando no console ou na tabela do Cheat Engine.
+  - **Causa:** O motor de scripts Lua encontrou um erro em tempo de execução ao executar um comando no console ou na tabela de endereços do OnyxEngine.
   - **Diagnóstico PT-BR:** Erro na execução do script de automação Lua.
   - **Resolução:** Inspecionar o log de rastreamento do erro e corrigir a lógica do script.
 

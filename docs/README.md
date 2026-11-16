@@ -21,7 +21,7 @@ A documentação está dividida nos seguintes módulos técnicos:
 
 3. [Subsistemas Técnicos e Engenharia de Módulos](SUBSYSTEMS.md)
    - Detalhamento de cada crate, módulo de injeção, hook engine e plugin do ecossistema.
-   - Funcionamento de varredura multi-thread, resolução de cadeias de ponteiros, depurador VEH/PageGuard, e evasão anticheat.
+   - Funcionamento de varredura multi-thread, resolução de cadeias de ponteiros, depurador VEH/PageGuard, e evasão de proteções e EDRs.
 
 4. [Servidor Nativo MCP e Automação de Inteligência Artificial](MCP_SERVER.md)
    - Arquitetura do servidor MCP nativo em Rust (`onyx_mcp.dll` e `onyx_mcp_server.exe`).

@@ -70,12 +70,12 @@ O `crates/backend` expõe uma interface C-ABI estrita (`#[no_mangle] extern "C"`
 
 ## 4. Bibliotecas de Injeção e Evasão (crates/dlls/)
 
-1. **`speedhack_dll`:** Modifica a escala de tempo de jogos interceptando as chamadas de alta precisão `QueryPerformanceCounter`, `QueryPerformanceFrequency` e `GetTickCount64`.
+1. **`speedhack_dll`:** Modifica a escala de tempo de processos e loops de atualização interceptando as chamadas de alta precisão `QueryPerformanceCounter`, `QueryPerformanceFrequency` e `GetTickCount64`.
 2. **`vehdebug_dll`:** Biblioteca injetável no espaço de endereçamento do alvo para interceptação de eventos de depuração local através de manipuladores VEH internos.
-3. **`d3dhook_dll`:** Intercepta as tabelas virtuais (`vtable`) de dispositivos Direct3D 9, 11 e 12, permitindo desenhar gráficos diretamente no backbuffer do jogo.
+3. **`d3dhook_dll`:** Intercepta as tabelas virtuais (`vtable`) de dispositivos Direct3D 9, 11 e 12, permitindo desenhar gráficos diretamente no backbuffer da aplicação gráfica.
 4. **`allochook_dll`:** Intercepta as APIs de alocação de memória da runtime C (`malloc`, `free`, `realloc`) para auditoria de vazamento de memória e identificação de buffers de dados.
-5. **`luaclient_dll`:** Ponte de comunicação IPC com o interpretador Lua do Cheat Engine.
-6. **`callstack_spoof`:** Evasor de heurísticas de análise de pilha (Callstack Walkers de antivírus e anticheats). Substitui o endereço de retorno no frame da thread por ponteiros pertencentes a bibliotecas legítimas do Windows.
+5. **`luaclient_dll`:** Ponte de comunicação IPC com o interpretador Lua do frontend OnyxEngine.
+6. **`callstack_spoof`:** Evasor de heurísticas de análise de pilha (Callstack Walkers de antivírus, EDRs e agentes de monitoramento). Substitui o endereço de retorno no frame da thread por ponteiros pertencentes a bibliotecas legítimas do Windows.
 7. **`pe_strip`:** Limpa e zera os cabeçalhos PE de bibliotecas injetadas na memória do alvo para evitar detecção por varreduras de assinaturas de dumps.
 8. **`syscalls_indirect`:** Invocador de chamadas de sistema (syscalls) indiretas que salta diretamente para o opcode `syscall; ret` dentro da `ntdll.dll`, contornando ganchos usermode aplicados por soluções de EDR.
 9. **`taskmgr_cloak`:** Injeta stubs que mascaram a existência do processo na listagem da tabela de tarefas do sistema operacional.

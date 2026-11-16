@@ -45,7 +45,7 @@ O subsistema MCP opera sob dois modos de inicialização:
 - `memory_protect`: Altera as permissões de proteção de uma região de memória virtual (VirtualProtectEx).
 - `memory_query_regions`: Mapeia e lista as regiões de memória virtual (VAD / VirtualQueryEx) do processo alvo.
 
-### C. Varredura de Memória (Cheat Engine Scanner)
+### C. Varredura de Memória (OnyxEngine Memory Scanner)
 - `scanner_first_scan`: Executa a primeira varredura de memória (Exact, AOB, Float, String) em threads paralelas.
 - `scanner_next_scan`: Filtra os resultados da varredura anterior com nova condição (Exact, Increased, Decreased, Changed, Unchanged).
 - `scanner_get_results`: Retorna a lista de endereços e valores encontrados na varredura ativa.
@@ -56,7 +56,7 @@ O subsistema MCP opera sob dois modos de inicialização:
 - `pointer_scan`: Varredura reversa de ponteiros multi-nível para encontrar caminhos estáveis até o endereço alvo.
 
 ### E. Scripting AutoAssembler
-- `aa_validate_script`: Valida sintaxe e semântica de script AutoAssembler do Cheat Engine (`[ENABLE]`, `[DISABLE]`, `alloc`, `registersymbol`).
+- `aa_validate_script`: Valida sintaxe e semântica de script AutoAssembler do OnyxEngine (`[ENABLE]`, `[DISABLE]`, `alloc`, `registersymbol`).
 - `aa_execute_script`: Compila e executa script AutoAssembler aplicando hooks, alocações de memória e patches no processo.
 
 ### F. Congelamento de Valores (Memory Freezer)
@@ -90,12 +90,12 @@ O subsistema MCP opera sob dois modos de inicialização:
 - `kernel_connect`: Estabelece conexão direta com o driver Ring-0 OnyxDriver / OwMemDriver.
 - `kernel_read_cr3`: Lê memória física direta do processo através da tradução de tabela de páginas CR3 em Ring-0.
 - `kernel_write_cr3`: Grava na memória física direta através de Ring-0 contornando proteções virtuais de página.
-- `kernel_strip_callbacks`: Desvincula callbacks ObRegisterCallbacks de processo/thread no kernel para cegar anticheats e EDRs.
+- `kernel_strip_callbacks`: Desvincula callbacks ObRegisterCallbacks de processo/thread no kernel para cegar drivers de monitoramento e EDRs.
 - `kernel_hide_process`: Oculta o processo alvo via Direct Kernel Object Manipulation (DKOM) desvinculando de ActiveProcessLinks.
 
 ### L. Injeção e Manipulação de Clock
 - `inject_dll`: Injeta uma DLL no processo alvo via CreateRemoteThread + LoadLibraryW.
-- `speedhack_set_speed`: Ativa e ajusta a velocidade do jogo/processo alvo através do multiplicador de tempo do speedhack.
+- `speedhack_set_speed`: Ativa e ajusta a velocidade do processo alvo através do multiplicador de tempo do speedhack.
 
 ### M. Diagnóstico e Sistema
 - `system_get_last_error`: Retorna o código do último erro diagnosticado pelo OnyxEngine acompanhado da mensagem explicativa no idioma ativo (PT-BR).

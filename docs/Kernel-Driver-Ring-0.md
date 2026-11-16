@@ -2,7 +2,7 @@
 
 ## 1. Visão Geral
 
-O **OwMemDriver.sys** (também integrado como **OnyxDriver**) é o subsistema de kernel Ring-0 do OnyxEngine, desenvolvido em C nativo e x64 Assembly com o Windows Driver Kit (WDK). Ele é responsável por fornecer operações privilegiadas de memória física e hardware que não podem ser executadas a partir do usermode (Ring-3), permitindo ao OnyxEngine inspecionar e manipular processos protegidos por mecanismos modernos de segurança de sistemas operacionais e anti-cheats (como EAC, BattlEye, Vanguard e EDRs corporativos).
+O **OwMemDriver.sys** (também integrado como **OnyxDriver**) é o subsistema de kernel Ring-0 do OnyxEngine, desenvolvido em C nativo e x64 Assembly com o Windows Driver Kit (WDK). Ele é responsável por fornecer operações privilegiadas de memória física e hardware que não podem ser executadas a partir do usermode (Ring-3), permitindo ao OnyxEngine inspecionar e manipular processos protegidos por mecanismos modernos de segurança de sistemas operacionais e soluções de segurança avançadas e EDRs corporativos.
 
 ---
 
@@ -39,7 +39,7 @@ O **OwMemDriver.sys** (também integrado como **OnyxDriver**) é o subsistema de
 ## 3. Principais Subsistemas do Driver
 
 ### 3.1 Tradução Física Direta e Paginação CR3 (`physmem.c`)
-- **Desvio de Hooks Usermode**: Não utiliza APIs como `NtReadVirtualMemory` ou `ReadProcessMemory`, que são monitoradas por EDRs e anti-cheats.
+- **Desvio de Hooks Usermode**: Não utiliza APIs como `NtReadVirtualMemory` ou `ReadProcessMemory`, que são monitoradas por EDRs e drivers de proteção de integridade.
 - **Caminhada de Tabelas de Páginas**: A partir do ponteiro `CR3` (Directory Table Base) do `EPROCESS` alvo, o driver resolve o endereço virtual em endereço físico através da hierarquia de paginação de 4 níveis do x86_64:
   $$\text{Virtual Address} \longrightarrow \text{PML4} \longrightarrow \text{PDPT} \longrightarrow \text{PD} \longrightarrow \text{PT} \longrightarrow \text{Physical Frame}$$
 - **Mapeamento Seguro**: Utiliza `MmMapIoSpaceEx` com verificações estritas de limites e tratamento de exceções estruturadas (SEH), prevenindo Blue Screen of Death (BSOD) em acessos a páginas inválidas.
@@ -87,7 +87,7 @@ ULONG64 TranslateVirtualToPhysical(ULONG64 cr3, ULONG64 virtualAddress)
 ```
 
 ### 3.2 Evasão e Desvinculação de ObRegisterCallbacks (`callbacks.c`)
-- Sistemas anticheat usam `ObRegisterCallbacks` para interceptar tentativas de obtenção de handles para processos de jogos via `NtOpenProcess`, reduzindo privilégios para `PROCESS_QUERY_LIMITED_INFORMATION`.
+- Drivers de segurança usam `ObRegisterCallbacks` para interceptar tentativas de obtenção de handles para processos protegidos via `NtOpenProcess`, reduzindo privilégios para `PROCESS_QUERY_LIMITED_INFORMATION`.
 - O driver localiza dinamicamente as listas internas não documentadas do kernel:
   - `ObpProcessCallbackList`
   - `ObpThreadCallbackList`
@@ -155,7 +155,7 @@ ULONG StripProcessAndThreadCallbacks(ULONG Mode)
 
 ### 3.4 Furtividade e Limpeza de Rastros (`stealth.c`)
 Para evitar detecções de carregamento de drivers manuais ou sem assinatura:
-- **Limpeza de PiDDBCacheTable**: Remove a entrada do driver do cache de executáveis incompatíveis verificado por anticheats.
+- **Limpeza de PiDDBCacheTable**: Remove a entrada do driver do cache de executáveis incompatíveis verificado por drivers de segurança e EDRs.
 - **Desvinculação de MmUnloadedDrivers**: Purga o registro de descarga de driver da lista do kernel para impedir auditoria retroativa.
 - **Limpeza de KernelHashBucketList**: Remove hashes de certificados residuais gerados pelo carregador do Windows.
 

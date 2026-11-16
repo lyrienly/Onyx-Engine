@@ -31,18 +31,13 @@ function Build-Package {
     New-Item -ItemType Directory -Path (Join-Path $PkgDir "modules\injections") -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $PkgDir "plugins") -Force | Out-Null
 
-    # 1. Main Executables
+    # 1. Main Executables (Pascal / Lazarus Native UI)
     $LazarusExe = Join-Path $RootDir "UI\bin\$ExeName"
     if (Test-Path $LazarusExe) {
         Copy-Item -Path $LazarusExe -Destination (Join-Path $PkgDir "OnyxEngine-CE.exe") -Force
         Copy-Item -Path $LazarusExe -Destination (Join-Path $PkgDir $ExeName) -Force
     } else {
         Write-Warning "Lazarus binary not found at $LazarusExe"
-    }
-
-    $RustGuiExe = Join-Path $RootDir "target\$TargetTriple\release\OnyxEngine.exe"
-    if (Test-Path $RustGuiExe) {
-        Copy-Item -Path $RustGuiExe -Destination (Join-Path $PkgDir "OnyxEngine-Rust.exe") -Force
     }
 
     # 2. Core Rust Engine DLLs

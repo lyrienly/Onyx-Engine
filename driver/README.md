@@ -21,7 +21,7 @@ Driver de kernel dedicado para o **OnyxEngine**, projetado para alto desempenho,
 ### 3. Gestão Furtiva de ObRegisterCallbacks
 - No momento em que `IOCTL_CE_OPENPROCESS` é executado, o driver desliga temporariamente os ponteiros `PreOperation` de callbacks registrados (`StripProcessCallbacks(FALSE)`).
 - Logo após a chamada `ObOpenObjectByPointer` criar a handle com `PROCESS_ALL_ACCESS`, os callbacks são restaurados (`StripProcessCallbacks(TRUE)`).
-- Impede que drivers de anti-cheat (Easy Anti-Cheat, BattlEye, Vanguard) façam downgrade de direitos da handle ou bloqueiem a abertura do processo.
+- Impede que drivers de proteção e segurança (EDRs, agentes de monitoramento) façam downgrade de direitos da handle ou bloqueiem a abertura do processo.
 
 ### 4. Ocultação de Processo via Kernel (DKOM)
 - Função `HideProcessByPid(pid)` que localiza o `EPROCESS` e desvincula a entrada do processo da lista duplamente encadeada `ActiveProcessLinks`.

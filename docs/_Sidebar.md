@@ -5,7 +5,7 @@
 * [[Referência C-ABI, FFI & Structs|C-ABI-FFI-Reference]]
 
 ### Tutoriais & Prática de Engenharia Reversa
-* [[Tutorial Prático: Criando seu Primeiro Trainer|Tutorial-Reversing-First-Game]]
+* [[Tutorial Prático: Engenharia Reversa e Instrumentação de Processos|Tutorial-Reversing-First-Game]]
 * [[Engenharia Reversa de Unreal Engine 4 & 5|Unreal-Engine-Dissector]]
 
 ### Motores de Memória & Análise
@@ -16,7 +16,7 @@
 
 ### Stealth, Injeções & Kernel Ring-0
 * [[Módulos de Stealth & Injeções|Stealth-Injections-Hooks]]
-* [[Evasão Avançada de Anticheats & Ring-0|Anticheat-Bypass-Deep-Dive]]
+* [[Evasão Avançada de Sistemas de Proteção & Ring-0|Anticheat-Bypass-Deep-Dive]]
 * [[Driver Ring-0 e Evasão Kernel|Kernel-Driver-Ring0]]
 
 ### Automação & Inteligência Artificial

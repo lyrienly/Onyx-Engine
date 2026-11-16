@@ -1,6 +1,6 @@
 # Bem-vindo à Wiki Oficial do OnyxEngine
 
-O **OnyxEngine** é uma plataforma profissional de engenharia reversa, análise dinâmica de memória e instrumentação de processos x86_64 para sistemas Windows. O projeto moderniza a fundação clássica do Cheat Engine, substituindo implementações monolíticas e código legado por uma **arquitetura híbrida desacoplada em 25 bibliotecas nativas em Rust**, integradas a uma interface gráfica reformulada em Free Pascal / Lazarus, um driver de modo kernel Ring-0 (`OwMemDriver.sys`) e um servidor nativo compatível com o **Model Context Protocol (MCP)** para controle autônomo por agentes de Inteligência Artificial.
+O **OnyxEngine** é uma plataforma profissional de engenharia reversa, análise dinâmica de memória e instrumentação de processos x86_64 para sistemas Windows. O projeto moderniza a fundação clássica de ferramentas de análise de memória, substituindo implementações monolíticas e código legado por uma **arquitetura híbrida desacoplada em 25 bibliotecas nativas em Rust**, integradas a uma interface gráfica reformulada em Free Pascal / Lazarus, um driver de modo kernel Ring-0 (`OwMemDriver.sys`) e um servidor nativo compatível com o **Model Context Protocol (MCP)** para controle autônomo por agentes de Inteligência Artificial.
 
 ---
 
@@ -57,11 +57,11 @@ O OnyxEngine separa rigidamente **apresentação gráfica**, **lógica de escane
 A Wiki está estruturada em módulos detalhados para engenheiros reversos, pesquisadores de segurança e desenvolvedores de automação:
 
 ### Tutoriais Práticos & Aplicação Real
-* **[[Tutorial Prático: Criando seu Primeiro Trainer|Tutorial-Reversing-First-Game]]**: Guia completo do zero: anexação, varredura SIMD, detecção com breakpoints de hardware (DR0-DR3), resolução de ponteiros estáticos, criação de script AutoAssembler e automação remota por IA via MCP.
+* **[[Tutorial Prático: Engenharia Reversa e Instrumentação de Processos|Tutorial-Reversing-First-Game]]**: Guia completo do zero: anexação, varredura SIMD, detecção com breakpoints de hardware (DR0-DR3), resolução de ponteiros estáticos, criação de script AutoAssembler e automação remota por IA via MCP.
 * **[[Engenharia Reversa de Unreal Engine 4 & 5|Unreal-Engine-Dissector]]**: Arquitetura interna da Unreal Engine (`GObjects`, `FNamePool`, `UWorld`, `APlayerController`), dissecação de classes C++, extração da matriz de ossos esqueléticos (`BoneMatrix`) para ESP/Aimbot e geração de SDK.
 
-### Anticheats, Stealth & Kernel Ring-0
-* **[[Evasão Avançada de Anticheats & Ring-0|Anticheat-Bypass-Deep-Dive]]**: Análise do modelo de ameaças de Vanguard, EAC, BattlEye e Ricochet. Implementação técnica de Callstack Spoofing, Syscalls Indiretas (Halo's Gate), Manual Mapping com expurgo de cabeçalhos PE e neutralização de `ObRegisterCallbacks`.
+### Evasão, Stealth & Kernel Ring-0
+* **[[Evasão Avançada de Sistemas de Proteção & Ring-0|Anticheat-Bypass-Deep-Dive]]**: Análise do modelo de ameaças de drivers de proteção de sistema e agentes EDR. Implementação técnica de Callstack Spoofing, Syscalls Indiretas (Halo's Gate), Manual Mapping com expurgo de cabeçalhos PE e neutralização de `ObRegisterCallbacks`.
 * **[[Módulos de Stealth & Injeções|Stealth-Injections-Hooks]]**: Especificação dos módulos `onyx_dll_mapper`, `pe_strip`, `callstack_spoof`, `syscalls_indirect`, `taskmgr_cloak`, `vehdebug_dll` e `speedhack_dll`.
 * **[[Driver Ring-0 e Evasão Kernel|Kernel-Driver-Ring-0]]**: Paginação física x86_64 a partir do registrador `CR3` ($\text{PML4} \rightarrow \text{PDPT} \rightarrow \text{PD} \rightarrow \text{PT}$), manipulação DKOM em `ActiveProcessLinks` e gravação de execução de CPU via Intel Processor Trace (Intel PT).
 

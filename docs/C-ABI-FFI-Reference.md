@@ -18,7 +18,7 @@ A comunicação entre a casca gráfica em **Free Pascal / Lazarus** (`UI/OnyxBac
 #pragma pack(push, 8)
 typedef struct _PROCESS_INFO_ENTRY {
     uint32_t process_id;            // PID numérico do processo
-    char     process_name[260];     // Nome do executável (ex: "game.exe")
+    char     process_name[260];     // Nome do executável (ex: "target_app.exe")
     uint64_t base_address;          // Endereço de carregamento do módulo principal
     uint64_t image_size;            // Tamanho em bytes da imagem PE na memória
     uint32_t is_64bit;              // 1 se x64, 0 se WoW64 / 32-bit

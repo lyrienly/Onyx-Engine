@@ -2,7 +2,7 @@
 
 ## 1. Visão Geral
 
-Grande parte dos jogos contemporâneos é desenvolvida sobre motores como **Unity** ou frameworks **.NET (C# / F#)**. Em processos gerenciados, o código executável não reside estaticamente em arquivos binários compilados diretamente para código de máquina; em vez disso, ele é empacotado em bytecode intermediário (CIL - Common Intermediate Language) e compilado dinamicamente para código nativo em tempo de execução (**JIT - Just-In-Time Compilation**).
+Grande parte das aplicações contemporâneas é desenvolvida sobre motores como **Unity** ou frameworks **.NET (C# / F#)**. Em processos gerenciados, o código executável não reside estaticamente em arquivos binários compilados diretamente para código de máquina; em vez disso, ele é empacotado em bytecode intermediário (CIL - Common Intermediate Language) e compilado dinamicamente para código nativo em tempo de execução (**JIT - Just-In-Time Compilation**).
 
 O OnyxEngine possui módulos nativos dedicados à instrumentação de runtimes gerenciados:
 * **`onyx_mono.dll`**: Inspetor de runtimes Mono Classic e Unity Engine.
@@ -13,7 +13,7 @@ O OnyxEngine possui módulos nativos dedicados à instrumentação de runtimes g
 
 ## 2. Inspeção de Runtimes Mono / Unity (`onyx_mono.dll`)
 
-Em jogos Unity que utilizam a backend Mono (`mono.dll` ou `mono-2.0-bdwgc.dll`), o `onyx_mono.dll` conecta-se às estruturas internas do runtime gerenciado exportadas pelo processo:
+Em aplicações Unity que utilizam a backend Mono (`mono.dll` ou `mono-2.0-bdwgc.dll`), o `onyx_mono.dll` conecta-se às estruturas internas do runtime gerenciado exportadas pelo processo:
 
 ```text
 +---------------------------------------------------------------------------------+
@@ -62,7 +62,7 @@ O **`onyx_mono_hook.dll`** resolve essa questão:
 
 ## 4. Instrumentação de .NET Moderno e CoreCLR (`onyx_dotnet.dll`)
 
-Para aplicações e jogos que utilizam .NET Framework moderno ou .NET Core 6/7/8/9:
+Para aplicações e softwares que utilizam .NET Framework moderno ou .NET Core 6/7/8/9:
 - O módulo localiza as bibliotecas de execução `clr.dll` ou `coreclr.dll`.
 - Utiliza a biblioteca auxiliar de acesso a dados do compilador (**DAC - Data Access Component** / `mscordacwks.dll`).
 - Percorre a tabela de métodos (**MethodTable**) e o objeto **EEClass** para mapear instâncias ativas no garbage collector (GC Heap), permitindo rastrear objetos vivos sem que os ponteiros fiquem obsoletos após coletas de lixo do .NET.

@@ -2,9 +2,9 @@
 
 ## 1. O Problema do Endereçamento Dinâmico
 
-Em jogos e aplicações modernas para x86_64, objetos críticos como a estrutura do jogador (`LocalPlayer`), inventários e tabelas de entidades residem em memória de alocação dinâmica (**Heap / VirtualAlloc**) e têm seus endereços base aleatorizados pelo sistema operacional a cada inicialização (**ASLR - Address Space Layout Randomization**).
+Em aplicações modernas para x86_64, objetos críticos como estruturas de contexto principal, inventários e tabelas de entidades residem em memória de alocação dinâmica (**Heap / VirtualAlloc**) e têm seus endereços base aleatorizados pelo sistema operacional a cada inicialização (**ASLR - Address Space Layout Randomization**).
 
-Como consequência, um endereço de memória estático obtido em uma sessão torna-se inválido na sessão seguinte. Para contornar essa limitação de forma permanente, o OnyxEngine utiliza o módulo **`onyx_pointer.dll`** para identificar **cadeias de ponteiros multinível** que conectam um endereço estático do módulo executável principal (ex: `game.exe + 0x1A2B3C`) até o endereço dinâmico da variável desejada.
+Como consequência, um endereço de memória estático obtido em uma sessão torna-se inválido na sessão seguinte. Para contornar essa limitação de forma permanente, o OnyxEngine utiliza o módulo **`onyx_pointer.dll`** para identificar **cadeias de ponteiros multinível** que conectam um endereço estático do módulo executável principal (ex: `target_app.exe + 0x1A2B3C`) até o endereço dinâmico da variável desejada.
 
 ---
 
@@ -75,7 +75,7 @@ O `onyx_pointer.dll` emprega o algoritmo de **Varredura Reversa com Mapa de Pont
 2. **Poda de Ramos Cíclicos**: Caminhos que referenciam estruturas circulares de dados (listas encadeadas em que $A \rightarrow B \rightarrow A$) são abortados imediatamente para evitar loops infinitos.
 3. **Rescan Multi-Sessão**:
    - Um scan inicial pode encontrar 500.000 caminhos possíveis.
-   - Ao reiniciar o jogo ou mudar de fase, o endereço da variável muda para um novo valor.
+   - Ao reiniciar o processo ou recarregar módulos, o endereço da variável muda para um novo valor.
    - O comando de **Rescan** testa cada uma das 500.000 cadeias salvas contra o novo endereço alvo, descartando ponteiros que apontam para lixo e filtrando até restar apenas **1 a 5 caminhos verdadeiros**.
 
 ### 4.1 Algoritmo de Expansão de Frente de Onda (`scan_wavefront`)

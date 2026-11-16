@@ -8,7 +8,7 @@ O OnyxEngine adota um modelo em camadas desacoplado, projetado para garantir est
 +-------------------------------------------------------------------------+
 |                       Interface Gráfica (GUI)                          |
 |  - Lazarus / Free Pascal (UI/OnyxBackend.pas, MainUnit.pas, Form...)    |
-|  - Cheat Engine 7.7 GUI modificada e desvinculada de rotinas legacy    |
+|  - Frontend nativo modificado e desvinculada de rotinas legacy    |
 +------------------------------------+------------------------------------+
                                      |
                                      | C-ABI Export (stdcall / cdecl)

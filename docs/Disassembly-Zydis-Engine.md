@@ -4,7 +4,7 @@
 
 A engenharia reversa e a criação de patches em tempo real no OnyxEngine são sustentadas por dois módulos centrais escritos em Rust:
 * **`onyx_disasm.dll`**: Motor de desmontagem de instruções de máquina x86 e x86_64 de ultra-alta velocidade baseado no decodificador **Zydis**.
-* **`onyx_aa.dll`**: Compilador JIT de scripts de montagem de dois passos (**AutoAssembler**), compatível com a sintaxe clássica do Cheat Engine, capaz de alocar code caves, resolver símbolos e injetar trampolins em tempo de execução.
+* **`onyx_aa.dll`**: Compilador JIT de scripts de montagem de dois passos (**AutoAssembler**), compatível com a sintaxe clássica de scripts de montagem, capaz de alocar code caves, resolver símbolos e injetar trampolins em tempo de execução.
 
 ---
 
@@ -125,14 +125,14 @@ pub fn disassemble(bytes: &[u8], base_addr: u64) -> Vec<Instruction> {
 
 ## 3. O Compilador AutoAssembler (`onyx_aa.dll`)
 
-O **AutoAssembler** é o padrão da indústria para criação de trainers e modificações de código na memória de jogos. Um script é composto por seções de ativação (`[ENABLE]`) e desativação (`[DISABLE]`), garantindo que qualquer alteração possa ser desfeita de forma limpa.
+O **AutoAssembler** é amplamente utilizado para instrumentação dinâmica, aplicação de hot-patches e modificações de código em memória de processos. Um script é composto por seções de ativação (`[ENABLE]`) e desativação (`[DISABLE]`), garantindo que qualquer alteração possa ser desfeita de forma limpa.
 
 ### 3.1 Exemplo de Script de Hook (Detour Code Cave)
 
 ```assembly
 [ENABLE]
 // Aloca 1024 bytes de memória executável próxima ao módulo alvo
-alloc(newmem, 1024, "game.exe"+0x45A120)
+alloc(newmem, 1024, "target_app.exe"+0x45A120)
 label(returnhere)
 label(originalcode)
 
@@ -148,14 +148,14 @@ originalcode:
   mov eax, [rbx+0x44]
   jmp returnhere
 
-"game.exe"+0x45A120:
+"target_app.exe"+0x45A120:
   // Salto para o code cave criado
   jmp newmem
 returnhere:
 
 [DISABLE]
 // Restaura os bytes originais da função
-"game.exe"+0x45A120:
+"target_app.exe"+0x45A120:
   mov eax, [rbx+0x44]
 
 // Libera a memória alocada e limpa símbolos
